@@ -1,0 +1,18 @@
+{
+  "venvPath": ".",
+  "venv": "venv",
+  "pythonVersion": "3.12",
+  "typeCheckingMode": "basic",
+  "reportMissingImports": "warning",
+  "reportMissingTypeStubs": false,
+  "pythonPlatform": "Linux",
+  "executionEnvironments": [
+    {
+      "root": "src",
+      "pythonVersion": "3.12",
+      "pythonPlatform": "Linux",
+      "extraPaths": []
+    }
+  ]
+}
+
