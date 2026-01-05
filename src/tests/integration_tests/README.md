@@ -4,6 +4,25 @@
 
 Integration tests verify that multiple components work together correctly. They test the interaction between different parts of the SDK, including external services like databases and LLM providers.
 
+## Test Files
+
+### Component Integration Tests
+
+- **`test_agent_rag_integration.py`**: Tests integration between Agent Framework and RAG system
+  - Agent using RAG for querying
+  - RAG ingestion followed by agent query
+  
+- **`test_api_agent_integration.py`**: Tests integration between API Backend and Agent Framework
+  - API service with agent
+  - Agent task execution via API
+
+### End-to-End Tests
+
+- **`test_end_to_end_workflows.py`**: Tests complete workflows from start to finish
+  - Complete Q&A workflow
+  - Agent with RAG workflow
+  - Multi-component integration scenarios
+
 ## Purpose
 
 Integration tests ensure:

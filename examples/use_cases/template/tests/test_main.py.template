@@ -1,0 +1,61 @@
+"""
+Unit Tests for [Use Case Name]
+
+Tests the main use case implementation.
+"""
+
+import pytest
+from unittest.mock import Mock, MagicMock, patch
+from main import UseCaseClass
+from models import UseCaseRequest, UseCaseResponse
+
+
+class TestUseCaseClass:
+    """Test UseCaseClass."""
+    
+    @pytest.fixture
+    def mock_components(self):
+        """Create mock components."""
+        mock_gateway = MagicMock()
+        mock_observability = MagicMock()
+        
+        usecase = UseCaseClass(
+            gateway=mock_gateway,
+            observability=mock_observability
+        )
+        
+        return usecase, mock_gateway, mock_observability
+    
+    @pytest.mark.asyncio
+    async def test_execute_success(self, mock_components):
+        """Test successful execution."""
+        usecase, mock_gateway, mock_observability = mock_components
+        
+        request = UseCaseRequest(id="test-001", data="test data")
+        
+        # TODO: Mock component responses
+        # mock_gateway.generate.return_value = ...
+        
+        result = await usecase.execute(request)
+        
+        assert isinstance(result, UseCaseResponse)
+        assert result.id == request.id
+        # Add more assertions
+    
+    @pytest.mark.asyncio
+    async def test_execute_error(self, mock_components):
+        """Test error handling."""
+        usecase, mock_gateway, mock_observability = mock_components
+        
+        request = UseCaseRequest(id="test-001", data="test data")
+        
+        # Mock error
+        mock_gateway.generate.side_effect = Exception("Gateway error")
+        
+        with pytest.raises(Exception):
+            await usecase.execute(request)
+
+
+if __name__ == "__main__":
+    pytest.main([__file__, "-v"])
+

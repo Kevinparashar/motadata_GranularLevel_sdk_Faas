@@ -137,3 +137,22 @@ The RAG system implements error handling for:
 4. **Similarity Threshold Tuning**: Adjust similarity thresholds to balance recall and precision
 5. **Context Length Management**: Consider token limits when building context from retrieved documents
 6. **Caching Strategy**: Implement caching for frequently accessed documents and queries
+
+## Examples and Tests
+
+### Working Examples
+
+See the following examples for RAG system usage:
+
+- **Basic RAG Example**: `examples/basic_usage/09_rag_basic.py` - Basic RAG operations including document ingestion and querying
+- **Agent with RAG**: `examples/integration/agent_with_rag.py` - Integration example showing agent using RAG for context
+- **Complete Q&A System**: `examples/end_to_end/complete_qa_system.py` - End-to-end example with RAG system
+
+### Tests
+
+- **Unit Tests**: `src/tests/unit_tests/test_rag.py` - Comprehensive unit tests for RAG components
+- **Integration Tests**: `src/tests/integration_tests/test_agent_rag_integration.py` - Agent-RAG integration tests
+
+For more examples and test documentation, see:
+- `examples/README.md` - Complete examples documentation
+- `src/tests/unit_tests/README.md` - Unit tests documentation

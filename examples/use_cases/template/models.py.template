@@ -1,0 +1,26 @@
+"""
+Data Models
+
+Pydantic models for request/response data.
+"""
+
+from pydantic import BaseModel, Field
+from typing import Optional, List, Dict, Any
+from datetime import datetime
+
+
+class UseCaseRequest(BaseModel):
+    """Use case request model."""
+    id: str = Field(..., description="Request identifier")
+    data: str = Field(..., description="Request data")
+    metadata: Optional[Dict[str, Any]] = Field(default=None, description="Additional metadata")
+    timestamp: datetime = Field(default_factory=datetime.now, description="Request timestamp")
+
+
+class UseCaseResponse(BaseModel):
+    """Use case response model."""
+    id: str = Field(..., description="Response identifier")
+    result: str = Field(..., description="Result data")
+    metadata: Optional[Dict[str, Any]] = Field(default=None, description="Additional metadata")
+    timestamp: datetime = Field(default_factory=datetime.now, description="Response timestamp")
+

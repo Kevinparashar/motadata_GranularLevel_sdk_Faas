@@ -1,0 +1,48 @@
+# [Use Case Name] - Architecture
+
+## Overview
+
+Architecture documentation for [Use Case Name].
+
+## Component Diagram
+
+```
+[User/System]
+    │
+    ▼
+[API Layer] (if applicable)
+    │
+    ▼
+[Use Case Implementation]
+    │
+    ├─→ [SDK Component 1]
+    ├─→ [SDK Component 2]
+    └─→ [SDK Component 3]
+```
+
+## Data Flow
+
+1. **Input**: [Describe input]
+2. **Processing**: [Describe processing steps]
+3. **Output**: [Describe output]
+
+## Component Interactions
+
+- **Component 1** → **Component 2**: [Purpose]
+- **Component 2** → **Component 3**: [Purpose]
+
+## Error Handling
+
+- **Error Type 1**: [Handling strategy]
+- **Error Type 2**: [Handling strategy]
+
+## Performance Considerations
+
+- **Bottlenecks**: [Identify bottlenecks]
+- **Optimizations**: [Optimization strategies]
+
+## Scalability
+
+- **Horizontal Scaling**: [How to scale]
+- **Vertical Scaling**: [How to scale]
+

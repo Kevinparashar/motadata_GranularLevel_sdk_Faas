@@ -1,0 +1,26 @@
+"""
+Integration Tests for [Use Case Name]
+
+Tests component integration and end-to-end workflows.
+"""
+
+import pytest
+from main import UseCaseClass
+from models import UseCaseRequest
+
+
+@pytest.mark.integration
+class TestUseCaseIntegration:
+    """Integration tests for use case."""
+    
+    @pytest.mark.asyncio
+    async def test_complete_workflow(self):
+        """Test complete use case workflow."""
+        # TODO: Implement integration test
+        # Use real components (with test database/config)
+        pass
+
+
+if __name__ == "__main__":
+    pytest.main([__file__, "-v", "-m", "integration"])
+

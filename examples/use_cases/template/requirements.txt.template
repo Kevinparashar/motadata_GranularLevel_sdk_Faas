@@ -1,0 +1,10 @@
+# Use Case Specific Dependencies
+# Add any additional dependencies beyond the SDK requirements
+
+# SDK dependencies are inherited from parent requirements.txt
+# Add only use-case-specific packages here
+
+# Example:
+# fastapi>=0.100.0
+# uvicorn>=0.23.0
+

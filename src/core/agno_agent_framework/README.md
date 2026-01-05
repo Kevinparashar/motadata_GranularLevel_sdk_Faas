@@ -96,3 +96,24 @@ The framework is designed to be swappable with other agent frameworks (e.g., Lan
 3. **Error Recovery**: Implement robust error handling and recovery mechanisms for agent failures.
 4. **Resource Management**: Monitor agent resource usage, especially LLM API calls, to manage costs.
 5. **Observability**: Ensure all agent activities are logged and monitored for debugging and optimization.
+
+## Examples and Tests
+
+### Working Examples
+
+See the following examples for Agent Framework usage:
+
+- **Basic Agent Example**: `examples/basic_usage/07_agent_basic.py` - Basic agent operations including creation, session management, memory, and tools
+- **Agent with RAG**: `examples/integration/agent_with_rag.py` - Integration example showing agent using RAG for context
+- **API with Agent**: `examples/integration/api_with_agent.py` - REST API exposing agent functionality
+- **Complete Q&A System**: `examples/end_to_end/complete_qa_system.py` - End-to-end example with agent framework
+
+### Tests
+
+- **Unit Tests**: `src/tests/unit_tests/test_agent.py` - Comprehensive unit tests for agent components
+- **Integration Tests**: `src/tests/integration_tests/test_agent_rag_integration.py` - Agent-RAG integration tests
+- **Integration Tests**: `src/tests/integration_tests/test_api_agent_integration.py` - API-Agent integration tests
+
+For more examples and test documentation, see:
+- `examples/README.md` - Complete examples documentation
+- `src/tests/unit_tests/README.md` - Unit tests documentation

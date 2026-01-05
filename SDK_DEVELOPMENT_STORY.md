@@ -362,4 +362,41 @@ Application Layer:
 #### Documentation
 - **Platform Standards**: Ensure documentation follows established standards and is kept up-to-date
 
+---
+
+## Examples and Tests
+
+### Working Examples
+
+The SDK includes comprehensive working examples for all components:
+
+- **Basic Usage Examples**: `examples/basic_usage/` - 10 examples covering all components
+- **Integration Examples**: `examples/integration/` - Multi-component integration examples
+- **End-to-End Examples**: `examples/end_to_end/` - Complete workflow examples
+
+See `examples/README.md` for detailed documentation.
+
+### Test Suites
+
+The SDK includes comprehensive test suites:
+
+- **Unit Tests**: `src/tests/unit_tests/` - Tests for all 10 components
+- **Integration Tests**: `src/tests/integration_tests/` - Component integration tests
+- **End-to-End Tests**: `src/tests/integration_tests/test_end_to_end_workflows.py` - Complete workflow tests
+
+See `src/tests/unit_tests/README.md` and `src/tests/integration_tests/README.md` for detailed documentation.
+
+### Running Examples and Tests
+
+```bash
+# Run examples
+python examples/basic_usage/01_observability_basic.py
+
+# Run tests
+pytest src/tests/unit_tests/
+pytest src/tests/integration_tests/ -m integration
+```
+
+For complete documentation, see `EXAMPLES_AND_TESTS_SUMMARY.md`.
+
 

@@ -303,3 +303,25 @@ Start Trace
 5. **Optimization**: Cache frequently accessed data
 6. **Scalability**: Design for horizontal scaling
 
+## Examples and Tests
+
+### Working Examples
+
+See `examples/` directory for working code examples demonstrating these workflows:
+
+- **Basic Usage**: `examples/basic_usage/` - Examples for each component showing individual workflows
+- **Integration**: `examples/integration/` - Examples showing multi-component workflows
+- **End-to-End**: `examples/end_to_end/` - Complete workflow examples
+
+### Test Suites
+
+See `src/tests/` directory for comprehensive tests validating these workflows:
+
+- **Unit Tests**: `src/tests/unit_tests/` - Component-specific workflow tests
+- **Integration Tests**: `src/tests/integration_tests/` - Multi-component workflow tests
+
+For detailed examples and test documentation, see:
+- `examples/README.md` - Examples documentation
+- `src/tests/unit_tests/README.md` - Unit tests documentation
+- `src/tests/integration_tests/README.md` - Integration tests documentation
+

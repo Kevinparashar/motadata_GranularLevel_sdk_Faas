@@ -38,9 +38,51 @@ motadata-python-ai-sdk/
 │   ├── __init__.py
 │   └── README.md
 │
+├── examples/                     # Working code examples
+│   ├── README.md
+│   ├── USE_CASES_STRUCTURE.md   # Use cases structure guide
+│   ├── basic_usage/              # Basic component examples
+│   │   ├── 01_observability_basic.py
+│   │   ├── 02_pool_implementation_basic.py
+│   │   ├── 03_postgresql_database_basic.py
+│   │   ├── 04_connectivity_basic.py
+│   │   ├── 05_litellm_gateway_basic.py
+│   │   ├── 06_cache_basic.py
+│   │   ├── 07_agent_basic.py
+│   │   ├── 08_prompt_context_basic.py
+│   │   ├── 09_rag_basic.py
+│   │   └── 10_api_backend_basic.py
+│   ├── integration/              # Integration examples
+│   │   ├── agent_with_rag.py
+│   │   └── api_with_agent.py
+│   ├── end_to_end/              # End-to-end workflows
+│   │   └── complete_qa_system.py
+│   └── use_cases/               # Real-world use cases
+│       ├── README.md            # Use cases index
+│       ├── template/            # Template for new use cases
+│       │   ├── README.md.template
+│       │   ├── main.py.template
+│       │   ├── config.py.template
+│       │   ├── models.py.template
+│       │   ├── requirements.txt.template
+│       │   ├── .env.example.template
+│       │   ├── tests/
+│       │   └── docs/
+│       └── [use_case_name]/     # Individual use cases
+│           ├── README.md
+│           ├── main.py
+│           ├── config.py
+│           ├── models.py
+│           ├── requirements.txt
+│           ├── .env.example
+│           ├── tests/
+│           └── docs/
+│
 ├── README.md                     # Main documentation
 ├── README_DEVELOPER.md          # Developer guide
-└── PROJECT_STRUCTURE.md         # This file
+├── PROJECT_STRUCTURE.md         # This file
+├── EXAMPLES_AND_TESTS_SUMMARY.md # Examples and tests summary
+└── SDK_DEVELOPMENT_STORY.md     # Development story
 ```
 
 ## Component Locations
@@ -63,8 +105,27 @@ Infrastructure components are at the root level:
 - `governance_framework/` - Governance and policies
 
 ### Tests (src/tests/)
-- `unit_tests/` - Unit tests
+- `unit_tests/` - Unit tests for all components
+  - `test_observability.py` - Observability tests
+  - `test_pool_implementation.py` - Pool tests
+  - `test_postgresql_database.py` - Database tests
+  - `test_litellm_gateway.py` - Gateway tests
+  - `test_cache.py` - Cache tests
+  - `test_agent.py` - Agent tests
+  - `test_rag.py` - RAG tests
 - `integration_tests/` - Integration tests
+  - `test_agent_rag_integration.py` - Agent-RAG integration
+  - `test_api_agent_integration.py` - API-Agent integration
+  - `test_end_to_end_workflows.py` - End-to-end workflows
+
+### Examples (examples/)
+- `basic_usage/` - Working examples for each component (10 examples)
+- `integration/` - Multi-component integration examples (2 examples)
+- `end_to_end/` - Complete workflow examples (1 example)
+- `use_cases/` - Real-world use case implementations
+  - `template/` - Template for creating new use cases
+  - `[use_case_name]/` - Individual use cases (snake_case naming)
+    - Standard structure: README.md, main.py, config.py, models.py, tests/, docs/
 
 ## Import Paths
 

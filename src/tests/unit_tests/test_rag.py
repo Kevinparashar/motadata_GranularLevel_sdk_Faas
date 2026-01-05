@@ -1,0 +1,215 @@
+"""
+Unit Tests for RAG Component
+
+Tests document processing, retrieval, and generation.
+"""
+
+import pytest
+from unittest.mock import Mock, MagicMock, patch
+from src.core.rag import RAGSystem
+from src.core.rag.document_processor import DocumentProcessor, DocumentChunk
+from src.core.rag.retriever import Retriever
+from src.core.rag.generator import RAGGenerator
+
+
+class TestDocumentProcessor:
+    """Test DocumentProcessor."""
+    
+    def test_chunk_document(self):
+        """Test document chunking."""
+        processor = DocumentProcessor()
+        
+        content = "This is a test document. " * 100
+        chunks = processor.chunk_document(
+            content=content,
+            document_id="doc-001",
+            chunk_size=100
+        )
+        
+        assert len(chunks) > 0
+        assert all(isinstance(chunk, DocumentChunk) for chunk in chunks)
+    
+    def test_chunk_with_overlap(self):
+        """Test chunking with overlap."""
+        processor = DocumentProcessor()
+        
+        content = "Test content " * 50
+        chunks = processor.chunk_document(
+            content=content,
+            document_id="doc-001",
+            chunk_size=50,
+            overlap=10
+        )
+        
+        assert len(chunks) > 0
+
+
+class TestRetriever:
+    """Test Retriever."""
+    
+    @pytest.fixture
+    def mock_retriever(self):
+        """Mock retriever with dependencies."""
+        mock_vector_ops = MagicMock()
+        mock_gateway = MagicMock()
+        
+        mock_vector_ops.similarity_search.return_value = [
+            {"id": 1, "document_id": 1, "content": "Test content", "similarity": 0.95}
+        ]
+        
+        mock_embedding_response = MagicMock()
+        mock_embedding_response.embeddings = [[0.1] * 1536]
+        mock_gateway.embed.return_value = mock_embedding_response
+        
+        retriever = Retriever(
+            vector_ops=mock_vector_ops,
+            gateway=mock_gateway,
+            embedding_model="text-embedding-3-small"
+        )
+        
+        return retriever, mock_vector_ops, mock_gateway
+    
+    def test_retrieve(self, mock_retriever):
+        """Test document retrieval."""
+        retriever, mock_vector_ops, mock_gateway = mock_retriever
+        
+        results = retriever.retrieve(
+            query="Test query",
+            top_k=5,
+            threshold=0.7
+        )
+        
+        assert len(results) == 1
+        assert results[0]["similarity"] == 0.95
+        mock_gateway.embed.assert_called_once()
+
+
+class TestRAGGenerator:
+    """Test RAGGenerator."""
+    
+    @pytest.fixture
+    def mock_generator(self):
+        """Mock generator with gateway."""
+        mock_gateway = MagicMock()
+        mock_response = MagicMock()
+        mock_response.text = "Generated answer"
+        mock_gateway.generate.return_value = mock_response
+        
+        generator = RAGGenerator(
+            gateway=mock_gateway,
+            model="gpt-4"
+        )
+        
+        return generator, mock_gateway
+    
+    def test_generate(self, mock_generator):
+        """Test response generation."""
+        generator, mock_gateway = mock_generator
+        
+        context_docs = [
+            {"content": "Context document 1"},
+            {"content": "Context document 2"}
+        ]
+        
+        answer = generator.generate(
+            query="Test question",
+            context_documents=context_docs,
+            max_tokens=200
+        )
+        
+        assert answer == "Generated answer"
+        mock_gateway.generate.assert_called_once()
+
+
+class TestRAGSystem:
+    """Test RAGSystem."""
+    
+    @pytest.fixture
+    def mock_rag_system(self):
+        """Mock RAG system with dependencies."""
+        mock_db = MagicMock()
+        mock_gateway = MagicMock()
+        
+        # Mock database operations
+        mock_db.execute_query.return_value = {"id": 1}
+        
+        # Mock embedding response
+        mock_embedding_response = MagicMock()
+        mock_embedding_response.embeddings = [[0.1] * 1536]
+        mock_gateway.embed.return_value = mock_embedding_response
+        
+        # Mock generation response
+        mock_gen_response = MagicMock()
+        mock_gen_response.text = "Generated answer"
+        mock_gateway.generate.return_value = mock_gen_response
+        
+        rag = RAGSystem(
+            db=mock_db,
+            gateway=mock_gateway,
+            embedding_model="text-embedding-3-small",
+            generation_model="gpt-4"
+        )
+        
+        return rag, mock_db, mock_gateway
+    
+    def test_ingest_document(self, mock_rag_system):
+        """Test document ingestion."""
+        rag, mock_db, mock_gateway = mock_rag_system
+        
+        doc_id = rag.ingest_document(
+            title="Test Document",
+            content="Test content",
+            source="test_source"
+        )
+        
+        assert doc_id is not None
+        mock_db.execute_query.assert_called()
+        mock_gateway.embed.assert_called()
+    
+    def test_query(self, mock_rag_system):
+        """Test RAG query."""
+        rag, mock_db, mock_gateway = mock_rag_system
+        
+        # Mock vector operations
+        with patch.object(rag.vector_ops, 'similarity_search') as mock_search:
+            mock_search.return_value = [
+                {"id": 1, "document_id": 1, "content": "Test", "similarity": 0.9}
+            ]
+            
+            result = rag.query(
+                query="Test query",
+                top_k=5,
+                threshold=0.7
+            )
+            
+            assert "answer" in result
+            assert "retrieved_documents" in result
+            assert result["num_documents"] == 1
+    
+    @pytest.mark.asyncio
+    async def test_query_async(self, mock_rag_system):
+        """Test async RAG query."""
+        rag, mock_db, mock_gateway = mock_rag_system
+        
+        # Mock async gateway
+        mock_async_response = MagicMock()
+        mock_async_response.text = "Async answer"
+        mock_gateway.generate_async = Mock(return_value=mock_async_response)
+        
+        with patch.object(rag.vector_ops, 'similarity_search') as mock_search:
+            mock_search.return_value = [
+                {"id": 1, "document_id": 1, "content": "Test", "similarity": 0.9}
+            ]
+            
+            result = await rag.query_async(
+                query="Test query",
+                top_k=5
+            )
+            
+            assert "answer" in result
+            assert result["answer"] == "Async answer"
+
+
+if __name__ == "__main__":
+    pytest.main([__file__, "-v"])
+

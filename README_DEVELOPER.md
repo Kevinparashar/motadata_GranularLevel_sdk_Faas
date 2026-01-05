@@ -222,6 +222,41 @@ except ComponentError as e:
 4. Update documentation
 5. Submit pull request
 
+## Examples and Tests
+
+### Working Examples
+
+See `examples/` directory for working code examples:
+- **Basic Usage**: `examples/basic_usage/` - Examples for each component
+- **Integration**: `examples/integration/` - Multi-component examples
+- **End-to-End**: `examples/end_to_end/` - Complete workflows
+
+### Test Suites
+
+See `src/tests/` directory for comprehensive tests:
+- **Unit Tests**: `src/tests/unit_tests/` - Component-specific tests
+- **Integration Tests**: `src/tests/integration_tests/` - Integration tests
+
+### Running Examples
+
+```bash
+# Run a basic example
+python examples/basic_usage/01_observability_basic.py
+
+# Run an integration example
+python examples/integration/agent_with_rag.py
+```
+
+### Running Tests
+
+```bash
+# Run all unit tests
+pytest src/tests/unit_tests/
+
+# Run integration tests
+pytest src/tests/integration_tests/ -m integration
+```
+
 ## Questions?
 
 Refer to existing components for examples or contact the development team.
