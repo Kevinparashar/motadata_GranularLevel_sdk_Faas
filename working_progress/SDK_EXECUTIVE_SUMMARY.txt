@@ -16,6 +16,7 @@ The SDK provides:
 - Ready-to-use AI components (agents, chatbots, document Q&A systems)
 - Unified interface for multiple AI providers (OpenAI, Anthropic, Google)
 - Production-grade infrastructure (caching, monitoring, security)
+- Function-driven API for easy component creation and usage
 - Standardized patterns and best practices
 - Complete documentation and examples
 
@@ -48,24 +49,30 @@ APPLICATION LAYER:
 
 KEY FEATURES:
 -------------
-1. MODULAR DESIGN
+1. FUNCTION-DRIVEN API
+   - Factory functions for easy component creation
+   - High-level convenience functions for common operations
+   - Utility functions for batch processing and retries
+   - Standard SDK design patterns for better developer experience
+
+2. MODULAR DESIGN
    - Components can be swapped (e.g., switch AI providers)
    - Easy to customize and extend
    - Independent development and testing
 
-2. PRODUCTION-READY
+3. PRODUCTION-READY
    - Built-in error handling
    - Comprehensive testing (80%+ coverage)
    - Security and governance built-in
    - Observability and monitoring
 
-3. DEVELOPER-FRIENDLY
+4. DEVELOPER-FRIENDLY
    - Complete documentation
    - Working examples for all components
    - Step-by-step guides
    - Template for new use cases
 
-4. STANDARDIZED
+5. STANDARDIZED
    - Consistent patterns across projects
    - Best practices built-in
    - Quality standards enforced

@@ -40,6 +40,67 @@ The **API Backend Services** (`src/core/api_backend_services/`) expose the gatew
 - **pydantic**: Used for data validation and configuration management, ensuring type safety and proper validation of gateway configurations and responses.
 - **httpx**: Provides async HTTP client capabilities for efficient concurrent API requests to LLM providers.
 
+## Function-Driven API
+
+The LiteLLM Gateway provides a **function-driven API** with factory functions, high-level convenience functions, and utilities for easy gateway creation and usage.
+
+### Factory Functions
+
+Create gateways with simplified configuration:
+
+```python
+from src.core.litellm_gateway import create_gateway, configure_gateway
+
+# Create gateway with providers
+gateway = create_gateway(
+    providers=["openai", "anthropic"],
+    default_model="gpt-4",
+    api_keys={"openai": "sk-...", "anthropic": "sk-..."}
+)
+
+# Configure gateway
+config = configure_gateway(
+    model_list=[{"model_name": "gpt-4", ...}],
+    timeout=120.0
+)
+```
+
+### High-Level Convenience Functions
+
+Use simplified functions for common operations:
+
+```python
+from src.core.litellm_gateway import (
+    generate_text,
+    generate_embeddings,
+    stream_text
+)
+
+# Generate text easily
+text = generate_text(gateway, "What is AI?", model="gpt-4")
+
+# Generate embeddings
+embeddings = generate_embeddings(gateway, ["Hello", "World"])
+
+# Stream text
+async for chunk in stream_text(gateway, "Tell me a story"):
+    print(chunk, end="", flush=True)
+```
+
+### Utility Functions
+
+Use utility functions for batch operations:
+
+```python
+from src.core.litellm_gateway import batch_generate
+
+# Generate text for multiple prompts
+prompts = ["What is AI?", "What is ML?"]
+texts = batch_generate(gateway, prompts)
+```
+
+See `src/core/litellm_gateway/functions.py` for complete function documentation.
+
 ## Key Methods and Their Roles
 
 ### `generate()` and `generate_async()`

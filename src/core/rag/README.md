@@ -101,6 +101,75 @@ The backend services route requests to the appropriate RAG system methods.
 - **pydantic**: Used for data validation and model definitions. All document chunks, retrieval results, and generation responses are defined using Pydantic models.
 - **hashlib**: Used for generating unique chunk identifiers during document processing.
 
+## Function-Driven API
+
+The RAG System provides a **function-driven API** with factory functions, high-level convenience functions, and utilities for easy RAG system creation and usage.
+
+### Factory Functions
+
+Create RAG systems with simplified configuration:
+
+```python
+from src.core.rag import create_rag_system, create_document_processor
+
+# Create RAG system
+rag = create_rag_system(
+    db=db,
+    gateway=gateway,
+    embedding_model="text-embedding-3-small",
+    generation_model="gpt-4"
+)
+
+# Create document processor
+processor = create_document_processor(
+    chunk_size=500,
+    strategy="sentence"
+)
+```
+
+### High-Level Convenience Functions
+
+Use simplified functions for common operations:
+
+```python
+from src.core.rag import (
+    quick_rag_query,
+    ingest_document_simple,
+    batch_ingest_documents
+)
+
+# Quick RAG query
+result = quick_rag_query(rag, "What is AI?", top_k=5)
+print(result["answer"])
+
+# Simple document ingestion
+doc_id = ingest_document_simple(
+    rag,
+    "AI Guide",
+    "Artificial Intelligence is..."
+)
+
+# Batch ingest documents
+doc_ids = batch_ingest_documents(rag, documents, batch_size=10)
+```
+
+### Utility Functions
+
+Use utility functions for batch processing:
+
+```python
+from src.core.rag import batch_process_documents
+
+# Process documents in batches
+results = batch_process_documents(
+    documents,
+    lambda doc: process_document(doc),
+    batch_size=10
+)
+```
+
+See `src/core/rag/functions.py` for complete function documentation.
+
 ## Key Components
 
 ### DocumentProcessor

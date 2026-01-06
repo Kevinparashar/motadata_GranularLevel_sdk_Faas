@@ -323,6 +323,220 @@ pytest src/tests/
 pytest src/tests/ --cov=src --cov-report=html
 ```
 
+## Function-Driven API
+
+The SDK provides a **function-driven API** with factory functions, high-level convenience functions, and utilities for easy component creation and usage.
+
+### Factory Functions
+
+Create components with simplified configuration:
+
+```python
+# Agent Framework
+from src.core.agno_agent_framework import create_agent, create_agent_with_memory, create_agent_manager
+
+gateway = LiteLLMGateway()
+agent = create_agent("agent1", "Assistant", gateway)
+agent_with_memory = create_agent_with_memory(
+    "agent2", "Analyst", gateway,
+    memory_config={"persistence_path": "/tmp/memory.json"}
+)
+manager = create_agent_manager()
+
+# RAG System
+from src.core.rag import create_rag_system
+
+rag = create_rag_system(db, gateway, embedding_model="text-embedding-3-small")
+
+# LiteLLM Gateway
+from src.core.litellm_gateway import create_gateway
+
+gateway = create_gateway(
+    providers=["openai", "anthropic"],
+    default_model="gpt-4",
+    api_keys={"openai": "sk-...", "anthropic": "sk-..."}
+)
+
+# Prompt Management
+from src.core.prompt_context_management import create_prompt_manager
+
+prompt_manager = create_prompt_manager(max_tokens=8000)
+
+# Cache Mechanism
+from src.core.cache_mechanism import create_memory_cache, create_redis_cache
+
+cache = create_memory_cache(default_ttl=600, max_size=2048)
+redis_cache = create_redis_cache(redis_url="redis://localhost:6379/0")
+
+# API Backend Services
+from src.core.api_backend_services import create_api_app, create_api_router
+
+app = create_api_app(title="AI SDK API", enable_cors=True)
+router = create_api_router(prefix="/api/v1", tags=["agents"])
+```
+
+### High-Level Convenience Functions
+
+Use simplified functions for common operations:
+
+```python
+# Agent Operations
+from src.core.agno_agent_framework import chat_with_agent, execute_task
+
+# Chat with agent (handles session management automatically)
+response = await chat_with_agent(
+    agent,
+    "What is AI?",
+    context={"user_id": "user123"}
+)
+print(response["answer"])
+
+# Execute task easily
+result = await execute_task(
+    agent,
+    "analyze",
+    {"text": "Analyze this document", "model": "gpt-4"}
+)
+
+# RAG Operations
+from src.core.rag import quick_rag_query, ingest_document_simple
+
+# Quick RAG query
+result = quick_rag_query(rag, "What is machine learning?", top_k=5)
+print(result["answer"])
+
+# Simple document ingestion
+doc_id = ingest_document_simple(
+    rag,
+    "AI Guide",
+    "Artificial Intelligence is..."
+)
+
+# Gateway Operations
+from src.core.litellm_gateway import generate_text, generate_embeddings
+
+# Generate text easily
+text = generate_text(gateway, "Explain quantum computing", model="gpt-4")
+
+# Generate embeddings
+embeddings = generate_embeddings(gateway, ["Hello", "World"])
+
+# Prompt Management
+from src.core.prompt_context_management import render_prompt, build_context
+
+# Render prompt template
+prompt = render_prompt(
+    prompt_manager,
+    "analysis_template",
+    {"text": "Analyze this", "model": "gpt-4"}
+)
+
+# Build context from history
+context = build_context(prompt_manager, "What is AI?", include_history=True)
+
+# Cache Operations
+from src.core.cache_mechanism import cache_get, cache_set, cache_delete
+
+cache_set(cache, "user:123", {"name": "John"}, ttl=600)
+value = cache_get(cache, "user:123")
+cache_delete(cache, "user:123")
+
+# API Operations
+from src.core.api_backend_services import (
+    register_router,
+    create_rag_endpoints,
+    create_agent_endpoints,
+    add_health_check
+)
+
+create_rag_endpoints(router, rag, prefix="/api/rag")
+create_agent_endpoints(router, agent_manager, prefix="/api/agents")
+register_router(app, router)
+add_health_check(app, path="/health")
+```
+
+### Utility Functions
+
+Use utility functions for common patterns:
+
+```python
+# Batch Processing
+from src.core.agno_agent_framework import batch_process_agents
+from src.core.rag import batch_ingest_documents
+
+# Process multiple agents concurrently
+results = batch_process_agents(
+    [agent1, agent2, agent3],
+    "analyze",
+    {"text": "..."}
+)
+
+# Batch ingest documents
+doc_ids = batch_ingest_documents(rag, documents, batch_size=10)
+
+# Retry Logic
+from src.core.agno_agent_framework import retry_on_failure
+
+@retry_on_failure(max_retries=3, retry_delay=1.0)
+async def my_function():
+    # Will retry up to 3 times on failure
+    pass
+
+# Cache Utilities
+from src.core.cache_mechanism import cache_or_compute, batch_cache_set
+
+# Cache or compute pattern
+value = cache_or_compute(cache, "key", expensive_function, ttl=3600)
+
+# Batch cache operations
+items = {"key1": "value1", "key2": "value2"}
+batch_cache_set(cache, items, ttl=600)
+```
+
+### Complete Example
+
+```python
+from src.core.litellm_gateway import create_gateway, generate_text
+from src.core.agno_agent_framework import create_agent, chat_with_agent
+from src.core.rag import create_rag_system, quick_rag_query
+
+# Create gateway
+gateway = create_gateway(providers=["openai"], default_model="gpt-4")
+
+# Create agent
+agent = create_agent("assistant", "AI Assistant", gateway)
+
+# Chat with agent
+response = await chat_with_agent(agent, "What is AI?")
+print(response["answer"])
+
+# Create RAG system
+rag = create_rag_system(db, gateway)
+
+# Query RAG
+result = quick_rag_query(rag, "What is machine learning?")
+print(result["answer"])
+
+# Create cache
+from src.core.cache_mechanism import create_memory_cache, cache_set
+cache = create_memory_cache(default_ttl=600)
+cache_set(cache, "result", result, ttl=300)
+
+# Create API app
+from src.core.api_backend_services import (
+    create_api_app,
+    create_api_router,
+    create_rag_endpoints,
+    register_router
+)
+app = create_api_app(title="AI SDK API")
+router = create_api_router(prefix="/api/v1")
+create_rag_endpoints(router, rag)
+register_router(app, router)
+```
+
+See component-specific README files for detailed function documentation.
+
 ## Examples and Tutorials
 
 The SDK includes comprehensive working examples and tutorials:
@@ -383,6 +597,14 @@ The SDK includes comprehensive test suites:
   - `test_agent.py` - Agent framework tests
   - `test_rag.py` - RAG system tests
 
+- **Function-Driven API Tests**: Comprehensive tests for function-driven API
+  - `test_agent_functions.py` - Agent framework functions tests
+  - `test_rag_functions.py` - RAG system functions tests
+  - `test_cache_functions.py` - Cache mechanism functions tests
+  - `test_api_functions.py` - API backend functions tests
+  - `test_litellm_gateway_functions.py` - LiteLLM Gateway functions tests
+  - `test_prompt_context_functions.py` - Prompt context functions tests
+
 ### Integration Tests
 - **Component Integration**: See `src/tests/integration_tests/` for integration tests
   - `test_agent_rag_integration.py` - Agent-RAG integration
@@ -402,6 +624,13 @@ pytest src/tests/ --cov=src --cov-report=html
 
 # Run specific test file
 pytest src/tests/unit_tests/test_rag.py -v
+
+# Run function-driven API tests
+pytest src/tests/unit_tests/test_agent_functions.py -v
+pytest src/tests/unit_tests/test_rag_functions.py -v
+
+# Run all function-driven API tests
+pytest src/tests/unit_tests/ -k "functions" -v
 ```
 
 See `src/tests/unit_tests/README.md` and `src/tests/integration_tests/README.md` for detailed testing instructions.

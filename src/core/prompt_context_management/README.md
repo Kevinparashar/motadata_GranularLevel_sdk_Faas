@@ -62,6 +62,86 @@ This enables external systems to manage prompts programmatically.
 
 - **pydantic**: Used for prompt template and context model definitions. All prompt templates and context objects are defined using Pydantic models, ensuring validation and type safety.
 
+## Function-Driven API
+
+The Prompt Context Management provides a **function-driven API** with factory functions, high-level convenience functions, and utilities for easy prompt management.
+
+### Factory Functions
+
+Create prompt managers with simplified configuration:
+
+```python
+from src.core.prompt_context_management import (
+    create_prompt_manager,
+    create_context_window_manager
+)
+
+# Create prompt manager
+manager = create_prompt_manager(max_tokens=8000)
+
+# Create context window manager
+window = create_context_window_manager(max_tokens=8000)
+```
+
+### High-Level Convenience Functions
+
+Use simplified functions for common operations:
+
+```python
+from src.core.prompt_context_management import (
+    render_prompt,
+    add_template,
+    build_context,
+    truncate_to_fit,
+    redact_sensitive
+)
+
+# Render prompt template
+prompt = render_prompt(
+    manager,
+    "analysis_template",
+    {"text": "Analyze this", "model": "gpt-4"}
+)
+
+# Add template
+add_template(
+    manager,
+    "greeting",
+    "1.0",
+    "Hello {name}, welcome to {service}!"
+)
+
+# Build context from history
+context = build_context(manager, "What is AI?", include_history=True)
+
+# Truncate prompt
+truncated = truncate_to_fit(manager, long_prompt, max_tokens=2000)
+
+# Redact sensitive information
+safe_text = redact_sensitive(manager, "API key: sk-1234567890")
+```
+
+### Utility Functions
+
+Use utility functions for validation and estimation:
+
+```python
+from src.core.prompt_context_management import (
+    estimate_tokens,
+    validate_prompt_length
+)
+
+# Estimate tokens
+tokens = estimate_tokens(manager, "Hello world")
+
+# Validate prompt length
+result = validate_prompt_length(manager, prompt)
+if not result["fits"]:
+    print(f"Prompt too long: {result['tokens']} tokens")
+```
+
+See `src/core/prompt_context_management/functions.py` for complete function documentation.
+
 ## Key Features
 
 ### Template System

@@ -1,0 +1,26 @@
+# Python Path Configuration
+# Add this directory to PYTHONPATH to resolve imports
+
+The import error "src.core.cache_mechanism could not be resolved" is a linter configuration issue.
+
+SOLUTIONS:
+
+1. Install package in development mode:
+   pip install -e .
+
+2. Add to PYTHONPATH (Linux/Mac):
+   export PYTHONPATH="${PYTHONPATH}:$(pwd)/src"
+
+3. VS Code: Reload window
+   - Press Ctrl+Shift+P (Cmd+Shift+P on Mac)
+   - Type "Reload Window"
+   - Press Enter
+
+4. The configuration files have been created:
+   - pyrightconfig.json (for Pyright/Pylance)
+   - .pylintrc (for Pylint)
+   - .vscode/settings.json (for VS Code)
+
+5. Restart your IDE/editor after making these changes.
+
+Note: The imports are correct and will work at runtime. This is only a linter/IDE configuration issue.

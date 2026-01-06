@@ -63,6 +63,114 @@ The **Cache Mechanism** (`src/core/cache_mechanism/`) can be used by the backend
 - **uvicorn**: ASGI server for running FastAPI applications. It provides high-performance async request handling.
 - **pydantic**: Used for request and response validation. All API request and response models are defined using Pydantic, ensuring type safety and validation.
 
+## Function-Driven API
+
+The API Backend Services provides a **function-driven API** with factory functions, high-level convenience functions, and utilities for easy API creation and endpoint management.
+
+### Factory Functions
+
+Create API applications and routers with simplified configuration:
+
+```python
+from src.core.api_backend_services import (
+    create_api_app,
+    create_api_router,
+    configure_api_app
+)
+
+# Create FastAPI app
+app = create_api_app(
+    title="My AI API",
+    enable_cors=True,
+    cors_origins=["http://localhost:3000"]
+)
+
+# Create API router
+router = create_api_router(prefix="/api/v1", tags=["agents"])
+
+# Configure existing app
+app = configure_api_app(app, enable_cors=True)
+```
+
+### High-Level Convenience Functions
+
+Use simplified functions for common operations:
+
+```python
+from src.core.api_backend_services import (
+    register_router,
+    add_endpoint,
+    create_rag_endpoints,
+    create_agent_endpoints,
+    create_gateway_endpoints
+)
+
+# Register router
+register_router(app, router)
+
+# Add endpoint
+def get_status():
+    return {"status": "ok"}
+
+add_endpoint(router, "/status", "GET", get_status)
+
+# Create component endpoints
+create_rag_endpoints(router, rag_system, prefix="/api/rag")
+create_agent_endpoints(router, agent_manager, prefix="/api/agents")
+create_gateway_endpoints(router, gateway, prefix="/api/gateway")
+```
+
+### Utility Functions
+
+Use utility functions for common API patterns:
+
+```python
+from src.core.api_backend_services import (
+    add_health_check,
+    add_api_versioning
+)
+
+# Add health check
+add_health_check(app, path="/health")
+
+# Set up API versioning
+api_prefix = add_api_versioning(app, version="v1")
+# Use api_prefix for all routes
+```
+
+### Complete Example
+
+```python
+from src.core.api_backend_services import (
+    create_api_app,
+    create_api_router,
+    create_rag_endpoints,
+    create_agent_endpoints,
+    add_health_check
+)
+
+# Create app
+app = create_api_app(title="AI SDK API", enable_cors=True)
+
+# Create router
+router = create_api_router(prefix="/api/v1")
+
+# Add component endpoints
+create_rag_endpoints(router, rag_system)
+create_agent_endpoints(router, agent_manager)
+
+# Register router
+register_router(app, router)
+
+# Add health check
+add_health_check(app)
+
+# Run with uvicorn
+# uvicorn app:app --reload
+```
+
+See `src/core/api_backend_services/functions.py` for complete function documentation.
+
 ## Key Features
 
 ### RESTful API Design

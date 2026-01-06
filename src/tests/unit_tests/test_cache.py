@@ -7,20 +7,21 @@ Tests caching operations for LLM responses and embeddings.
 import pytest
 import time
 from unittest.mock import Mock, patch
-from src.core.cache_mechanism import CacheManager, CacheBackend
+from src.core.cache_mechanism import CacheMechanism, CacheConfig
 
 
-class TestCacheManager:
-    """Test CacheManager."""
+class TestCacheMechanism:
+    """Test CacheMechanism."""
     
     def test_memory_cache_initialization(self):
         """Test memory cache initialization."""
-        cache = CacheManager(backend=CacheBackend.MEMORY)
-        assert cache.backend == CacheBackend.MEMORY
+        config = CacheConfig(backend="memory")
+        cache = CacheMechanism(config=config)
+        assert cache.config.backend == "memory"
     
     def test_set_get(self):
         """Test set and get operations."""
-        cache = CacheManager(backend=CacheBackend.MEMORY)
+        cache = CacheMechanism(config=CacheConfig(backend="memory"))
         
         cache.set("key1", "value1")
         value = cache.get("key1")
@@ -28,7 +29,7 @@ class TestCacheManager:
     
     def test_set_with_ttl(self):
         """Test set with TTL."""
-        cache = CacheManager(backend=CacheBackend.MEMORY)
+        cache = CacheMechanism(config=CacheConfig(backend="memory"))
         
         cache.set("key1", "value1", ttl=1)
         value = cache.get("key1")
@@ -41,55 +42,37 @@ class TestCacheManager:
     
     def test_delete(self):
         """Test delete operation."""
-        cache = CacheManager(backend=CacheBackend.MEMORY)
+        cache = CacheMechanism(config=CacheConfig(backend="memory"))
         
         cache.set("key1", "value1")
         cache.delete("key1")
         value = cache.get("key1")
         assert value is None
     
-    def test_clear(self):
-        """Test clear operation."""
-        cache = CacheManager(backend=CacheBackend.MEMORY)
+    def test_invalidate_pattern(self):
+        """Test pattern-based invalidation."""
+        cache = CacheMechanism(config=CacheConfig(backend="memory"))
         
-        cache.set("key1", "value1")
-        cache.set("key2", "value2")
-        cache.clear()
+        cache.set("user:1", "value1")
+        cache.set("user:2", "value2")
+        cache.set("post:1", "value3")
         
-        assert cache.get("key1") is None
-        assert cache.get("key2") is None
+        cache.invalidate_pattern("user:")
+        
+        assert cache.get("user:1") is None
+        assert cache.get("user:2") is None
+        assert cache.get("post:1") == "value3"  # Should remain
     
-    def test_exists(self):
-        """Test exists check."""
-        cache = CacheManager(backend=CacheBackend.MEMORY)
-        
-        cache.set("key1", "value1")
-        assert cache.exists("key1") is True
-        assert cache.exists("key2") is False
-    
-    def test_get_stats(self):
-        """Test statistics retrieval."""
-        cache = CacheManager(backend=CacheBackend.MEMORY)
-        
-        cache.set("key1", "value1")
-        cache.get("key1")  # Hit
-        cache.get("key2")  # Miss
-        
-        stats = cache.get_stats()
-        assert "hits" in stats or "misses" in stats or "size" in stats
-    
-    @patch('src.core.cache_mechanism.redis.Redis')
-    def test_redis_cache(self, mock_redis):
+    @patch('src.core.cache_mechanism.cache.redis')
+    def test_redis_cache(self, mock_redis_module):
         """Test Redis cache backend."""
         mock_redis_client = Mock()
-        mock_redis.return_value = mock_redis_client
+        mock_redis_module.Redis.from_url.return_value = mock_redis_client
         mock_redis_client.get.return_value = b"value1"
         mock_redis_client.set.return_value = True
         
-        cache = CacheManager(
-            backend=CacheBackend.REDIS,
-            config={"host": "localhost", "port": 6379}
-        )
+        config = CacheConfig(backend="redis", redis_url="redis://localhost:6379/0")
+        cache = CacheMechanism(config=config)
         
         cache.set("key1", "value1")
         value = cache.get("key1")

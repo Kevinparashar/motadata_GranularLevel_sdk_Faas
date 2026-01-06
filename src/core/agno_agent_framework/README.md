@@ -71,6 +71,106 @@ The `AgentManager` class manages multiple agents. It provides:
 
 Agents communicate through the `AgentMessage` system. Messages are routed through the AgentManager, which ensures reliable delivery. This communication mechanism enables agents to coordinate, share information, and work together on complex tasks.
 
+## Function-Driven API
+
+The Agent Framework provides a **function-driven API** with factory functions, high-level convenience functions, and utilities for easy agent creation and management.
+
+### Factory Functions
+
+Create agents and managers with simplified configuration:
+
+```python
+from src.core.agno_agent_framework import (
+    create_agent,
+    create_agent_with_memory,
+    create_agent_manager,
+    create_orchestrator
+)
+
+# Create a basic agent
+gateway = LiteLLMGateway()
+agent = create_agent("agent1", "Assistant", gateway)
+
+# Create agent with memory pre-configured
+agent = create_agent_with_memory(
+    "agent2", "Analyst", gateway,
+    memory_config={"persistence_path": "/tmp/memory.json"}
+)
+
+# Create agent manager
+manager = create_agent_manager()
+manager.register_agent(agent)
+
+# Create orchestrator
+orchestrator = create_orchestrator(manager)
+```
+
+### High-Level Convenience Functions
+
+Use simplified functions for common operations:
+
+```python
+from src.core.agno_agent_framework import (
+    chat_with_agent,
+    execute_task,
+    delegate_task,
+    find_agents_by_capability
+)
+
+# Chat with agent (handles session management automatically)
+response = await chat_with_agent(
+    agent,
+    "What is AI?",
+    context={"user_id": "user123"}
+)
+print(response["answer"])
+
+# Execute task easily
+result = await execute_task(
+    agent,
+    "analyze",
+    {"text": "Analyze this document", "model": "gpt-4"}
+)
+
+# Delegate task between agents
+result = await delegate_task(
+    orchestrator,
+    "agent1",
+    "agent2",
+    "analyze",
+    {"data": "..."}
+)
+
+# Find agents by capability
+agents = find_agents_by_capability(manager, "data_analysis")
+```
+
+### Utility Functions
+
+Use utility functions for common patterns:
+
+```python
+from src.core.agno_agent_framework import (
+    batch_process_agents,
+    retry_on_failure
+)
+
+# Process multiple agents concurrently
+results = batch_process_agents(
+    [agent1, agent2, agent3],
+    "analyze",
+    {"text": "..."}
+)
+
+# Retry decorator
+@retry_on_failure(max_retries=3, retry_delay=1.0)
+async def my_function():
+    # Will retry up to 3 times on failure
+    pass
+```
+
+See `src/core/agno_agent_framework/functions.py` for complete function documentation.
+
 ## Task Execution Flow
 
 1. **Task Submission**: A task is submitted to an agent through the `add_task()` method, which adds it to the agent's task queue.

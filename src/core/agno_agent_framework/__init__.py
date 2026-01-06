@@ -45,8 +45,21 @@ from .orchestration import (
     CoordinationPattern,
     AgentOrchestrator
 )
+from .functions import (
+    create_agent,
+    create_agent_with_memory,
+    create_agent_manager,
+    create_orchestrator,
+    execute_task,
+    chat_with_agent,
+    delegate_task,
+    find_agents_by_capability,
+    batch_process_agents,
+    retry_on_failure,
+)
 
 __all__ = [
+    # Core classes
     "Agent",
     "AgentManager",
     "AgentStatus",
@@ -75,4 +88,17 @@ __all__ = [
     "WorkflowStatus",
     "CoordinationPattern",
     "AgentOrchestrator",
+    # Factory functions
+    "create_agent",
+    "create_agent_with_memory",
+    "create_agent_manager",
+    "create_orchestrator",
+    # High-level convenience functions
+    "execute_task",
+    "chat_with_agent",
+    "delegate_task",
+    "find_agents_by_capability",
+    # Utility functions
+    "batch_process_agents",
+    "retry_on_failure",
 ]

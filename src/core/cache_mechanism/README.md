@@ -49,6 +49,90 @@ The **API Backend Services** (`src/core/api_backend_services/`) can use caching 
 - **Memory**: OrderedDict-based LRU with TTL and max-size enforcement
 - **Redis**: Optional; enabled when `redis` dependency and URL are provided
 
+## Function-Driven API
+
+The Cache Mechanism provides a **function-driven API** with factory functions, high-level convenience functions, and utilities for easy cache creation and usage.
+
+### Factory Functions
+
+Create caches with simplified configuration:
+
+```python
+from src.core.cache_mechanism import (
+    create_cache,
+    create_memory_cache,
+    create_redis_cache
+)
+
+# Create in-memory cache
+cache = create_memory_cache(default_ttl=600, max_size=2048)
+
+# Create Redis cache
+cache = create_redis_cache(
+    redis_url="redis://localhost:6379/0",
+    default_ttl=600
+)
+
+# Create cache with custom config
+cache = create_cache(
+    backend="memory",
+    default_ttl=300,
+    namespace="my_cache"
+)
+```
+
+### High-Level Convenience Functions
+
+Use simplified functions for common operations:
+
+```python
+from src.core.cache_mechanism import (
+    cache_get,
+    cache_set,
+    cache_delete,
+    cache_clear_pattern
+)
+
+# Get from cache
+value = cache_get(cache, "user:123")
+
+# Set in cache
+cache_set(cache, "user:123", {"name": "John"}, ttl=600)
+
+# Delete from cache
+cache_delete(cache, "user:123")
+
+# Clear pattern
+cache_clear_pattern(cache, "user:*")
+```
+
+### Utility Functions
+
+Use utility functions for advanced patterns:
+
+```python
+from src.core.cache_mechanism import (
+    cache_or_compute,
+    batch_cache_set,
+    batch_cache_get
+)
+
+# Cache or compute
+def expensive_operation():
+    # Expensive computation
+    return result
+
+value = cache_or_compute(cache, "expensive:key", expensive_operation, ttl=3600)
+
+# Batch operations
+items = {"user:1": {"name": "John"}, "user:2": {"name": "Jane"}}
+batch_cache_set(cache, items, ttl=600)
+
+values = batch_cache_get(cache, ["user:1", "user:2", "user:3"])
+```
+
+See `src/core/cache_mechanism/functions.py` for complete function documentation.
+
 ## Key Features
 
 ### Key Features

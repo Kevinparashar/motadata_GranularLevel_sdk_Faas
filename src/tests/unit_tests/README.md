@@ -19,7 +19,16 @@ pip install -e .
 pytest src/tests/unit_tests/
 
 # Run specific test file
-pytest src/tests/unit_tests/test_gateway.py
+pytest src/tests/unit_tests/test_litellm_gateway.py
+
+# Run function-driven API tests
+pytest src/tests/unit_tests/test_agent_functions.py
+pytest src/tests/unit_tests/test_rag_functions.py
+pytest src/tests/unit_tests/test_cache_functions.py
+pytest src/tests/unit_tests/test_api_functions.py
+
+# Run all function-driven API tests
+pytest src/tests/unit_tests/ -k "functions"
 
 # Run with coverage
 pytest src/tests/unit_tests/ --cov=src --cov-report=html
@@ -34,13 +43,37 @@ Tests are organized by component:
 
 ```
 unit_tests/
-├── test_gateway.py          # LiteLLM Gateway tests
-├── test_agents.py            # Agent framework tests
-├── test_database.py          # Database tests
-├── test_rag.py               # RAG system tests
-├── test_cache.py             # Cache mechanism tests
-└── test_connectivity.py      # Connectivity client tests
+├── Component Tests (Class-based)
+│   ├── test_agent.py                    # Agent framework class tests
+│   ├── test_cache.py                    # Cache mechanism class tests
+│   ├── test_litellm_gateway.py          # LiteLLM Gateway class tests
+│   ├── test_rag.py                      # RAG system class tests
+│   ├── test_postgresql_database.py      # Database tests
+│   ├── test_pool_implementation.py      # Pool implementation tests
+│   └── test_observability.py           # Observability tests
+│
+└── Function-Driven API Tests
+    ├── test_agent_functions.py          # Agent framework functions tests
+    ├── test_rag_functions.py           # RAG system functions tests
+    ├── test_cache_functions.py         # Cache mechanism functions tests
+    ├── test_api_functions.py            # API backend functions tests
+    ├── test_litellm_gateway_functions.py # LiteLLM Gateway functions tests
+    └── test_prompt_context_functions.py # Prompt context functions tests
 ```
+
+### Function-Driven API Tests
+
+The SDK provides comprehensive test coverage for the function-driven API:
+
+- **Factory Functions**: Test component creation with various configurations
+- **Convenience Functions**: Test high-level operations and integrations
+- **Utility Functions**: Test batch operations, retries, and common patterns
+
+Each function test file includes:
+- Factory function tests (create_*, configure_*)
+- Convenience function tests (high-level operations)
+- Utility function tests (batch processing, retries, etc.)
+- Edge case and error handling tests
 
 ## Testing Framework Used
 
