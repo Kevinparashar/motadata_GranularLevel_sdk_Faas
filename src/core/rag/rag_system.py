@@ -102,24 +102,48 @@ class RAGSystem:
             metadata=metadata
         )
         
-        # Generate embeddings and store
-        embeddings_data = []
-        for chunk in chunks:
-            try:
-                embedding_response = self.gateway.embed(
-                    texts=[chunk.content],
-                    model=self.embedding_model
-                )
-                if embedding_response.embeddings and len(embedding_response.embeddings) > 0:
-                    embedding = embedding_response.embeddings[0]
-                    embeddings_data.append((
-                        int(document_id),
-                        embedding,
-                        self.embedding_model
-                    ))
-            except Exception:
-                # skip failed chunk embedding to keep ingestion resilient
-                continue
+        if not chunks:
+            return document_id
+        
+        # Batch processing: Collect all chunk texts
+        chunk_texts = [chunk.content for chunk in chunks]
+        
+        # Generate embeddings in batch (single API call)
+        try:
+            embedding_response = self.gateway.embed(
+                texts=chunk_texts,
+                model=self.embedding_model
+            )
+            
+            # Map embeddings back to chunks
+            embeddings_data = []
+            if embedding_response.embeddings:
+                for i, embedding in enumerate(embedding_response.embeddings):
+                    if i < len(chunks):  # Ensure we have a matching chunk
+                        embeddings_data.append((
+                            int(document_id),
+                            embedding,
+                            self.embedding_model
+                        ))
+        except Exception:
+            # If batch fails, fall back to individual processing for resilience
+            embeddings_data = []
+            for chunk in chunks:
+                try:
+                    embedding_response = self.gateway.embed(
+                        texts=[chunk.content],
+                        model=self.embedding_model
+                    )
+                    if embedding_response.embeddings and len(embedding_response.embeddings) > 0:
+                        embedding = embedding_response.embeddings[0]
+                        embeddings_data.append((
+                            int(document_id),
+                            embedding,
+                            self.embedding_model
+                        ))
+                except Exception:
+                    # skip failed chunk embedding to keep ingestion resilient
+                    continue
         
         # Batch insert embeddings
         if embeddings_data:
@@ -221,4 +245,184 @@ class RAGSystem:
                 "num_documents": 0,
                 "error": str(e),
             }
+    
+    async def ingest_document_async(
+        self,
+        title: str,
+        content: str,
+        source: Optional[str] = None,
+        metadata: Optional[Dict[str, Any]] = None
+    ) -> str:
+        """
+        Ingest a document into the RAG system asynchronously with batch processing.
+        
+        Args:
+            title: Document title
+            content: Document content
+            source: Optional source URL/path
+            metadata: Optional metadata
+        
+        Returns:
+            Document ID
+        """
+        # Insert document
+        query = """
+        INSERT INTO documents (title, content, metadata, source)
+        VALUES (%s, %s, %s::jsonb, %s)
+        RETURNING id;
+        """
+        
+        import json
+        metadata_json = json.dumps(metadata or {})
+        
+        result = self.db.execute_query(
+            query,
+            (title, content, metadata_json, source),
+            fetch_one=True
+        )
+        
+        document_id = str(result['id'])
+        
+        # Process and chunk document
+        chunks = self.document_processor.chunk_document(
+            content=content,
+            document_id=document_id,
+            metadata=metadata
+        )
+        
+        if not chunks:
+            return document_id
+        
+        # Batch processing: Collect all chunk texts
+        chunk_texts = [chunk.content for chunk in chunks]
+        
+        # Generate embeddings in batch (single async API call)
+        try:
+            embedding_response = await self.gateway.embed_async(
+                texts=chunk_texts,
+                model=self.embedding_model
+            )
+            
+            # Map embeddings back to chunks
+            embeddings_data = []
+            if embedding_response.embeddings:
+                for i, embedding in enumerate(embedding_response.embeddings):
+                    if i < len(chunks):  # Ensure we have a matching chunk
+                        embeddings_data.append((
+                            int(document_id),
+                            embedding,
+                            self.embedding_model
+                        ))
+        except Exception:
+            # If batch fails, fall back to individual processing for resilience
+            embeddings_data = []
+            for chunk in chunks:
+                try:
+                    embedding_response = await self.gateway.embed_async(
+                        texts=[chunk.content],
+                        model=self.embedding_model
+                    )
+                    if embedding_response.embeddings and len(embedding_response.embeddings) > 0:
+                        embedding = embedding_response.embeddings[0]
+                        embeddings_data.append((
+                            int(document_id),
+                            embedding,
+                            self.embedding_model
+                        ))
+                except Exception:
+                    # skip failed chunk embedding to keep ingestion resilient
+                    continue
+        
+        # Batch insert embeddings
+        if embeddings_data:
+            self.vector_ops.batch_insert_embeddings(embeddings_data)
+        
+        return document_id
+    
+    def ingest_documents_batch(
+        self,
+        documents: List[Dict[str, Any]],
+        batch_size: int = 10
+    ) -> List[str]:
+        """
+        Ingest multiple documents in batch with optimized processing.
+        
+        Args:
+            documents: List of document dicts with keys: title, content, source (optional), metadata (optional)
+            batch_size: Number of documents to process in each batch
+        
+        Returns:
+            List of document IDs
+        """
+        document_ids = []
+        
+        # Process documents in batches
+        for i in range(0, len(documents), batch_size):
+            batch = documents[i:i + batch_size]
+            
+            # Process each document in the batch
+            for doc in batch:
+                try:
+                    doc_id = self.ingest_document(
+                        title=doc.get("title", ""),
+                        content=doc.get("content", ""),
+                        source=doc.get("source"),
+                        metadata=doc.get("metadata")
+                    )
+                    document_ids.append(doc_id)
+                except Exception:
+                    # Log error but continue with other documents
+                    # In production, you might want to log this properly
+                    continue
+        
+        return document_ids
+    
+    async def ingest_documents_batch_async(
+        self,
+        documents: List[Dict[str, Any]],
+        batch_size: int = 10
+    ) -> List[str]:
+        """
+        Ingest multiple documents in batch asynchronously with optimized processing.
+        
+        Args:
+            documents: List of document dicts with keys: title, content, source (optional), metadata (optional)
+            batch_size: Number of documents to process in each batch
+        
+        Returns:
+            List of document IDs
+        """
+        import asyncio
+        
+        document_ids = []
+        
+        # Process documents in batches
+        for i in range(0, len(documents), batch_size):
+            batch = documents[i:i + batch_size]
+            
+            # Process batch concurrently
+            tasks = []
+            for doc in batch:
+                task = self.ingest_document_async(
+                    title=doc.get("title", ""),
+                    content=doc.get("content", ""),
+                    source=doc.get("source"),
+                    metadata=doc.get("metadata")
+                )
+                tasks.append(task)
+            
+            # Wait for all documents in batch to complete
+            try:
+                batch_results = await asyncio.gather(*tasks, return_exceptions=True)
+                for result in batch_results:
+                    if isinstance(result, Exception):
+                        # Log error but continue
+                        continue
+                    else:
+                        document_ids.append(result)
+            except Exception:
+                # Continue with next batch even if current batch fails
+                continue
+        
+        return document_ids
 
