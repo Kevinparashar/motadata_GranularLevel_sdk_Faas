@@ -2,17 +2,14 @@
 
 ## Overview
 
-The Cache Mechanism component provides comprehensive caching capabilities to improve performance, reduce costs, and enhance user experience. It implements various caching strategies for different types of data, including LLM responses, embeddings, documents, and query results.
+The Cache Mechanism component provides caching capabilities to improve performance, reduce costs, and enhance user experience. It offers in-memory (LRU + TTL) and Redis backends with pattern-based invalidation.
 
 ## Purpose and Functionality
 
-Caching is essential for AI applications because:
-- **Cost Reduction**: LLM API calls are expensive; caching responses reduces API usage
-- **Performance Improvement**: Cached responses are returned instantly, improving response times
-- **Rate Limit Management**: Caching helps avoid rate limit issues by reducing API calls
-- **Consistency**: Caching ensures consistent responses for identical queries
-
-The component supports multiple caching backends (in-memory, Redis, database) and provides a unified interface for all caching operations. This allows components to use caching without being tied to a specific caching implementation.
+- Reduce LLM and retrieval costs by caching responses and embeddings
+- Improve latency through reuse of cached results
+- Provide TTL management and simple eviction for memory-bound deployments
+- Allow pattern-based invalidation for coordinated cache clears
 
 ## Connection to Other Components
 
@@ -47,34 +44,19 @@ This monitoring helps optimize cache configurations and identify caching opportu
 
 The **API Backend Services** (`src/core/api_backend_services/`) can use caching to improve API response times. Frequently accessed endpoints can cache their responses, reducing backend processing time and improving user experience.
 
-## Libraries Utilized
+## Backends
 
-The component is designed to work with multiple caching libraries:
-- **redis**: For distributed caching when using Redis as the backend
-- **cachetools**: For in-memory caching implementations
-- **diskcache**: For disk-based caching when persistence is needed
-
-The component abstracts these libraries, allowing easy switching between backends.
+- **Memory**: OrderedDict-based LRU with TTL and max-size enforcement
+- **Redis**: Optional; enabled when `redis` dependency and URL are provided
 
 ## Key Features
 
-### Multi-Backend Support
+### Key Features
 
-The cache mechanism supports multiple backends:
-- **In-Memory**: Fast, local caching for single-instance deployments
-- **Redis**: Distributed caching for multi-instance deployments
-- **Database**: Persistent caching using the PostgreSQL database
-
-### TTL (Time-To-Live) Management
-
-All cached entries can have configurable TTL values, ensuring cached data doesn't become stale. The component automatically expires entries that exceed their TTL.
-
-### Cache Invalidation
-
-The component provides mechanisms for cache invalidation:
-- **Time-based Expiration**: Automatic expiration based on TTL
-- **Manual Invalidation**: Ability to manually invalidate specific entries
-- **Pattern-based Invalidation**: Invalidate entries matching patterns
+- **TTL Management**: Configurable default TTL per instance
+- **LRU Eviction**: Max-size enforcement for memory backend
+- **Pattern Invalidation**: Clear keys matching simple patterns
+- **Namespace Support**: Avoid collisions across components
 
 ### Cache Statistics
 
@@ -92,11 +74,12 @@ The component implements robust error handling:
 
 ## Configuration
 
-Caching can be configured through:
-- **Backend Selection**: Choose the appropriate caching backend
-- **TTL Settings**: Configure default TTL values
-- **Size Limits**: Set maximum cache sizes
-- **Eviction Policies**: Configure how entries are evicted when cache is full
+`CacheConfig` supports:
+- `backend`: `"memory"` or `"redis"`
+- `default_ttl`: default TTL in seconds
+- `max_size`: max entries for in-memory cache
+- `redis_url`: optional Redis connection URL
+- `namespace`: namespacing for keys
 
 ## Best Practices
 

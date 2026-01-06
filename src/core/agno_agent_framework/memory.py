@@ -9,6 +9,7 @@ from pydantic import BaseModel, Field
 from datetime import datetime
 from enum import Enum
 import json
+from pathlib import Path
 
 
 class MemoryType(str, Enum):
@@ -45,7 +46,8 @@ class AgentMemory:
         self,
         agent_id: str,
         max_short_term: int = 50,
-        max_long_term: int = 1000
+        max_long_term: int = 1000,
+        persistence_path: Optional[str] = None
     ):
         """
         Initialize agent memory.
@@ -58,11 +60,19 @@ class AgentMemory:
         self.agent_id = agent_id
         self.max_short_term = max_short_term
         self.max_long_term = max_long_term
+        self._persistence_path = Path(persistence_path) if persistence_path else None
         
         self._short_term: List[MemoryItem] = []
         self._long_term: Dict[str, MemoryItem] = {}
         self._episodic: List[MemoryItem] = []
         self._semantic: Dict[str, MemoryItem] = {}
+
+        if self._persistence_path and self._persistence_path.exists():
+            try:
+                self._load()
+            except Exception:
+                # If load fails, continue with empty memory
+                pass
     
     def store(
         self,
@@ -124,6 +134,7 @@ class AgentMemory:
         elif memory_type == MemoryType.SEMANTIC:
             self._semantic[memory.memory_id] = memory
         
+        self._persist()
         return memory
     
     def retrieve(
@@ -188,6 +199,7 @@ class AgentMemory:
             memory.access_count += 1
             memory.last_accessed = datetime.now()
         
+        self._persist()
         return memories_to_search[:limit]
     
     def forget(self, memory_id: str) -> bool:
@@ -209,6 +221,7 @@ class AgentMemory:
         # Try long-term
         if memory_id in self._long_term:
             self._long_term.pop(memory_id)
+            self._persist()
             return True
         
         # Try episodic
@@ -220,6 +233,7 @@ class AgentMemory:
         # Try semantic
         if memory_id in self._semantic:
             self._semantic.pop(memory_id)
+            self._persist()
             return True
         
         return False
@@ -256,6 +270,7 @@ class AgentMemory:
             self._long_term[long_term_memory.memory_id] = long_term_memory
             self._short_term.remove(memory)
             consolidated += 1
+        self._persist()
         
         return consolidated
     
@@ -279,4 +294,35 @@ class AgentMemory:
                 len(self._semantic)
             )
         }
+
+    def _persist(self) -> None:
+        """Persist memory to disk if configured."""
+        if not self._persistence_path:
+            return
+        data = {
+            "short_term": [m.model_dump() for m in self._short_term],
+            "long_term": [m.model_dump() for m in self._long_term.values()],
+            "episodic": [m.model_dump() for m in self._episodic],
+            "semantic": [m.model_dump() for m in self._semantic.values()],
+        }
+        self._persistence_path.parent.mkdir(parents=True, exist_ok=True)
+        with self._persistence_path.open("w", encoding="utf-8") as f:
+            json.dump(data, f, default=str)
+
+    def _load(self) -> None:
+        if not self._persistence_path or not self._persistence_path.exists():
+            return
+        with self._persistence_path.open("r", encoding="utf-8") as f:
+            data = json.load(f)
+
+        def _parse(items: List[Dict[str, Any]]) -> List[MemoryItem]:
+            parsed: List[MemoryItem] = []
+            for item in items:
+                parsed.append(MemoryItem(**item))
+            return parsed
+
+        self._short_term = _parse(data.get("short_term", []))
+        self._long_term = {m.memory_id: m for m in _parse(data.get("long_term", []))}
+        self._episodic = _parse(data.get("episodic", []))
+        self._semantic = {m.memory_id: m for m in _parse(data.get("semantic", []))}
 

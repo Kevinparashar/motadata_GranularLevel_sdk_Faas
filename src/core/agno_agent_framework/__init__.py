@@ -37,6 +37,14 @@ from .plugins import (
     PluginStatus,
     PluginHook
 )
+from .orchestration import (
+    WorkflowPipeline,
+    WorkflowStep,
+    WorkflowState,
+    WorkflowStatus,
+    CoordinationPattern,
+    AgentOrchestrator
+)
 
 __all__ = [
     "Agent",
@@ -61,4 +69,10 @@ __all__ = [
     "PluginManager",
     "PluginStatus",
     "PluginHook",
+    "WorkflowPipeline",
+    "WorkflowStep",
+    "WorkflowState",
+    "WorkflowStatus",
+    "CoordinationPattern",
+    "AgentOrchestrator",
 ]

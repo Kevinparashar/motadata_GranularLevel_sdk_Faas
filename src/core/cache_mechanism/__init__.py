@@ -1,8 +1,10 @@
 """
 Cache Mechanism
 
-Caching strategies and implementation.
+Provides cache utilities for SDK components.
 """
 
-__all__ = []
+from .cache import CacheMechanism, CacheConfig
+
+__all__ = ["CacheMechanism", "CacheConfig"]
 

@@ -9,6 +9,7 @@ from pydantic import BaseModel, Field
 from enum import Enum
 import asyncio
 from datetime import datetime
+from .memory import AgentMemory, MemoryType
 
 
 class AgentStatus(str, Enum):
@@ -69,10 +70,19 @@ class Agent(BaseModel):
     # Communication
     message_queue: List[AgentMessage] = Field(default_factory=list)
     communication_enabled: bool = True
+
+    # Memory
+    memory: Optional[AgentMemory] = None
+    memory_persistence_path: Optional[str] = None
+    auto_persist_memory: bool = True
     
     # Task management
     task_queue: List[AgentTask] = Field(default_factory=list)
     current_task: Optional[AgentTask] = None
+
+    # Reliability
+    max_retries: int = 1
+    retry_delay: float = 0.1
     
     # Metadata
     created_at: datetime = Field(default_factory=datetime.now)
@@ -143,18 +153,32 @@ class Agent(BaseModel):
         """
         self.status = AgentStatus.RUNNING
         self.current_task = task
+        attempt = 0
+        last_error: Optional[Exception] = None
         
-        try:
-            # Execute task based on type
-            result = await self._execute_task_internal(task)
-            self.last_active = datetime.now()
-            return result
-        except Exception as e:
-            self.status = AgentStatus.ERROR
-            raise
-        finally:
-            self.status = AgentStatus.IDLE
-            self.current_task = None
+        while attempt < max(1, self.max_retries):
+            try:
+                result = await self._execute_task_internal(task)
+                self.last_active = datetime.now()
+                if self.memory and self.auto_persist_memory:
+                    self.memory.store(
+                        content=f"Task {task.task_id} result: {result}",
+                        memory_type=MemoryType.SHORT_TERM,
+                        importance=0.6,
+                        metadata={"task_type": task.task_type},
+                    )
+                return result
+            except Exception as e:  # pragma: no cover - runtime errors
+                last_error = e
+                self.status = AgentStatus.ERROR
+                attempt += 1
+                if attempt < max(1, self.max_retries):
+                    await asyncio.sleep(self.retry_delay)
+                    continue
+                raise
+            finally:
+                self.status = AgentStatus.IDLE
+                self.current_task = None
     
     async def _execute_task_internal(self, task: AgentTask) -> Any:
         """
@@ -190,6 +214,13 @@ class Agent(BaseModel):
             "task_id": task.task_id,
             "result": f"Task {task.task_type} executed"
         }
+
+    def attach_memory(self, persistence_path: Optional[str] = None) -> None:
+        """Attach an AgentMemory instance with optional persistence."""
+        self.memory = AgentMemory(
+            agent_id=self.agent_id,
+            persistence_path=persistence_path or self.memory_persistence_path,
+        )
     
     def send_message(
         self,
@@ -246,11 +277,17 @@ class Agent(BaseModel):
 
 
 class AgentManager:
-    """Manager for multiple agents."""
+    """
+    Manager for multiple agents with orchestration support.
+    
+    Provides agent registration, discovery, and basic coordination.
+    For advanced orchestration, use AgentOrchestrator.
+    """
     
     def __init__(self):
         """Initialize agent manager."""
         self._agents: Dict[str, Agent] = {}
+        self._orchestrator: Optional[Any] = None  # AgentOrchestrator instance
     
     def register_agent(self, agent: Agent) -> None:
         """
@@ -260,6 +297,15 @@ class AgentManager:
             agent: Agent instance
         """
         self._agents[agent.agent_id] = agent
+    
+    def unregister_agent(self, agent_id: str) -> None:
+        """
+        Unregister an agent.
+        
+        Args:
+            agent_id: Agent identifier
+        """
+        self._agents.pop(agent_id, None)
     
     def get_agent(self, agent_id: str) -> Optional[Agent]:
         """
@@ -282,6 +328,21 @@ class AgentManager:
         """
         return list(self._agents.keys())
     
+    def find_agents_by_capability(self, capability_name: str) -> List[Agent]:
+        """
+        Find agents with a specific capability.
+        
+        Args:
+            capability_name: Capability name to search for
+        
+        Returns:
+            List of agents with the capability
+        """
+        return [
+            agent for agent in self._agents.values()
+            if any(cap.name == capability_name for cap in agent.capabilities)
+        ]
+    
     async def broadcast_message(
         self,
         from_agent: str,
@@ -300,6 +361,26 @@ class AgentManager:
             if agent.agent_id != from_agent:
                 agent.send_message(from_agent, content, message_type)
     
+    async def send_message_to_agent(
+        self,
+        from_agent: str,
+        to_agent: str,
+        content: Any,
+        message_type: str = "message"
+    ) -> None:
+        """
+        Send a message from one agent to another.
+        
+        Args:
+            from_agent: Sender agent ID
+            to_agent: Target agent ID
+            content: Message content
+            message_type: Type of message
+        """
+        target = self.get_agent(to_agent)
+        if target:
+            target.send_message(from_agent, content, message_type)
+    
     def get_agent_statuses(self) -> Dict[str, Dict[str, Any]]:
         """
         Get status of all agents.
@@ -311,4 +392,17 @@ class AgentManager:
             agent_id: agent.get_status()
             for agent_id, agent in self._agents.items()
         }
+    
+    def attach_orchestrator(self, orchestrator: Any) -> None:
+        """
+        Attach an orchestrator to this manager.
+        
+        Args:
+            orchestrator: AgentOrchestrator instance
+        """
+        self._orchestrator = orchestrator
+    
+    def get_orchestrator(self) -> Optional[Any]:
+        """Get the attached orchestrator."""
+        return self._orchestrator
 

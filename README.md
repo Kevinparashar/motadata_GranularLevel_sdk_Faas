@@ -95,8 +95,12 @@ motadata-python-ai-sdk/
 
 2. **Agno Agent Framework** (`src/core/agno_agent_framework/`)
    - Autonomous AI agents
-   - Multi-agent coordination
+   - Multi-agent coordination and orchestration
+   - Workflow pipelines with dependencies
+   - Coordination patterns (leader-follower, peer-to-peer)
+   - Task delegation and chaining
    - Task execution and communication
+   - Optional persistent memory and retry-aware task execution
 
 3. **PostgreSQL Database** (`src/core/postgresql_database/`)
    - PostgreSQL with pgvector extension
@@ -122,9 +126,9 @@ motadata-python-ai-sdk/
    - Backend integration
 
 8. **Cache Mechanism** (`src/core/cache_mechanism/`)
-   - Response caching
-   - Embedding caching
-   - Query result caching
+   - Response, embedding, and query result caching
+   - In-memory (LRU + TTL) and optional Redis backend
+   - Pattern-based invalidation and max-size enforcement
 
 9. **Connectivity Clients** (`connectivity_clients/`)
    - Client connection management

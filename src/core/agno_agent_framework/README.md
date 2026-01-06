@@ -64,6 +64,8 @@ The `AgentManager` class manages multiple agents. It provides:
 - Message routing between agents
 - Broadcast messaging capabilities
 - Status monitoring for all agents
+- Agent discovery by capability
+- Orchestrator integration
 
 ### Agent Communication
 
@@ -89,6 +91,73 @@ The framework implements error handling at multiple levels:
 
 The framework is designed to be swappable with other agent frameworks (e.g., LangChain) through the `AgentFrameworkInterface` defined in `src/core/interfaces.py`. This allows the SDK to support multiple agent frameworks while maintaining a consistent interface.
 
+## Multi-Agent Orchestration
+
+The framework includes advanced orchestration capabilities through the `AgentOrchestrator` class:
+
+### Workflow Pipelines
+
+Create complex multi-step workflows with dependencies:
+- **Sequential Execution**: Steps execute in order based on dependencies
+- **Parallel Execution**: Independent steps run concurrently
+- **Conditional Execution**: Steps can have conditions for execution
+- **Error Handling**: Retry logic and timeout support per step
+- **State Management**: Workflow context is maintained across steps
+
+### Coordination Patterns
+
+Multiple coordination patterns are supported:
+
+1. **Leader-Follower**: Leader executes first, then followers execute in parallel
+2. **Peer-to-Peer**: All agents execute simultaneously and coordinate results
+3. **Pipeline**: Sequential processing through a chain of agents
+4. **Broadcast**: One-to-many communication pattern
+
+### Task Delegation and Chaining
+
+- **Task Delegation**: Agents can delegate tasks to other agents
+- **Task Chaining**: Chain tasks across multiple agents sequentially
+- **Result Transformation**: Transform results between chained tasks
+
+### Example Usage
+
+```python
+from src.core.agno_agent_framework import (
+    Agent, AgentManager, AgentOrchestrator
+)
+
+# Create agents and manager
+manager = AgentManager()
+agent1 = Agent(agent_id="agent1", name="Agent 1")
+agent2 = Agent(agent_id="agent2", name="Agent 2")
+manager.register_agent(agent1)
+manager.register_agent(agent2)
+
+# Create orchestrator
+orchestrator = AgentOrchestrator(manager)
+
+# Create workflow
+workflow = orchestrator.create_workflow(name="My Workflow")
+workflow.add_step(
+    agent_id="agent1",
+    task_type="task1",
+    parameters={"param": "value"},
+    step_id="step1"
+)
+workflow.add_step(
+    agent_id="agent2",
+    task_type="task2",
+    parameters={"param": "value"},
+    step_id="step2",
+    depends_on=["step1"]  # Depends on step1
+)
+
+# Execute workflow
+result = await orchestrator.execute_workflow(workflow.pipeline_id)
+```
+
+See `examples/integration/multi_agent_orchestration.py` for complete examples.
+
 ## Best Practices
 
 1. **Agent Specialization**: Design agents with specific, well-defined capabilities rather than general-purpose agents.
@@ -96,6 +165,7 @@ The framework is designed to be swappable with other agent frameworks (e.g., Lan
 3. **Error Recovery**: Implement robust error handling and recovery mechanisms for agent failures.
 4. **Resource Management**: Monitor agent resource usage, especially LLM API calls, to manage costs.
 5. **Observability**: Ensure all agent activities are logged and monitored for debugging and optimization.
+6. **Workflow Design**: Design workflows with clear dependencies and error handling for production use.
 
 ## Examples and Tests
 

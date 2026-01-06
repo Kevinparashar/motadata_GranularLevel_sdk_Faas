@@ -78,7 +78,10 @@ Examples are organized following the component dependency order:
 Simple examples showing how to use each component independently.
 
 ### Integration
-Examples showing how multiple components work together.
+Examples showing how multiple components work together:
+- `agent_with_rag.py` - Agent using RAG for context
+- `api_with_agent.py` - API exposing agent functionality
+- `multi_agent_orchestration.py` - Multi-agent workflows, coordination patterns, task delegation
 
 ### End-to-End
 Complete workflows from start to finish, demonstrating real-world use cases.
