@@ -17,6 +17,8 @@ The SDK provides:
 - Unified interface for multiple AI providers (OpenAI, Anthropic, Google)
 - Production-grade infrastructure (caching, monitoring, security)
 - Function-driven API for easy component creation and usage
+- Agent state persistence for reliable agent management
+- Advanced RAG features (hybrid retrieval, query optimization, document management)
 - Standardized patterns and best practices
 - Complete documentation and examples
 

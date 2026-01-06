@@ -274,6 +274,128 @@ class Agent(BaseModel):
             "current_task": self.current_task.task_id if self.current_task else None,
             "last_active": self.last_active.isoformat(),
         }
+    
+    def save_state(self, file_path: Optional[str] = None) -> None:
+        """
+        Save agent state to disk for persistence.
+        
+        Saves agent configuration, capabilities, task queue, and metadata.
+        Memory is persisted separately via memory.save() if memory is attached.
+        
+        Args:
+            file_path: Optional path to save state. If None, uses agent_id.json
+        """
+        import json
+        from pathlib import Path
+        
+        if not file_path:
+            file_path = f"{self.agent_id}_state.json"
+        
+        state_path = Path(file_path)
+        state_path.parent.mkdir(parents=True, exist_ok=True)
+        
+        # Prepare state (exclude non-serializable objects like gateway)
+        state = {
+            "agent_id": self.agent_id,
+            "name": self.name,
+            "description": self.description,
+            "capabilities": [cap.model_dump() for cap in self.capabilities],
+            "status": self.status.value,
+            "llm_model": self.llm_model,
+            "llm_provider": self.llm_provider,
+            "task_queue": [task.model_dump() for task in self.task_queue],
+            "current_task": self.current_task.model_dump() if self.current_task else None,
+            "max_retries": self.max_retries,
+            "retry_delay": self.retry_delay,
+            "created_at": self.created_at.isoformat(),
+            "last_active": self.last_active.isoformat(),
+            "metadata": self.metadata,
+            "memory_persistence_path": str(self.memory_persistence_path) if self.memory_persistence_path else None,
+            "auto_persist_memory": self.auto_persist_memory,
+            "communication_enabled": self.communication_enabled,
+        }
+        
+        with state_path.open("w", encoding="utf-8") as f:
+            json.dump(state, f, indent=2, default=str)
+        
+        # Persist memory if attached
+        if self.memory and self.auto_persist_memory:
+            self.memory.save()
+    
+    @classmethod
+    def load_state(
+        cls,
+        file_path: str,
+        gateway: Optional[Any] = None
+    ) -> "Agent":
+        """
+        Load agent state from disk.
+        
+        Args:
+            file_path: Path to saved state file
+            gateway: LiteLLM Gateway instance (required for agent functionality)
+        
+        Returns:
+            Restored Agent instance
+        """
+        import json
+        from pathlib import Path
+        
+        state_path = Path(file_path)
+        if not state_path.exists():
+            raise FileNotFoundError(f"Agent state file not found: {file_path}")
+        
+        with state_path.open("r", encoding="utf-8") as f:
+            state = json.load(f)
+        
+        # Recreate agent
+        agent = cls(
+            agent_id=state["agent_id"],
+            name=state["name"],
+            description=state.get("description", ""),
+            gateway=gateway,
+            llm_model=state.get("llm_model"),
+            llm_provider=state.get("llm_provider"),
+        )
+        
+        # Restore capabilities
+        agent.capabilities = [
+            AgentCapability(**cap) for cap in state.get("capabilities", [])
+        ]
+        
+        # Restore status
+        agent.status = AgentStatus(state.get("status", "idle"))
+        
+        # Restore task queue
+        agent.task_queue = [
+            AgentTask(**task) for task in state.get("task_queue", [])
+        ]
+        
+        # Restore current task
+        if state.get("current_task"):
+            agent.current_task = AgentTask(**state["current_task"])
+        
+        # Restore configuration
+        agent.max_retries = state.get("max_retries", 1)
+        agent.retry_delay = state.get("retry_delay", 0.1)
+        agent.metadata = state.get("metadata", {})
+        agent.communication_enabled = state.get("communication_enabled", True)
+        agent.auto_persist_memory = state.get("auto_persist_memory", True)
+        
+        # Restore timestamps
+        from datetime import datetime
+        if state.get("created_at"):
+            agent.created_at = datetime.fromisoformat(state["created_at"])
+        if state.get("last_active"):
+            agent.last_active = datetime.fromisoformat(state["last_active"])
+        
+        # Restore memory if path exists
+        memory_path = state.get("memory_persistence_path")
+        if memory_path:
+            agent.memory_persistence_path = memory_path
+            agent.attach_memory(memory_path)
+        
+        return agent
 
 
 class AgentManager:

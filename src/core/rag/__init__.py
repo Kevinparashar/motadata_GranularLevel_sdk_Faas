@@ -17,6 +17,8 @@ from .functions import (
     ingest_document_simple_async,
     batch_ingest_documents,
     batch_ingest_documents_async,
+    update_document_simple,
+    delete_document_simple,
     batch_process_documents,
 )
 
@@ -37,6 +39,8 @@ __all__ = [
     "ingest_document_simple_async",
     "batch_ingest_documents",
     "batch_ingest_documents_async",
+    "update_document_simple",
+    "delete_document_simple",
     # Utility functions
     "batch_process_documents",
 ]

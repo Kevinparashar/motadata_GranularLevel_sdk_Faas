@@ -402,6 +402,43 @@ def retry_on_failure(
     return decorator
 
 
+def save_agent_state(
+    agent: Agent,
+    file_path: Optional[str] = None
+) -> None:
+    """
+    Save agent state to disk for persistence (utility function).
+    
+    Args:
+        agent: Agent instance to save
+        file_path: Optional path to save state
+    
+    Example:
+        >>> save_agent_state(agent, "/tmp/agent_state.json")
+    """
+    agent.save_state(file_path)
+
+
+def load_agent_state(
+    file_path: str,
+    gateway: Any
+) -> Agent:
+    """
+    Load agent state from disk (utility function).
+    
+    Args:
+        file_path: Path to saved state file
+        gateway: LiteLLM Gateway instance
+    
+    Returns:
+        Restored Agent instance
+    
+    Example:
+        >>> agent = load_agent_state("/tmp/agent_state.json", gateway)
+    """
+    return Agent.load_state(file_path, gateway)
+
+
 __all__ = [
     # Factory functions
     "create_agent",
@@ -416,5 +453,7 @@ __all__ = [
     # Utility functions
     "batch_process_agents",
     "retry_on_failure",
+    "save_agent_state",
+    "load_agent_state",
 ]
 

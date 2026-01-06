@@ -87,7 +87,9 @@ def quick_rag_query(
     query: str,
     top_k: int = 5,
     threshold: float = 0.7,
-    max_tokens: int = 1000
+    max_tokens: int = 1000,
+    use_query_rewriting: bool = True,
+    retrieval_strategy: str = "vector"
 ) -> Dict[str, Any]:
     """
     Quick RAG query without manual setup (high-level convenience).
@@ -110,7 +112,9 @@ def quick_rag_query(
         query=query,
         top_k=top_k,
         threshold=threshold,
-        max_tokens=max_tokens
+        max_tokens=max_tokens,
+        use_query_rewriting=use_query_rewriting,
+        retrieval_strategy=retrieval_strategy
     )
 
 
@@ -119,7 +123,9 @@ async def quick_rag_query_async(
     query: str,
     top_k: int = 5,
     threshold: float = 0.7,
-    max_tokens: int = 1000
+    max_tokens: int = 1000,
+    use_query_rewriting: bool = True,
+    retrieval_strategy: str = "vector"
 ) -> Dict[str, Any]:
     """
     Quick async RAG query (high-level convenience).
@@ -142,7 +148,9 @@ async def quick_rag_query_async(
         query=query,
         top_k=top_k,
         threshold=threshold,
-        max_tokens=max_tokens
+        max_tokens=max_tokens,
+        use_query_rewriting=use_query_rewriting,
+        retrieval_strategy=retrieval_strategy
     )
 
 
@@ -316,6 +324,56 @@ def batch_process_documents(
     return asyncio.run(_process_all())
 
 
+def update_document_simple(
+    rag_system: RAGSystem,
+    document_id: str,
+    title: Optional[str] = None,
+    content: Optional[str] = None,
+    metadata: Optional[Dict[str, Any]] = None
+) -> bool:
+    """
+    Update a document in the RAG system (high-level convenience).
+    
+    Args:
+        rag_system: RAGSystem instance
+        document_id: Document ID to update
+        title: Optional new title
+        content: Optional new content (will re-process and re-embed)
+        metadata: Optional new metadata
+    
+    Returns:
+        True if update successful, False otherwise
+    
+    Example:
+        >>> success = update_document_simple(
+        ...     rag, "doc-123",
+        ...     title="Updated Title",
+        ...     content="Updated content"
+        ... )
+    """
+    return rag_system.update_document(document_id, title, content, metadata)
+
+
+def delete_document_simple(
+    rag_system: RAGSystem,
+    document_id: str
+) -> bool:
+    """
+    Delete a document from the RAG system (high-level convenience).
+    
+    Args:
+        rag_system: RAGSystem instance
+        document_id: Document ID to delete
+    
+    Returns:
+        True if deletion successful, False otherwise
+    
+    Example:
+        >>> success = delete_document_simple(rag, "doc-123")
+    """
+    return rag_system.delete_document(document_id)
+
+
 __all__ = [
     # Factory functions
     "create_rag_system",
@@ -327,6 +385,8 @@ __all__ = [
     "ingest_document_simple_async",
     "batch_ingest_documents",
     "batch_ingest_documents_async",
+    "update_document_simple",
+    "delete_document_simple",
     # Utility functions
     "batch_process_documents",
 ]

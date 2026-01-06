@@ -401,8 +401,13 @@ result = await execute_task(
 # RAG Operations
 from src.core.rag import quick_rag_query, ingest_document_simple
 
-# Quick RAG query
-result = quick_rag_query(rag, "What is machine learning?", top_k=5)
+# Quick RAG query with hybrid retrieval and query rewriting
+result = quick_rag_query(
+    rag, "What is machine learning?", 
+    top_k=5,
+    retrieval_strategy="hybrid",
+    use_query_rewriting=True
+)
 print(result["answer"])
 
 # Simple document ingestion
@@ -411,6 +416,13 @@ doc_id = ingest_document_simple(
     "AI Guide",
     "Artificial Intelligence is..."
 )
+
+# Update document
+from src.core.rag import update_document_simple, delete_document_simple
+update_document_simple(rag, doc_id, title="Updated Guide", content="New content")
+
+# Delete document
+delete_document_simple(rag, doc_id)
 
 # Gateway Operations
 from src.core.litellm_gateway import generate_text, generate_embeddings
@@ -510,11 +522,22 @@ agent = create_agent("assistant", "AI Assistant", gateway)
 response = await chat_with_agent(agent, "What is AI?")
 print(response["answer"])
 
+# Save agent state for persistence
+from src.core.agno_agent_framework import save_agent_state, load_agent_state
+save_agent_state(agent, "/tmp/agent_state.json")
+
+# Load agent state later
+restored_agent = load_agent_state("/tmp/agent_state.json", gateway)
+
 # Create RAG system
 rag = create_rag_system(db, gateway)
 
-# Query RAG
-result = quick_rag_query(rag, "What is machine learning?")
+# Query RAG with hybrid retrieval
+result = quick_rag_query(
+    rag, "What is machine learning?",
+    retrieval_strategy="hybrid",
+    use_query_rewriting=True
+)
 print(result["answer"])
 
 # Create cache

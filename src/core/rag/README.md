@@ -77,6 +77,80 @@ The RAG system now supports **optimized batch processing** for improved performa
 
 This caching improves performance and reduces costs.
 
+### Query Optimization
+
+The RAG system now includes **advanced query optimization** features:
+
+1. **Query Rewriting**:
+   - Automatically expands abbreviations (AI → artificial intelligence)
+   - Normalizes query terms for better retrieval
+   - Improves search quality by enhancing query semantics
+
+2. **Query Caching**:
+   - Caches query results to avoid redundant processing
+   - Reduces LLM API calls for repeated queries
+   - Configurable TTL for cache entries
+
+**Example:**
+```python
+# Query with rewriting enabled (default)
+result = rag.query("What is AI?", use_query_rewriting=True)
+
+# Query with caching (automatic)
+result = rag.query("What is machine learning?")  # First call - generates
+result = rag.query("What is machine learning?")  # Second call - from cache
+```
+
+### Hybrid Retrieval
+
+The RAG system supports **hybrid retrieval strategies** that combine multiple search methods:
+
+1. **Vector Search**: Semantic similarity using embeddings
+2. **Keyword Search**: Traditional text matching
+3. **Hybrid**: Combines both with weighted scoring
+
+**Benefits:**
+- Better recall for diverse query types
+- Improved accuracy for exact matches
+- Balanced results combining semantic and keyword relevance
+
+**Example:**
+```python
+# Vector-only retrieval (default)
+result = rag.query("What is AI?", retrieval_strategy="vector")
+
+# Hybrid retrieval (vector + keyword)
+result = rag.query("What is AI?", retrieval_strategy="hybrid")
+```
+
+### Document Management
+
+The RAG system now supports **complete document lifecycle management**:
+
+1. **Document Updates**:
+   - Update document title, content, or metadata
+   - Content updates automatically re-process and re-embed chunks
+   - Maintains document versioning through metadata
+
+2. **Document Deletion**:
+   - Delete documents and all associated chunks/embeddings
+   - Automatic cache invalidation
+   - Clean removal from knowledge base
+
+**Example:**
+```python
+# Update document
+rag.update_document(
+    document_id="doc-123",
+    title="Updated Title",
+    content="Updated content",
+    metadata={"version": "2.0"}
+)
+
+# Delete document
+rag.delete_document("doc-123")
+```
+
 ### Integration with Evaluation & Observability
 
 The **Evaluation & Observability** component (`src/core/evaluation_observability/`) tracks:
@@ -135,11 +209,18 @@ Use simplified functions for common operations:
 from src.core.rag import (
     quick_rag_query,
     ingest_document_simple,
-    batch_ingest_documents
+    batch_ingest_documents,
+    update_document_simple,
+    delete_document_simple
 )
 
-# Quick RAG query
-result = quick_rag_query(rag, "What is AI?", top_k=5)
+# Quick RAG query with hybrid retrieval
+result = quick_rag_query(
+    rag, "What is AI?", 
+    top_k=5,
+    retrieval_strategy="hybrid",
+    use_query_rewriting=True
+)
 print(result["answer"])
 
 # Simple document ingestion
@@ -151,6 +232,16 @@ doc_id = ingest_document_simple(
 
 # Batch ingest documents
 doc_ids = batch_ingest_documents(rag, documents, batch_size=10)
+
+# Update document
+update_document_simple(
+    rag, "doc-123",
+    title="Updated Title",
+    content="Updated content"
+)
+
+# Delete document
+delete_document_simple(rag, "doc-123")
 ```
 
 ### Utility Functions
@@ -184,7 +275,9 @@ The `DocumentProcessor` class handles document preprocessing:
 The `Retriever` class performs document retrieval:
 - **Query Embedding**: Converts text queries into vector embeddings using the gateway
 - **Similarity Search**: Uses the database's vector operations to find similar documents
+- **Hybrid Retrieval**: Combines vector similarity and keyword search for better results
 - **Result Filtering**: Applies metadata filters to refine search results
+- **Query Optimization**: Supports query rewriting and caching for improved performance
 
 ### RAGGenerator
 
@@ -198,6 +291,9 @@ The `RAGGenerator` class generates context-aware responses:
 The `RAGSystem` class integrates all components:
 - **Document Ingestion**: Orchestrates the complete document ingestion pipeline
 - **Query Processing**: Handles end-to-end query processing from retrieval to generation
+- **Document Management**: Supports document updates and deletion with automatic re-processing
+- **Query Optimization**: Implements query rewriting and caching for better performance
+- **Hybrid Retrieval**: Supports multiple retrieval strategies (vector, keyword, hybrid)
 - **Component Coordination**: Manages interactions between processor, retriever, and generator
 
 ## Document Ingestion Flow
@@ -213,11 +309,18 @@ The `RAGSystem` class integrates all components:
 ## Query Processing Flow
 
 1. **Query Input**: A user query is received
-2. **Query Embedding**: The query is converted to an embedding using the gateway
-3. **Similarity Search**: The database performs similarity search to find relevant documents
-4. **Context Building**: Retrieved documents are formatted into context
-5. **Response Generation**: The gateway generates a response using the context and query
-6. **Response Return**: The generated response is returned along with retrieved documents
+2. **Query Rewriting** (optional): Query is rewritten to improve retrieval (expands abbreviations, normalizes terms)
+3. **Query Caching Check**: System checks cache for existing query results
+4. **Query Embedding**: The query is converted to an embedding using the gateway
+5. **Retrieval Strategy**: 
+   - **Vector Search**: Semantic similarity search using embeddings
+   - **Hybrid Search**: Combines vector and keyword search with weighted scoring
+   - **Keyword Search**: Traditional text matching
+6. **Similarity Search**: The database performs similarity search to find relevant documents
+7. **Context Building**: Retrieved documents are formatted into context
+8. **Response Generation**: The gateway generates a response using the context and query
+9. **Response Caching**: Result is cached for future queries
+10. **Response Return**: The generated response is returned along with retrieved documents
 
 ## Error Handling
 

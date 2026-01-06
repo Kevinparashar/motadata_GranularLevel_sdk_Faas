@@ -167,6 +167,32 @@ results = batch_process_agents(
 async def my_function():
     # Will retry up to 3 times on failure
     pass
+
+# Save agent state for persistence
+save_agent_state(agent, "/tmp/agent_state.json")
+
+# Load agent state
+agent = load_agent_state("/tmp/agent_state.json", gateway)
+```
+
+### Agent State Persistence
+
+Agents now support **full state persistence**, allowing you to save and restore complete agent state:
+
+- **Save State**: Persists agent configuration, capabilities, task queue, current task, and metadata
+- **Load State**: Restores agent from saved state file with all configuration intact
+- **Memory Persistence**: Agent memory is persisted separately via memory.save() if attached
+
+**Example:**
+```python
+from src.core.agno_agent_framework import save_agent_state, load_agent_state
+
+# Save agent state
+save_agent_state(agent, "/tmp/agent_state.json")
+
+# Later, restore agent
+restored_agent = load_agent_state("/tmp/agent_state.json", gateway)
+# Agent is fully restored with all capabilities, tasks, and configuration
 ```
 
 See `src/core/agno_agent_framework/functions.py` for complete function documentation.

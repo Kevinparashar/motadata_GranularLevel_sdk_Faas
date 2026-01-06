@@ -151,30 +151,89 @@ class RAGSystem:
         
         return document_id
     
+    def _rewrite_query(self, query: str) -> str:
+        """
+        Rewrite query to improve retrieval quality.
+        
+        Simple query rewriting: expand abbreviations, normalize terms.
+        Can be extended with LLM-based query expansion.
+        
+        Args:
+            query: Original query
+        
+        Returns:
+            Rewritten query
+        """
+        # Basic query normalization
+        rewritten = query.strip()
+        
+        # Expand common abbreviations
+        abbreviations = {
+            "AI": "artificial intelligence",
+            "ML": "machine learning",
+            "DL": "deep learning",
+            "NLP": "natural language processing",
+            "API": "application programming interface",
+        }
+        
+        for abbr, full in abbreviations.items():
+            rewritten = rewritten.replace(abbr, full)
+        
+        # Remove extra whitespace
+        rewritten = " ".join(rewritten.split())
+        
+        return rewritten
+    
     def query(
         self,
         query: str,
         top_k: int = 5,
         threshold: float = 0.7,
-        max_tokens: int = 1000
+        max_tokens: int = 1000,
+        use_query_rewriting: bool = True,
+        retrieval_strategy: str = "vector"  # "vector", "hybrid", "keyword"
     ) -> Dict[str, Any]:
         """
-        Query the RAG system.
+        Query the RAG system with query optimization.
+        
+        Args:
+            query: User query
+            top_k: Number of documents to retrieve
+            threshold: Similarity threshold
+            max_tokens: Maximum tokens in response
+            use_query_rewriting: Whether to rewrite query for better retrieval
+            retrieval_strategy: Retrieval strategy ("vector", "hybrid", "keyword")
+        
+        Returns:
+            Dictionary with answer and retrieved documents
         """
-        cache_key = f"rag:query:{query}:{top_k}:{threshold}:{max_tokens}"
+        # Query rewriting for optimization
+        original_query = query
+        if use_query_rewriting:
+            query = self._rewrite_query(query)
+        
+        cache_key = f"rag:query:{query}:{top_k}:{threshold}:{max_tokens}:{retrieval_strategy}"
         cached = self.cache.get(cache_key)
         if cached:
             return cached
 
         try:
-            retrieved_docs = self.retriever.retrieve(
-                query=query,
-                top_k=top_k,
-                threshold=threshold
-            )
+            # Use hybrid retrieval if specified
+            if retrieval_strategy == "hybrid":
+                retrieved_docs = self.retriever.retrieve_hybrid(
+                    query=query,
+                    top_k=top_k,
+                    threshold=threshold
+                )
+            else:
+                retrieved_docs = self.retriever.retrieve(
+                    query=query,
+                    top_k=top_k,
+                    threshold=threshold
+                )
 
             answer = self.generator.generate(
-                query=query,
+                query=original_query,  # Use original query for generation
                 context_documents=retrieved_docs,
                 max_tokens=max_tokens
             )
@@ -182,7 +241,9 @@ class RAGSystem:
             result = {
                 "answer": answer,
                 "retrieved_documents": retrieved_docs,
-                "num_documents": len(retrieved_docs)
+                "num_documents": len(retrieved_docs),
+                "query_used": query if use_query_rewriting else original_query,
+                "original_query": original_query
             }
             self.cache.set(cache_key, result, ttl=300)
             return result
@@ -199,7 +260,9 @@ class RAGSystem:
         query: str,
         top_k: int = 5,
         threshold: float = 0.7,
-        max_tokens: int = 1000
+        max_tokens: int = 1000,
+        use_query_rewriting: bool = True,
+        retrieval_strategy: str = "vector"
     ) -> Dict[str, Any]:
         """
         Query the RAG system asynchronously.
@@ -213,20 +276,33 @@ class RAGSystem:
         Returns:
             Dictionary with answer and retrieved documents
         """
-        cache_key = f"rag:query:{query}:{top_k}:{threshold}:{max_tokens}"
+        # Query rewriting for optimization
+        original_query = query
+        if use_query_rewriting:
+            query = self._rewrite_query(query)
+        
+        cache_key = f"rag:query:{query}:{top_k}:{threshold}:{max_tokens}:{retrieval_strategy}"
         cached = self.cache.get(cache_key)
         if cached:
             return cached
 
         try:
-            retrieved_docs = self.retriever.retrieve(
-                query=query,
-                top_k=top_k,
-                threshold=threshold
-            )
+            # Use hybrid retrieval if specified
+            if retrieval_strategy == "hybrid":
+                retrieved_docs = self.retriever.retrieve_hybrid(
+                    query=query,
+                    top_k=top_k,
+                    threshold=threshold
+                )
+            else:
+                retrieved_docs = self.retriever.retrieve(
+                    query=query,
+                    top_k=top_k,
+                    threshold=threshold
+                )
             
             answer = await self.generator.generate_async(
-                query=query,
+                query=original_query,  # Use original query for generation
                 context_documents=retrieved_docs,
                 max_tokens=max_tokens
             )
@@ -234,7 +310,9 @@ class RAGSystem:
             result = {
                 "answer": answer,
                 "retrieved_documents": retrieved_docs,
-                "num_documents": len(retrieved_docs)
+                "num_documents": len(retrieved_docs),
+                "query_used": query if use_query_rewriting else original_query,
+                "original_query": original_query
             }
             self.cache.set(cache_key, result, ttl=300)
             return result
@@ -425,4 +503,132 @@ class RAGSystem:
                 continue
         
         return document_ids
+    
+    def update_document(
+        self,
+        document_id: str,
+        title: Optional[str] = None,
+        content: Optional[str] = None,
+        metadata: Optional[Dict[str, Any]] = None
+    ) -> bool:
+        """
+        Update an existing document in the RAG system.
+        
+        Args:
+            document_id: Document ID to update
+            title: Optional new title
+            content: Optional new content (will re-process and re-embed)
+            metadata: Optional new metadata
+        
+        Returns:
+            True if update successful, False otherwise
+        """
+        try:
+            # Update document metadata
+            updates = []
+            params = []
+            
+            if title is not None:
+                updates.append("title = %s")
+                params.append(title)
+            
+            if metadata is not None:
+                import json
+                updates.append("metadata = %s::jsonb")
+                params.append(json.dumps(metadata))
+            
+            if updates:
+                query = f"""
+                UPDATE documents
+                SET {', '.join(updates)}
+                WHERE id = %s;
+                """
+                params.append(document_id)
+                self.db.execute_query(query, tuple(params))
+            
+            # If content changed, re-process document
+            if content is not None:
+                # Delete old chunks and embeddings
+                self._delete_document_chunks(document_id)
+                
+                # Re-process and re-embed
+                chunks = self.document_processor.chunk_document(
+                    content=content,
+                    document_id=document_id,
+                    metadata=metadata
+                )
+                
+                if chunks:
+                    chunk_texts = [chunk.content for chunk in chunks]
+                    
+                    # Generate embeddings in batch
+                    embedding_response = self.gateway.embed(
+                        texts=chunk_texts,
+                        model=self.embedding_model
+                    )
+                    
+                    if embedding_response.embeddings:
+                        embeddings_data = []
+                        for i, embedding in enumerate(embedding_response.embeddings):
+                            if i < len(chunks):
+                                embeddings_data.append((
+                                    int(document_id),
+                                    embedding,
+                                    self.embedding_model
+                                ))
+                        
+                        if embeddings_data:
+                            self.vector_ops.batch_insert_embeddings(embeddings_data)
+                
+                # Update content in database
+                query = "UPDATE documents SET content = %s WHERE id = %s;"
+                self.db.execute_query(query, (content, document_id))
+            
+            # Invalidate cache for this document
+            self.cache.invalidate_pattern(f"rag:doc:{document_id}")
+            
+            return True
+        except Exception:
+            return False
+    
+    def delete_document(self, document_id: str) -> bool:
+        """
+        Delete a document and its associated chunks/embeddings from the RAG system.
+        
+        Args:
+            document_id: Document ID to delete
+        
+        Returns:
+            True if deletion successful, False otherwise
+        """
+        try:
+            # Delete document chunks and embeddings
+            self._delete_document_chunks(document_id)
+            
+            # Delete document
+            query = "DELETE FROM documents WHERE id = %s;"
+            self.db.execute_query(query, (document_id,))
+            
+            # Invalidate cache
+            self.cache.invalidate_pattern(f"rag:doc:{document_id}")
+            self.cache.invalidate_pattern(f"rag:query:*")
+            
+            return True
+        except Exception:
+            return False
+    
+    def _delete_document_chunks(self, document_id: str) -> None:
+        """
+        Delete all chunks and embeddings for a document.
+        
+        Args:
+            document_id: Document ID
+        """
+        # Delete embeddings
+        query = "DELETE FROM embeddings WHERE document_id = %s;"
+        self.db.execute_query(query, (document_id,))
+        
+        # Note: If you have a chunks table, delete from there too
+        # query = "DELETE FROM chunks WHERE document_id = %s;"
+        # self.db.execute_query(query, (document_id,))
 

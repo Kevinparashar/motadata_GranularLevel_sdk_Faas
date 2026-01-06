@@ -18,6 +18,8 @@ from src.core.rag.functions import (
     ingest_document_simple_async,
     batch_ingest_documents,
     batch_ingest_documents_async,
+    update_document_simple,
+    delete_document_simple,
     # Utility functions
     batch_process_documents,
 )
@@ -140,6 +142,31 @@ class TestConvenienceFunctions:
         
         assert "answer" in result
         mock_rag_system.query.assert_called_once()
+    
+    def test_quick_rag_query_with_hybrid(self, mock_rag_system):
+        """Test quick_rag_query with hybrid retrieval strategy."""
+        result = quick_rag_query(
+            mock_rag_system,
+            "Test query",
+            retrieval_strategy="hybrid"
+        )
+        
+        assert "answer" in result
+        # Verify hybrid strategy was passed
+        call_args = mock_rag_system.query.call_args
+        assert call_args[1]["retrieval_strategy"] == "hybrid"
+    
+    def test_quick_rag_query_with_rewriting(self, mock_rag_system):
+        """Test quick_rag_query with query rewriting."""
+        result = quick_rag_query(
+            mock_rag_system,
+            "Test query",
+            use_query_rewriting=True
+        )
+        
+        assert "answer" in result
+        call_args = mock_rag_system.query.call_args
+        assert call_args[1]["use_query_rewriting"] is True
     
     @pytest.mark.asyncio
     async def test_quick_rag_query_async(self, mock_rag_system):
@@ -298,6 +325,37 @@ class TestUtilityFunctions:
         )
         
         assert results == []
+    
+    def test_update_document_simple(self, mock_rag_system):
+        """Test update_document_simple convenience function."""
+        mock_rag_system.update_document = Mock(return_value=True)
+        
+        success = update_document_simple(
+            rag_system=mock_rag_system,
+            document_id="doc-123",
+            title="Updated Title",
+            content="Updated content"
+        )
+        
+        assert success is True
+        mock_rag_system.update_document.assert_called_once_with(
+            "doc-123",
+            "Updated Title",
+            "Updated content",
+            None
+        )
+    
+    def test_delete_document_simple(self, mock_rag_system):
+        """Test delete_document_simple convenience function."""
+        mock_rag_system.delete_document = Mock(return_value=True)
+        
+        success = delete_document_simple(
+            rag_system=mock_rag_system,
+            document_id="doc-123"
+        )
+        
+        assert success is True
+        mock_rag_system.delete_document.assert_called_once_with("doc-123")
 
 
 if __name__ == "__main__":

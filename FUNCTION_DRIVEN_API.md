@@ -34,6 +34,8 @@ The Motadata Python AI SDK provides a **function-driven API** that makes it easy
 #### Utility Functions
 - `batch_process_agents()` - Process tasks on multiple agents concurrently
 - `retry_on_failure()` - Decorator for retry logic
+- `save_agent_state()` - Save agent state to disk for persistence
+- `load_agent_state()` - Load agent state from disk
 
 **Example:**
 ```python
@@ -59,12 +61,14 @@ result = await execute_task(agent, "analyze", {"text": "..."})
 - `create_document_processor()` - Create a document processor
 
 #### High-Level Convenience Functions
-- `quick_rag_query()` - Quick RAG query without manual setup
-- `quick_rag_query_async()` - Async quick RAG query
+- `quick_rag_query()` - Quick RAG query with query rewriting and hybrid retrieval support
+- `quick_rag_query_async()` - Async quick RAG query with optimization
 - `ingest_document_simple()` - Simple document ingestion
 - `ingest_document_simple_async()` - Async simple document ingestion
 - `batch_ingest_documents()` - Batch ingest multiple documents
 - `batch_ingest_documents_async()` - Async batch ingest
+- `update_document_simple()` - Update document with automatic re-processing
+- `delete_document_simple()` - Delete document and all associated data
 
 #### Utility Functions
 - `batch_process_documents()` - Process documents in batches
@@ -78,8 +82,10 @@ from src.core.rag import (
 )
 
 rag = create_rag_system(db, gateway)
-result = quick_rag_query(rag, "What is AI?", top_k=5)
+result = quick_rag_query(rag, "What is AI?", top_k=5, retrieval_strategy="hybrid")
 doc_id = ingest_document_simple(rag, "AI Guide", "Content...")
+update_document_simple(rag, doc_id, title="Updated Guide", content="New content")
+delete_document_simple(rag, doc_id)
 ```
 
 ### 3. LiteLLM Gateway ✅

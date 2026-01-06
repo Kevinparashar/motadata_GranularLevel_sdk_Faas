@@ -56,6 +56,8 @@ from .functions import (
     find_agents_by_capability,
     batch_process_agents,
     retry_on_failure,
+    save_agent_state,
+    load_agent_state,
 )
 
 __all__ = [
@@ -101,4 +103,6 @@ __all__ = [
     # Utility functions
     "batch_process_agents",
     "retry_on_failure",
+    "save_agent_state",
+    "load_agent_state",
 ]
