@@ -61,17 +61,26 @@ API Backend Services (Validate Request)
     ▼
 RAG System (src/core/rag/)
     │
+    ├─→ Query Rewriting (Optional: Expand abbreviations, normalize)
+    │
+    ├─→ Cache Mechanism (Check Cache for Query Results)
+    │
     ├─→ Prompt Context Management (Build Prompt)
     │
     ├─→ LiteLLM Gateway (Generate Query Embedding)
     │
-    ├─→ Vector Database (Similarity Search)
+    ├─→ Retriever
+    │   ├─→ Vector Database (Similarity Search)
+    │   ├─→ Keyword Search (Optional: Hybrid retrieval)
+    │   └─→ Metadata Filtering (Filter by metadata)
     │
-    ├─→ PostgreSQL Database (Retrieve Documents)
+    ├─→ PostgreSQL Database (Retrieve Documents with Metadata)
     │
-    ├─→ Cache Mechanism (Check Cache)
+    ├─→ Context Building (Assemble retrieved documents)
     │
-    ├─→ LiteLLM Gateway (Generate Response)
+    ├─→ LiteLLM Gateway (Generate Response with Context)
+    │
+    ├─→ Cache Mechanism (Store Query Result)
     │
     └─→ Evaluation & Observability (Log & Trace)
     │
@@ -111,11 +120,35 @@ Document Input
     ▼
 RAG System
     │
-    ├─→ Document Processor (Chunk Document)
+    ├─→ Document Processor
+    │   │
+    │   ├─→ Load Document (Multiple formats: text, HTML, JSON)
+    │   │
+    │   ├─→ Preprocessing Pipeline
+    │   │   ├─→ Text Normalization
+    │   │   ├─→ Whitespace Cleaning
+    │   │   └─→ Unicode Normalization
+    │   │
+    │   ├─→ Metadata Extraction
+    │   │   ├─→ Title Extraction
+    │   │   ├─→ Date Extraction
+    │   │   ├─→ Tag/Keyword Extraction
+    │   │   ├─→ Language Detection
+    │   │   └─→ File Metadata (name, size, extension)
+    │   │
+    │   ├─→ Metadata Validation (Schema-based)
+    │   │
+    │   ├─→ Chunking (Multiple strategies: fixed, sentence, paragraph, semantic)
+    │   │
+    │   ├─→ Chunk Validation
+    │   │   ├─→ Size Validation (min/max)
+    │   │   └─→ Content Quality Checks
+    │   │
+    │   └─→ Metadata Enrichment (Document → Chunk metadata)
     │
-    ├─→ LiteLLM Gateway (Generate Embeddings)
+    ├─→ LiteLLM Gateway (Batch Generate Embeddings)
     │
-    ├─→ PostgreSQL Database (Store Document)
+    ├─→ PostgreSQL Database (Store Document with Metadata)
     │
     ├─→ Vector Database (Store Embeddings)
     │

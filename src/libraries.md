@@ -110,6 +110,10 @@ This document provides a comprehensive list of all libraries used in the SDK, th
 | `nltk` | >=3.8.0 | Natural language processing |
 | `pdfplumber` | >=0.9.0 | PDF parsing (optional) |
 | `PyPDF2` | >=3.0.0 | PDF processing (optional) |
+| `html.parser` | Built-in | HTML text extraction |
+| `json` | Built-in | JSON parsing and conversion |
+| `unicodedata` | Built-in | Unicode normalization |
+| `re` | Built-in | Regular expressions for text processing |
 
 ## Development Dependencies
 

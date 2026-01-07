@@ -15,8 +15,15 @@ src/core/your_component/
 ├── __init__.py          # Component exports
 ├── README.md            # Component documentation
 ├── your_component.py    # Main implementation
+├── functions.py         # Factory and convenience functions (if applicable)
 └── interfaces.py        # Interfaces for swappability (if applicable)
 ```
+
+**Note**: For components with complex functionality (like RAG), consider:
+- Separate classes for different responsibilities (e.g., DocumentProcessor, Retriever, Generator)
+- Pipeline patterns for multi-step processing (e.g., preprocessing, chunking, validation)
+- Metadata handling with schema validation
+- Multiple processing strategies (e.g., chunking strategies: fixed, sentence, paragraph, semantic)
 
 ### Component Template
 
@@ -93,7 +100,7 @@ from abc import ABC, abstractmethod
 
 class ComponentInterface(ABC):
     """Interface for swappable components."""
-    
+
     @abstractmethod
     def execute(self, *args, **kwargs):
         """Execute component operation."""
@@ -108,7 +115,7 @@ from .interfaces import ComponentInterface
 
 class YourComponent(ComponentInterface):
     """Your component implementation."""
-    
+
     def execute(self, *args, **kwargs):
         """Implementation."""
         pass
@@ -165,6 +172,11 @@ Must include:
 4. Error handling
 5. Integration points
 6. Usage examples
+7. Enhanced features (if applicable):
+   - Pipeline processing steps
+   - Multiple strategies/approaches
+   - Metadata handling and validation
+   - Preprocessing and validation steps
 
 ### Code Documentation
 
@@ -213,6 +225,10 @@ except ComponentError as e:
 4. **Logging**: Use structured logging
 5. **Testing**: Maintain high test coverage (>80%)
 6. **Documentation**: Keep documentation up to date
+7. **Pipeline Design**: For multi-step processing, use pipeline patterns with validation at each step
+8. **Metadata Management**: Implement schema-based metadata validation and enrichment
+9. **Strategy Pattern**: Support multiple strategies/approaches (e.g., chunking strategies, retrieval strategies)
+10. **Preprocessing**: Include preprocessing steps for data normalization and cleaning
 
 ## Contribution Process
 
