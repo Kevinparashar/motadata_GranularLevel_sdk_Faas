@@ -98,6 +98,7 @@ from src.core.agno_agent_framework import (
     create_agent,
     create_agent_with_memory,
     create_agent_with_prompt_management,
+    create_agent_with_tools,
     create_agent_manager,
     create_orchestrator
 )
@@ -118,6 +119,27 @@ agent = create_agent_with_prompt_management(
     system_prompt="You are a helpful AI assistant.",
     role_template="assistant_role",
     max_context_tokens=8000
+)
+
+# Create agent with tools pre-configured
+from src.core.agno_agent_framework.tools import Tool, ToolType
+
+def calculate_sum(a: int, b: int) -> int:
+    return a + b
+
+tool = Tool(
+    tool_id="calc_sum",
+    name="calculate_sum",
+    description="Adds two numbers together",
+    tool_type=ToolType.FUNCTION,
+    function=calculate_sum
+)
+
+agent = create_agent_with_tools(
+    "agent4", "Calculator", gateway,
+    tools=[tool],
+    enable_tool_calling=True,
+    max_tool_iterations=10
 )
 
 # Create agent manager
@@ -198,24 +220,83 @@ save_agent_state(agent, "/tmp/agent_state.json")
 agent = load_agent_state("/tmp/agent_state.json", gateway)
 ```
 
+### Tool Calling Integration
+
+Agents now support **integrated tool calling** with automatic function execution during task execution:
+
+- **Tool Registration**: Register tools with agents using `attach_tools()` or `add_tool()`
+- **Automatic Tool Execution**: When LLM requests function calls, tools are automatically executed
+- **Iterative Tool Calling**: Agents can make multiple tool calls in a loop until task completion
+- **Tool Results Integration**: Tool execution results are fed back to the LLM for continued reasoning
+- **Error Handling**: Tool execution errors are caught and reported to the LLM
+
+**Example:**
+```python
+from src.core.agno_agent_framework import create_agent_with_tools
+from src.core.agno_agent_framework.tools import Tool, ToolType
+
+# Define a tool function
+def get_weather(location: str) -> str:
+    return f"Weather in {location}: Sunny, 25°C"
+
+# Create tool
+weather_tool = Tool(
+    tool_id="weather",
+    name="get_weather",
+    description="Get weather information for a location",
+    tool_type=ToolType.FUNCTION,
+    function=get_weather
+)
+
+# Create agent with tools
+agent = create_agent_with_tools(
+    "weather_agent", "Weather Assistant", gateway,
+    tools=[weather_tool],
+    enable_tool_calling=True,
+    max_tool_iterations=10
+)
+
+# Execute task - agent will automatically use tools when needed
+result = await agent.execute_task(
+    AgentTask(
+        task_id="task1",
+        task_type="llm_query",
+        parameters={
+            "prompt": "What's the weather in New York?",
+            "model": "gpt-4"
+        }
+    )
+)
+# Agent will call get_weather tool and use the result in its response
+```
+
 ### Agent State Persistence
 
-Agents now support **full state persistence**, allowing you to save and restore complete agent state:
+Agents now support **complete state persistence**, allowing you to save and restore full agent state:
 
-- **Save State**: Persists agent configuration, capabilities, task queue, current task, and metadata
-- **Load State**: Restores agent from saved state file with all configuration intact
+- **Save State**: Persists agent configuration, capabilities, task queue, current task, tools, memory paths, prompt manager state, and metadata
+- **Load State**: Restores agent from saved state file with all configuration intact, including tools (requires tool functions to be provided)
 - **Memory Persistence**: Agent memory is persisted separately via memory.save() if attached
+- **Tool Persistence**: Tool definitions are saved (tool functions must be re-registered on load)
 
 **Example:**
 ```python
 from src.core.agno_agent_framework import save_agent_state, load_agent_state
 
-# Save agent state
+# Save agent state (includes tools, memory paths, prompt manager state)
 save_agent_state(agent, "/tmp/agent_state.json")
 
-# Later, restore agent
-restored_agent = load_agent_state("/tmp/agent_state.json", gateway)
-# Agent is fully restored with all capabilities, tasks, and configuration
+# Later, restore agent with tool functions
+tool_functions = {
+    "get_weather": get_weather,
+    "calculate_sum": calculate_sum
+}
+restored_agent = load_agent_state(
+    "/tmp/agent_state.json",
+    gateway,
+    restore_tools=tool_functions
+)
+# Agent is fully restored with all capabilities, tasks, tools, and configuration
 ```
 
 See `src/core/agno_agent_framework/functions.py` for complete function documentation.
@@ -285,6 +366,18 @@ result = await execute_task(
    - Role template is rendered (if configured)
    - Relevant memories are retrieved and added as context
    - Conversation history is included
+4. **Tool Preparation**: If tools are registered and tool calling is enabled:
+   - Tool schemas are prepared for LLM function calling
+   - Tools are included in the LLM request
+5. **LLM Call**: The enhanced prompt (and tools) is sent to the LiteLLM Gateway
+6. **Tool Execution Loop** (if tool calling enabled):
+   - LLM response is checked for function calls
+   - If function calls are present:
+     - Tools are executed with provided arguments
+     - Tool results are fed back to the LLM
+     - Process repeats until no more function calls or max iterations reached
+7. **Result Processing**: Final LLM response is processed and returned
+8. **Memory Storage**: Task result is stored in agent memory (if memory is attached)
    - Token budget is enforced
 4. **LLM Reasoning**: The agent uses the LiteLLM Gateway with the enhanced prompt to generate responses or make decisions.
 5. **Task Execution**: The agent executes the task based on its capabilities and the LLM's guidance.

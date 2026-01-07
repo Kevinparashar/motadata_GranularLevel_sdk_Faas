@@ -4,12 +4,14 @@ Agno Agent Framework - Core Agent Implementation
 Provides the base agent class and agent management functionality.
 """
 
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Optional, Callable
 from pydantic import BaseModel, Field
 from enum import Enum
 import asyncio
+import json
 from datetime import datetime
 from .memory import AgentMemory, MemoryType
+from .tools import ToolRegistry, ToolExecutor, Tool
 
 # Import Prompt Context Management
 try:
@@ -90,6 +92,12 @@ class Agent(BaseModel):
     role_template: Optional[str] = None  # Role-based template name
     use_prompt_management: bool = True  # Enable/disable prompt management
     max_context_tokens: int = 4000  # Max tokens for context window
+    
+    # Tool Management
+    tool_registry: Optional[ToolRegistry] = None
+    tool_executor: Optional[ToolExecutor] = None
+    enable_tool_calling: bool = True  # Enable/disable tool calling
+    max_tool_iterations: int = 10  # Max iterations for tool calling loop
     
     # Task management
     task_queue: List[AgentTask] = Field(default_factory=list)
@@ -197,7 +205,7 @@ class Agent(BaseModel):
     
     async def _execute_task_internal(self, task: AgentTask) -> Any:
         """
-        Internal task execution logic with integrated prompt management.
+        Internal task execution logic with integrated prompt management and tool calling.
         
         Args:
             task: Task to execute
@@ -222,17 +230,130 @@ class Agent(BaseModel):
             if self.prompt_manager:
                 self.prompt_manager.record_history(final_prompt)
             
-            response = await self.gateway.generate_async(
-                prompt=final_prompt,
-                model=model,
-                **task.parameters.get("llm_kwargs", {})
-            )
+            # Prepare messages for conversation
+            messages = [{"role": "user", "content": final_prompt}]
             
+            # Get tool schemas if tools are enabled
+            tools_schema = None
+            if self.enable_tool_calling and self.tool_registry:
+                tools_schema = self.tool_registry.get_tools_schema()
+            
+            # Tool calling loop
+            iteration = 0
+            tool_calls_made = []
+            
+            while iteration < self.max_tool_iterations:
+                # Prepare kwargs for LLM call
+                llm_kwargs = task.parameters.get("llm_kwargs", {})
+                
+                # Add tools if available
+                if tools_schema:
+                    llm_kwargs["tools"] = tools_schema
+                    llm_kwargs["tool_choice"] = "auto"
+                
+                # Make LLM call
+                response = await self.gateway.generate_async(
+                    prompt=messages[-1]["content"] if messages else final_prompt,
+                    model=model,
+                    messages=messages,
+                    **llm_kwargs
+                )
+                
+                # Extract response content
+                response_text = response.text
+                finish_reason = getattr(response, 'finish_reason', None)
+                
+                # Check for function calls in raw response
+                function_calls = self._extract_function_calls(response)
+                
+                # If no function calls, return the final response
+                if not function_calls or finish_reason != "tool_calls":
+                    # Add assistant response to messages
+                    messages.append({"role": "assistant", "content": response_text})
+                    
+                    return {
+                        "status": "completed",
+                        "task_id": task.task_id,
+                        "result": response_text,
+                        "model": response.model if hasattr(response, 'model') else model,
+                        "tool_calls": tool_calls_made,
+                        "iterations": iteration + 1
+                    }
+                
+                # Execute function calls
+                messages.append({"role": "assistant", "content": response_text})
+                
+                for func_call in function_calls:
+                    tool_name = func_call.get("name", "")
+                    arguments = func_call.get("arguments", {})
+                    
+                    try:
+                        # Execute tool
+                        if self.tool_executor:
+                            tool_result = self.tool_executor.execute_tool_call(
+                                tool_name=tool_name,
+                                arguments=arguments
+                            )
+                            
+                            # Store tool call info
+                            tool_calls_made.append({
+                                "tool": tool_name,
+                                "arguments": arguments,
+                                "result": str(tool_result) if not isinstance(tool_result, (dict, list)) else tool_result,
+                                "success": True
+                            })
+                            
+                            # Add tool result to messages for next LLM call
+                            messages.append({
+                                "role": "tool",
+                                "content": json.dumps(tool_result) if isinstance(tool_result, (dict, list)) else str(tool_result),
+                                "tool_call_id": func_call.get("id", f"call_{iteration}_{len(tool_calls_made)}")
+                            })
+                            
+                            # Store tool execution in memory
+                            if self.memory:
+                                self.memory.store(
+                                    content=f"Tool {tool_name} executed with result: {tool_result}",
+                                    memory_type=MemoryType.SHORT_TERM,
+                                    importance=0.7,
+                                    metadata={"tool_name": tool_name, "task_id": task.task_id}
+                                )
+                        else:
+                            tool_calls_made.append({
+                                "tool": tool_name,
+                                "arguments": arguments,
+                                "result": "Tool executor not available",
+                                "success": False
+                            })
+                    except Exception as e:
+                        # Handle tool execution errors
+                        error_msg = f"Tool {tool_name} execution failed: {str(e)}"
+                        tool_calls_made.append({
+                            "tool": tool_name,
+                            "arguments": arguments,
+                            "result": error_msg,
+                            "success": False,
+                            "error": str(e)
+                        })
+                        
+                        # Add error to messages
+                        messages.append({
+                            "role": "tool",
+                            "content": error_msg,
+                            "tool_call_id": func_call.get("id", f"call_{iteration}_{len(tool_calls_made)}")
+                        })
+                
+                iteration += 1
+            
+            # Max iterations reached, return last response
             return {
                 "status": "completed",
                 "task_id": task.task_id,
-                "result": response.text,
-                "model": response.model
+                "result": response_text,
+                "model": response.model if hasattr(response, 'model') else model,
+                "tool_calls": tool_calls_made,
+                "iterations": iteration,
+                "warning": "Max tool iterations reached"
             }
         
         # Default task execution
@@ -241,6 +362,49 @@ class Agent(BaseModel):
             "task_id": task.task_id,
             "result": f"Task {task.task_type} executed"
         }
+    
+    def _extract_function_calls(self, response: Any) -> List[Dict[str, Any]]:
+        """
+        Extract function calls from LLM response.
+        
+        Args:
+            response: LLM response object
+        
+        Returns:
+            List of function call dictionaries
+        """
+        function_calls = []
+        
+        # Check raw_response for function calls
+        if hasattr(response, 'raw_response'):
+            raw = response.raw_response
+            if isinstance(raw, dict):
+                choices = raw.get("choices", [])
+                if choices:
+                    message = choices[0].get("message", {})
+                    tool_calls = message.get("tool_calls", [])
+                    if tool_calls:
+                        for tool_call in tool_calls:
+                            func_call = {
+                                "id": tool_call.get("id", ""),
+                                "name": tool_call.get("function", {}).get("name", ""),
+                                "arguments": json.loads(tool_call.get("function", {}).get("arguments", "{}"))
+                            }
+                            function_calls.append(func_call)
+            elif hasattr(raw, 'choices'):
+                # Handle LiteLLM response object
+                if raw.choices:
+                    message = raw.choices[0].message
+                    if hasattr(message, 'tool_calls') and message.tool_calls:
+                        for tool_call in message.tool_calls:
+                            func_call = {
+                                "id": tool_call.id if hasattr(tool_call, 'id') else "",
+                                "name": tool_call.function.name if hasattr(tool_call, 'function') and hasattr(tool_call.function, 'name') else "",
+                                "arguments": json.loads(tool_call.function.arguments) if hasattr(tool_call, 'function') and hasattr(tool_call.function, 'arguments') else {}
+                            }
+                            function_calls.append(func_call)
+        
+        return function_calls
     
     def _build_prompt_with_context(
         self,
@@ -355,6 +519,37 @@ class Agent(BaseModel):
             agent_id=self.agent_id,
             persistence_path=persistence_path or self.memory_persistence_path,
         )
+    
+    def attach_tools(self, tools: Optional[List[Tool]] = None, registry: Optional[ToolRegistry] = None) -> None:
+        """
+        Attach tools to the agent.
+        
+        Args:
+            tools: Optional list of Tool instances to register
+            registry: Optional pre-configured ToolRegistry
+        """
+        if registry:
+            self.tool_registry = registry
+        else:
+            self.tool_registry = ToolRegistry()
+            if tools:
+                for tool in tools:
+                    self.tool_registry.register_tool(tool)
+        
+        self.tool_executor = ToolExecutor(self.tool_registry)
+    
+    def add_tool(self, tool: Tool) -> None:
+        """
+        Add a single tool to the agent's tool registry.
+        
+        Args:
+            tool: Tool instance to add
+        """
+        if not self.tool_registry:
+            self.tool_registry = ToolRegistry()
+            self.tool_executor = ToolExecutor(self.tool_registry)
+        
+        self.tool_registry.register_tool(tool)
     
     def attach_prompt_manager(
         self,
@@ -475,15 +670,14 @@ class Agent(BaseModel):
     
     def save_state(self, file_path: Optional[str] = None) -> None:
         """
-        Save agent state to disk for persistence.
+        Save complete agent state to disk for persistence.
         
-        Saves agent configuration, capabilities, task queue, and metadata.
-        Memory is persisted separately via memory.save() if memory is attached.
+        Saves agent configuration, capabilities, task queue, tools, memory,
+        prompt manager state, and metadata.
         
         Args:
             file_path: Optional path to save state. If None, uses agent_id.json
         """
-        import json
         from pathlib import Path
         
         if not file_path:
@@ -492,7 +686,44 @@ class Agent(BaseModel):
         state_path = Path(file_path)
         state_path.parent.mkdir(parents=True, exist_ok=True)
         
-        # Prepare state (exclude non-serializable objects like gateway)
+        # Serialize tool registry if available
+        tools_state = None
+        if self.tool_registry:
+            tools_state = []
+            for tool_id, tool in self.tool_registry._tools.items():
+                # Serialize tool (exclude function, as it's not serializable)
+                tool_dict = {
+                    "tool_id": tool.tool_id,
+                    "name": tool.name,
+                    "description": tool.description,
+                    "tool_type": tool.tool_type.value if hasattr(tool.tool_type, 'value') else str(tool.tool_type),
+                    "parameters": [param.model_dump() for param in tool.parameters],
+                    "metadata": tool.metadata,
+                    "tags": tool.tags,
+                    # Note: function is not serialized - must be re-registered on load
+                }
+                tools_state.append(tool_dict)
+        
+        # Serialize prompt manager state if available
+        prompt_manager_state = None
+        if self.prompt_manager:
+            prompt_manager_state = {
+                "max_tokens": self.max_context_tokens,
+                "templates": [],
+                "history_count": len(self.prompt_manager.history) if hasattr(self.prompt_manager, 'history') else 0
+            }
+            # Save templates if available
+            if hasattr(self.prompt_manager, 'templates'):
+                for template_name, template in self.prompt_manager.templates.items():
+                    template_dict = {
+                        "name": template_name,
+                        "version": template.version if hasattr(template, 'version') else "1.0",
+                        "content": template.content if hasattr(template, 'content') else str(template),
+                        "metadata": template.metadata if hasattr(template, 'metadata') else {}
+                    }
+                    prompt_manager_state["templates"].append(template_dict)
+        
+        # Prepare complete state
         state = {
             "agent_id": self.agent_id,
             "name": self.name,
@@ -515,32 +746,43 @@ class Agent(BaseModel):
             "role_template": self.role_template,
             "use_prompt_management": self.use_prompt_management,
             "max_context_tokens": self.max_context_tokens,
+            "enable_tool_calling": self.enable_tool_calling,
+            "max_tool_iterations": self.max_tool_iterations,
+            "tools": tools_state,
+            "prompt_manager": prompt_manager_state,
         }
         
         with state_path.open("w", encoding="utf-8") as f:
             json.dump(state, f, indent=2, default=str)
         
-        # Persist memory if attached
+        # Persist memory if attached (memory saves to its own file)
         if self.memory and self.auto_persist_memory:
             self.memory.save()
+        
+        # Save prompt manager history if available
+        if self.prompt_manager and hasattr(self.prompt_manager, 'save_history'):
+            prompt_history_path = state_path.parent / f"{self.agent_id}_prompt_history.json"
+            self.prompt_manager.save_history(str(prompt_history_path))
     
     @classmethod
     def load_state(
         cls,
         file_path: str,
-        gateway: Optional[Any] = None
+        gateway: Optional[Any] = None,
+        restore_tools: Optional[Dict[str, Callable]] = None
     ) -> "Agent":
         """
-        Load agent state from disk.
+        Load complete agent state from disk.
         
         Args:
             file_path: Path to saved state file
             gateway: LiteLLM Gateway instance (required for agent functionality)
+            restore_tools: Optional dictionary mapping tool names to their functions.
+                          Required to restore tools with their implementations.
         
         Returns:
-            Restored Agent instance
+            Restored Agent instance with complete state
         """
-        import json
         from pathlib import Path
         
         state_path = Path(file_path)
@@ -587,6 +829,8 @@ class Agent(BaseModel):
         agent.role_template = state.get("role_template")
         agent.use_prompt_management = state.get("use_prompt_management", True)
         agent.max_context_tokens = state.get("max_context_tokens", 4000)
+        agent.enable_tool_calling = state.get("enable_tool_calling", True)
+        agent.max_tool_iterations = state.get("max_tool_iterations", 10)
         
         # Restore prompt manager if enabled
         if agent.use_prompt_management and PromptContextManager:
@@ -595,6 +839,53 @@ class Agent(BaseModel):
                 system_prompt=agent.system_prompt,
                 role_template=agent.role_template
             )
+            
+            # Restore prompt manager templates
+            prompt_manager_state = state.get("prompt_manager")
+            if prompt_manager_state and agent.prompt_manager:
+                for template_dict in prompt_manager_state.get("templates", []):
+                    agent.prompt_manager.add_template(
+                        name=template_dict["name"],
+                        version=template_dict.get("version", "1.0"),
+                        content=template_dict["content"],
+                        metadata=template_dict.get("metadata", {})
+                    )
+                
+                # Restore prompt history if available
+                prompt_history_path = state_path.parent / f"{agent.agent_id}_prompt_history.json"
+                if prompt_history_path.exists() and hasattr(agent.prompt_manager, 'load_history'):
+                    agent.prompt_manager.load_history(str(prompt_history_path))
+        
+        # Restore tools if available
+        tools_state = state.get("tools")
+        if tools_state and restore_tools:
+            from .tools import Tool, ToolParameter, ToolType
+            restored_tools = []
+            for tool_dict in tools_state:
+                tool_name = tool_dict["name"]
+                # Get function from restore_tools dict
+                if tool_name in restore_tools:
+                    tool = Tool(
+                        tool_id=tool_dict["tool_id"],
+                        name=tool_dict["name"],
+                        description=tool_dict["description"],
+                        tool_type=ToolType(tool_dict["tool_type"]),
+                        function=restore_tools[tool_name],
+                        parameters=[ToolParameter(**param) for param in tool_dict.get("parameters", [])],
+                        metadata=tool_dict.get("metadata", {}),
+                        tags=tool_dict.get("tags", [])
+                    )
+                    restored_tools.append(tool)
+            
+            if restored_tools:
+                agent.attach_tools(tools=restored_tools)
+        
+        # Restore memory if persistence path is set
+        memory_path = state.get("memory_persistence_path")
+        if memory_path:
+            agent.memory_persistence_path = memory_path
+            agent.attach_memory(memory_path)
+            # Memory will auto-load from file if it exists
         
         # Restore timestamps
         from datetime import datetime

@@ -34,7 +34,7 @@ def create_agent(
 ) -> Agent:
     """
     Create and configure an agent with default settings.
-    
+
     Args:
         agent_id: Unique agent identifier
         name: Agent name
@@ -43,10 +43,10 @@ def create_agent(
         llm_model: Optional LLM model name
         llm_provider: Optional LLM provider
         **kwargs: Additional agent configuration
-    
+
     Returns:
         Configured Agent instance
-    
+
     Example:
         >>> gateway = LiteLLMGateway()
         >>> agent = create_agent("agent1", "Assistant", gateway)
@@ -71,7 +71,7 @@ def create_agent_with_memory(
 ) -> Agent:
     """
     Create an agent with memory pre-configured.
-    
+
     Args:
         agent_id: Unique agent identifier
         name: Agent name
@@ -81,10 +81,10 @@ def create_agent_with_memory(
             - max_short_term: Max short-term memories (default: 50)
             - max_long_term: Max long-term memories (default: 1000)
         **kwargs: Additional agent configuration
-    
+
     Returns:
         Agent instance with memory attached
-    
+
     Example:
         >>> agent = create_agent_with_memory(
         ...     "agent1", "Assistant", gateway,
@@ -92,17 +92,17 @@ def create_agent_with_memory(
         ... )
     """
     agent = create_agent(agent_id, name, gateway, **kwargs)
-    
+
     if memory_config:
         persistence_path = memory_config.get("persistence_path")
         max_short_term = memory_config.get("max_short_term", 50)
         max_long_term = memory_config.get("max_long_term", 1000)
-        
+
         agent.attach_memory(persistence_path)
         if agent.memory:
             agent.memory.max_short_term = max_short_term
             agent.memory.max_long_term = max_long_term
-    
+
     return agent
 
 
@@ -118,7 +118,7 @@ def create_agent_with_prompt_management(
 ) -> Agent:
     """
     Create an agent with prompt context management pre-configured.
-    
+
     Args:
         agent_id: Unique agent identifier
         name: Agent name
@@ -131,10 +131,10 @@ def create_agent_with_prompt_management(
             - safety_margin: Safety margin for token estimation
             - templates: List of template dicts with name, version, content, metadata
         **kwargs: Additional agent configuration
-    
+
     Returns:
         Agent instance with prompt management attached
-    
+
     Example:
         >>> agent = create_agent_with_prompt_management(
         ...     "agent1", "Assistant", gateway,
@@ -144,21 +144,21 @@ def create_agent_with_prompt_management(
         ... )
     """
     agent = create_agent(agent_id, name, gateway, **kwargs)
-    
+
     if create_prompt_manager:
         prompt_max_tokens = max_context_tokens
         safety_margin = 200
-        
+
         if prompt_config:
             prompt_max_tokens = prompt_config.get("max_tokens", max_context_tokens)
             safety_margin = prompt_config.get("safety_margin", 200)
-        
+
         agent.attach_prompt_manager(
             max_tokens=prompt_max_tokens,
             system_prompt=system_prompt,
             role_template=role_template
         )
-        
+
         # Add templates if provided
         if prompt_config and "templates" in prompt_config:
             for template in prompt_config["templates"]:
@@ -174,17 +174,74 @@ def create_agent_with_prompt_management(
         agent.role_template = role_template
         agent.max_context_tokens = max_context_tokens
         agent.use_prompt_management = False
-    
+
+    return agent
+
+
+def create_agent_with_tools(
+    agent_id: str,
+    name: str,
+    gateway: Any,
+    tools: Optional[List[Any]] = None,
+    tool_registry: Optional[Any] = None,
+    enable_tool_calling: bool = True,
+    max_tool_iterations: int = 10,
+    **kwargs: Any
+) -> Agent:
+    """
+    Create an agent with tools pre-configured.
+
+    Args:
+        agent_id: Unique agent identifier
+        name: Agent name
+        gateway: LiteLLM Gateway instance
+        tools: Optional list of Tool instances to register
+        tool_registry: Optional pre-configured ToolRegistry
+        enable_tool_calling: Enable/disable tool calling (default: True)
+        max_tool_iterations: Maximum iterations for tool calling loop (default: 10)
+        **kwargs: Additional agent configuration
+
+    Returns:
+        Agent instance with tools attached
+
+    Example:
+        >>> from src.core.agno_agent_framework.tools import Tool, ToolType
+        >>>
+        >>> def calculate_sum(a: int, b: int) -> int:
+        ...     return a + b
+        >>>
+        >>> tool = Tool(
+        ...     tool_id="calc_sum",
+        ...     name="calculate_sum",
+        ...     description="Adds two numbers",
+        ...     tool_type=ToolType.FUNCTION,
+        ...     function=calculate_sum
+        ... )
+        >>>
+        >>> agent = create_agent_with_tools(
+        ...     "agent1", "Calculator", gateway,
+        ...     tools=[tool],
+        ...     enable_tool_calling=True
+        ... )
+    """
+    agent = create_agent(agent_id, name, gateway, **kwargs)
+
+    agent.enable_tool_calling = enable_tool_calling
+    agent.max_tool_iterations = max_tool_iterations
+
+    if tools or tool_registry:
+        agent.attach_tools(tools=tools, registry=tool_registry)
+
     return agent
 
 
 def create_agent_manager() -> AgentManager:
     """
     Create a new AgentManager instance.
-    
+
     Returns:
         AgentManager instance
-    
+
     Example:
         >>> manager = create_agent_manager()
         >>> agent = create_agent("agent1", "Assistant", gateway)
@@ -196,13 +253,13 @@ def create_agent_manager() -> AgentManager:
 def create_orchestrator(agent_manager: AgentManager) -> AgentOrchestrator:
     """
     Create an AgentOrchestrator for multi-agent workflows.
-    
+
     Args:
         agent_manager: AgentManager instance
-    
+
     Returns:
         AgentOrchestrator instance
-    
+
     Example:
         >>> manager = create_agent_manager()
         >>> orchestrator = create_orchestrator(manager)
@@ -223,16 +280,16 @@ async def execute_task(
 ) -> Any:
     """
     Execute a task on an agent (high-level convenience function).
-    
+
     Args:
         agent: Agent instance
         task_type: Type of task to execute
         parameters: Task parameters
         priority: Task priority (higher = more important)
-    
+
     Returns:
         Task execution result
-    
+
     Example:
         >>> result = await execute_task(
         ...     agent,
@@ -253,16 +310,16 @@ async def chat_with_agent(
 ) -> Dict[str, Any]:
     """
     Chat with an agent using session management (high-level convenience).
-    
+
     Args:
         agent: Agent instance
         message: User message
         session_id: Optional session ID (creates new if not provided)
         context: Optional context variables
-    
+
     Returns:
         Dictionary with response and session info
-    
+
     Example:
         >>> response = await chat_with_agent(
         ...     agent,
@@ -275,22 +332,22 @@ async def chat_with_agent(
     # Use a module-level session manager or create one per agent
     if not hasattr(chat_with_agent, '_session_managers'):
         chat_with_agent._session_managers = {}
-    
+
     if agent.agent_id not in chat_with_agent._session_managers:
         chat_with_agent._session_managers[agent.agent_id] = SessionManager()
-    
+
     session_manager = chat_with_agent._session_managers[agent.agent_id]
-    
+
     if session_id:
         session = session_manager.get_session(session_id)
         if not session:
             session = session_manager.create_session(agent.agent_id)
     else:
         session = session_manager.create_session(agent.agent_id)
-    
+
     # Add user message to session
     session.add_message("user", message, metadata=context or {})
-    
+
     # Execute task
     result = await execute_task(
         agent,
@@ -303,13 +360,13 @@ async def chat_with_agent(
             ]
         }
     )
-    
+
     # Extract answer
     answer = result.get("result", "") if isinstance(result, dict) else str(result)
-    
+
     # Add assistant response to session
     session.add_message("assistant", answer)
-    
+
     return {
         "answer": answer,
         "session_id": session.session_id,
@@ -327,7 +384,7 @@ async def delegate_task(
 ) -> Any:
     """
     Delegate a task from one agent to another (high-level convenience).
-    
+
     Args:
         orchestrator: AgentOrchestrator instance
         from_agent_id: Source agent ID
@@ -335,10 +392,10 @@ async def delegate_task(
         task_type: Type of task
         parameters: Task parameters
         priority: Task priority
-    
+
     Returns:
         Task execution result
-    
+
     Example:
         >>> result = await delegate_task(
         ...     orchestrator,
@@ -363,14 +420,14 @@ def find_agents_by_capability(
 ) -> List[Agent]:
     """
     Find agents with a specific capability (high-level convenience).
-    
+
     Args:
         manager: AgentManager instance
         capability_name: Capability name to search for
-    
+
     Returns:
         List of agents with the capability
-    
+
     Example:
         >>> agents = find_agents_by_capability(manager, "data_analysis")
         >>> for agent in agents:
@@ -391,16 +448,16 @@ def batch_process_agents(
 ) -> List[Any]:
     """
     Process tasks on multiple agents concurrently.
-    
+
     Args:
         agents: List of agent instances
         task_type: Type of task to execute
         parameters: Task parameters
         max_concurrent: Maximum concurrent executions
-    
+
     Returns:
         List of results from each agent
-    
+
     Example:
         >>> results = batch_process_agents(
         ...     [agent1, agent2, agent3],
@@ -409,14 +466,14 @@ def batch_process_agents(
         ... )
     """
     import asyncio
-    
+
     async def _process():
         tasks = [
             execute_task(agent, task_type, parameters)
             for agent in agents
         ]
         return await asyncio.gather(*tasks, return_exceptions=True)
-    
+
     return asyncio.run(_process())
 
 
@@ -427,15 +484,15 @@ def retry_on_failure(
 ):
     """
     Decorator to retry function on failure.
-    
+
     Args:
         max_retries: Maximum number of retries
         retry_delay: Delay between retries in seconds
         exceptions: Tuple of exceptions to catch
-    
+
     Returns:
         Decorator function
-    
+
     Example:
         >>> @retry_on_failure(max_retries=3)
         ... async def my_function():
@@ -444,7 +501,7 @@ def retry_on_failure(
     """
     import asyncio
     from functools import wraps
-    
+
     def decorator(func: Any) -> Any:
         @wraps(func)
         async def async_wrapper(*args, **kwargs):
@@ -458,7 +515,7 @@ def retry_on_failure(
                         await asyncio.sleep(retry_delay * (attempt + 1))
                     else:
                         raise last_error
-        
+
         @wraps(func)
         def sync_wrapper(*args, **kwargs):
             import time
@@ -472,11 +529,11 @@ def retry_on_failure(
                         time.sleep(retry_delay * (attempt + 1))
                     else:
                         raise last_error
-        
+
         if asyncio.iscoroutinefunction(func):
             return async_wrapper
         return sync_wrapper
-    
+
     return decorator
 
 
@@ -486,11 +543,11 @@ def save_agent_state(
 ) -> None:
     """
     Save agent state to disk for persistence (utility function).
-    
+
     Args:
         agent: Agent instance to save
         file_path: Optional path to save state
-    
+
     Example:
         >>> save_agent_state(agent, "/tmp/agent_state.json")
     """
@@ -503,14 +560,14 @@ def load_agent_state(
 ) -> Agent:
     """
     Load agent state from disk (utility function).
-    
+
     Args:
         file_path: Path to saved state file
         gateway: LiteLLM Gateway instance
-    
+
     Returns:
         Restored Agent instance
-    
+
     Example:
         >>> agent = load_agent_state("/tmp/agent_state.json", gateway)
     """
