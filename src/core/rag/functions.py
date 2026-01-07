@@ -52,7 +52,12 @@ def create_rag_system(
 def create_document_processor(
     chunk_size: int = 1000,
     chunk_overlap: int = 200,
-    strategy: str = "fixed"
+    chunking_strategy: str = "fixed",
+    min_chunk_size: int = 50,
+    max_chunk_size: int = 2000,
+    enable_preprocessing: bool = True,
+    enable_metadata_extraction: bool = True,
+    metadata_schema: Optional[Any] = None
 ) -> DocumentProcessor:
     """
     Create a document processor with specified configuration.
@@ -60,7 +65,12 @@ def create_document_processor(
     Args:
         chunk_size: Size of chunks in characters
         chunk_overlap: Overlap between chunks
-        strategy: Chunking strategy ("fixed", "sentence", "paragraph")
+        chunking_strategy: Chunking strategy ("fixed", "sentence", "paragraph", "semantic")
+        min_chunk_size: Minimum chunk size to keep (filters out tiny chunks)
+        max_chunk_size: Maximum chunk size (splits oversized chunks)
+        enable_preprocessing: Enable text preprocessing (normalization, cleaning)
+        enable_metadata_extraction: Enable automatic metadata extraction
+        metadata_schema: Optional metadata schema for validation
     
     Returns:
         DocumentProcessor instance
@@ -68,13 +78,20 @@ def create_document_processor(
     Example:
         >>> processor = create_document_processor(
         ...     chunk_size=500,
-        ...     strategy="sentence"
+        ...     chunking_strategy="sentence",
+        ...     enable_preprocessing=True,
+        ...     enable_metadata_extraction=True
         ... )
     """
     return DocumentProcessor(
         chunk_size=chunk_size,
         chunk_overlap=chunk_overlap,
-        strategy=strategy
+        chunking_strategy=chunking_strategy,
+        min_chunk_size=min_chunk_size,
+        max_chunk_size=max_chunk_size,
+        enable_preprocessing=enable_preprocessing,
+        enable_metadata_extraction=enable_metadata_extraction,
+        metadata_schema=metadata_schema
     )
 
 

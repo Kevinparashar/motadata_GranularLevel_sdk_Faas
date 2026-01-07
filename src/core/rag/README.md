@@ -266,9 +266,24 @@ See `src/core/rag/functions.py` for complete function documentation.
 ### DocumentProcessor
 
 The `DocumentProcessor` class handles document preprocessing:
-- **Chunking Strategies**: Supports fixed-size, sentence-based, and paragraph-based chunking
-- **Metadata Preservation**: Maintains document metadata throughout processing
-- **Chunk Identification**: Generates unique identifiers for document chunks
+- **Enhanced Chunking Pipeline**: 
+  - Multiple chunking strategies: fixed-size, sentence-based, paragraph-based, and semantic chunking
+  - Preprocessing pipeline: text normalization, whitespace cleaning, unicode normalization
+  - Chunk validation: filters chunks by size (min/max), validates content
+  - Word boundary awareness: chunks break at word boundaries when possible
+  - Semantic chunking: chunks by headers and sections for structured documents
+- **Advanced Metadata Handling**:
+  - Automatic metadata extraction: title, dates, tags, language detection
+  - Metadata validation: schema-based validation for metadata consistency
+  - Metadata enrichment: document-level metadata automatically added to chunks
+  - Metadata transformation: normalization and standardization
+  - File metadata extraction: extracts file name, size, extension, modification date
+- **Multiple File Format Support**:
+  - Text files (.txt, .md, .markdown)
+  - HTML files with text extraction
+  - JSON files with readable conversion
+  - Extensible architecture for additional formats
+- **Chunk Identification**: Generates unique identifiers for document chunks with token count estimation
 
 ### Retriever
 
@@ -299,10 +314,17 @@ The `RAGSystem` class integrates all components:
 ## Document Ingestion Flow
 
 1. **Document Input**: A document is provided with title, content, and optional metadata
-2. **Document Storage**: The document is stored in the database
-3. **Chunking**: The document processor splits the document into chunks
-4. **Batch Embedding Generation**: All chunks are embedded in a single batch API call using the LiteLLM Gateway (optimized for performance)
-5. **Batch Embedding Storage**: All embeddings are stored in the database with pgvector using batch insert
+2. **Preprocessing**: Document content is preprocessed (normalization, cleaning, unicode handling)
+3. **Metadata Extraction**: Automatic extraction of metadata (title, dates, tags, language, file info)
+4. **Metadata Validation**: Metadata is validated against schema (if provided)
+5. **Document Storage**: The document is stored in the database with enriched metadata
+6. **Chunking Pipeline**: 
+   - Document is chunked based on selected strategy
+   - Chunks are validated (size, content quality)
+   - Chunk metadata is enriched with document-level metadata
+   - Token counts are estimated for each chunk
+7. **Batch Embedding Generation**: All chunks are embedded in a single batch API call using the LiteLLM Gateway (optimized for performance)
+8. **Batch Embedding Storage**: All embeddings are stored in the database with pgvector using batch insert
 
 **Optimization**: The system now uses batch processing to embed all chunks in one API call instead of individual calls, significantly improving performance and reducing costs.
 
@@ -330,16 +352,95 @@ The RAG system implements error handling for:
 - **Generation Errors**: Handles LLM generation failures with appropriate fallbacks
 - **Database Errors**: Catches and reports database operation failures
 
+## Enhanced Chunking Pipeline
+
+The RAG system now includes a comprehensive chunking pipeline with advanced features:
+
+### Preprocessing Steps
+
+1. **Text Normalization**: Normalizes whitespace, removes control characters, handles unicode
+2. **Content Cleaning**: Removes artifacts and normalizes formatting
+3. **Encoding Handling**: Properly handles various text encodings
+
+### Chunking Strategies
+
+- **Fixed**: Fixed-size chunks with word boundary awareness
+- **Sentence**: Chunks by sentences, preserving sentence boundaries
+- **Paragraph**: Chunks by paragraphs, handling large paragraphs intelligently
+- **Semantic**: Chunks by semantic boundaries (headers, sections) for structured documents
+
+### Chunk Validation
+
+- **Size Validation**: Filters chunks that are too small or too large
+- **Content Validation**: Ensures chunks contain meaningful content
+- **Quality Checks**: Validates chunk quality before embedding
+
+### Metadata Handling
+
+The system provides comprehensive metadata management:
+
+1. **Automatic Extraction**:
+   - Title extraction from content or file
+   - Date extraction from various formats
+   - Tag/keyword extraction (hashtags)
+   - Language detection
+   - File metadata (name, size, extension, modification date)
+
+2. **Metadata Validation**:
+   - Schema-based validation
+   - Type checking
+   - Required field validation
+
+3. **Metadata Enrichment**:
+   - Document-level metadata automatically added to chunks
+   - Chunk-specific metadata (index, position, token count)
+   - Merged metadata from multiple sources
+
+4. **Metadata Schema**:
+   - Define custom metadata schemas
+   - Validate metadata against schemas
+   - Ensure consistency across documents
+
+### File Format Support
+
+- **Text Files**: `.txt`, `.md`, `.markdown`
+- **HTML Files**: Extracts text content from HTML
+- **JSON Files**: Converts JSON to readable text format
+- **Extensible**: Architecture supports adding more formats
+
+**Example:**
+```python
+from src.core.rag import create_document_processor
+
+# Create processor with enhanced features
+processor = create_document_processor(
+    chunk_size=1000,
+    chunk_overlap=200,
+    chunking_strategy="semantic",  # Use semantic chunking
+    min_chunk_size=100,  # Filter chunks smaller than 100 chars
+    max_chunk_size=2000,  # Split chunks larger than 2000 chars
+    enable_preprocessing=True,  # Enable text preprocessing
+    enable_metadata_extraction=True  # Enable automatic metadata extraction
+)
+
+# Process document with metadata extraction
+content, metadata = processor.load_document("document.txt")
+chunks = processor.chunk_document(content, "doc_123", metadata)
+```
+
 ## Best Practices
 
 1. **Chunk Size Optimization**: Choose appropriate chunk sizes based on document types and use cases
-2. **Embedding Model Consistency**: Use the same embedding model for both ingestion and retrieval
-3. **Metadata Management**: Maintain rich metadata for effective filtering and organization
-4. **Similarity Threshold Tuning**: Adjust similarity thresholds to balance recall and precision
-5. **Context Length Management**: Consider token limits when building context from retrieved documents
-6. **Caching Strategy**: Implement caching for frequently accessed documents and queries
-7. **Batch Processing**: Use `ingest_documents_batch()` or `ingest_documents_batch_async()` for ingesting multiple documents to leverage batch optimization
-8. **Async Processing**: Use async methods (`ingest_document_async()`, `query_async()`) for better concurrency and throughput
+2. **Chunking Strategy**: Use semantic chunking for structured documents (markdown, HTML), sentence chunking for narrative text
+3. **Embedding Model Consistency**: Use the same embedding model for both ingestion and retrieval
+4. **Metadata Management**: Leverage automatic metadata extraction and maintain rich metadata for effective filtering and organization
+5. **Preprocessing**: Enable preprocessing for cleaner, more consistent chunks
+6. **Chunk Validation**: Set appropriate min/max chunk sizes to filter low-quality chunks
+7. **Similarity Threshold Tuning**: Adjust similarity thresholds to balance recall and precision
+8. **Context Length Management**: Consider token limits when building context from retrieved documents
+9. **Caching Strategy**: Implement caching for frequently accessed documents and queries
+10. **Batch Processing**: Use `ingest_documents_batch()` or `ingest_documents_batch_async()` for ingesting multiple documents to leverage batch optimization
+11. **Async Processing**: Use async methods (`ingest_document_async()`, `query_async()`) for better concurrency and throughput
 
 ## Examples and Tests
 
