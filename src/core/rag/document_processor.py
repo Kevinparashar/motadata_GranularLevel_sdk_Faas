@@ -11,6 +11,7 @@ import re
 from datetime import datetime
 from pydantic import BaseModel, Field, validator
 from enum import Enum
+# Removed custom exceptions - using standard Python exceptions
 
 
 class ChunkingStrategy(str, Enum):
@@ -333,8 +334,8 @@ class DocumentProcessor:
             try:
                 with open(path, 'r', encoding='utf-8') as f:
                     content = f.read()
-            except UnicodeDecodeError:
-                raise ValueError(f"Unsupported file format: {suffix}")
+            except UnicodeDecodeError as e:
+                raise RuntimeError(f"Unsupported file format: {suffix}") from e
         
         # Extract metadata from content
         extracted_metadata = self.metadata_handler.extract_metadata(
