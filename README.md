@@ -110,8 +110,11 @@ motadata-python-ai-sdk/
 
 4. **RAG System** (`src/core/rag/`)
    - Retrieval-Augmented Generation
-   - Document ingestion and retrieval
-   - Context-aware response generation
+   - Enhanced chunking pipeline with preprocessing, multiple strategies (fixed, sentence, paragraph, semantic)
+   - Advanced metadata handling: automatic extraction, validation, enrichment, and schema support
+   - Multiple file format support (text, HTML, JSON) with extensible architecture
+   - Document ingestion and retrieval with batch processing
+   - Context-aware response generation with query optimization
 
 5. **Prompt Context Management** (`src/core/prompt_context_management/`)
    - Prompt templates and versioning
@@ -346,10 +349,22 @@ agent_with_memory = create_agent_with_memory(
 )
 manager = create_agent_manager()
 
-# RAG System
-from src.core.rag import create_rag_system
+# RAG System with Enhanced Chunking and Metadata
+from src.core.rag import create_rag_system, create_document_processor
 
+# Create RAG system
 rag = create_rag_system(db, gateway, embedding_model="text-embedding-3-small")
+
+# Create document processor with enhanced features
+processor = create_document_processor(
+    chunk_size=1000,
+    chunk_overlap=200,
+    chunking_strategy="semantic",  # Use semantic chunking for structured docs
+    min_chunk_size=100,  # Filter tiny chunks
+    max_chunk_size=2000,  # Split oversized chunks
+    enable_preprocessing=True,  # Enable text normalization
+    enable_metadata_extraction=True  # Auto-extract metadata
+)
 
 # LiteLLM Gateway
 from src.core.litellm_gateway import create_gateway
@@ -401,23 +416,25 @@ result = await execute_task(
     {"text": "Analyze this document", "model": "gpt-4"}
 )
 
-# RAG Operations
+# RAG Operations with Enhanced Features
 from src.core.rag import quick_rag_query, ingest_document_simple
 
 # Quick RAG query with hybrid retrieval and query rewriting
 result = quick_rag_query(
-    rag, "What is machine learning?", 
+    rag, "What is machine learning?",
     top_k=5,
     retrieval_strategy="hybrid",
     use_query_rewriting=True
 )
 print(result["answer"])
 
-# Simple document ingestion
+# Simple document ingestion with automatic metadata extraction
+# Metadata (title, dates, tags, language) is automatically extracted
 doc_id = ingest_document_simple(
     rag,
     "AI Guide",
-    "Artificial Intelligence is..."
+    "Artificial Intelligence is... #ai #ml",
+    metadata={"category": "tutorial", "author": "AI Team"}
 )
 
 # Update document
@@ -532,14 +549,14 @@ save_agent_state(agent, "/tmp/agent_state.json")
 # Load agent state later
 restored_agent = load_agent_state("/tmp/agent_state.json", gateway)
 
-# Create RAG system
+# Create RAG system with enhanced chunking and metadata handling
 rag = create_rag_system(db, gateway)
 
-# Query RAG with hybrid retrieval
+# Query RAG with hybrid retrieval and query optimization
 result = quick_rag_query(
     rag, "What is machine learning?",
     retrieval_strategy="hybrid",
-    use_query_rewriting=True
+    use_query_rewriting=True  # Automatic query enhancement
 )
 print(result["answer"])
 
