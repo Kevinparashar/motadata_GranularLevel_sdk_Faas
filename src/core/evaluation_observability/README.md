@@ -52,8 +52,21 @@ The **Governance Framework** (root level) can use observability data for:
 
 - **opentelemetry-api**: Provides the OpenTelemetry API for distributed tracing. It enables standardized tracing across components.
 - **opentelemetry-sdk**: Implements the OpenTelemetry SDK, providing the actual tracing implementation.
+- **opentelemetry-exporter-otlp**: OTLP exporter for sending traces and metrics to OTLP-compatible backends.
+- **opentelemetry-exporter-jaeger**: Jaeger exporter for distributed tracing visualization.
+- **opentelemetry-exporter-prometheus**: Prometheus exporter for metrics collection.
 - **structlog**: Provides structured logging capabilities, enabling consistent log formatting and parsing.
 - **prometheus-client**: Provides metrics collection and exposition, enabling integration with monitoring systems.
+
+## OpenTelemetry (OTEL) Implementation
+
+For detailed information on how OpenTelemetry is implemented in this SDK, see:
+- **[OTEL Implementation Guide](../../../OTEL_IMPLEMENTATION_GUIDE.md)**: Comprehensive guide covering:
+  - Architecture and integration points
+  - Component instrumentation (Agent, RAG, Gateway, Database, NATS)
+  - Context propagation across async operations and messaging
+  - Exporters and backend configuration
+  - Usage examples and best practices
 
 ## Key Features
 

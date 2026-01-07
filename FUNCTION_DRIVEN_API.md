@@ -22,6 +22,7 @@ The Motadata Python AI SDK provides a **function-driven API** that makes it easy
 #### Factory Functions
 - `create_agent()` - Create and configure an agent
 - `create_agent_with_memory()` - Create agent with memory pre-configured
+- `create_agent_with_prompt_management()` - Create agent with prompt context management pre-configured
 - `create_agent_manager()` - Create an AgentManager instance
 - `create_orchestrator()` - Create an AgentOrchestrator for workflows
 
@@ -41,12 +42,23 @@ The Motadata Python AI SDK provides a **function-driven API** that makes it easy
 ```python
 from src.core.agno_agent_framework import (
     create_agent,
+    create_agent_with_prompt_management,
     chat_with_agent,
     execute_task
 )
 
 gateway = LiteLLMGateway()
+
+# Basic agent
 agent = create_agent("agent1", "Assistant", gateway)
+
+# Agent with prompt management
+agent = create_agent_with_prompt_management(
+    "agent2", "Helper", gateway,
+    system_prompt="You are a helpful assistant.",
+    role_template="assistant_role",
+    max_context_tokens=8000
+)
 
 response = await chat_with_agent(agent, "What is AI?")
 result = await execute_task(agent, "analyze", {"text": "..."})

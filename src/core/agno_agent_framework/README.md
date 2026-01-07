@@ -20,6 +20,18 @@ Agents are designed to be specialized, with each agent having specific capabilit
 
 The **LiteLLM Gateway** (`src/core/litellm_gateway/`) is a critical dependency for the agent framework. Every agent requires a gateway instance to perform LLM operations. When an agent needs to reason, generate text, or analyze information, it calls the gateway's methods. The gateway is injected into agents during creation, establishing a clear dependency relationship. The framework uses the gateway's `generate_async()` method for agent reasoning and decision-making.
 
+### Integration with Prompt Context Management
+
+The **Prompt Context Management** (`src/core/prompt_context_management/`) is fully integrated into the Agent Framework. Agents automatically use prompt management for:
+- **System Prompts**: Define agent behavior and role through system prompts
+- **Role-Based Templates**: Use role-based prompt templates for consistent agent behavior
+- **Context Assembly**: Automatically assemble context from conversation history and memory
+- **Token Budget Enforcement**: Enforce token limits to prevent context window overflow
+- **Context Prioritization**: Prioritize relevant context from memory based on task requirements
+- **Prompt History**: Maintain prompt history for context-aware conversations
+
+When agents execute tasks, prompts are automatically enhanced with system prompts, role templates, relevant memories, and conversation history, ensuring optimal LLM interactions.
+
 ### Integration with RAG System
 
 The **RAG System** (`src/core/rag/`) can be used by agents when they need to retrieve information from the knowledge base. Agents can query the RAG system to get context-aware information before making decisions or generating responses. This integration enables agents to have access to up-to-date information stored in the document database.
@@ -56,6 +68,8 @@ The `Agent` class represents an individual agent. Each agent has:
 - A task queue for managing pending tasks
 - A message queue for receiving communications from other agents
 - A reference to the LiteLLM Gateway for LLM operations
+- **Integrated Prompt Context Management** for system prompts, role templates, and context assembly
+- **Memory integration** for context-aware prompt building
 
 ### AgentManager Class
 
@@ -83,6 +97,7 @@ Create agents and managers with simplified configuration:
 from src.core.agno_agent_framework import (
     create_agent,
     create_agent_with_memory,
+    create_agent_with_prompt_management,
     create_agent_manager,
     create_orchestrator
 )
@@ -95,6 +110,14 @@ agent = create_agent("agent1", "Assistant", gateway)
 agent = create_agent_with_memory(
     "agent2", "Analyst", gateway,
     memory_config={"persistence_path": "/tmp/memory.json"}
+)
+
+# Create agent with prompt management pre-configured
+agent = create_agent_with_prompt_management(
+    "agent3", "Helper", gateway,
+    system_prompt="You are a helpful AI assistant.",
+    role_template="assistant_role",
+    max_context_tokens=8000
 )
 
 # Create agent manager
@@ -197,14 +220,76 @@ restored_agent = load_agent_state("/tmp/agent_state.json", gateway)
 
 See `src/core/agno_agent_framework/functions.py` for complete function documentation.
 
+### Prompt Context Management Integration
+
+Agents now have **full integration with Prompt Context Management**, providing:
+
+- **System Prompt Support**: Define agent behavior through system prompts
+- **Role-Based Templates**: Use role-based prompt templates for consistent behavior
+- **Context Assembly**: Automatically assemble context from memory and conversation history
+- **Token Budget Enforcement**: Enforce token limits to prevent context overflow
+- **Context Prioritization**: Prioritize relevant memories based on task requirements
+- **Prompt History**: Maintain conversation history for context-aware interactions
+
+**Example:**
+```python
+from src.core.agno_agent_framework import create_agent_with_prompt_management
+
+# Create agent with prompt management
+agent = create_agent_with_prompt_management(
+    agent_id="agent1",
+    name="Assistant",
+    gateway=gateway,
+    system_prompt="You are a helpful AI assistant specialized in technical questions.",
+    role_template="technical_assistant",
+    max_context_tokens=8000
+)
+
+# Add custom prompt templates
+agent.add_prompt_template(
+    name="analysis_template",
+    version="1.0",
+    content="Analyze the following: {input}\nConsider: {context}"
+)
+
+# Set system prompt dynamically
+agent.set_system_prompt("You are now a data analyst.")
+
+# Execute task - prompt is automatically enhanced with context
+result = await execute_task(
+    agent,
+    "analyze",
+    {
+        "prompt": "What are the key insights?",
+        "context": "Sales data shows 20% growth"
+    }
+)
+```
+
+**How It Works:**
+1. When an agent executes a task, the prompt is automatically enhanced:
+   - System prompt is prepended (if set)
+   - Role template is rendered and added (if configured)
+   - Relevant memories are retrieved and added as context
+   - Conversation history is included (if available)
+   - Token budget is enforced to prevent overflow
+2. The enhanced prompt is sent to the LLM Gateway
+3. Prompt history is recorded for future context building
+
 ## Task Execution Flow
 
 1. **Task Submission**: A task is submitted to an agent through the `add_task()` method, which adds it to the agent's task queue.
 2. **Task Selection**: The agent selects the highest priority task from its queue.
-3. **LLM Reasoning**: If the task requires reasoning, the agent uses the LiteLLM Gateway to generate responses or make decisions.
-4. **Task Execution**: The agent executes the task based on its capabilities and the LLM's guidance.
-5. **Result Storage**: Task results can be stored in the database for persistence.
-6. **Status Update**: The agent updates its status and notifies the observability system.
+3. **Prompt Building**: If prompt management is enabled:
+   - System prompt is added (if configured)
+   - Role template is rendered (if configured)
+   - Relevant memories are retrieved and added as context
+   - Conversation history is included
+   - Token budget is enforced
+4. **LLM Reasoning**: The agent uses the LiteLLM Gateway with the enhanced prompt to generate responses or make decisions.
+5. **Task Execution**: The agent executes the task based on its capabilities and the LLM's guidance.
+6. **Result Storage**: Task results can be stored in memory and database for persistence.
+7. **Status Update**: The agent updates its status and notifies the observability system.
 
 ## Error Handling
 

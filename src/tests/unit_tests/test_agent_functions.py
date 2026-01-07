@@ -11,6 +11,7 @@ from src.core.agno_agent_framework.functions import (
     # Factory functions
     create_agent,
     create_agent_with_memory,
+    create_agent_with_prompt_management,
     create_agent_manager,
     create_orchestrator,
     # Convenience functions
@@ -106,6 +107,71 @@ class TestFactoryFunctions:
         
         assert isinstance(agent, Agent)
         assert agent.agent_id == "agent1"
+    
+    @patch('src.core.agno_agent_framework.functions.create_prompt_manager')
+    def test_create_agent_with_prompt_management(self, mock_create_pm, mock_gateway):
+        """Test create_agent_with_prompt_management factory function."""
+        mock_pm = Mock()
+        mock_create_pm.return_value = mock_pm
+        
+        agent = create_agent_with_prompt_management(
+            agent_id="agent1",
+            name="Agent with Prompts",
+            gateway=mock_gateway,
+            system_prompt="You are a helpful assistant.",
+            role_template="assistant",
+            max_context_tokens=8000
+        )
+        
+        assert isinstance(agent, Agent)
+        assert agent.agent_id == "agent1"
+        assert agent.system_prompt == "You are a helpful assistant."
+        assert agent.role_template == "assistant"
+        assert agent.max_context_tokens == 8000
+        # Prompt manager should be attached
+        assert agent.prompt_manager is not None
+    
+    @patch('src.core.agno_agent_framework.functions.create_prompt_manager')
+    def test_create_agent_with_prompt_management_with_templates(self, mock_create_pm, mock_gateway):
+        """Test create_agent_with_prompt_management with templates."""
+        mock_pm = Mock()
+        mock_create_pm.return_value = mock_pm
+        
+        prompt_config = {
+            "templates": [
+                {
+                    "name": "greeting",
+                    "version": "1.0",
+                    "content": "Hello {name}!",
+                    "metadata": {"type": "greeting"}
+                }
+            ]
+        }
+        
+        agent = create_agent_with_prompt_management(
+            agent_id="agent1",
+            name="Agent",
+            gateway=mock_gateway,
+            prompt_config=prompt_config
+        )
+        
+        assert agent.prompt_manager is not None
+        # Verify template was added
+        mock_pm.add_template.assert_called_once()
+    
+    def test_create_agent_with_prompt_management_no_module(self, mock_gateway):
+        """Test create_agent_with_prompt_management when module not available."""
+        with patch('src.core.agno_agent_framework.functions.create_prompt_manager', None):
+            agent = create_agent_with_prompt_management(
+                agent_id="agent1",
+                name="Agent",
+                gateway=mock_gateway,
+                system_prompt="Test prompt"
+            )
+            
+            assert isinstance(agent, Agent)
+            assert agent.system_prompt == "Test prompt"
+            assert agent.use_prompt_management is False
     
     def test_create_agent_manager(self):
         """Test create_agent_manager factory function."""
@@ -236,6 +302,25 @@ class TestConvenienceFunctions:
         assert result == {"result": "Completed"}
         manager.get_agent.assert_called_once_with("agent2")
         agent2.execute_task.assert_called_once()
+    
+    @patch('src.core.agno_agent_framework.functions.create_prompt_manager')
+    def test_create_agent_with_prompt_management_basic(self, mock_create_pm, mock_gateway):
+        """Test create_agent_with_prompt_management basic functionality."""
+        mock_pm = Mock()
+        mock_pm.history = []
+        mock_create_pm.return_value = mock_pm
+        
+        agent = create_agent_with_prompt_management(
+            agent_id="agent1",
+            name="Agent with Prompts",
+            gateway=mock_gateway,
+            system_prompt="You are helpful.",
+            max_context_tokens=8000
+        )
+        
+        assert agent.system_prompt == "You are helpful."
+        assert agent.max_context_tokens == 8000
+        assert agent.use_prompt_management is True
     
     def test_find_agents_by_capability(self):
         """Test find_agents_by_capability convenience function."""

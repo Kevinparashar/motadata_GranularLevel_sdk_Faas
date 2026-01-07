@@ -11,6 +11,14 @@ import asyncio
 from datetime import datetime
 from .memory import AgentMemory, MemoryType
 
+# Import Prompt Context Management
+try:
+    from ..prompt_context_management import PromptContextManager, create_prompt_manager
+except ImportError:
+    # Fallback if not available
+    PromptContextManager = None
+    create_prompt_manager = None
+
 
 class AgentStatus(str, Enum):
     """Agent status enumeration."""
@@ -75,6 +83,13 @@ class Agent(BaseModel):
     memory: Optional[AgentMemory] = None
     memory_persistence_path: Optional[str] = None
     auto_persist_memory: bool = True
+    
+    # Prompt Context Management
+    prompt_manager: Optional[Any] = None  # PromptContextManager instance
+    system_prompt: Optional[str] = None
+    role_template: Optional[str] = None  # Role-based template name
+    use_prompt_management: bool = True  # Enable/disable prompt management
+    max_context_tokens: int = 4000  # Max tokens for context window
     
     # Task management
     task_queue: List[AgentTask] = Field(default_factory=list)
@@ -182,7 +197,7 @@ class Agent(BaseModel):
     
     async def _execute_task_internal(self, task: AgentTask) -> Any:
         """
-        Internal task execution logic.
+        Internal task execution logic with integrated prompt management.
         
         Args:
             task: Task to execute
@@ -192,11 +207,23 @@ class Agent(BaseModel):
         """
         # Use gateway for LLM operations if available
         if self.gateway and task.task_type in ["llm_query", "generate", "analyze"]:
-            prompt = task.parameters.get("prompt", "")
+            # Get base prompt from task parameters
+            base_prompt = task.parameters.get("prompt", "")
             model = task.parameters.get("model", self.llm_model or "gpt-4")
             
+            # Build prompt using prompt management if enabled
+            final_prompt = self._build_prompt_with_context(
+                base_prompt=base_prompt,
+                task=task,
+                task_type=task.task_type
+            )
+            
+            # Record prompt in history if prompt manager is available
+            if self.prompt_manager:
+                self.prompt_manager.record_history(final_prompt)
+            
             response = await self.gateway.generate_async(
-                prompt=prompt,
+                prompt=final_prompt,
                 model=model,
                 **task.parameters.get("llm_kwargs", {})
             )
@@ -214,12 +241,183 @@ class Agent(BaseModel):
             "task_id": task.task_id,
             "result": f"Task {task.task_type} executed"
         }
+    
+    def _build_prompt_with_context(
+        self,
+        base_prompt: str,
+        task: AgentTask,
+        task_type: str
+    ) -> str:
+        """
+        Build prompt with context management, system prompts, and memory integration.
+        
+        Args:
+            base_prompt: Base prompt from task
+            task: Task instance
+            task_type: Type of task
+        
+        Returns:
+            Final prompt with context
+        """
+        # Initialize prompt manager if not present and enabled
+        if self.use_prompt_management and not self.prompt_manager:
+            if PromptContextManager:
+                self.prompt_manager = create_prompt_manager(
+                    max_tokens=self.max_context_tokens
+                )
+                # Add default role template if role_template is set
+                if self.role_template and self.description:
+                    self.prompt_manager.add_template(
+                        name=self.role_template,
+                        version="1.0",
+                        content=self.description
+                    )
+        
+        # If prompt management is disabled, return base prompt
+        if not self.use_prompt_management or not self.prompt_manager:
+            return base_prompt
+        
+        # Start with system prompt if available
+        prompt_parts = []
+        
+        # Add system prompt
+        if self.system_prompt:
+            prompt_parts.append(f"System: {self.system_prompt}")
+        
+        # Add role-based template if available
+        if self.role_template:
+            try:
+                role_prompt = self.prompt_manager.render(
+                    template_name=self.role_template,
+                    variables={
+                        "agent_name": self.name,
+                        "agent_id": self.agent_id,
+                        "capabilities": ", ".join([cap.name for cap in self.capabilities]),
+                        "description": self.description
+                    }
+                )
+                prompt_parts.append(f"Role: {role_prompt}")
+            except (ValueError, KeyError):
+                # Template not found or render failed, use description
+                if self.description:
+                    prompt_parts.append(f"Role: {self.description}")
+        
+        # Retrieve relevant context from memory
+        context_from_memory = ""
+        if self.memory:
+            # Retrieve relevant memories based on task
+            relevant_memories = self.memory.retrieve(
+                query=base_prompt,
+                limit=5  # Get top 5 relevant memories
+            )
+            if relevant_memories:
+                memory_contents = [mem.content for mem in relevant_memories]
+                context_from_memory = "\n".join(memory_contents)
+        
+        # Build context with history if available
+        if self.prompt_manager.history:
+            context = self.prompt_manager.build_context_with_history(base_prompt)
+        else:
+            context = base_prompt
+        
+        # Add context from memory
+        if context_from_memory:
+            context = f"{context}\n\nRelevant Context:\n{context_from_memory}"
+        
+        # Add task-specific context
+        if task.parameters.get("context"):
+            context = f"{context}\n\nAdditional Context:\n{task.parameters.get('context')}"
+        
+        # Add the main prompt
+        prompt_parts.append(f"Task: {base_prompt}")
+        
+        # Combine all parts
+        full_prompt = "\n\n".join(prompt_parts)
+        
+        # Add context if available
+        if context and context != base_prompt:
+            full_prompt = f"{full_prompt}\n\nContext:\n{context}"
+        
+        # Enforce token budget
+        validation = self.prompt_manager.window.estimate_tokens(full_prompt)
+        if validation > (self.max_context_tokens - self.prompt_manager.window.safety_margin):
+            # Truncate to fit
+            full_prompt = self.prompt_manager.truncate_prompt(
+                full_prompt,
+                max_tokens=self.max_context_tokens
+            )
+        
+        return full_prompt
 
     def attach_memory(self, persistence_path: Optional[str] = None) -> None:
         """Attach an AgentMemory instance with optional persistence."""
         self.memory = AgentMemory(
             agent_id=self.agent_id,
             persistence_path=persistence_path or self.memory_persistence_path,
+        )
+    
+    def attach_prompt_manager(
+        self,
+        prompt_manager: Optional[Any] = None,
+        max_tokens: int = 4000,
+        system_prompt: Optional[str] = None,
+        role_template: Optional[str] = None
+    ) -> None:
+        """
+        Attach a PromptContextManager instance to the agent.
+        
+        Args:
+            prompt_manager: Optional PromptContextManager instance (creates new if None)
+            max_tokens: Maximum tokens for context window
+            system_prompt: Optional system prompt for the agent
+            role_template: Optional role-based template name
+        """
+        if prompt_manager:
+            self.prompt_manager = prompt_manager
+        elif PromptContextManager:
+            self.prompt_manager = create_prompt_manager(max_tokens=max_tokens)
+        else:
+            raise ImportError("PromptContextManager is not available")
+        
+        self.max_context_tokens = max_tokens
+        if system_prompt:
+            self.system_prompt = system_prompt
+        if role_template:
+            self.role_template = role_template
+    
+    def set_system_prompt(self, system_prompt: str) -> None:
+        """
+        Set the system prompt for the agent.
+        
+        Args:
+            system_prompt: System prompt text
+        """
+        self.system_prompt = system_prompt
+    
+    def add_prompt_template(
+        self,
+        name: str,
+        version: str,
+        content: str,
+        metadata: Optional[Dict[str, Any]] = None
+    ) -> None:
+        """
+        Add a prompt template to the agent's prompt manager.
+        
+        Args:
+            name: Template name
+            version: Template version
+            content: Template content
+            metadata: Optional metadata
+        """
+        if not self.prompt_manager:
+            self.attach_prompt_manager()
+        
+        self.prompt_manager.add_template(
+            name=name,
+            version=version,
+            content=content,
+            metadata=metadata
         )
     
     def send_message(
@@ -313,6 +511,10 @@ class Agent(BaseModel):
             "memory_persistence_path": str(self.memory_persistence_path) if self.memory_persistence_path else None,
             "auto_persist_memory": self.auto_persist_memory,
             "communication_enabled": self.communication_enabled,
+            "system_prompt": self.system_prompt,
+            "role_template": self.role_template,
+            "use_prompt_management": self.use_prompt_management,
+            "max_context_tokens": self.max_context_tokens,
         }
         
         with state_path.open("w", encoding="utf-8") as f:
@@ -381,6 +583,18 @@ class Agent(BaseModel):
         agent.metadata = state.get("metadata", {})
         agent.communication_enabled = state.get("communication_enabled", True)
         agent.auto_persist_memory = state.get("auto_persist_memory", True)
+        agent.system_prompt = state.get("system_prompt")
+        agent.role_template = state.get("role_template")
+        agent.use_prompt_management = state.get("use_prompt_management", True)
+        agent.max_context_tokens = state.get("max_context_tokens", 4000)
+        
+        # Restore prompt manager if enabled
+        if agent.use_prompt_management and PromptContextManager:
+            agent.attach_prompt_manager(
+                max_tokens=agent.max_context_tokens,
+                system_prompt=agent.system_prompt,
+                role_template=agent.role_template
+            )
         
         # Restore timestamps
         from datetime import datetime

@@ -18,6 +18,7 @@ The SDK provides:
 - Production-grade infrastructure (caching, monitoring, security)
 - Function-driven API for easy component creation and usage
 - Agent state persistence for reliable agent management
+- Integrated Prompt Context Management in agents (system prompts, role templates, context assembly)
 - Advanced RAG features (hybrid retrieval, query optimization, document management)
 - Standardized patterns and best practices
 - Complete documentation and examples

@@ -5,7 +5,7 @@ Tests agent creation, task execution, and communication.
 """
 
 import pytest
-from unittest.mock import Mock, MagicMock, patch
+from unittest.mock import Mock, MagicMock, patch, AsyncMock
 from datetime import datetime
 from src.core.agno_agent_framework import (
     Agent,
@@ -210,6 +210,77 @@ class TestToolRegistry:
         
         result = registry.execute("add", a=5, b=3)
         assert result == 8
+    
+    @patch('src.core.agno_agent_framework.agent.create_prompt_manager')
+    def test_attach_prompt_manager(self, mock_create_pm, agent):
+        """Test attaching prompt manager to agent."""
+        mock_pm = Mock()
+        mock_pm.history = []
+        mock_create_pm.return_value = mock_pm
+        
+        agent.attach_prompt_manager(
+            max_tokens=8000,
+            system_prompt="You are helpful.",
+            role_template="assistant"
+        )
+        
+        assert agent.prompt_manager is not None
+        assert agent.system_prompt == "You are helpful."
+        assert agent.role_template == "assistant"
+        assert agent.max_context_tokens == 8000
+    
+    @patch('src.core.agno_agent_framework.agent.create_prompt_manager')
+    def test_set_system_prompt(self, mock_create_pm, agent):
+        """Test setting system prompt."""
+        agent.set_system_prompt("You are a data analyst.")
+        assert agent.system_prompt == "You are a data analyst."
+    
+    @patch('src.core.agno_agent_framework.agent.create_prompt_manager')
+    def test_add_prompt_template(self, mock_create_pm, agent):
+        """Test adding prompt template."""
+        mock_pm = Mock()
+        mock_pm.add_template = Mock()
+        mock_create_pm.return_value = mock_pm
+        
+        agent.attach_prompt_manager()
+        agent.add_prompt_template(
+            name="analysis",
+            version="1.0",
+            content="Analyze: {input}",
+            metadata={"type": "analysis"}
+        )
+        
+        mock_pm.add_template.assert_called_once()
+    
+    @patch('src.core.agno_agent_framework.agent.create_prompt_manager')
+    def test_build_prompt_with_context(self, mock_create_pm, agent):
+        """Test building prompt with context management."""
+        mock_pm = Mock()
+        mock_pm.history = []
+        mock_pm.build_context_with_history = Mock(return_value="Context with history")
+        mock_pm.window = Mock()
+        mock_pm.window.estimate_tokens = Mock(return_value=100)
+        mock_pm.window.safety_margin = 200
+        mock_pm.truncate_prompt = Mock(return_value="Truncated prompt")
+        mock_create_pm.return_value = mock_pm
+        
+        agent.attach_prompt_manager()
+        agent.system_prompt = "You are helpful."
+        
+        task = AgentTask(
+            task_id="task1",
+            task_type="llm_query",
+            parameters={"prompt": "What is AI?"}
+        )
+        
+        prompt = agent._build_prompt_with_context(
+            base_prompt="What is AI?",
+            task=task,
+            task_type="llm_query"
+        )
+        
+        assert "System: You are helpful." in prompt
+        assert "What is AI?" in prompt
 
 
 if __name__ == "__main__":

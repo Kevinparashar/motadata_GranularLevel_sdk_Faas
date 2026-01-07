@@ -48,6 +48,7 @@ from .orchestration import (
 from .functions import (
     create_agent,
     create_agent_with_memory,
+    create_agent_with_prompt_management,
     create_agent_manager,
     create_orchestrator,
     execute_task,
@@ -93,6 +94,7 @@ __all__ = [
     # Factory functions
     "create_agent",
     "create_agent_with_memory",
+    "create_agent_with_prompt_management",
     "create_agent_manager",
     "create_orchestrator",
     # High-level convenience functions

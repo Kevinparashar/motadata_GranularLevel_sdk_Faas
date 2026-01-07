@@ -101,6 +101,7 @@ motadata-python-ai-sdk/
    - Task delegation and chaining
    - Task execution and communication
    - Optional persistent memory and retry-aware task execution
+   - **Integrated Prompt Context Management** with system prompts, role templates, and context assembly
 
 3. **PostgreSQL Database** (`src/core/postgresql_database/`)
    - PostgreSQL with pgvector extension
@@ -167,6 +168,8 @@ Response with Observability
 - **Gateway ↔ All**: Gateway provides LLM access to all components
 - **Database ↔ RAG**: RAG stores/retrieves documents and embeddings
 - **Agents ↔ Gateway**: Agents use gateway for LLM operations
+- **Agents ↔ Prompt Management**: Agents automatically use prompt management for context assembly
+- **Agents ↔ Memory**: Agents use memory for context-aware prompt building
 - **Cache ↔ All**: All components can use caching
 - **Observability ↔ All**: All operations are traced and logged
 
@@ -667,6 +670,7 @@ See `src/tests/unit_tests/README.md` and `src/tests/integration_tests/README.md`
 - **Libraries**: See `src/libraries.md` for complete library list
 - **Developer Guide**: See `README_DEVELOPER.md` for development guidelines
 - **Ground Truth Analysis**: See `GROUND_TRUTH_ANALYSIS.md` for SDK as reference implementation guide
+- **OpenTelemetry Guide**: See `OTEL_IMPLEMENTATION_GUIDE.md` for comprehensive OTEL integration and observability
 
 ## Modularity and Swappability
 

@@ -12,6 +12,12 @@ from .tools import ToolRegistry, ToolExecutor
 from .plugins import PluginManager
 from .orchestration import AgentOrchestrator, WorkflowPipeline
 
+# Import Prompt Context Management
+try:
+    from ..prompt_context_management import create_prompt_manager
+except ImportError:
+    create_prompt_manager = None
+
 
 # ============================================================================
 # Factory Functions
@@ -96,6 +102,78 @@ def create_agent_with_memory(
         if agent.memory:
             agent.memory.max_short_term = max_short_term
             agent.memory.max_long_term = max_long_term
+    
+    return agent
+
+
+def create_agent_with_prompt_management(
+    agent_id: str,
+    name: str,
+    gateway: Any,
+    system_prompt: Optional[str] = None,
+    role_template: Optional[str] = None,
+    max_context_tokens: int = 4000,
+    prompt_config: Optional[Dict[str, Any]] = None,
+    **kwargs: Any
+) -> Agent:
+    """
+    Create an agent with prompt context management pre-configured.
+    
+    Args:
+        agent_id: Unique agent identifier
+        name: Agent name
+        gateway: LiteLLM Gateway instance
+        system_prompt: Optional system prompt for the agent
+        role_template: Optional role-based template name
+        max_context_tokens: Maximum tokens for context window (default: 4000)
+        prompt_config: Optional prompt configuration dict with keys:
+            - max_tokens: Max tokens (overrides max_context_tokens)
+            - safety_margin: Safety margin for token estimation
+            - templates: List of template dicts with name, version, content, metadata
+        **kwargs: Additional agent configuration
+    
+    Returns:
+        Agent instance with prompt management attached
+    
+    Example:
+        >>> agent = create_agent_with_prompt_management(
+        ...     "agent1", "Assistant", gateway,
+        ...     system_prompt="You are a helpful AI assistant.",
+        ...     role_template="assistant_role",
+        ...     max_context_tokens=8000
+        ... )
+    """
+    agent = create_agent(agent_id, name, gateway, **kwargs)
+    
+    if create_prompt_manager:
+        prompt_max_tokens = max_context_tokens
+        safety_margin = 200
+        
+        if prompt_config:
+            prompt_max_tokens = prompt_config.get("max_tokens", max_context_tokens)
+            safety_margin = prompt_config.get("safety_margin", 200)
+        
+        agent.attach_prompt_manager(
+            max_tokens=prompt_max_tokens,
+            system_prompt=system_prompt,
+            role_template=role_template
+        )
+        
+        # Add templates if provided
+        if prompt_config and "templates" in prompt_config:
+            for template in prompt_config["templates"]:
+                agent.add_prompt_template(
+                    name=template["name"],
+                    version=template.get("version", "1.0"),
+                    content=template["content"],
+                    metadata=template.get("metadata")
+                )
+    else:
+        # If prompt manager not available, set basic config
+        agent.system_prompt = system_prompt
+        agent.role_template = role_template
+        agent.max_context_tokens = max_context_tokens
+        agent.use_prompt_management = False
     
     return agent
 
@@ -443,6 +521,7 @@ __all__ = [
     # Factory functions
     "create_agent",
     "create_agent_with_memory",
+    "create_agent_with_prompt_management",
     "create_agent_manager",
     "create_orchestrator",
     # High-level convenience functions
