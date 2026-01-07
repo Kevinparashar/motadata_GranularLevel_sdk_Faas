@@ -57,6 +57,7 @@ The SDK follows a layered architecture with clear separation of concerns:
 - **Dependency Injection**: Components receive dependencies through constructor injection
 - **Async-First**: Full asyncio support for high-performance operations
 - **Type Safety**: Comprehensive type hints and Pydantic models throughout
+- **Structured Error Handling**: Custom exception hierarchy for granular error handling and debugging
 
 ### Component Communication
 - Components communicate through well-defined interfaces
@@ -699,6 +700,81 @@ The SDK is designed with modularity in mind:
 - **LLM Providers**: Switch between providers via LiteLLM
 
 See component README files for swapping instructions.
+
+## Error Handling
+
+The SDK uses a structured exception hierarchy for granular error handling and debugging. All SDK exceptions inherit from `SDKError`, enabling platform-wide catching and uniform error handling.
+
+### Exception Hierarchy
+
+```
+SDKError (Base)
+├── AgentError
+│   ├── AgentExecutionError
+│   ├── AgentConfigurationError
+│   └── AgentStateError
+├── ToolError
+│   ├── ToolInvocationError
+│   ├── ToolNotFoundError
+│   ├── ToolNotImplementedError
+│   └── ToolValidationError
+├── MemoryError
+│   ├── MemoryReadError
+│   ├── MemoryWriteError
+│   └── MemoryPersistenceError
+├── OrchestrationError
+│   ├── WorkflowNotFoundError
+│   └── AgentNotFoundError
+└── RAGError
+    ├── RetrievalError
+    ├── GenerationError
+    ├── EmbeddingError
+    ├── DocumentProcessingError
+    ├── ChunkingError
+    └── ValidationError
+```
+
+### Usage Examples
+
+**Catching Specific Errors:**
+```python
+from src.core.agno_agent_framework.exceptions import (
+    AgentExecutionError,
+    ToolInvocationError
+)
+from src.core.rag.exceptions import RetrievalError
+
+try:
+    result = await agent.execute_task(task)
+except AgentExecutionError as e:
+    print(f"Agent {e.agent_id} failed: {e.message}")
+    print(f"Task type: {e.task_type}, Stage: {e.execution_stage}")
+except ToolInvocationError as e:
+    print(f"Tool {e.tool_name} failed: {e.message}")
+    print(f"Error type: {e.error_type}")
+except RetrievalError as e:
+    print(f"Retrieval failed for query: {e.query}")
+```
+
+**Catching All SDK Errors:**
+```python
+from src.core.exceptions import SDKError
+
+try:
+    # Any SDK operation
+    result = await agent.execute_task(task)
+except SDKError as e:
+    print(f"SDK error: {e.message}")
+    if e.original_error:
+        print(f"Original error: {e.original_error}")
+```
+
+**Error Location:**
+- Base exception: `src/core/exceptions.py`
+- Agent Framework exceptions: `src/core/agno_agent_framework/exceptions.py`
+- RAG exceptions: `src/core/rag/exceptions.py`
+
+All exceptions include structured attributes (agent_id, tool_name, operation, etc.) for enhanced debugging and monitoring.
 
 ## License
 

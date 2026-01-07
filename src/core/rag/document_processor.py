@@ -11,7 +11,11 @@ import re
 from datetime import datetime
 from pydantic import BaseModel, Field, validator
 from enum import Enum
-# Removed custom exceptions - using standard Python exceptions
+from .exceptions import (
+    DocumentProcessingError,
+    ChunkingError,
+    ValidationError
+)
 
 
 class ChunkingStrategy(str, Enum):
@@ -54,7 +58,11 @@ class DocumentChunk(BaseModel):
     def content_not_empty(cls, v):
         """Validate that content is not empty."""
         if not v or not v.strip():
-            raise ValueError("Chunk content cannot be empty")
+            raise ValidationError(
+                message="Chunk content cannot be empty",
+                field="content",
+                value=v
+            )
         return v.strip()
 
 
@@ -335,7 +343,12 @@ class DocumentProcessor:
                 with open(path, 'r', encoding='utf-8') as f:
                     content = f.read()
             except UnicodeDecodeError as e:
-                raise RuntimeError(f"Unsupported file format: {suffix}") from e
+                raise DocumentProcessingError(
+                    message=f"Unsupported file format: {suffix}",
+                    file_path=str(file_path),
+                    operation="load_document",
+                    original_error=e
+                )
         
         # Extract metadata from content
         extracted_metadata = self.metadata_handler.extract_metadata(
@@ -436,7 +449,11 @@ class DocumentProcessor:
         elif self.chunking_strategy == "semantic":
             chunks = self._chunk_semantic(processed_content, document_id, extracted_metadata)
         else:
-            raise ValueError(f"Unknown chunking strategy: {self.chunking_strategy}")
+            raise ChunkingError(
+                message=f"Unknown chunking strategy: {self.chunking_strategy}",
+                document_id=document_id,
+                chunking_strategy=self.chunking_strategy
+            )
         
         # Enrich chunks with metadata and validate
         validated_chunks = []

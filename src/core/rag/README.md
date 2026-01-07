@@ -346,11 +346,56 @@ The `RAGSystem` class integrates all components:
 
 ## Error Handling
 
+The RAG system uses a structured exception hierarchy for granular error handling. All RAG-related exceptions inherit from `SDKError` and provide structured attributes for debugging.
+
+### Exception Types
+
+**RAG Exceptions** (`src/core/rag/exceptions.py`):
+- `RetrievalError`: Raised when document retrieval or vector search fails
+  - Attributes: `query`, `document_id`, `operation`
+- `GenerationError`: Raised when LLM-based generation fails (RAG answer synthesis)
+  - Attributes: `query`, `context`, `operation`
+- `EmbeddingError`: Raised when embedding generation fails
+  - Attributes: `text`, `model`
+- `DocumentProcessingError`: Raised when document processing fails (loading, parsing, chunking)
+  - Attributes: `document_id`, `file_path`, `operation`
+- `ChunkingError`: Raised when document chunking fails
+  - Attributes: `document_id`, `chunking_strategy`
+- `ValidationError`: Raised when validation fails (e.g., empty content, invalid format)
+  - Attributes: `field`, `value`
+
+### Usage Examples
+
+```python
+from src.core.rag.exceptions import (
+    RetrievalError,
+    GenerationError,
+    EmbeddingError,
+    DocumentProcessingError
+)
+
+try:
+    results = retriever.retrieve(query, top_k=5)
+except RetrievalError as e:
+    logger.error(f"Retrieval failed for query '{e.query}': {e.message}")
+    # Handle retrieval failure
+except EmbeddingError as e:
+    logger.error(f"Embedding generation failed: {e.message}")
+    # Handle embedding failure
+except DocumentProcessingError as e:
+    logger.error(f"Document processing failed for {e.file_path}: {e.message}")
+    # Handle document processing failure
+```
+
+### Error Handling Levels
+
 The RAG system implements error handling for:
-- **Document Processing Errors**: Handles failures during chunking or embedding generation
-- **Retrieval Errors**: Manages cases where no relevant documents are found
-- **Generation Errors**: Handles LLM generation failures with appropriate fallbacks
-- **Database Errors**: Catches and reports database operation failures
+- **Document Processing Errors**: Wrapped in `DocumentProcessingError` or `ChunkingError`
+- **Retrieval Errors**: Wrapped in `RetrievalError` with query context
+- **Generation Errors**: Wrapped in `GenerationError` with query and context
+- **Embedding Errors**: Wrapped in `EmbeddingError` with text and model information
+- **Validation Errors**: Wrapped in `ValidationError` with field and value information
+- **Database Errors**: Caught and reported with appropriate context
 
 ## Enhanced Chunking Pipeline
 
