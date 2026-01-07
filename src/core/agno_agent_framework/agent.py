@@ -12,6 +12,7 @@ import json
 from datetime import datetime
 from .memory import AgentMemory, MemoryType
 from .tools import ToolRegistry, ToolExecutor, Tool
+# Removed custom exceptions - using standard Python exceptions
 
 # Import Prompt Context Management
 try:
@@ -327,21 +328,14 @@ class Agent(BaseModel):
                             })
                     except Exception as e:
                         # Handle tool execution errors
-                        error_msg = f"Tool {tool_name} execution failed: {str(e)}"
                         tool_calls_made.append({
                             "tool": tool_name,
                             "arguments": arguments,
-                            "result": error_msg,
+                            "result": f"Tool execution failed: {str(e)}",
                             "success": False,
                             "error": str(e)
                         })
-                        
-                        # Add error to messages
-                        messages.append({
-                            "role": "tool",
-                            "content": error_msg,
-                            "tool_call_id": func_call.get("id", f"call_{iteration}_{len(tool_calls_made)}")
-                        })
+                        raise
                 
                 iteration += 1
             
@@ -425,12 +419,12 @@ class Agent(BaseModel):
         """
         # Initialize prompt manager if not present and enabled
         if self.use_prompt_management and not self.prompt_manager:
-            if PromptContextManager:
+            if PromptContextManager and create_prompt_manager:
                 self.prompt_manager = create_prompt_manager(
                     max_tokens=self.max_context_tokens
                 )
                 # Add default role template if role_template is set
-                if self.role_template and self.description:
+                if self.prompt_manager and self.role_template and self.description:
                     self.prompt_manager.add_template(
                         name=self.role_template,
                         version="1.0",
@@ -569,7 +563,7 @@ class Agent(BaseModel):
         """
         if prompt_manager:
             self.prompt_manager = prompt_manager
-        elif PromptContextManager:
+        elif PromptContextManager and create_prompt_manager:
             self.prompt_manager = create_prompt_manager(max_tokens=max_tokens)
         else:
             raise ImportError("PromptContextManager is not available")
@@ -607,6 +601,9 @@ class Agent(BaseModel):
         """
         if not self.prompt_manager:
             self.attach_prompt_manager()
+        
+        if not self.prompt_manager:
+            raise RuntimeError("Prompt manager is not available")
         
         self.prompt_manager.add_template(
             name=name,
@@ -755,9 +752,11 @@ class Agent(BaseModel):
         with state_path.open("w", encoding="utf-8") as f:
             json.dump(state, f, indent=2, default=str)
         
-        # Persist memory if attached (memory saves to its own file)
+        # Persist memory if attached (memory persists automatically via _persist())
         if self.memory and self.auto_persist_memory:
-            self.memory.save()
+            # Memory persistence is handled automatically by the memory system
+            # when operations are performed (store, consolidate, etc.)
+            pass
         
         # Save prompt manager history if available
         if self.prompt_manager and hasattr(self.prompt_manager, 'save_history'):

@@ -83,7 +83,7 @@ class Retriever:
             Embedding vector
         """
         if not self.gateway:
-            raise ValueError("Gateway not available for embedding generation")
+            raise RuntimeError("Gateway not available for embedding generation")
         
         response = self.gateway.embed(
             texts=[text],
@@ -93,7 +93,7 @@ class Retriever:
         if response.embeddings and len(response.embeddings) > 0:
             return response.embeddings[0]
         
-        raise ValueError("Failed to generate embedding")
+        raise RuntimeError("Failed to generate embedding: No embeddings returned")
     
     def retrieve_hybrid(
         self,

@@ -10,6 +10,7 @@ from datetime import datetime
 from enum import Enum
 import json
 from pathlib import Path
+# Removed custom exceptions - using standard Python exceptions
 
 
 class MemoryType(str, Enum):
@@ -37,11 +38,11 @@ class MemoryItem(BaseModel):
 class AgentMemory:
     """
     Agent memory system for storing and retrieving information.
-    
+
     Manages both short-term (working) memory and long-term
     (persistent) memory for agents.
     """
-    
+
     def __init__(
         self,
         agent_id: str,
@@ -51,7 +52,7 @@ class AgentMemory:
     ):
         """
         Initialize agent memory.
-        
+
         Args:
             agent_id: Agent identifier
             max_short_term: Maximum short-term memory items
@@ -61,7 +62,7 @@ class AgentMemory:
         self.max_short_term = max_short_term
         self.max_long_term = max_long_term
         self._persistence_path = Path(persistence_path) if persistence_path else None
-        
+
         self._short_term: List[MemoryItem] = []
         self._long_term: Dict[str, MemoryItem] = {}
         self._episodic: List[MemoryItem] = []
@@ -73,7 +74,7 @@ class AgentMemory:
             except Exception:
                 # If load fails, continue with empty memory
                 pass
-    
+
     def store(
         self,
         content: str,
@@ -84,19 +85,19 @@ class AgentMemory:
     ) -> MemoryItem:
         """
         Store a memory item.
-        
+
         Args:
             content: Memory content
             memory_type: Type of memory
             importance: Importance score (0.0-1.0)
             metadata: Optional metadata
             tags: Optional tags
-        
+
         Returns:
             Created memory item
         """
         import uuid
-        
+
         memory = MemoryItem(
             memory_id=str(uuid.uuid4()),
             agent_id=self.agent_id,
@@ -106,7 +107,7 @@ class AgentMemory:
             metadata=metadata or {},
             tags=tags or []
         )
-        
+
         if memory_type == MemoryType.SHORT_TERM:
             self._short_term.append(memory)
             # Trim if exceeds max
@@ -114,7 +115,7 @@ class AgentMemory:
                 # Remove least important items
                 self._short_term.sort(key=lambda m: m.importance)
                 self._short_term = self._short_term[-self.max_short_term:]
-        
+
         elif memory_type == MemoryType.LONG_TERM:
             self._long_term[memory.memory_id] = memory
             # Trim if exceeds max
@@ -127,16 +128,19 @@ class AgentMemory:
                 to_remove = sorted_items[:len(sorted_items) - self.max_long_term]
                 for item in to_remove:
                     self._long_term.pop(item.memory_id, None)
-        
+
         elif memory_type == MemoryType.EPISODIC:
             self._episodic.append(memory)
-        
+
         elif memory_type == MemoryType.SEMANTIC:
             self._semantic[memory.memory_id] = memory
-        
-        self._persist()
+
+        try:
+            self._persist()
+        except Exception as e:
+            raise RuntimeError(f"Failed to persist memory: {str(e)}") from e
         return memory
-    
+
     def retrieve(
         self,
         query: Optional[str] = None,
@@ -146,40 +150,40 @@ class AgentMemory:
     ) -> List[MemoryItem]:
         """
         Retrieve memory items.
-        
+
         Args:
             query: Optional search query
             memory_type: Optional memory type filter
             tags: Optional tag filter
             limit: Maximum number of results
-        
+
         Returns:
             List of memory items
         """
         results = []
-        
+
         # Determine which memories to search
         memories_to_search = []
-        
+
         if memory_type is None or memory_type == MemoryType.SHORT_TERM:
             memories_to_search.extend(self._short_term)
-        
+
         if memory_type is None or memory_type == MemoryType.LONG_TERM:
             memories_to_search.extend(self._long_term.values())
-        
+
         if memory_type is None or memory_type == MemoryType.EPISODIC:
             memories_to_search.extend(self._episodic)
-        
+
         if memory_type is None or memory_type == MemoryType.SEMANTIC:
             memories_to_search.extend(self._semantic.values())
-        
+
         # Filter by tags if provided
         if tags:
             memories_to_search = [
                 m for m in memories_to_search
                 if any(tag in m.tags for tag in tags)
             ]
-        
+
         # Simple text search if query provided
         if query:
             query_lower = query.lower()
@@ -187,28 +191,28 @@ class AgentMemory:
                 m for m in memories_to_search
                 if query_lower in m.content.lower()
             ]
-        
+
         # Sort by importance and recency
         memories_to_search.sort(
             key=lambda m: (m.importance, m.last_accessed),
             reverse=True
         )
-        
+
         # Update access counts
         for memory in memories_to_search[:limit]:
             memory.access_count += 1
             memory.last_accessed = datetime.now()
-        
+
         self._persist()
         return memories_to_search[:limit]
-    
+
     def forget(self, memory_id: str) -> bool:
         """
         Forget a memory item.
-        
+
         Args:
             memory_id: Memory identifier
-        
+
         Returns:
             True if memory was found and removed
         """
@@ -217,33 +221,33 @@ class AgentMemory:
             if memory.memory_id == memory_id:
                 self._short_term.pop(i)
                 return True
-        
+
         # Try long-term
         if memory_id in self._long_term:
             self._long_term.pop(memory_id)
             self._persist()
             return True
-        
+
         # Try episodic
         for i, memory in enumerate(self._episodic):
             if memory.memory_id == memory_id:
                 self._episodic.pop(i)
                 return True
-        
+
         # Try semantic
         if memory_id in self._semantic:
             self._semantic.pop(memory_id)
             self._persist()
             return True
-        
+
         return False
-    
+
     def consolidate(self) -> int:
         """
         Consolidate short-term memories to long-term.
-        
+
         Moves important short-term memories to long-term storage.
-        
+
         Returns:
             Number of memories consolidated
         """
@@ -252,7 +256,7 @@ class AgentMemory:
             m for m in self._short_term
             if m.importance >= 0.7
         ]
-        
+
         consolidated = 0
         for memory in important:
             # Create long-term version
@@ -266,18 +270,18 @@ class AgentMemory:
                 tags=memory.tags,
                 timestamp=memory.timestamp
             )
-            
+
             self._long_term[long_term_memory.memory_id] = long_term_memory
             self._short_term.remove(memory)
             consolidated += 1
         self._persist()
-        
+
         return consolidated
-    
+
     def get_stats(self) -> Dict[str, Any]:
         """
         Get memory statistics.
-        
+
         Returns:
             Dictionary with memory statistics
         """
@@ -299,30 +303,36 @@ class AgentMemory:
         """Persist memory to disk if configured."""
         if not self._persistence_path:
             return
-        data = {
-            "short_term": [m.model_dump() for m in self._short_term],
-            "long_term": [m.model_dump() for m in self._long_term.values()],
-            "episodic": [m.model_dump() for m in self._episodic],
-            "semantic": [m.model_dump() for m in self._semantic.values()],
-        }
-        self._persistence_path.parent.mkdir(parents=True, exist_ok=True)
-        with self._persistence_path.open("w", encoding="utf-8") as f:
-            json.dump(data, f, default=str)
+        try:
+            data = {
+                "short_term": [m.model_dump() for m in self._short_term],
+                "long_term": [m.model_dump() for m in self._long_term.values()],
+                "episodic": [m.model_dump() for m in self._episodic],
+                "semantic": [m.model_dump() for m in self._semantic.values()],
+            }
+            self._persistence_path.parent.mkdir(parents=True, exist_ok=True)
+            with self._persistence_path.open("w", encoding="utf-8") as f:
+                json.dump(data, f, default=str)
+        except Exception as e:
+            raise RuntimeError(f"Failed to persist memory to disk: {str(e)}") from e
 
     def _load(self) -> None:
         if not self._persistence_path or not self._persistence_path.exists():
             return
-        with self._persistence_path.open("r", encoding="utf-8") as f:
-            data = json.load(f)
+        try:
+            with self._persistence_path.open("r", encoding="utf-8") as f:
+                data = json.load(f)
 
-        def _parse(items: List[Dict[str, Any]]) -> List[MemoryItem]:
-            parsed: List[MemoryItem] = []
-            for item in items:
-                parsed.append(MemoryItem(**item))
-            return parsed
+            def _parse(items: List[Dict[str, Any]]) -> List[MemoryItem]:
+                parsed: List[MemoryItem] = []
+                for item in items:
+                    parsed.append(MemoryItem(**item))
+                return parsed
 
-        self._short_term = _parse(data.get("short_term", []))
-        self._long_term = {m.memory_id: m for m in _parse(data.get("long_term", []))}
-        self._episodic = _parse(data.get("episodic", []))
-        self._semantic = {m.memory_id: m for m in _parse(data.get("semantic", []))}
+            self._short_term = _parse(data.get("short_term", []))
+            self._long_term = {m.memory_id: m for m in _parse(data.get("long_term", []))}
+            self._episodic = _parse(data.get("episodic", []))
+            self._semantic = {m.memory_id: m for m in _parse(data.get("semantic", []))}
+        except Exception as e:
+            raise RuntimeError(f"Failed to load memory from disk: {str(e)}") from e
 

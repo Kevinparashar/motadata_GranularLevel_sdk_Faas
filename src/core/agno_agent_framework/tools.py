@@ -64,20 +64,24 @@ class Tool(BaseModel):
             Tool execution result
         
         Raises:
+            NotImplementedError: If tool has no function implementation
             ValueError: If required parameters are missing
             RuntimeError: If tool execution fails
         """
         if self.function is None:
-            raise RuntimeError(f"Tool {self.name} has no function implementation")
+            raise NotImplementedError(f"Tool '{self.name}' is not implemented")
         
         # Validate parameters
-        self._validate_parameters(kwargs)
+        try:
+            self._validate_parameters(kwargs)
+        except ValueError as e:
+            raise ValueError(f"Tool '{self.name}' validation failed: {str(e)}") from e
         
         # Execute function
         try:
             return self.function(**kwargs)
         except Exception as e:
-            raise RuntimeError(f"Tool {self.name} execution failed: {e}")
+            raise RuntimeError(f"Tool {self.name} execution failed: {str(e)}") from e
     
     def _validate_parameters(self, provided: Dict[str, Any]) -> None:
         """
@@ -87,7 +91,7 @@ class Tool(BaseModel):
             provided: Provided parameters
         
         Raises:
-            ValueError: If validation fails
+            ValueError: If validation fails (will be wrapped in ToolValidationError)
         """
         for param in self.parameters:
             if param.required and param.name not in provided:
