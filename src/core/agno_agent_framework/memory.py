@@ -10,7 +10,11 @@ from datetime import datetime
 from enum import Enum
 import json
 from pathlib import Path
-# Removed custom exceptions - using standard Python exceptions
+from .exceptions import (
+    MemoryReadError,
+    MemoryWriteError,
+    MemoryPersistenceError
+)
 
 
 class MemoryType(str, Enum):
@@ -138,7 +142,14 @@ class AgentMemory:
         try:
             self._persist()
         except Exception as e:
-            raise RuntimeError(f"Failed to persist memory: {str(e)}") from e
+            raise MemoryWriteError(
+                message=f"Failed to persist memory: {str(e)}",
+                agent_id=self.agent_id,
+                memory_id=memory.memory_id,
+                memory_type=memory_type.value if hasattr(memory_type, 'value') else str(memory_type),
+                operation="store",
+                original_error=e
+            )
         return memory
 
     def retrieve(
@@ -314,7 +325,13 @@ class AgentMemory:
             with self._persistence_path.open("w", encoding="utf-8") as f:
                 json.dump(data, f, default=str)
         except Exception as e:
-            raise RuntimeError(f"Failed to persist memory to disk: {str(e)}") from e
+            raise MemoryPersistenceError(
+                message=f"Failed to persist memory to disk: {str(e)}",
+                agent_id=self.agent_id,
+                file_path=str(self._persistence_path) if self._persistence_path else None,
+                operation="save",
+                original_error=e
+            )
 
     def _load(self) -> None:
         if not self._persistence_path or not self._persistence_path.exists():
@@ -334,5 +351,11 @@ class AgentMemory:
             self._episodic = _parse(data.get("episodic", []))
             self._semantic = {m.memory_id: m for m in _parse(data.get("semantic", []))}
         except Exception as e:
-            raise RuntimeError(f"Failed to load memory from disk: {str(e)}") from e
+            raise MemoryPersistenceError(
+                message=f"Failed to load memory from disk: {str(e)}",
+                agent_id=self.agent_id,
+                file_path=str(self._persistence_path) if self._persistence_path else None,
+                operation="load",
+                original_error=e
+            )
 

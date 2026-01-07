@@ -386,10 +386,7 @@ result = await execute_task(
 
 ## Error Handling
 
-The framework implements error handling at multiple levels:
-- **Task-Level Errors**: If a task fails, the agent updates its status to ERROR and can optionally retry the task.
-- **Communication Errors**: Failed message deliveries are logged and can be retried.
-- **LLM Errors**: Errors from the gateway are caught and handled gracefully, with fallback behaviors when possible.
+The Agent Framework uses a structured exception hierarchy for granular error handling. See the [Error Handling](#error-handling) section above for detailed information about exception types and usage examples.
 
 ## Swappability
 

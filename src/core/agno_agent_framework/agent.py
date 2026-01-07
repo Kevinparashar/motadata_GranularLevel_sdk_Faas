@@ -12,7 +12,12 @@ import json
 from datetime import datetime
 from .memory import AgentMemory, MemoryType
 from .tools import ToolRegistry, ToolExecutor, Tool
-# Removed custom exceptions - using standard Python exceptions
+from .exceptions import (
+    AgentExecutionError,
+    AgentConfigurationError,
+    AgentStateError,
+    MemoryWriteError
+)
 
 # Import Prompt Context Management
 try:
@@ -192,14 +197,25 @@ class Agent(BaseModel):
                         metadata={"task_type": task.task_type},
                     )
                 return result
+            except AgentExecutionError:
+                # Re-raise agent execution errors as-is
+                self.status = AgentStatus.ERROR
+                raise
             except Exception as e:  # pragma: no cover - runtime errors
+                # Wrap other exceptions in AgentExecutionError
                 last_error = e
                 self.status = AgentStatus.ERROR
                 attempt += 1
                 if attempt < max(1, self.max_retries):
                     await asyncio.sleep(self.retry_delay)
                     continue
-                raise
+                raise AgentExecutionError(
+                    message=f"Agent execution failed: {str(e)}",
+                    agent_id=self.agent_id,
+                    task_type=task.task_type if task else None,
+                    execution_stage="execution",
+                    original_error=e
+                )
             finally:
                 self.status = AgentStatus.IDLE
                 self.current_task = None
@@ -566,7 +582,11 @@ class Agent(BaseModel):
         elif PromptContextManager and create_prompt_manager:
             self.prompt_manager = create_prompt_manager(max_tokens=max_tokens)
         else:
-            raise ImportError("PromptContextManager is not available")
+            raise AgentConfigurationError(
+                message="PromptContextManager is not available",
+                agent_id=self.agent_id,
+                config_key="prompt_manager"
+            )
         
         self.max_context_tokens = max_tokens
         if system_prompt:
@@ -603,7 +623,11 @@ class Agent(BaseModel):
             self.attach_prompt_manager()
         
         if not self.prompt_manager:
-            raise RuntimeError("Prompt manager is not available")
+            raise AgentConfigurationError(
+                message="Prompt manager is not available",
+                agent_id=self.agent_id,
+                config_key="prompt_manager"
+            )
         
         self.prompt_manager.add_template(
             name=name,
@@ -786,7 +810,11 @@ class Agent(BaseModel):
         
         state_path = Path(file_path)
         if not state_path.exists():
-            raise FileNotFoundError(f"Agent state file not found: {file_path}")
+            raise AgentStateError(
+                message=f"Agent state file not found: {file_path}",
+                operation="load",
+                file_path=file_path
+            )
         
         with state_path.open("r", encoding="utf-8") as f:
             state = json.load(f)

@@ -207,15 +207,30 @@ def your_function(
 
 ### Error Handling
 
+The SDK uses a hybrid exception hierarchy approach:
+- **Base Exception**: `src/core/exceptions.py` - Contains `SDKError` base class
+- **Component Exceptions**: Each component has its own exceptions file (e.g., `src/core/agno_agent_framework/exceptions.py`, `src/core/rag/exceptions.py`)
+
+**Example:**
 ```python
-from .exceptions import ComponentError
+from src.core.exceptions import SDKError
+from src.core.agno_agent_framework.exceptions import AgentExecutionError
+from src.core.rag.exceptions import RetrievalError
 
 try:
-    result = operation()
-except ComponentError as e:
-    logger.error(f"Component error: {e}")
-    raise
+    result = await agent.execute_task(task)
+except AgentExecutionError as e:
+    logger.error(f"Agent {e.agent_id} failed: {e.message}")
+    # Handle agent-specific error
+except SDKError as e:
+    logger.error(f"SDK error: {e.message}")
+    # Handle any SDK error
 ```
+
+**Component Exception Files:**
+- Agent Framework: `src/core/agno_agent_framework/exceptions.py`
+- RAG System: `src/core/rag/exceptions.py`
+- Base: `src/core/exceptions.py`
 
 ## Best Practices
 

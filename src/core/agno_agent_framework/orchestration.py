@@ -15,6 +15,11 @@ from typing import TYPE_CHECKING, Any, Callable, Dict, List, Optional, Set
 from datetime import datetime
 
 from .agent import Agent, AgentTask, AgentStatus
+from .exceptions import (
+    OrchestrationError,
+    WorkflowNotFoundError,
+    AgentNotFoundError
+)
 
 if TYPE_CHECKING:
     from .agent import AgentManager
@@ -355,7 +360,7 @@ class AgentOrchestrator:
         """
         workflow = self.workflows.get(workflow_id)
         if not workflow:
-            raise ValueError(f"Workflow '{workflow_id}' not found")
+            raise WorkflowNotFoundError(workflow_id)
         
         self.active_workflows.add(workflow_id)
         try:
@@ -387,7 +392,7 @@ class AgentOrchestrator:
         """
         target_agent = self.agent_manager.get_agent(to_agent_id)
         if not target_agent:
-            raise ValueError(f"Agent '{to_agent_id}' not found")
+            raise AgentNotFoundError(to_agent_id)
         
         task_id = target_agent.add_task(task_type, parameters, priority)
         task = next(t for t in target_agent.task_queue if t.task_id == task_id)
@@ -428,7 +433,7 @@ class AgentOrchestrator:
         for i, agent_id in enumerate(agent_chain):
             agent = self.agent_manager.get_agent(agent_id)
             if not agent:
-                raise ValueError(f"Agent '{agent_id}' not found")
+                raise AgentNotFoundError(agent_id)
             
             task = AgentTask(
                 task_id=f"chain_{i}_{agent_id}",
@@ -474,7 +479,7 @@ class AgentOrchestrator:
         """
         leader = self.agent_manager.get_agent(leader_id)
         if not leader:
-            raise ValueError(f"Agent '{leader_id}' not found")
+            raise AgentNotFoundError(leader_id)
         
         # Execute leader task
         leader_task_obj = AgentTask(

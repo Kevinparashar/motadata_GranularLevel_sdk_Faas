@@ -9,6 +9,12 @@ from pydantic import BaseModel, Field
 from abc import ABC, abstractmethod
 from enum import Enum
 import inspect
+from .exceptions import (
+    ToolInvocationError,
+    ToolNotFoundError,
+    ToolNotImplementedError,
+    ToolValidationError
+)
 
 
 class ToolType(str, Enum):
@@ -64,24 +70,38 @@ class Tool(BaseModel):
             Tool execution result
         
         Raises:
-            NotImplementedError: If tool has no function implementation
-            ValueError: If required parameters are missing
-            RuntimeError: If tool execution fails
+            ToolNotImplementedError: If tool has no function implementation
+            ToolValidationError: If required parameters are missing
+            ToolInvocationError: If tool execution fails
         """
         if self.function is None:
-            raise NotImplementedError(f"Tool '{self.name}' is not implemented")
+            raise ToolNotImplementedError(self.name)
         
         # Validate parameters
         try:
             self._validate_parameters(kwargs)
         except ValueError as e:
-            raise ValueError(f"Tool '{self.name}' validation failed: {str(e)}") from e
+            raise ToolValidationError(
+                message=f"Tool '{self.name}' validation failed: {str(e)}",
+                tool_name=self.name,
+                missing_parameters=[str(e)],
+                original_error=e
+            )
         
         # Execute function
         try:
             return self.function(**kwargs)
+        except ToolInvocationError:
+            # Re-raise tool invocation errors as-is
+            raise
         except Exception as e:
-            raise RuntimeError(f"Tool {self.name} execution failed: {str(e)}") from e
+            raise ToolInvocationError(
+                message=f"Tool {self.name} execution failed: {str(e)}",
+                tool_name=self.name,
+                arguments=kwargs,
+                error_type="runtime",
+                original_error=e
+            )
     
     def _validate_parameters(self, provided: Dict[str, Any]) -> None:
         """
@@ -91,11 +111,19 @@ class Tool(BaseModel):
             provided: Provided parameters
         
         Raises:
-            ValueError: If validation fails (will be wrapped in ToolValidationError)
+            ToolValidationError: If validation fails
         """
+        missing_params = []
         for param in self.parameters:
             if param.required and param.name not in provided:
-                raise ValueError(f"Required parameter '{param.name}' not provided")
+                missing_params.append(param.name)
+        
+        if missing_params:
+            raise ToolValidationError(
+                message=f"Required parameters missing: {', '.join(missing_params)}",
+                tool_name=self.name,
+                missing_parameters=missing_params
+            )
     
     def get_schema(self) -> Dict[str, Any]:
         """
@@ -299,7 +327,7 @@ class ToolExecutor:
         tool = self.registry.get_tool_by_name(tool_name)
         
         if tool is None:
-            raise ValueError(f"Tool '{tool_name}' not found")
+            raise ToolNotFoundError(tool_name)
         
         return tool.execute(**arguments)
 
