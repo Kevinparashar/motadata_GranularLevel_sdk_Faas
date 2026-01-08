@@ -18,6 +18,8 @@ from .exceptions import (
     AgentStateError,
     MemoryWriteError
 )
+from ..utils.circuit_breaker import CircuitBreaker, CircuitBreakerConfig, CircuitState
+from ..utils.health_check import HealthCheck, HealthStatus, HealthCheckResult
 
 # Import Prompt Context Management
 try:
@@ -113,7 +115,14 @@ class Agent(BaseModel):
     # Reliability
     max_retries: int = 1
     retry_delay: float = 0.1
-
+    
+    # Circuit Breaker for external service calls
+    circuit_breaker: Optional[CircuitBreaker] = None
+    circuit_breaker_config: Optional[CircuitBreakerConfig] = None
+    
+    # Health Check
+    health_check: Optional[HealthCheck] = None
+    
     # Metadata
     created_at: datetime = Field(default_factory=datetime.now)
     last_active: datetime = Field(default_factory=datetime.now)
@@ -619,6 +628,104 @@ class Agent(BaseModel):
         """
         self.system_prompt = system_prompt
 
+    def attach_circuit_breaker(
+        self,
+        config: Optional[CircuitBreakerConfig] = None
+    ) -> None:
+        """
+        Attach a circuit breaker to the agent for external service calls.
+        
+        Args:
+            config: Optional circuit breaker configuration
+        """
+        self.circuit_breaker_config = config or CircuitBreakerConfig()
+        self.circuit_breaker = CircuitBreaker(
+            name=f"agent_{self.agent_id}",
+            config=self.circuit_breaker_config
+        )
+    
+    def attach_health_check(self) -> None:
+        """Attach health check to the agent."""
+        self.health_check = HealthCheck(name=f"agent_{self.agent_id}")
+        
+        # Add default health checks
+        async def check_gateway_health() -> HealthCheckResult:
+            """Check if gateway is available."""
+            if not self.gateway:
+                return HealthCheckResult(
+                    status=HealthStatus.UNHEALTHY,
+                    message="Gateway not configured"
+                )
+            return HealthCheckResult(
+                status=HealthStatus.HEALTHY,
+                message="Gateway available"
+            )
+        
+        async def check_memory_health() -> HealthCheckResult:
+            """Check if memory is functioning."""
+            if not self.memory:
+                return HealthCheckResult(
+                    status=HealthStatus.DEGRADED,
+                    message="Memory not configured"
+                )
+            return HealthCheckResult(
+                status=HealthStatus.HEALTHY,
+                message="Memory available"
+            )
+        
+        async def check_status_health() -> HealthCheckResult:
+            """Check agent status."""
+            if self.status == AgentStatus.ERROR:
+                return HealthCheckResult(
+                    status=HealthStatus.UNHEALTHY,
+                    message="Agent in error state"
+                )
+            elif self.status == AgentStatus.STOPPED:
+                return HealthCheckResult(
+                    status=HealthStatus.DEGRADED,
+                    message="Agent stopped"
+                )
+            return HealthCheckResult(
+                status=HealthStatus.HEALTHY,
+                message=f"Agent status: {self.status.value}"
+            )
+        
+        self.health_check.add_check(check_gateway_health)
+        self.health_check.add_check(check_memory_health)
+        self.health_check.add_check(check_status_health)
+    
+    async def get_health(self) -> Dict[str, Any]:
+        """
+        Get agent health status.
+        
+        Returns:
+            Dictionary with health information
+        """
+        if not self.health_check:
+            self.attach_health_check()
+        
+        if not self.health_check:
+            return {
+                "name": f"agent_{self.agent_id}",
+                "status": "unknown",
+                "message": "Health check not available"
+            }
+        
+        result = await self.health_check.check()
+        health_info = self.health_check.get_health()
+        
+        # Add agent-specific metrics
+        health_info.update({
+            "agent_id": self.agent_id,
+            "status": self.status.value,
+            "task_queue_size": len(self.task_queue),
+            "current_task": self.current_task.task_id if self.current_task else None,
+            "last_active": self.last_active.isoformat(),
+            "circuit_breaker": self.circuit_breaker.get_stats() if self.circuit_breaker else None
+        })
+        
+        return health_info
+    
     def add_prompt_template(
         self,
         name: str,

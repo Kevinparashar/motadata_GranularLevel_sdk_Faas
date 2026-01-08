@@ -8,8 +8,16 @@ through LiteLLM, with support for streaming, function calling, and embeddings.
 import os
 from typing import Any, Dict, List, Optional, AsyncIterator
 from litellm import completion, acompletion, embedding, aembedding
-from litellm import Router
+try:
+    from litellm.router import Router  # type: ignore
+except ImportError:
+    from litellm import Router  # type: ignore  # Fallback for older versions
 from pydantic import BaseModel, Field
+from ..utils.circuit_breaker import CircuitBreaker, CircuitBreakerConfig, CircuitState
+from ..utils.health_check import HealthCheck, HealthStatus, HealthCheckResult
+from .rate_limiter import RateLimiter, RateLimitConfig, RequestDeduplicator, RequestBatcher
+from datetime import datetime
+import asyncio
 
 
 class GatewayConfig(BaseModel):
@@ -22,6 +30,14 @@ class GatewayConfig(BaseModel):
     timeout: float = 60.0
     max_retries: int = 3
     retry_delay: float = 1.0
+    # Advanced features
+    enable_circuit_breaker: bool = True
+    enable_rate_limiting: bool = True
+    enable_request_deduplication: bool = True
+    enable_request_batching: bool = False
+    enable_health_monitoring: bool = True
+    rate_limit_config: Optional[RateLimitConfig] = None
+    circuit_breaker_config: Optional[CircuitBreakerConfig] = None
 
 
 class GenerateResponse(BaseModel):
@@ -64,12 +80,207 @@ class LiteLLMGateway:
         self.router = router
 
         if router is None and self.config.model_list:
-            self.router = Router(
-                model_list=self.config.model_list,
-                fallbacks=self.config.fallbacks,
-                timeout=self.config.timeout,
-                num_retries=self.config.max_retries,
+            router_kwargs = {
+                "model_list": self.config.model_list,
+                "timeout": self.config.timeout,
+                "num_retries": self.config.max_retries,
+            }
+            if self.config.fallbacks is not None:
+                router_kwargs["fallbacks"] = self.config.fallbacks
+            self.router = Router(**router_kwargs)
+
+        # Initialize circuit breaker
+        self.circuit_breaker: Optional[CircuitBreaker] = None
+        if self.config.enable_circuit_breaker:
+            self.circuit_breaker = CircuitBreaker(
+                name="litellm_gateway",
+                config=self.config.circuit_breaker_config or CircuitBreakerConfig(
+                    failure_threshold=5,
+                    success_threshold=2,
+                    timeout=60.0
+                )
             )
+
+        # Initialize rate limiter (per-tenant)
+        self.rate_limiters: Dict[str, RateLimiter] = {}
+
+        # Initialize request deduplicator
+        self.deduplicator: Optional[RequestDeduplicator] = None
+        if self.config.enable_request_deduplication:
+            self.deduplicator = RequestDeduplicator(ttl=300.0)
+
+        # Initialize request batcher
+        self.batcher: Optional[RequestBatcher] = None
+        if self.config.enable_request_batching:
+            self.batcher = RequestBatcher(batch_size=10, batch_timeout=0.5)
+
+        # Initialize health check
+        self.health_check: Optional[HealthCheck] = None
+        if self.config.enable_health_monitoring:
+            self.health_check = HealthCheck(name="litellm_gateway")
+            self._setup_health_checks()
+
+        # Provider health tracking
+        self.provider_health: Dict[str, Dict[str, Any]] = {}
+
+    def _setup_health_checks(self) -> None:
+        """Setup health check functions."""
+        if not self.health_check:
+            return
+
+        async def check_router_health() -> HealthCheckResult:
+            """Check router health."""
+            if not self.router:
+                return HealthCheckResult(
+                    status=HealthStatus.DEGRADED,
+                    message="Router not configured"
+                )
+            return HealthCheckResult(
+                status=HealthStatus.HEALTHY,
+                message="Router available"
+            )
+
+        async def check_circuit_breaker_health() -> HealthCheckResult:
+            """Check circuit breaker health."""
+            if not self.circuit_breaker:
+                return HealthCheckResult(
+                    status=HealthStatus.HEALTHY,
+                    message="Circuit breaker not enabled"
+                )
+            stats = self.circuit_breaker.get_stats()
+            if stats["state"] == CircuitState.OPEN.value:
+                return HealthCheckResult(
+                    status=HealthStatus.UNHEALTHY,
+                    message="Circuit breaker is OPEN",
+                    details=stats
+                )
+            return HealthCheckResult(
+                status=HealthStatus.HEALTHY,
+                message="Circuit breaker healthy",
+                details=stats
+            )
+
+        async def check_provider_health() -> HealthCheckResult:
+            """Check provider health."""
+            if not self.provider_health:
+                return HealthCheckResult(
+                    status=HealthStatus.UNKNOWN,
+                    message="No provider health data"
+                )
+
+            # Check if any provider is unhealthy
+            unhealthy_providers = [
+                name for name, health in self.provider_health.items()
+                if health.get("status") == "unhealthy"
+            ]
+
+            if unhealthy_providers:
+                return HealthCheckResult(
+                    status=HealthStatus.DEGRADED,
+                    message=f"Unhealthy providers: {', '.join(unhealthy_providers)}",
+                    details={"provider_health": self.provider_health}
+                )
+
+            return HealthCheckResult(
+                status=HealthStatus.HEALTHY,
+                message="All providers healthy",
+                details={"provider_health": self.provider_health}
+            )
+
+        self.health_check.add_check(check_router_health)
+        self.health_check.add_check(check_circuit_breaker_health)
+        self.health_check.add_check(check_provider_health)
+
+    def _get_rate_limiter(self, tenant_id: Optional[str] = None) -> Optional[RateLimiter]:
+        """Get or create rate limiter for tenant."""
+        if not self.config.enable_rate_limiting:
+            return None
+
+        key = tenant_id or "global"
+        if key not in self.rate_limiters:
+            self.rate_limiters[key] = RateLimiter(
+                config=self.config.rate_limit_config or RateLimitConfig(),
+                tenant_id=tenant_id
+            )
+        return self.rate_limiters[key]
+
+    def _classify_error(self, error: Exception) -> Dict[str, Any]:
+        """
+        Classify error for advanced error handling.
+
+        Args:
+            error: Exception to classify
+
+        Returns:
+            Dictionary with error classification
+        """
+        error_type = type(error).__name__
+        error_message = str(error)
+
+        classification = {
+            "type": error_type,
+            "message": error_message,
+            "category": "unknown",
+            "retryable": False,
+            "provider_error": False,
+            "rate_limit_error": False,
+            "timeout_error": False,
+            "authentication_error": False
+        }
+
+        # Classify error
+        if "rate limit" in error_message.lower() or "429" in error_message:
+            classification.update({
+                "category": "rate_limit",
+                "retryable": True,
+                "rate_limit_error": True
+            })
+        elif "timeout" in error_message.lower() or "timed out" in error_message.lower():
+            classification.update({
+                "category": "timeout",
+                "retryable": True,
+                "timeout_error": True
+            })
+        elif "authentication" in error_message.lower() or "401" in error_message or "403" in error_message:
+            classification.update({
+                "category": "authentication",
+                "retryable": False,
+                "authentication_error": True
+            })
+        elif "api" in error_type.lower() or "provider" in error_type.lower():
+            classification.update({
+                "category": "provider",
+                "retryable": True,
+                "provider_error": True
+            })
+        else:
+            # Check for retryable patterns
+            retryable_patterns = ["connection", "network", "temporary", "503", "502", "500"]
+            if any(pattern in error_message.lower() for pattern in retryable_patterns):
+                classification["retryable"] = True
+                classification["category"] = "network"
+
+        return classification
+
+    async def get_health(self) -> Dict[str, Any]:
+        """Get gateway health status."""
+        if not self.health_check:
+            return {"status": "health_monitoring_disabled"}
+
+        result = await self.health_check.check()
+        health_info = self.health_check.get_health()
+
+        # Add gateway-specific metrics
+        health_info.update({
+            "circuit_breaker": self.circuit_breaker.get_stats() if self.circuit_breaker else None,
+            "rate_limiters": {
+                tenant: limiter.get_stats()
+                for tenant, limiter in self.rate_limiters.items()
+            },
+            "provider_health": self.provider_health
+        })
+
+        return health_info
 
     def generate(
         self,
@@ -113,31 +324,47 @@ class LiteLLMGateway:
 
         if stream:
             # For streaming, return an async iterator
-            return response
+            return response  # type: ignore[return-value]
 
-        # Extract text from response
-        if hasattr(response, 'choices') and len(response.choices) > 0:
-            text = response.choices[0].message.content
-            model_name = response.model if hasattr(response, 'model') else model
-            usage = response.usage.__dict__ if hasattr(response, 'usage') else None
-            finish_reason = response.choices[0].finish_reason if hasattr(response.choices[0], 'finish_reason') else None
+        # Extract text from response (litellm types are incomplete, using runtime checks)
+        text: str = ""
+        model_name: str = model
+        usage: Optional[Dict[str, Any]] = None
+        finish_reason: Optional[str] = None
+        raw_response: Optional[Dict[str, Any]] = None
+
+        if hasattr(response, 'choices') and response.choices:  # type: ignore[attr-defined]
+            choices = response.choices  # type: ignore[attr-defined]
+            if len(choices) > 0:
+                choice = choices[0]
+                if hasattr(choice, 'message') and hasattr(choice.message, 'content'):  # type: ignore[attr-defined]
+                    text = choice.message.content or ""  # type: ignore[attr-defined]
+                if hasattr(choice, 'finish_reason'):  # type: ignore[attr-defined]
+                    finish_reason = choice.finish_reason  # type: ignore[attr-defined]
+            if hasattr(response, 'model'):  # type: ignore[attr-defined]
+                model_name = response.model or model  # type: ignore[attr-defined]
+            if hasattr(response, 'usage') and response.usage:  # type: ignore[attr-defined]
+                usage = response.usage.__dict__ if hasattr(response.usage, '__dict__') else None  # type: ignore[attr-defined]
+            raw_response = response.__dict__ if hasattr(response, '__dict__') else None
         elif isinstance(response, dict):
-            text = response.get('choices', [{}])[0].get('message', {}).get('content', '')
-            model_name = response.get('model', model)
+            choices = response.get('choices', [])
+            if choices and len(choices) > 0:
+                message = choices[0].get('message', {})
+                text = message.get('content', '') or ""
+                finish_reason = choices[0].get('finish_reason')
+            model_name = response.get('model', model) or model
             usage = response.get('usage')
-            finish_reason = response.get('choices', [{}])[0].get('finish_reason')
+            raw_response = response
         else:
-            text = str(response)
-            model_name = model
-            usage = None
-            finish_reason = None
+            text = str(response) if response else ""
+            raw_response = {"response": str(response)} if response else None
 
         return GenerateResponse(
-            text=text,
-            model=model_name,
+            text=text or "",
+            model=model_name or model,
             usage=usage,
             finish_reason=finish_reason,
-            raw_response=response.__dict__ if hasattr(response, '__dict__') else response
+            raw_response=raw_response
         )
 
     async def generate_async(
@@ -150,11 +377,12 @@ class LiteLLMGateway:
         **kwargs: Any
     ) -> GenerateResponse:
         """
-        Generate text completion asynchronously.
+        Generate text completion asynchronously with advanced features.
 
         Args:
             prompt: Input prompt
             model: Model identifier
+            tenant_id: Optional tenant ID for rate limiting and tracking
             messages: Optional list of messages
             stream: Whether to stream the response
             **kwargs: Additional parameters
@@ -165,20 +393,82 @@ class LiteLLMGateway:
         if messages is None:
             messages = [{"role": "user", "content": prompt}]
 
-        if self.router:
-            response = await self.router.acompletion(
+        # Rate limiting
+        rate_limiter = self._get_rate_limiter(tenant_id)
+        if rate_limiter:
+            await rate_limiter.acquire()
+
+        # Define the actual generation function
+        async def _generate() -> Any:
+            """Internal generation function."""
+            try:
+                if self.router:
+                    response = await self.router.acompletion(  # type: ignore
+                        model=model,
+                        messages=messages,  # type: ignore
+                        stream=stream,
+                        **kwargs
+                    )
+                else:
+                    response = await acompletion(  # type: ignore
+                        model=model,
+                        messages=messages,  # type: ignore
+                        stream=stream,
+                        **kwargs
+                    )
+
+                # Update provider health
+                provider_name = model.split("/")[0] if "/" in model else "default"
+                self.provider_health[provider_name] = {
+                    "status": "healthy",
+                    "last_success": datetime.now().isoformat(),
+                    "last_check": datetime.now().isoformat()
+                }
+
+                return response
+
+            except Exception as e:
+                # Classify error
+                error_classification = self._classify_error(e)
+
+                # Update provider health
+                provider_name = model.split("/")[0] if "/" in model else "default"
+                self.provider_health[provider_name] = {
+                    "status": "unhealthy" if not error_classification["retryable"] else "degraded",
+                    "last_error": str(e),
+                    "error_classification": error_classification,
+                    "last_check": datetime.now().isoformat()
+                }
+
+                raise
+
+        # Use deduplication if enabled
+        if self.deduplicator and not stream:
+            response = await self.deduplicator.get_or_execute(
+                _generate,
+                prompt=prompt,
                 model=model,
                 messages=messages,
                 stream=stream,
                 **kwargs
             )
+        # Use batching if enabled
+        elif self.batcher and not stream:
+            batch_key = f"{model}_{tenant_id or 'global'}"
+            response = await self.batcher.batch_execute(
+                batch_key,
+                _generate,
+                prompt=prompt,
+                model=model,
+                messages=messages,
+                stream=stream,
+                **kwargs
+            )
+        # Use circuit breaker if enabled
+        elif self.circuit_breaker:
+            response = await self.circuit_breaker.call(_generate)
         else:
-            response = await acompletion(
-                model=model,
-                messages=messages,
-                stream=stream,
-                **kwargs
-            )
+            response = await _generate()
 
         if stream:
             return response
@@ -254,7 +544,7 @@ class LiteLLMGateway:
 
         return EmbedResponse(
             embeddings=embeddings,
-            model=model_name,
+            model=model_name or model,
             usage=usage
         )
 
@@ -288,23 +578,30 @@ class LiteLLMGateway:
                 **kwargs
             )
 
-        # Extract embeddings
-        if hasattr(response, 'data'):
-            embeddings = [item.embedding for item in response.data]
-            model_name = response.model if hasattr(response, 'model') else model
-            usage = response.usage.__dict__ if hasattr(response, 'usage') else None
+        # Extract embeddings (litellm types are incomplete, using runtime checks)
+        embeddings: List[List[float]] = []
+        model_name: str = model
+        usage: Optional[Dict[str, Any]] = None
+
+        if hasattr(response, 'data') and response.data:  # type: ignore[attr-defined]
+            data_list = response.data if isinstance(response.data, list) else []  # type: ignore[attr-defined]
+            embeddings = [item.embedding for item in data_list if hasattr(item, 'embedding')]  # type: ignore[attr-defined]
+            if hasattr(response, 'model'):  # type: ignore[attr-defined]
+                model_name = response.model or model  # type: ignore[attr-defined]
+            if hasattr(response, 'usage') and response.usage:  # type: ignore[attr-defined]
+                usage = response.usage.__dict__ if hasattr(response.usage, '__dict__') else None  # type: ignore[attr-defined]
         elif isinstance(response, dict):
-            embeddings = [item.get('embedding', []) for item in response.get('data', [])]
-            model_name = response.get('model', model)
+            data = response.get('data', [])
+            if data and isinstance(data, list):
+                embeddings = [item.get('embedding', []) for item in data if isinstance(item, dict)]
+            model_name = response.get('model', model) or model
             usage = response.get('usage')
         else:
             embeddings = []
-            model_name = model
-            usage = None
 
         return EmbedResponse(
             embeddings=embeddings,
-            model=model_name,
+            model=model_name or model,
             usage=usage
         )
 
