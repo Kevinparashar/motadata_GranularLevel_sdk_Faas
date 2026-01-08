@@ -135,7 +135,7 @@ See `src/core/cache_mechanism/functions.py` for complete function documentation.
 
 ## Key Features
 
-### Key Features
+### Core Features
 
 - **TTL Management**: Configurable default TTL per instance
 - **LRU Eviction**: Max-size enforcement for memory backend
@@ -148,6 +148,152 @@ The component tracks cache statistics:
 - **Hit/Miss Ratios**: Tracks cache effectiveness
 - **Size Metrics**: Monitors cache size and memory usage
 - **Performance Metrics**: Tracks cache operation performance
+
+### Cache Warming Strategies
+
+The cache mechanism now supports **cache warming** to pre-load frequently accessed data:
+
+- **Pre-loading**: Pre-loads data into cache before it's needed
+- **Warming Patterns**: Configurable patterns for identifying data to warm
+- **Scheduled Warming**: Schedule cache warming at specific times
+- **On-Demand Warming**: Trigger cache warming on demand
+
+**Example:**
+```python
+from src.core.cache_mechanism.cache_enhancements import CacheWarmer
+
+# Create cache warmer
+warmer = CacheWarmer(
+    cache=cache,
+    warming_strategy="scheduled",  # or "on_demand", "automatic"
+    warming_interval=3600  # seconds
+)
+
+# Define warming patterns
+warmer.add_warming_pattern("user:*", priority=1)
+warmer.add_warming_pattern("document:*", priority=2)
+
+# Start warming
+warmer.start_warming()
+```
+
+### Memory Usage Monitoring
+
+The cache mechanism includes **memory usage monitoring** for better resource management:
+
+- **Memory Tracking**: Tracks memory usage in real-time
+- **Memory Alerts**: Alerts when memory usage exceeds thresholds
+- **Memory Pressure Handling**: Automatically handles memory pressure
+- **Memory Reports**: Provides detailed memory usage reports
+
+**Example:**
+```python
+from src.core.cache_mechanism.cache_enhancements import CacheMonitor
+
+# Create cache monitor
+monitor = CacheMonitor(
+    cache=cache,
+    memory_threshold=0.8,  # Alert at 80% memory usage
+    enable_alerts=True
+)
+
+# Get memory usage
+usage = monitor.get_memory_usage()
+print(f"Memory usage: {usage['usage_percent']}%")
+print(f"Memory available: {usage['available_mb']}MB")
+
+# Check memory pressure
+if monitor.check_memory_pressure():
+    monitor.handle_memory_pressure()
+```
+
+### Automatic Cache Sharding
+
+The cache mechanism supports **automatic cache sharding** for improved performance:
+
+- **Automatic Sharding**: Automatically shards cache across multiple nodes
+- **Shard Management**: Manages shards and distributes load
+- **Shard Recovery**: Recovers from shard failures
+- **Shard Balancing**: Balances load across shards
+
+**Example:**
+```python
+from src.core.cache_mechanism.cache_enhancements import CacheSharder
+
+# Create cache sharder
+sharder = CacheSharder(
+    cache=cache,
+    num_shards=4,
+    sharding_strategy="consistent_hashing"  # or "round_robin", "key_based"
+)
+
+# Enable sharding
+sharder.enable_sharding()
+
+# Get shard for key
+shard = sharder.get_shard("user:123")
+```
+
+### Cache Validation
+
+The cache mechanism includes **cache validation processes** to ensure data integrity:
+
+- **Data Validation**: Validates cached data before retrieval
+- **Integrity Checks**: Checks data integrity and consistency
+- **Validation Rules**: Configurable validation rules
+- **Automatic Validation**: Automatically validates data on retrieval
+
+**Example:**
+```python
+from src.core.cache_mechanism.cache_enhancements import CacheValidator
+
+# Create cache validator
+validator = CacheValidator(
+    cache=cache,
+    validate_on_get=True,
+    validate_on_set=True,
+    validation_rules=["schema_check", "integrity_check"]
+)
+
+# Add custom validation rule
+validator.add_validation_rule(
+    lambda data: isinstance(data, dict) and "id" in data,
+    "Data must be a dict with 'id' field"
+)
+
+# Attach validator to cache
+cache.attach_validator(validator)
+```
+
+### Automatic Recovery Mechanisms
+
+The cache mechanism provides **automatic recovery** for cache failures:
+
+- **Failure Detection**: Detects cache failures automatically
+- **Automatic Recovery**: Automatically recovers from failures
+- **Recovery Strategies**: Multiple recovery strategies (retry, fallback, rebuild)
+- **Recovery Monitoring**: Monitors recovery process
+
+**Example:**
+```python
+from src.core.cache_mechanism.cache_enhancements import CacheRecovery
+
+# Create cache recovery
+recovery = CacheRecovery(
+    cache=cache,
+    recovery_strategy="automatic",  # or "manual", "scheduled"
+    retry_attempts=3,
+    fallback_cache=fallback_cache  # Optional fallback cache
+)
+
+# Enable recovery
+recovery.enable_recovery()
+
+# Get recovery status
+status = recovery.get_recovery_status()
+print(f"Recovery status: {status['status']}")
+print(f"Recovery attempts: {status['attempts']}")
+```
 
 ## Error Handling
 
@@ -173,3 +319,9 @@ The component implements robust error handling:
 4. **Monitor Performance**: Track cache hit rates and adjust configurations
 5. **Distributed Caching**: Use distributed caches (Redis) for multi-instance deployments
 6. **Cost-Benefit Analysis**: Balance cache complexity with performance and cost benefits
+7. **Cache Warming**: Use cache warming for frequently accessed data to improve performance
+8. **Memory Monitoring**: Monitor memory usage to prevent memory pressure and optimize cache size
+9. **Cache Sharding**: Use cache sharding for large-scale deployments to improve performance and scalability
+10. **Cache Validation**: Enable cache validation to ensure data integrity and consistency
+11. **Recovery Mechanisms**: Configure automatic recovery to handle cache failures gracefully
+12. **Cache Statistics**: Regularly review cache statistics to optimize cache configuration

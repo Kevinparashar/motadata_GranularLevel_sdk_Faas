@@ -52,6 +52,9 @@ class AgentMemory:
         agent_id: str,
         max_short_term: int = 50,
         max_long_term: int = 1000,
+        max_episodic: int = 500,  # Limit for episodic memory (ITSM ticket history)
+        max_semantic: int = 2000,  # Limit for semantic memory (knowledge patterns)
+        max_age_days: Optional[int] = 30,  # Optional max age for automatic cleanup
         persistence_path: Optional[str] = None
     ):
         """
@@ -61,10 +64,17 @@ class AgentMemory:
             agent_id: Agent identifier
             max_short_term: Maximum short-term memory items
             max_long_term: Maximum long-term memory items
+            max_episodic: Maximum episodic memory items (default: 500 for ITSM)
+            max_semantic: Maximum semantic memory items (default: 2000 for ITSM)
+            max_age_days: Optional maximum age in days for automatic cleanup
+            persistence_path: Optional path for memory persistence
         """
         self.agent_id = agent_id
         self.max_short_term = max_short_term
         self.max_long_term = max_long_term
+        self.max_episodic = max_episodic
+        self.max_semantic = max_semantic
+        self.max_age_days = max_age_days
         self._persistence_path = Path(persistence_path) if persistence_path else None
 
         self._short_term: List[MemoryItem] = []
@@ -135,9 +145,21 @@ class AgentMemory:
 
         elif memory_type == MemoryType.EPISODIC:
             self._episodic.append(memory)
+            # Trim if exceeds max (FIFO - remove oldest)
+            if len(self._episodic) > self.max_episodic:
+                self._episodic = self._episodic[-self.max_episodic:]
 
         elif memory_type == MemoryType.SEMANTIC:
             self._semantic[memory.memory_id] = memory
+            # Trim if exceeds max (remove least important)
+            if len(self._semantic) > self.max_semantic:
+                sorted_items = sorted(
+                    self._semantic.values(),
+                    key=lambda m: m.importance
+                )
+                to_remove = sorted_items[:len(sorted_items) - self.max_semantic]
+                for item in to_remove:
+                    self._semantic.pop(item.memory_id, None)
 
         try:
             self._persist()
@@ -288,6 +310,144 @@ class AgentMemory:
         self._persist()
 
         return consolidated
+    
+    def cleanup_expired(self, max_age_days: Optional[int] = None) -> int:
+        """
+        Remove memories older than specified days.
+        
+        Args:
+            max_age_days: Maximum age in days (uses instance default if None)
+        
+        Returns:
+            Number of memories removed
+        """
+        from datetime import timedelta
+        
+        max_age = max_age_days or self.max_age_days
+        if max_age is None:
+            return 0
+        
+        cutoff = datetime.now() - timedelta(days=max_age)
+        removed = 0
+        
+        # Clean short-term
+        before = len(self._short_term)
+        self._short_term = [m for m in self._short_term if m.timestamp > cutoff]
+        removed += before - len(self._short_term)
+        
+        # Clean long-term
+        to_remove = [
+            mid for mid, m in self._long_term.items()
+            if m.timestamp <= cutoff
+        ]
+        for mid in to_remove:
+            self._long_term.pop(mid, None)
+            removed += 1
+        
+        # Clean episodic
+        before = len(self._episodic)
+        self._episodic = [m for m in self._episodic if m.timestamp > cutoff]
+        removed += before - len(self._episodic)
+        
+        # Clean semantic
+        to_remove = [
+            mid for mid, m in self._semantic.items()
+            if m.timestamp <= cutoff
+        ]
+        for mid in to_remove:
+            self._semantic.pop(mid, None)
+            removed += 1
+        
+        if removed > 0:
+            self._persist()
+        
+        return removed
+    
+    def check_memory_pressure(self) -> Dict[str, Any]:
+        """
+        Check if memory usage is high.
+        
+        Returns:
+            Dictionary with memory pressure information
+        """
+        total = (
+            len(self._short_term) +
+            len(self._long_term) +
+            len(self._episodic) +
+            len(self._semantic)
+        )
+        
+        max_total = (
+            self.max_short_term +
+            self.max_long_term +
+            self.max_episodic +
+            self.max_semantic
+        )
+        
+        usage_ratio = total / max_total if max_total > 0 else 0
+        
+        return {
+            "total_memories": total,
+            "max_total": max_total,
+            "usage_ratio": usage_ratio,
+            "under_pressure": usage_ratio > 0.8,
+            "breakdown": {
+                "short_term": {
+                    "count": len(self._short_term),
+                    "max": self.max_short_term,
+                    "usage": len(self._short_term) / self.max_short_term if self.max_short_term > 0 else 0
+                },
+                "long_term": {
+                    "count": len(self._long_term),
+                    "max": self.max_long_term,
+                    "usage": len(self._long_term) / self.max_long_term if self.max_long_term > 0 else 0
+                },
+                "episodic": {
+                    "count": len(self._episodic),
+                    "max": self.max_episodic,
+                    "usage": len(self._episodic) / self.max_episodic if self.max_episodic > 0 else 0
+                },
+                "semantic": {
+                    "count": len(self._semantic),
+                    "max": self.max_semantic,
+                    "usage": len(self._semantic) / self.max_semantic if self.max_semantic > 0 else 0
+                }
+            }
+        }
+    
+    def handle_memory_pressure(self) -> int:
+        """
+        Automatically clean up when under memory pressure.
+        
+        Returns:
+            Number of memories removed
+        """
+        pressure = self.check_memory_pressure()
+        
+        if not pressure["under_pressure"]:
+            return 0
+        
+        # Clean up old memories first
+        removed = self.cleanup_expired(max_age_days=7)
+        
+        # If still under pressure, remove least important
+        if self.check_memory_pressure()["under_pressure"]:
+            # Remove least important from all types
+            all_memories = (
+                list(self._short_term) +
+                list(self._long_term.values()) +
+                list(self._episodic) +
+                list(self._semantic.values())
+            )
+            all_memories.sort(key=lambda m: (m.importance, m.access_count))
+            
+            # Remove bottom 10%
+            to_remove = all_memories[:max(1, len(all_memories) // 10)]
+            for memory in to_remove:
+                self.forget(memory.memory_id)
+                removed += 1
+        
+        return removed
 
     def get_stats(self) -> Dict[str, Any]:
         """
@@ -307,7 +467,14 @@ class AgentMemory:
                 len(self._long_term) +
                 len(self._episodic) +
                 len(self._semantic)
-            )
+            ),
+            "limits": {
+                "max_short_term": self.max_short_term,
+                "max_long_term": self.max_long_term,
+                "max_episodic": self.max_episodic,
+                "max_semantic": self.max_semantic
+            },
+            "pressure": self.check_memory_pressure()
         }
 
     def _persist(self) -> None:

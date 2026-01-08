@@ -106,6 +106,9 @@ def create_agent_with_memory(
         if agent.memory:
             agent.memory.max_short_term = max_short_term
             agent.memory.max_long_term = max_long_term
+            # Set episodic and semantic limits for ITSM
+            agent.memory.max_episodic = memory_config.get("max_episodic", 500)
+            agent.memory.max_semantic = memory_config.get("max_semantic", 2000)
 
     return agent
 
