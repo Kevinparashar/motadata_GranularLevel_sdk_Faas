@@ -115,16 +115,196 @@ These methods generate vector embeddings for text inputs. They are primarily use
 
 These methods provide streaming capabilities, allowing real-time token generation. They return async iterators that yield text chunks as they're generated, enabling interactive user experiences.
 
+## Advanced Features
+
+### Rate Limiting with Request Queuing
+
+The gateway now includes **advanced rate limiting** with request queuing:
+
+- **Token Bucket Algorithm**: Implements token bucket for smooth rate limiting
+- **Request Queuing**: Queues requests when rate limit is exceeded instead of failing
+- **Per-Tenant Rate Limiting**: Supports tenant-specific rate limits
+- **Burst Support**: Allows burst requests within limits
+- **Queue Timeout**: Configurable timeout for queued requests
+
+**Example:**
+```python
+from src.core.litellm_gateway.rate_limiter import RateLimitConfig
+
+# Configure rate limiting
+rate_limit_config = RateLimitConfig(
+    requests_per_minute=60,
+    tokens_per_minute=90000,
+    enable_queuing=True,
+    queue_timeout=30.0
+)
+gateway.configure_rate_limiting(rate_limit_config)
+```
+
+### Request Batching and Deduplication
+
+The gateway supports **request batching and deduplication** for improved efficiency:
+
+- **Request Batching**: Groups similar requests together to reduce API calls
+- **Request Deduplication**: Prevents processing identical requests multiple times
+- **Automatic Batching**: Automatically batches requests when possible
+- **Deduplication Window**: Configurable time window for deduplication
+
+**Example:**
+```python
+# Batching and deduplication are automatic
+# Multiple identical requests within the deduplication window return cached result
+response1 = await gateway.generate_async("What is AI?", tenant_id="tenant1")
+response2 = await gateway.generate_async("What is AI?", tenant_id="tenant1")
+# response2 uses cached result from response1
+```
+
+### Circuit Breaker for Provider Failures
+
+The gateway includes **Circuit Breaker** mechanism for provider failures:
+
+- **Automatic Failure Detection**: Monitors provider health and opens circuit on failures
+- **Provider Isolation**: Failing providers are isolated to prevent cascading failures
+- **Automatic Recovery**: Attempts recovery after timeout period
+- **Fallback Providers**: Automatically falls back to healthy providers
+
+**Example:**
+```python
+from src.core.utils.circuit_breaker import CircuitBreakerConfig
+
+# Configure circuit breaker
+circuit_config = CircuitBreakerConfig(
+    failure_threshold=5,
+    success_threshold=2,
+    timeout=60.0
+)
+gateway.configure_circuit_breaker(circuit_config)
+```
+
+### Health Monitoring
+
+The gateway provides **comprehensive health monitoring** for providers:
+
+- **Provider Health Status**: Tracks health status for each provider
+- **Success/Failure Rates**: Records success and failure rates per provider
+- **Error Classification**: Classifies and tracks different error types
+- **Health Check Integration**: Automatic health checks for all providers
+
+**Example:**
+```python
+# Get gateway health
+health = await gateway.get_health()
+print(health['provider_health'])
+# {
+#   "openai": {
+#     "status": "healthy",
+#     "success_rate": 0.98,
+#     "last_error": None,
+#     "response_time_ms": 150
+#   },
+#   "anthropic": {
+#     "status": "degraded",
+#     "success_rate": 0.85,
+#     "last_error": "Rate limit exceeded",
+#     "response_time_ms": 250
+#   }
+# }
+```
+
+### LLMOps Integration
+
+The gateway includes **comprehensive LLMOps capabilities**:
+
+- **Operation Logging**: Logs all LLM operations (completion, embedding, chat, etc.)
+- **Token Usage Tracking**: Tracks token usage per operation
+- **Cost Calculation**: Calculates and tracks costs per tenant and per operation
+- **Latency Monitoring**: Monitors response times and latency
+- **Success/Error Rates**: Tracks success and error rates
+- **Persistent Storage**: Stores metrics for analysis
+
+**Example:**
+```python
+# Get LLMOps metrics
+metrics = gateway.get_llmops_metrics(tenant_id="tenant1", time_range_hours=24)
+print(f"Total operations: {metrics['total_operations']}")
+print(f"Total cost: ${metrics['total_cost_usd']:.2f}")
+print(f"Average latency: {metrics['average_latency_ms']:.2f}ms")
+
+# Get cost summary
+cost_summary = gateway.get_cost_summary(tenant_id="tenant1")
+print(f"Cost per 1K tokens: ${cost_summary['cost_per_1k_tokens']:.4f}")
+```
+
+### Validation/Guardrails Framework
+
+The gateway includes **validation and guardrails** for output quality:
+
+- **Content Filtering**: Blocks outputs containing blocked patterns or PII
+- **Format Validation**: Validates JSON and ITSM-specific formats
+- **Compliance Checking**: Ensures ITIL and security policy compliance
+- **Validation Levels**: Three levels (STRICT, MODERATE, LENIENT)
+- **Custom Validators**: Support for custom validation rules
+
+**Example:**
+```python
+from src.core.validation import ValidationLevel
+
+# Configure validation
+config = GatewayConfig(
+    enable_validation=True,
+    validation_level=ValidationLevel.STRICT  # or MODERATE, LENIENT
+)
+gateway = LiteLLMGateway(config=config)
+
+# Add custom validator
+guardrail = gateway.validation_manager.get_guardrail()
+guardrail.add_validator(
+    lambda output: (
+        "incident_id" in output.lower(),
+        "Missing incident_id in response"
+    )
+)
+```
+
+### Feedback Loop Mechanism
+
+The gateway supports **feedback loop** for continuous learning:
+
+- **Feedback Collection**: Records user feedback (correction, rating, useful, improvement, error)
+- **Automatic Processing**: Processes feedback with callback system
+- **Learning Insights**: Extracts learning insights from feedback
+- **Persistent Storage**: Stores feedback for analysis
+
+**Example:**
+```python
+from src.core.feedback_loop import FeedbackType
+
+# Record feedback
+feedback_id = gateway.record_feedback(
+    query="How do I reset my password?",
+    response="You can reset your password...",
+    feedback_type=FeedbackType.CORRECTION,
+    content="Actually, the process is different...",
+    tenant_id="tenant1"
+)
+
+# Get learning insights
+insights = gateway.feedback_loop.get_learning_insights(tenant_id="tenant1")
+print(f"Average rating: {insights['average_rating']}")
+print(f"Common corrections: {insights['common_corrections']}")
+```
+
 ## Error Handling
 
 The gateway implements comprehensive error handling for various failure scenarios:
 
-- **Provider Failures**: When a primary provider fails, the gateway automatically attempts fallback providers if configured.
-- **Rate Limiting**: The gateway handles rate limit errors by implementing exponential backoff and retry logic.
+- **Provider Failures**: When a primary provider fails, the gateway automatically attempts fallback providers if configured. Circuit breaker prevents cascading failures.
+- **Rate Limiting**: The gateway handles rate limit errors by implementing advanced rate limiting with queuing, exponential backoff, and retry logic.
 - **Network Errors**: Transient network issues trigger automatic retries with configurable retry counts and delays.
 - **Invalid Responses**: Malformed or invalid responses from providers are caught and converted to standardized error responses.
+- **Validation Errors**: Output validation failures are caught and reported with detailed error messages.
 
-All errors are logged and can be monitored through the Evaluation & Observability component.
+All errors are logged and can be monitored through the Evaluation & Observability component and LLMOps.
 
 ## Configuration and Setup
 
@@ -140,6 +320,11 @@ Configuration can be provided programmatically or loaded from environment variab
 
 1. **Connection Reuse**: The gateway maintains persistent connections to providers when possible, reducing latency and overhead.
 2. **Caching**: Responses can be cached through the Cache Mechanism component to reduce costs and improve response times.
-3. **Monitoring**: All gateway operations should be monitored through the observability system to track usage, costs, and performance.
-4. **Error Handling**: Components using the gateway should implement appropriate error handling for gateway failures.
+3. **Monitoring**: All gateway operations should be monitored through the observability system and LLMOps to track usage, costs, and performance.
+4. **Error Handling**: Components using the gateway should implement appropriate error handling for gateway failures. Circuit breaker provides automatic protection.
 5. **Resource Management**: The gateway should be properly initialized and closed to ensure clean resource management.
+6. **Rate Limiting**: Configure rate limits appropriately to avoid API throttling. Use request queuing for better handling of rate limits.
+7. **Health Monitoring**: Regularly check gateway health to detect provider issues early.
+8. **Validation**: Enable validation/guardrails to ensure output quality and compliance.
+9. **Feedback Collection**: Collect user feedback to enable continuous improvement.
+10. **Cost Management**: Monitor LLMOps metrics to track and optimize costs per tenant.

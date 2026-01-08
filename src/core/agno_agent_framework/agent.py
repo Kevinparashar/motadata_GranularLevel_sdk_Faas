@@ -548,11 +548,30 @@ class Agent(BaseModel):
 
         return full_prompt
 
-    def attach_memory(self, persistence_path: Optional[str] = None) -> None:
-        """Attach an AgentMemory instance with optional persistence."""
+    def attach_memory(
+        self,
+        persistence_path: Optional[str] = None,
+        tenant_id: Optional[str] = None,
+        max_episodic: int = 500,
+        max_semantic: int = 2000,
+        max_age_days: Optional[int] = 30
+    ) -> None:
+        """
+        Attach an AgentMemory instance with optional persistence.
+        
+        Args:
+            persistence_path: Optional path for memory persistence
+            tenant_id: Optional tenant ID
+            max_episodic: Maximum episodic memory items (default: 500 for ITSM)
+            max_semantic: Maximum semantic memory items (default: 2000 for ITSM)
+            max_age_days: Optional maximum age in days for automatic cleanup
+        """
         self.memory = AgentMemory(
             agent_id=self.agent_id,
             persistence_path=persistence_path or self.memory_persistence_path,
+            max_episodic=max_episodic,
+            max_semantic=max_semantic,
+            max_age_days=max_age_days
         )
 
     def attach_tools(self, tools: Optional[List[Tool]] = None, registry: Optional[ToolRegistry] = None) -> None:

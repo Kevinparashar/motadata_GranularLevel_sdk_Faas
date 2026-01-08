@@ -54,7 +54,7 @@ The **Cache Mechanism** (`src/core/cache_mechanism/`) can be used to cache:
 
 The RAG system now supports **optimized batch processing** for improved performance:
 
-1. **Batch Embedding Generation**: 
+1. **Batch Embedding Generation**:
    - All chunks from a document are embedded in a single API call
    - Significantly reduces API calls and improves ingestion speed
    - Automatically falls back to individual processing if batch fails
@@ -151,6 +151,155 @@ rag.update_document(
 rag.delete_document("doc-123")
 ```
 
+### Advanced Re-ranking
+
+The RAG system now includes **advanced re-ranking algorithms** for improved document relevance:
+
+- **Cross-Encoder Re-ranking**: Uses cross-encoder models for more accurate relevance scoring
+- **Diversity Re-ranking**: Ensures diverse results by penalizing similar documents
+- **Hybrid Scoring**: Combines multiple signals (semantic similarity, keyword match, metadata)
+- **Configurable Re-ranking**: Enable/disable re-ranking and configure algorithms
+
+**Example:**
+```python
+from src.core.rag.rag_enhancements import DocumentReranker
+
+# Enable re-ranking
+reranker = DocumentReranker(
+    enable_reranking=True,
+    reranking_algorithm="cross_encoder",
+    top_k_before_rerank=20,
+    top_k_after_rerank=5
+)
+rag.attach_reranker(reranker)
+
+# Query with re-ranking
+result = rag.query("What is AI?", top_k=5, use_reranking=True)
+```
+
+### Document Versioning
+
+The RAG system supports **document versioning** for better management and retrieval:
+
+- **Version Tracking**: Tracks document versions with timestamps
+- **Version History**: Maintains history of document changes
+- **Version-Based Retrieval**: Retrieve specific document versions
+- **Automatic Versioning**: Automatically creates versions on updates
+
+**Example:**
+```python
+from src.core.rag.rag_enhancements import DocumentVersioning
+
+# Enable versioning
+versioning = DocumentVersioning(enable_versioning=True)
+rag.attach_versioning(versioning)
+
+# Ingest document (creates version 1.0)
+doc_id = rag.ingest_document("AI Guide", "Content...")
+
+# Update document (creates version 2.0)
+rag.update_document(doc_id, content="Updated content...")
+
+# Retrieve specific version
+doc = rag.get_document_version(doc_id, version="1.0")
+```
+
+### Explicit Relevance Scoring
+
+The RAG system provides **explicit relevance scoring** for retrieved documents:
+
+- **Similarity Scores**: Provides similarity scores for each retrieved document
+- **Relevance Metrics**: Calculates relevance metrics (semantic, keyword, hybrid)
+- **Score Normalization**: Normalizes scores for consistent comparison
+- **Score Thresholds**: Filter documents by relevance score thresholds
+
+**Example:**
+```python
+# Query with relevance scores
+result = rag.query("What is AI?", top_k=5, return_scores=True)
+
+for doc in result["documents"]:
+    print(f"Document: {doc['title']}")
+    print(f"Relevance Score: {doc['relevance_score']}")
+    print(f"Similarity Score: {doc['similarity_score']}")
+```
+
+### Incremental Updates
+
+The RAG system supports **incremental updates** to avoid full re-embedding:
+
+- **Change Detection**: Detects changes in document content
+- **Selective Re-embedding**: Only re-embeds changed chunks
+- **Efficient Updates**: Updates only affected embeddings
+- **Version Tracking**: Tracks changes for incremental processing
+
+**Example:**
+```python
+from src.core.rag.rag_enhancements import IncrementalUpdater
+
+# Enable incremental updates
+updater = IncrementalUpdater(enable_incremental=True)
+rag.attach_incremental_updater(updater)
+
+# Update document (only changed chunks are re-embedded)
+rag.update_document(
+    document_id="doc-123",
+    content="Updated content with minor changes"
+)
+# Only changed chunks are re-processed and re-embedded
+```
+
+### Document Validation
+
+The RAG system includes **enhanced document validation** processes:
+
+- **Format Validation**: Validates document formats and structure
+- **Content Validation**: Validates content quality and completeness
+- **Metadata Validation**: Validates metadata against schemas
+- **Compliance Checking**: Ensures documents meet compliance requirements
+
+**Example:**
+```python
+from src.core.rag.rag_enhancements import DocumentValidator
+
+# Configure validator
+validator = DocumentValidator(
+    validate_format=True,
+    validate_content=True,
+    validate_metadata=True,
+    compliance_rules=["itil", "security"]
+)
+rag.attach_validator(validator)
+
+# Ingest document (validates before processing)
+doc_id = rag.ingest_document("Guide", "Content...", validate=True)
+```
+
+### Real-time Document Synchronization
+
+The RAG system supports **real-time document synchronization**:
+
+- **Change Detection**: Detects changes in source documents
+- **Automatic Updates**: Automatically updates documents when source changes
+- **Synchronization Strategies**: Configurable sync strategies (immediate, batch, scheduled)
+- **Conflict Resolution**: Handles conflicts during synchronization
+
+**Example:**
+```python
+from src.core.rag.rag_enhancements import RealTimeSync
+
+# Enable real-time sync
+sync = RealTimeSync(
+    enable_sync=True,
+    sync_strategy="immediate",  # or "batch", "scheduled"
+    sync_interval=60  # seconds for batch/scheduled
+)
+rag.attach_realtime_sync(sync)
+
+# Watch document source
+rag.watch_document_source("file:///path/to/docs", auto_sync=True)
+```
+
 ### Integration with Evaluation & Observability
 
 The **Evaluation & Observability** component (`src/core/evaluation_observability/`) tracks:
@@ -216,7 +365,7 @@ from src.core.rag import (
 
 # Quick RAG query with hybrid retrieval
 result = quick_rag_query(
-    rag, "What is AI?", 
+    rag, "What is AI?",
     top_k=5,
     retrieval_strategy="hybrid",
     use_query_rewriting=True
@@ -266,7 +415,7 @@ See `src/core/rag/functions.py` for complete function documentation.
 ### DocumentProcessor
 
 The `DocumentProcessor` class handles document preprocessing:
-- **Enhanced Chunking Pipeline**: 
+- **Enhanced Chunking Pipeline**:
   - Multiple chunking strategies: fixed-size, sentence-based, paragraph-based, and semantic chunking
   - Preprocessing pipeline: text normalization, whitespace cleaning, unicode normalization
   - Chunk validation: filters chunks by size (min/max), validates content
@@ -318,7 +467,7 @@ The `RAGSystem` class integrates all components:
 3. **Metadata Extraction**: Automatic extraction of metadata (title, dates, tags, language, file info)
 4. **Metadata Validation**: Metadata is validated against schema (if provided)
 5. **Document Storage**: The document is stored in the database with enriched metadata
-6. **Chunking Pipeline**: 
+6. **Chunking Pipeline**:
    - Document is chunked based on selected strategy
    - Chunks are validated (size, content quality)
    - Chunk metadata is enriched with document-level metadata
@@ -334,7 +483,7 @@ The `RAGSystem` class integrates all components:
 2. **Query Rewriting** (optional): Query is rewritten to improve retrieval (expands abbreviations, normalizes terms)
 3. **Query Caching Check**: System checks cache for existing query results
 4. **Query Embedding**: The query is converted to an embedding using the gateway
-5. **Retrieval Strategy**: 
+5. **Retrieval Strategy**:
    - **Vector Search**: Semantic similarity search using embeddings
    - **Hybrid Search**: Combines vector and keyword search with weighted scoring
    - **Keyword Search**: Traditional text matching
@@ -486,6 +635,12 @@ chunks = processor.chunk_document(content, "doc_123", metadata)
 9. **Caching Strategy**: Implement caching for frequently accessed documents and queries
 10. **Batch Processing**: Use `ingest_documents_batch()` or `ingest_documents_batch_async()` for ingesting multiple documents to leverage batch optimization
 11. **Async Processing**: Use async methods (`ingest_document_async()`, `query_async()`) for better concurrency and throughput
+12. **Re-ranking**: Enable re-ranking for improved relevance, especially for top-k retrieval
+13. **Document Versioning**: Use versioning for documents that change frequently to track history
+14. **Incremental Updates**: Use incremental updates for large documents to avoid full re-embedding
+15. **Document Validation**: Enable validation to ensure document quality and compliance
+16. **Real-time Sync**: Use real-time synchronization for documents that change frequently
+17. **Relevance Scoring**: Use relevance scores to filter and rank retrieved documents
 
 ## Examples and Tests
 

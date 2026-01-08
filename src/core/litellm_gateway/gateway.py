@@ -16,8 +16,13 @@ from pydantic import BaseModel, Field
 from ..utils.circuit_breaker import CircuitBreaker, CircuitBreakerConfig, CircuitState
 from ..utils.health_check import HealthCheck, HealthStatus, HealthCheckResult
 from .rate_limiter import RateLimiter, RateLimitConfig, RequestDeduplicator, RequestBatcher
+from ..llmops import LLMOps, LLMOperationType, LLMOperationStatus
+from ..validation import ValidationManager, ValidationLevel
+from ..feedback_loop import FeedbackLoop, FeedbackType
 from datetime import datetime
+from pathlib import Path
 import asyncio
+import time
 
 
 class GatewayConfig(BaseModel):
@@ -36,8 +41,12 @@ class GatewayConfig(BaseModel):
     enable_request_deduplication: bool = True
     enable_request_batching: bool = False
     enable_health_monitoring: bool = True
+    enable_llmops: bool = True
+    enable_validation: bool = True
+    enable_feedback_loop: bool = True
     rate_limit_config: Optional[RateLimitConfig] = None
     circuit_breaker_config: Optional[CircuitBreakerConfig] = None
+    validation_level: ValidationLevel = ValidationLevel.MODERATE
 
 
 class GenerateResponse(BaseModel):
@@ -122,6 +131,31 @@ class LiteLLMGateway:
 
         # Provider health tracking
         self.provider_health: Dict[str, Dict[str, Any]] = {}
+        
+        # Storage path for LLMOps and Feedback
+        self.storage_path = Path("./llmops_data")
+        
+        # Initialize LLMOps
+        self.llmops: Optional[LLMOps] = None
+        if self.config.enable_llmops:
+            self.llmops = LLMOps(
+                storage_path=str(self.storage_path / "llmops.json"),
+                enable_logging=True,
+                enable_cost_tracking=True
+            )
+        
+        # Initialize validation manager
+        self.validation_manager: Optional[ValidationManager] = None
+        if self.config.enable_validation:
+            self.validation_manager = ValidationManager(default_level=self.config.validation_level)
+        
+        # Initialize feedback loop
+        self.feedback_loop: Optional[FeedbackLoop] = None
+        if self.config.enable_feedback_loop:
+            self.feedback_loop = FeedbackLoop(
+                storage_path=str(self.storage_path / "feedback.json"),
+                auto_process=True
+            )
 
     def _setup_health_checks(self) -> None:
         """Setup health check functions."""
@@ -277,10 +311,84 @@ class LiteLLMGateway:
                 tenant: limiter.get_stats()
                 for tenant, limiter in self.rate_limiters.items()
             },
-            "provider_health": self.provider_health
+            "provider_health": self.provider_health,
+            "llmops": self.llmops.get_metrics() if self.llmops else None,
+            "feedback_stats": self.feedback_loop.get_feedback_stats() if self.feedback_loop else None
         })
 
         return health_info
+    
+    def record_feedback(
+        self,
+        query: str,
+        response: str,
+        feedback_type: FeedbackType,
+        content: str,
+        tenant_id: Optional[str] = None
+    ) -> Optional[str]:
+        """
+        Record feedback for continuous learning.
+        
+        Args:
+            query: Original query
+            response: System response
+            feedback_type: Type of feedback
+            content: Feedback content
+            tenant_id: Optional tenant ID
+        
+        Returns:
+            Feedback ID or None if feedback loop not enabled
+        """
+        if not self.feedback_loop:
+            return None
+        
+        return self.feedback_loop.record_feedback(
+            query=query,
+            response=response,
+            feedback_type=feedback_type,
+            content=content,
+            tenant_id=tenant_id
+        )
+    
+    def get_llmops_metrics(
+        self,
+        tenant_id: Optional[str] = None,
+        time_range_hours: int = 24
+    ) -> Dict[str, Any]:
+        """
+        Get LLM operations metrics.
+        
+        Args:
+            tenant_id: Optional tenant ID filter
+            time_range_hours: Time range in hours
+        
+        Returns:
+            Dictionary with metrics
+        """
+        if not self.llmops:
+            return {"error": "LLMOps not enabled"}
+        
+        return self.llmops.get_metrics(tenant_id=tenant_id, time_range_hours=time_range_hours)
+    
+    def get_cost_summary(
+        self,
+        tenant_id: Optional[str] = None,
+        time_range_hours: int = 24
+    ) -> Dict[str, Any]:
+        """
+        Get cost summary.
+        
+        Args:
+            tenant_id: Optional tenant ID filter
+            time_range_hours: Time range in hours
+        
+        Returns:
+            Dictionary with cost summary
+        """
+        if not self.llmops:
+            return {"error": "LLMOps not enabled"}
+        
+        return self.llmops.get_cost_summary(tenant_id=tenant_id, time_range_hours=time_range_hours)
 
     def generate(
         self,
@@ -398,9 +506,18 @@ class LiteLLMGateway:
         if rate_limiter:
             await rate_limiter.acquire()
 
+        # Track operation metrics
+        start_time = time.time()
+        prompt_tokens = 0
+        completion_tokens = 0
+        error_message: Optional[str] = None
+        status = LLMOperationStatus.SUCCESS
+
         # Define the actual generation function
         async def _generate() -> Any:
             """Internal generation function."""
+            nonlocal prompt_tokens, completion_tokens, error_message, status
+            
             try:
                 if self.router:
                     response = await self.router.acompletion(  # type: ignore
@@ -417,6 +534,11 @@ class LiteLLMGateway:
                         **kwargs
                     )
 
+                # Extract token usage
+                if hasattr(response, 'usage') and response.usage:  # type: ignore[attr-defined]
+                    prompt_tokens = getattr(response.usage, 'prompt_tokens', 0) or 0  # type: ignore[attr-defined]
+                    completion_tokens = getattr(response.usage, 'completion_tokens', 0) or 0  # type: ignore[attr-defined]
+
                 # Update provider health
                 provider_name = model.split("/")[0] if "/" in model else "default"
                 self.provider_health[provider_name] = {
@@ -430,12 +552,21 @@ class LiteLLMGateway:
             except Exception as e:
                 # Classify error
                 error_classification = self._classify_error(e)
+                error_message = str(e)
+                
+                # Determine status
+                if "rate limit" in error_message.lower() or "429" in error_message:
+                    status = LLMOperationStatus.RATE_LIMITED
+                elif "timeout" in error_message.lower():
+                    status = LLMOperationStatus.TIMEOUT
+                else:
+                    status = LLMOperationStatus.ERROR
 
                 # Update provider health
                 provider_name = model.split("/")[0] if "/" in model else "default"
                 self.provider_health[provider_name] = {
                     "status": "unhealthy" if not error_classification["retryable"] else "degraded",
-                    "last_error": str(e),
+                    "last_error": error_message,
                     "error_classification": error_classification,
                     "last_check": datetime.now().isoformat()
                 }
@@ -472,6 +603,21 @@ class LiteLLMGateway:
 
         if stream:
             return response
+        
+        # Log operation
+        if self.llmops:
+            latency_ms = (time.time() - start_time) * 1000
+            self.llmops.log_operation(
+                operation_type=LLMOperationType.COMPLETION,
+                model=model,
+                prompt_tokens=prompt_tokens,
+                completion_tokens=completion_tokens,
+                latency_ms=latency_ms,
+                status=status,
+                error_message=error_message,
+                tenant_id=tenant_id,
+                metadata={"stream": stream}
+            )
 
         # Extract text from response
         if hasattr(response, 'choices') and len(response.choices) > 0:

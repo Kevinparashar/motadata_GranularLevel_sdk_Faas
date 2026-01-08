@@ -69,7 +69,9 @@ The `Agent` class represents an individual agent. Each agent has:
 - A message queue for receiving communications from other agents
 - A reference to the LiteLLM Gateway for LLM operations
 - **Integrated Prompt Context Management** for system prompts, role templates, and context assembly
-- **Memory integration** for context-aware prompt building
+- **Memory integration** with bounded episodic/semantic memory and automatic cleanup
+- **Circuit Breaker** for handling external service failures gracefully
+- **Health Check** system for monitoring agent performance and availability
 
 ### AgentManager Class
 
@@ -107,10 +109,15 @@ from src.core.agno_agent_framework import (
 gateway = LiteLLMGateway()
 agent = create_agent("agent1", "Assistant", gateway)
 
-# Create agent with memory pre-configured
+# Create agent with memory pre-configured (with bounded memory)
 agent = create_agent_with_memory(
     "agent2", "Analyst", gateway,
-    memory_config={"persistence_path": "/tmp/memory.json"}
+    memory_config={
+        "persistence_path": "/tmp/memory.json",
+        "max_episodic": 500,  # Limit episodic memory (ticket history)
+        "max_semantic": 2000,  # Limit semantic memory (knowledge patterns)
+        "max_age_days": 30  # Auto-cleanup after 30 days
+    }
 )
 
 # Create agent with prompt management pre-configured
@@ -357,6 +364,90 @@ result = await execute_task(
 2. The enhanced prompt is sent to the LLM Gateway
 3. Prompt history is recorded for future context building
 
+### Circuit Breaker Integration
+
+Agents now support **Circuit Breaker Pattern** for handling external service failures gracefully:
+
+- **Automatic Failure Detection**: Monitors failures and opens circuit when threshold is exceeded
+- **State Management**: Automatically transitions between CLOSED, OPEN, and HALF_OPEN states
+- **Configurable Thresholds**: Set failure and success thresholds
+- **Recovery Timeout**: Automatic recovery attempts after timeout period
+- **Statistics Tracking**: Tracks failure counts, success rates, and state transitions
+
+**Example:**
+```python
+from src.core.utils.circuit_breaker import CircuitBreakerConfig
+
+# Attach circuit breaker to agent
+config = CircuitBreakerConfig(
+    failure_threshold=5,  # Open circuit after 5 failures
+    success_threshold=2,  # Close circuit after 2 successes
+    timeout=60.0  # Wait 60 seconds before attempting recovery
+)
+agent.attach_circuit_breaker(config)
+
+# Circuit breaker automatically protects LLM calls
+result = await agent.execute_task(task)
+```
+
+### Health Check System
+
+Agents now include **built-in health checks** for monitoring performance and availability:
+
+- **Component Health**: Checks gateway, memory, and agent status
+- **Performance Metrics**: Tracks response times and success rates
+- **Circuit Breaker Status**: Includes circuit breaker state in health report
+- **Health History**: Maintains history of health check results
+
+**Example:**
+```python
+# Get agent health
+health = await agent.get_health()
+print(health)
+# {
+#   "name": "agent_agent1",
+#   "status": "healthy",
+#   "components": {
+#     "gateway": {"status": "healthy", "response_time_ms": 150},
+#     "memory": {"status": "healthy", "episodic_count": 45, "semantic_count": 120},
+#     "circuit_breaker": {"state": "closed", "failure_count": 0}
+#   },
+#   "metrics": {
+#     "total_checks": 100,
+#     "success_rate": 0.98
+#   }
+# }
+```
+
+### Bounded Memory Management
+
+Agent memory now supports **bounded episodic and semantic memory** to prevent memory leaks:
+
+- **Episodic Memory Limits**: Configurable limit (default: 500) for event/ticket history
+- **Semantic Memory Limits**: Configurable limit (default: 2000) for knowledge patterns
+- **Automatic Trimming**: Removes least important items when limits are exceeded
+- **Time-Based Expiration**: Automatic cleanup of memories older than specified days
+- **Memory Pressure Handling**: Proactive management when memory usage is high
+
+**Example:**
+```python
+# Attach memory with bounds
+agent.attach_memory(
+    persistence_path="/tmp/memory.json",
+    max_episodic=500,  # Limit for ticket history
+    max_semantic=2000,  # Limit for knowledge patterns
+    max_age_days=30  # Auto-cleanup after 30 days
+)
+
+# Automatic cleanup
+removed = agent.memory.cleanup_expired(max_age_days=7)
+
+# Check memory pressure
+pressure = agent.memory.check_memory_pressure()
+if pressure["under_pressure"]:
+    agent.memory.handle_memory_pressure()
+```
+
 ## Task Execution Flow
 
 1. **Task Submission**: A task is submitted to an agent through the `add_task()` method, which adds it to the agent's task queue.
@@ -467,6 +558,10 @@ See `examples/integration/multi_agent_orchestration.py` for complete examples.
 4. **Resource Management**: Monitor agent resource usage, especially LLM API calls, to manage costs.
 5. **Observability**: Ensure all agent activities are logged and monitored for debugging and optimization.
 6. **Workflow Design**: Design workflows with clear dependencies and error handling for production use.
+7. **Circuit Breaker Configuration**: Configure circuit breakers appropriately for your use case to prevent cascading failures.
+8. **Health Monitoring**: Regularly check agent health to detect issues early.
+9. **Memory Management**: Set appropriate memory bounds for long-running agents to prevent memory leaks.
+10. **Troubleshooting**: Refer to `docs/troubleshooting/agent_troubleshooting.md` for common issues and solutions.
 
 ## Examples and Tests
 
