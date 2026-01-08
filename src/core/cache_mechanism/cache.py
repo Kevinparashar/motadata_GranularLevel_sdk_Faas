@@ -44,13 +44,16 @@ class CacheMechanism:
             # Simple in-memory LRU with TTL
             self._store: OrderedDict[str, tuple[Any, float]] = OrderedDict()
 
-    def _namespaced_key(self, key: str) -> str:
+    def _namespaced_key(self, key: str, tenant_id: Optional[str] = None) -> str:
+        """Create namespaced cache key with optional tenant isolation."""
+        if tenant_id:
+            return f"{self.config.namespace}:{tenant_id}:{key}"
         return f"{self.config.namespace}:{key}"
 
-    def set(self, key: str, value: Any, ttl: Optional[int] = None) -> None:
+    def set(self, key: str, value: Any, tenant_id: Optional[str] = None, ttl: Optional[int] = None) -> None:
         ttl = ttl or self.config.default_ttl
         expires_at = time.time() + ttl
-        namespaced = self._namespaced_key(key)
+        namespaced = self._namespaced_key(key, tenant_id=tenant_id)
 
         if self.backend == "redis":
             self._client.set(namespaced, value, ex=ttl)
@@ -61,8 +64,8 @@ class CacheMechanism:
         self._store.move_to_end(namespaced)
         self._evict_if_needed()
 
-    def get(self, key: str) -> Optional[Any]:
-        namespaced = self._namespaced_key(key)
+    def get(self, key: str, tenant_id: Optional[str] = None) -> Optional[Any]:
+        namespaced = self._namespaced_key(key, tenant_id=tenant_id)
 
         if self.backend == "redis":
             value = self._client.get(namespaced)
@@ -81,17 +84,23 @@ class CacheMechanism:
         self._store.move_to_end(namespaced)
         return value
 
-    def delete(self, key: str) -> None:
-        namespaced = self._namespaced_key(key)
+    def delete(self, key: str, tenant_id: Optional[str] = None) -> None:
+        namespaced = self._namespaced_key(key, tenant_id=tenant_id)
         if self.backend == "redis":
             self._client.delete(namespaced)
         else:
             self._store.pop(namespaced, None)
 
-    def invalidate_pattern(self, pattern: str) -> None:
+    def invalidate_pattern(self, pattern: str, tenant_id: Optional[str] = None) -> None:
         """
         Invalidate all keys matching pattern (simple substring match for memory).
+
+        Args:
+            pattern: Pattern to match
+            tenant_id: Optional tenant ID to limit invalidation to specific tenant
         """
+        if tenant_id:
+            pattern = f"{tenant_id}:{pattern}"
         if self.backend == "redis":
             keys = self._client.keys(f"{self.config.namespace}:{pattern}*")
             if keys:

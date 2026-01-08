@@ -17,20 +17,24 @@ class PromptTemplate:
     name: str
     version: str
     content: str
+    tenant_id: Optional[str] = None  # Tenant context for multi-tenant SaaS
     metadata: Dict[str, Any] = field(default_factory=dict)
 
 
 class PromptStore:
-    """In-memory prompt template store with version support."""
+    """In-memory prompt template store with version support and tenant isolation."""
 
     def __init__(self) -> None:
-        self._templates: Dict[str, Dict[str, PromptTemplate]] = {}
+        # Structure: {tenant_id: {template_name: {version: PromptTemplate}}}
+        self._templates: Dict[Optional[str], Dict[str, Dict[str, PromptTemplate]]] = {}
 
     def add(self, template: PromptTemplate) -> None:
-        self._templates.setdefault(template.name, {})[template.version] = template
+        tenant_id = template.tenant_id
+        self._templates.setdefault(tenant_id, {}).setdefault(template.name, {})[template.version] = template
 
-    def get(self, name: str, version: Optional[str] = None) -> Optional[PromptTemplate]:
-        versions = self._templates.get(name)
+    def get(self, name: str, tenant_id: Optional[str] = None, version: Optional[str] = None) -> Optional[PromptTemplate]:
+        tenant_templates = self._templates.get(tenant_id, {})
+        versions = tenant_templates.get(name)
         if not versions:
             return None
         if version:
@@ -85,15 +89,15 @@ class PromptContextManager:
         self.history: List[str] = []
         self.window = ContextWindowManager(max_tokens=max_tokens, safety_margin=safety_margin)
 
-    def render(self, template_name: str, variables: Dict[str, Any], version: Optional[str] = None) -> str:
-        template = self.store.get(template_name, version=version)
+    def render(self, template_name: str, variables: Dict[str, Any], tenant_id: Optional[str] = None, version: Optional[str] = None) -> str:
+        template = self.store.get(template_name, tenant_id=tenant_id, version=version)
         if not template:
-            raise ValueError(f"Template '{template_name}' not found")
+            raise ValueError(f"Template '{template_name}' not found for tenant '{tenant_id or 'global'}'")
         # Basic Python format-style rendering
         return template.content.format(**variables)
 
-    def add_template(self, name: str, version: str, content: str, metadata: Optional[Dict[str, Any]] = None) -> None:
-        tmpl = PromptTemplate(name=name, version=version, content=content, metadata=metadata or {})
+    def add_template(self, name: str, version: str, content: str, tenant_id: Optional[str] = None, metadata: Optional[Dict[str, Any]] = None) -> None:
+        tmpl = PromptTemplate(name=name, version=version, content=content, tenant_id=tenant_id, metadata=metadata or {})
         self.store.add(tmpl)
 
     def record_history(self, prompt: str) -> None:

@@ -27,6 +27,7 @@ def create_agent(
     agent_id: str,
     name: str,
     gateway: Any,
+    tenant_id: Optional[str] = None,
     description: str = "",
     llm_model: Optional[str] = None,
     llm_provider: Optional[str] = None,
@@ -39,6 +40,7 @@ def create_agent(
         agent_id: Unique agent identifier
         name: Agent name
         gateway: LiteLLM Gateway instance
+        tenant_id: Optional tenant ID for multi-tenant SaaS
         description: Agent description
         llm_model: Optional LLM model name
         llm_provider: Optional LLM provider
@@ -49,10 +51,11 @@ def create_agent(
 
     Example:
         >>> gateway = LiteLLMGateway()
-        >>> agent = create_agent("agent1", "Assistant", gateway)
+        >>> agent = create_agent("agent1", "Assistant", gateway, tenant_id="tenant_123")
     """
     return Agent(
         agent_id=agent_id,
+        tenant_id=tenant_id,
         name=name,
         description=description,
         gateway=gateway,
@@ -66,6 +69,7 @@ def create_agent_with_memory(
     agent_id: str,
     name: str,
     gateway: Any,
+    tenant_id: Optional[str] = None,
     memory_config: Optional[Dict[str, Any]] = None,
     **kwargs: Any
 ) -> Agent:
@@ -110,6 +114,7 @@ def create_agent_with_prompt_management(
     agent_id: str,
     name: str,
     gateway: Any,
+    tenant_id: Optional[str] = None,
     system_prompt: Optional[str] = None,
     role_template: Optional[str] = None,
     max_context_tokens: int = 4000,
@@ -143,7 +148,7 @@ def create_agent_with_prompt_management(
         ...     max_context_tokens=8000
         ... )
     """
-    agent = create_agent(agent_id, name, gateway, **kwargs)
+    agent = create_agent(agent_id, name, gateway, tenant_id=tenant_id, **kwargs)
 
     if create_prompt_manager:
         prompt_max_tokens = max_context_tokens
@@ -182,6 +187,7 @@ def create_agent_with_tools(
     agent_id: str,
     name: str,
     gateway: Any,
+    tenant_id: Optional[str] = None,
     tools: Optional[List[Any]] = None,
     tool_registry: Optional[Any] = None,
     enable_tool_calling: bool = True,
@@ -224,7 +230,7 @@ def create_agent_with_tools(
         ...     enable_tool_calling=True
         ... )
     """
-    agent = create_agent(agent_id, name, gateway, **kwargs)
+    agent = create_agent(agent_id, name, gateway, tenant_id=tenant_id, **kwargs)
 
     agent.enable_tool_calling = enable_tool_calling
     agent.max_tool_iterations = max_tool_iterations
@@ -276,6 +282,7 @@ async def execute_task(
     agent: Agent,
     task_type: str,
     parameters: Dict[str, Any],
+    tenant_id: Optional[str] = None,
     priority: int = 0
 ) -> Any:
     """
@@ -299,12 +306,13 @@ async def execute_task(
     """
     task_id = agent.add_task(task_type, parameters, priority)
     task = next(t for t in agent.task_queue if t.task_id == task_id)
-    return await agent.execute_task(task)
+    return await agent.execute_task(task, tenant_id=tenant_id)
 
 
 async def chat_with_agent(
     agent: Agent,
     message: str,
+    tenant_id: Optional[str] = None,
     session_id: Optional[str] = None,
     context: Optional[Dict[str, Any]] = None
 ) -> Dict[str, Any]:

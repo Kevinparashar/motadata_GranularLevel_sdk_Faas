@@ -43,11 +43,11 @@ class EmbedResponse(BaseModel):
 class LiteLLMGateway:
     """
     LiteLLM Gateway for unified LLM access.
-    
+
     Provides a single interface to interact with multiple LLM providers
     including OpenAI, Anthropic, Google, Cohere, and more.
     """
-    
+
     def __init__(
         self,
         config: Optional[GatewayConfig] = None,
@@ -55,14 +55,14 @@ class LiteLLMGateway:
     ):
         """
         Initialize LiteLLM Gateway.
-        
+
         Args:
             config: Gateway configuration
             router: Optional pre-configured LiteLLM Router
         """
         self.config = config or GatewayConfig()
         self.router = router
-        
+
         if router is None and self.config.model_list:
             self.router = Router(
                 model_list=self.config.model_list,
@@ -70,31 +70,32 @@ class LiteLLMGateway:
                 timeout=self.config.timeout,
                 num_retries=self.config.max_retries,
             )
-    
+
     def generate(
         self,
         prompt: str,
         model: str = "gpt-4",
+        tenant_id: Optional[str] = None,
         messages: Optional[List[Dict[str, Any]]] = None,
         stream: bool = False,
         **kwargs: Any
     ) -> GenerateResponse:
         """
         Generate text completion.
-        
+
         Args:
             prompt: Input prompt
             model: Model identifier
             messages: Optional list of messages
             stream: Whether to stream the response
             **kwargs: Additional parameters
-        
+
         Returns:
             GenerateResponse with generated text
         """
         if messages is None:
             messages = [{"role": "user", "content": prompt}]
-        
+
         if self.router:
             response = self.router.completion(
                 model=model,
@@ -109,11 +110,11 @@ class LiteLLMGateway:
                 stream=stream,
                 **kwargs
             )
-        
+
         if stream:
             # For streaming, return an async iterator
             return response
-        
+
         # Extract text from response
         if hasattr(response, 'choices') and len(response.choices) > 0:
             text = response.choices[0].message.content
@@ -130,7 +131,7 @@ class LiteLLMGateway:
             model_name = model
             usage = None
             finish_reason = None
-        
+
         return GenerateResponse(
             text=text,
             model=model_name,
@@ -138,31 +139,32 @@ class LiteLLMGateway:
             finish_reason=finish_reason,
             raw_response=response.__dict__ if hasattr(response, '__dict__') else response
         )
-    
+
     async def generate_async(
         self,
         prompt: str,
         model: str = "gpt-4",
+        tenant_id: Optional[str] = None,
         messages: Optional[List[Dict[str, Any]]] = None,
         stream: bool = False,
         **kwargs: Any
     ) -> GenerateResponse:
         """
         Generate text completion asynchronously.
-        
+
         Args:
             prompt: Input prompt
             model: Model identifier
             messages: Optional list of messages
             stream: Whether to stream the response
             **kwargs: Additional parameters
-        
+
         Returns:
             GenerateResponse with generated text
         """
         if messages is None:
             messages = [{"role": "user", "content": prompt}]
-        
+
         if self.router:
             response = await self.router.acompletion(
                 model=model,
@@ -177,10 +179,10 @@ class LiteLLMGateway:
                 stream=stream,
                 **kwargs
             )
-        
+
         if stream:
             return response
-        
+
         # Extract text from response
         if hasattr(response, 'choices') and len(response.choices) > 0:
             text = response.choices[0].message.content
@@ -197,7 +199,7 @@ class LiteLLMGateway:
             model_name = model
             usage = None
             finish_reason = None
-        
+
         return GenerateResponse(
             text=text,
             model=model_name,
@@ -205,7 +207,7 @@ class LiteLLMGateway:
             finish_reason=finish_reason,
             raw_response=response.__dict__ if hasattr(response, '__dict__') else response
         )
-    
+
     def embed(
         self,
         texts: List[str],
@@ -214,12 +216,12 @@ class LiteLLMGateway:
     ) -> EmbedResponse:
         """
         Generate embeddings.
-        
+
         Args:
             texts: List of texts to embed
             model: Embedding model identifier
             **kwargs: Additional parameters
-        
+
         Returns:
             EmbedResponse with embeddings
         """
@@ -235,7 +237,7 @@ class LiteLLMGateway:
                 input=texts,
                 **kwargs
             )
-        
+
         # Extract embeddings
         if hasattr(response, 'data'):
             embeddings = [item.embedding for item in response.data]
@@ -249,13 +251,13 @@ class LiteLLMGateway:
             embeddings = []
             model_name = model
             usage = None
-        
+
         return EmbedResponse(
             embeddings=embeddings,
             model=model_name,
             usage=usage
         )
-    
+
     async def embed_async(
         self,
         texts: List[str],
@@ -264,12 +266,12 @@ class LiteLLMGateway:
     ) -> EmbedResponse:
         """
         Generate embeddings asynchronously.
-        
+
         Args:
             texts: List of texts to embed
             model: Embedding model identifier
             **kwargs: Additional parameters
-        
+
         Returns:
             EmbedResponse with embeddings
         """
@@ -285,7 +287,7 @@ class LiteLLMGateway:
                 input=texts,
                 **kwargs
             )
-        
+
         # Extract embeddings
         if hasattr(response, 'data'):
             embeddings = [item.embedding for item in response.data]
@@ -299,7 +301,7 @@ class LiteLLMGateway:
             embeddings = []
             model_name = model
             usage = None
-        
+
         return EmbedResponse(
             embeddings=embeddings,
             model=model_name,
