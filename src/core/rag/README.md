@@ -43,10 +43,46 @@ The processor prepares documents for embedding generation and storage.
 
 ### Integration with Cache Mechanism
 
-The **Cache Mechanism** (`src/core/cache_mechanism/`) can be used to cache:
-- **Query Results**: Frequently asked questions can be cached to reduce LLM API calls
+The **Cache Mechanism** (`src/core/cache_mechanism/`) is used to cache:
+- **Query Results**: Frequently asked questions are cached to reduce LLM API calls
 - **Embeddings**: Document embeddings can be cached to avoid regenerating them
-- **Retrieved Documents**: Retrieved document sets can be cached for similar queries
+- **Retrieved Documents**: Retrieved document sets are cached for similar queries
+
+This caching improves performance and reduces costs.
+
+### Integration with Agent Memory
+
+The **Agent Memory** (`src/core/agno_agent_framework/memory.py`) is integrated for conversation context:
+- **Query History**: Stores previous queries and answers for context
+- **User Preferences**: Remembers user-specific preferences and patterns
+- **Conversation Context**: Maintains conversation history across sessions
+- **Memory Retrieval**: Retrieves relevant memories to enhance query context
+
+**Example:**
+```python
+from src.core.rag import create_rag_system
+
+# Create RAG with memory enabled (default)
+rag = create_rag_system(
+    db=db,
+    gateway=gateway,
+    enable_memory=True,
+    memory_config={
+        "max_episodic": 100,  # Store last 100 queries
+        "max_semantic": 200,  # Store 200 semantic patterns
+        "max_age_days": 30    # Auto-cleanup after 30 days
+    }
+)
+
+# Query with user context
+result = rag.query(
+    query="What did we discuss about AI?",
+    user_id="user123",
+    conversation_id="conv456",
+    tenant_id="tenant1"
+)
+# Memory automatically retrieves previous context
+```
 
 ## Key Features
 

@@ -9,6 +9,7 @@ from ..postgresql_database.connection import DatabaseConnection
 from ..postgresql_database.vector_operations import VectorOperations
 from ..litellm_gateway import LiteLLMGateway
 from ..cache_mechanism import CacheMechanism, CacheConfig
+from ..agno_agent_framework.memory import AgentMemory, MemoryType
 from .document_processor import DocumentProcessor, DocumentChunk
 from .retriever import Retriever
 from .generator import RAGGenerator
@@ -29,6 +30,8 @@ class RAGSystem:
         generation_model: str = "gpt-4",
         cache: Optional[CacheMechanism] = None,
         cache_config: Optional[CacheConfig] = None,
+        enable_memory: bool = True,
+        memory_config: Optional[Dict[str, Any]] = None,
     ):
         """
         Initialize RAG system.
@@ -38,12 +41,28 @@ class RAGSystem:
             gateway: LiteLLM gateway
             embedding_model: Model for embeddings
             generation_model: Model for generation
+            cache: Optional cache mechanism
+            cache_config: Optional cache configuration
+            enable_memory: Enable memory for conversation context
+            memory_config: Optional memory configuration
         """
         self.db = db
         self.gateway = gateway
         self.embedding_model = embedding_model
         self.generation_model = generation_model
         self.cache = cache or CacheMechanism(cache_config or CacheConfig())
+
+        # Initialize memory for conversation context
+        self.memory: Optional[AgentMemory] = None
+        if enable_memory:
+            memory_config = memory_config or {}
+            self.memory = AgentMemory(
+                agent_id="rag_system",
+                max_episodic=memory_config.get("max_episodic", 100),
+                max_semantic=memory_config.get("max_semantic", 200),
+                max_age_days=memory_config.get("max_age_days", 30),
+                persistence_path=memory_config.get("persistence_path")
+            )
 
         # Initialize components
         self.vector_ops = VectorOperations(db)
@@ -194,7 +213,9 @@ class RAGSystem:
         threshold: float = 0.7,
         max_tokens: int = 1000,
         use_query_rewriting: bool = True,
-        retrieval_strategy: str = "vector"  # "vector", "hybrid", "keyword"
+        retrieval_strategy: str = "vector",  # "vector", "hybrid", "keyword"
+        user_id: Optional[str] = None,
+        conversation_id: Optional[str] = None
     ) -> Dict[str, Any]:
         """
         Query the RAG system with query optimization.
@@ -207,10 +228,26 @@ class RAGSystem:
             max_tokens: Maximum tokens in response
             use_query_rewriting: Whether to rewrite query for better retrieval
             retrieval_strategy: Retrieval strategy ("vector", "hybrid", "keyword")
+            user_id: Optional user ID for memory context
+            conversation_id: Optional conversation ID for memory context
 
         Returns:
             Dictionary with answer and retrieved documents
         """
+        # Retrieve relevant memories if memory is enabled
+        memories = []
+        memory_context = ""
+        if self.memory:
+            memories = self.memory.retrieve(
+                query=query,
+                limit=5,
+                memory_types=[MemoryType.EPISODIC, MemoryType.SEMANTIC]
+            )
+            if memories:
+                memory_context = "\n".join([
+                    f"- {mem.content}" for mem in memories[:3]
+                ])
+
         # Query rewriting for optimization
         original_query = query
         if use_query_rewriting:
@@ -218,7 +255,7 @@ class RAGSystem:
 
         # Include tenant_id in cache key for tenant isolation
         cache_key = f"rag:query:{tenant_id or 'global'}:{query}:{top_k}:{threshold}:{max_tokens}:{retrieval_strategy}"
-        cached = self.cache.get(cache_key)
+        cached = self.cache.get(cache_key, tenant_id=tenant_id)
         if cached:
             return cached
 
@@ -228,18 +265,27 @@ class RAGSystem:
                 retrieved_docs = self.retriever.retrieve_hybrid(
                     query=query,
                     top_k=top_k,
-                    threshold=threshold
+                    threshold=threshold,
+                    tenant_id=tenant_id
                 )
             else:
                 retrieved_docs = self.retriever.retrieve(
                     query=query,
                     top_k=top_k,
-                    threshold=threshold
+                    threshold=threshold,
+                    tenant_id=tenant_id
                 )
+
+            # Enhance context with memory if available
+            enhanced_context = retrieved_docs
+            if memory_context:
+                enhanced_context = [
+                    {"title": "Previous Context", "content": memory_context, "source": "memory"}
+                ] + retrieved_docs
 
             answer = self.generator.generate(
                 query=original_query,  # Use original query for generation
-                context_documents=retrieved_docs,
+                context_documents=enhanced_context,
                 max_tokens=max_tokens
             )
 
@@ -248,9 +294,27 @@ class RAGSystem:
                 "retrieved_documents": retrieved_docs,
                 "num_documents": len(retrieved_docs),
                 "query_used": query if use_query_rewriting else original_query,
-                "original_query": original_query
+                "original_query": original_query,
+                "memory_used": len(memories) if memories else 0
             }
-            self.cache.set(cache_key, result, ttl=300)
+
+            # Store in cache
+            self.cache.set(cache_key, result, ttl=300, tenant_id=tenant_id)
+
+            # Store in memory for future context
+            if self.memory:
+                self.memory.store(
+                    content=f"Query: {original_query}\nAnswer: {answer}",
+                    memory_type=MemoryType.EPISODIC,
+                    importance=0.7,
+                    metadata={
+                        "user_id": user_id,
+                        "conversation_id": conversation_id,
+                        "tenant_id": tenant_id,
+                        "num_documents": len(retrieved_docs)
+                    }
+                )
+
             return result
         except Exception as e:
             return {
@@ -263,31 +327,53 @@ class RAGSystem:
     async def query_async(
         self,
         query: str,
+        tenant_id: Optional[str] = None,
         top_k: int = 5,
         threshold: float = 0.7,
         max_tokens: int = 1000,
         use_query_rewriting: bool = True,
-        retrieval_strategy: str = "vector"
+        retrieval_strategy: str = "vector",
+        user_id: Optional[str] = None,
+        conversation_id: Optional[str] = None
     ) -> Dict[str, Any]:
         """
         Query the RAG system asynchronously.
 
         Args:
             query: User query
+            tenant_id: Optional tenant ID for multi-tenant SaaS
             top_k: Number of documents to retrieve
             threshold: Similarity threshold
             max_tokens: Maximum tokens in response
+            use_query_rewriting: Whether to rewrite query
+            retrieval_strategy: Retrieval strategy
+            user_id: Optional user ID for memory context
+            conversation_id: Optional conversation ID for memory context
 
         Returns:
             Dictionary with answer and retrieved documents
         """
+        # Retrieve relevant memories if memory is enabled
+        memories = []
+        memory_context = ""
+        if self.memory:
+            memories = self.memory.retrieve(
+                query=query,
+                limit=5,
+                memory_types=[MemoryType.EPISODIC, MemoryType.SEMANTIC]
+            )
+            if memories:
+                memory_context = "\n".join([
+                    f"- {mem.content}" for mem in memories[:3]
+                ])
+
         # Query rewriting for optimization
         original_query = query
         if use_query_rewriting:
             query = self._rewrite_query(query)
 
-        cache_key = f"rag:query:{query}:{top_k}:{threshold}:{max_tokens}:{retrieval_strategy}"
-        cached = self.cache.get(cache_key)
+        cache_key = f"rag:query:{tenant_id or 'global'}:{query}:{top_k}:{threshold}:{max_tokens}:{retrieval_strategy}"
+        cached = self.cache.get(cache_key, tenant_id=tenant_id)
         if cached:
             return cached
 
@@ -297,18 +383,27 @@ class RAGSystem:
                 retrieved_docs = self.retriever.retrieve_hybrid(
                     query=query,
                     top_k=top_k,
-                    threshold=threshold
+                    threshold=threshold,
+                    tenant_id=tenant_id
                 )
             else:
                 retrieved_docs = self.retriever.retrieve(
                     query=query,
                     top_k=top_k,
-                    threshold=threshold
+                    threshold=threshold,
+                    tenant_id=tenant_id
                 )
+
+            # Enhance context with memory if available
+            enhanced_context = retrieved_docs
+            if memory_context:
+                enhanced_context = [
+                    {"title": "Previous Context", "content": memory_context, "source": "memory"}
+                ] + retrieved_docs
 
             answer = await self.generator.generate_async(
                 query=original_query,  # Use original query for generation
-                context_documents=retrieved_docs,
+                context_documents=enhanced_context,
                 max_tokens=max_tokens
             )
 
@@ -317,9 +412,27 @@ class RAGSystem:
                 "retrieved_documents": retrieved_docs,
                 "num_documents": len(retrieved_docs),
                 "query_used": query if use_query_rewriting else original_query,
-                "original_query": original_query
+                "original_query": original_query,
+                "memory_used": len(memories) if memories else 0
             }
-            self.cache.set(cache_key, result, ttl=300)
+
+            # Store in cache
+            self.cache.set(cache_key, result, ttl=300, tenant_id=tenant_id)
+
+            # Store in memory for future context
+            if self.memory:
+                self.memory.store(
+                    content=f"Query: {original_query}\nAnswer: {answer}",
+                    memory_type=MemoryType.EPISODIC,
+                    importance=0.7,
+                    metadata={
+                        "user_id": user_id,
+                        "conversation_id": conversation_id,
+                        "tenant_id": tenant_id,
+                        "num_documents": len(retrieved_docs)
+                    }
+                )
+
             return result
         except Exception as e:
             return {

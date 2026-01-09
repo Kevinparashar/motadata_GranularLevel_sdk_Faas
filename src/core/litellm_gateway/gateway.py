@@ -19,10 +19,13 @@ from .rate_limiter import RateLimiter, RateLimitConfig, RequestDeduplicator, Req
 from ..llmops import LLMOps, LLMOperationType, LLMOperationStatus
 from ..validation import ValidationManager, ValidationLevel
 from ..feedback_loop import FeedbackLoop, FeedbackType
+from ..cache_mechanism import CacheMechanism, CacheConfig
 from datetime import datetime
 from pathlib import Path
 import asyncio
 import time
+import hashlib
+import json
 
 
 class GatewayConfig(BaseModel):
@@ -44,9 +47,13 @@ class GatewayConfig(BaseModel):
     enable_llmops: bool = True
     enable_validation: bool = True
     enable_feedback_loop: bool = True
+    enable_caching: bool = True
+    cache_ttl: int = 3600  # Default cache TTL in seconds (1 hour)
     rate_limit_config: Optional[RateLimitConfig] = None
     circuit_breaker_config: Optional[CircuitBreakerConfig] = None
     validation_level: ValidationLevel = ValidationLevel.MODERATE
+    cache: Optional[CacheMechanism] = None
+    cache_config: Optional[CacheConfig] = None
 
 
 class GenerateResponse(BaseModel):
@@ -131,10 +138,10 @@ class LiteLLMGateway:
 
         # Provider health tracking
         self.provider_health: Dict[str, Dict[str, Any]] = {}
-        
+
         # Storage path for LLMOps and Feedback
         self.storage_path = Path("./llmops_data")
-        
+
         # Initialize LLMOps
         self.llmops: Optional[LLMOps] = None
         if self.config.enable_llmops:
@@ -143,18 +150,25 @@ class LiteLLMGateway:
                 enable_logging=True,
                 enable_cost_tracking=True
             )
-        
+
         # Initialize validation manager
         self.validation_manager: Optional[ValidationManager] = None
         if self.config.enable_validation:
             self.validation_manager = ValidationManager(default_level=self.config.validation_level)
-        
+
         # Initialize feedback loop
         self.feedback_loop: Optional[FeedbackLoop] = None
         if self.config.enable_feedback_loop:
             self.feedback_loop = FeedbackLoop(
                 storage_path=str(self.storage_path / "feedback.json"),
                 auto_process=True
+            )
+
+        # Initialize cache mechanism
+        self.cache: Optional[CacheMechanism] = None
+        if self.config.enable_caching:
+            self.cache = self.config.cache or CacheMechanism(
+                self.config.cache_config or CacheConfig()
             )
 
     def _setup_health_checks(self) -> None:
@@ -317,7 +331,43 @@ class LiteLLMGateway:
         })
 
         return health_info
-    
+
+    def _generate_cache_key(
+        self,
+        prompt: str,
+        model: str,
+        messages: Optional[List[Dict[str, Any]]] = None,
+        tenant_id: Optional[str] = None,
+        **kwargs: Any
+    ) -> str:
+        """
+        Generate cache key for LLM request.
+
+        Args:
+            prompt: Input prompt
+            model: Model identifier
+            messages: Optional messages list
+            tenant_id: Optional tenant ID
+            **kwargs: Additional parameters
+
+        Returns:
+            Cache key string
+        """
+        # Create deterministic key from request parameters
+        key_data = {
+            "prompt": prompt,
+            "model": model,
+            "messages": messages,
+            "tenant_id": tenant_id,
+            **{k: v for k, v in kwargs.items() if k not in ["stream"]}  # Exclude stream
+        }
+
+        # Create hash for consistent key
+        key_string = json.dumps(key_data, sort_keys=True)
+        key_hash = hashlib.sha256(key_string.encode()).hexdigest()[:16]
+
+        return f"gateway:generate:{model}:{key_hash}"
+
     def record_feedback(
         self,
         query: str,
@@ -328,20 +378,20 @@ class LiteLLMGateway:
     ) -> Optional[str]:
         """
         Record feedback for continuous learning.
-        
+
         Args:
             query: Original query
             response: System response
             feedback_type: Type of feedback
             content: Feedback content
             tenant_id: Optional tenant ID
-        
+
         Returns:
             Feedback ID or None if feedback loop not enabled
         """
         if not self.feedback_loop:
             return None
-        
+
         return self.feedback_loop.record_feedback(
             query=query,
             response=response,
@@ -349,7 +399,7 @@ class LiteLLMGateway:
             content=content,
             tenant_id=tenant_id
         )
-    
+
     def get_llmops_metrics(
         self,
         tenant_id: Optional[str] = None,
@@ -357,19 +407,19 @@ class LiteLLMGateway:
     ) -> Dict[str, Any]:
         """
         Get LLM operations metrics.
-        
+
         Args:
             tenant_id: Optional tenant ID filter
             time_range_hours: Time range in hours
-        
+
         Returns:
             Dictionary with metrics
         """
         if not self.llmops:
             return {"error": "LLMOps not enabled"}
-        
+
         return self.llmops.get_metrics(tenant_id=tenant_id, time_range_hours=time_range_hours)
-    
+
     def get_cost_summary(
         self,
         tenant_id: Optional[str] = None,
@@ -377,17 +427,17 @@ class LiteLLMGateway:
     ) -> Dict[str, Any]:
         """
         Get cost summary.
-        
+
         Args:
             tenant_id: Optional tenant ID filter
             time_range_hours: Time range in hours
-        
+
         Returns:
             Dictionary with cost summary
         """
         if not self.llmops:
             return {"error": "LLMOps not enabled"}
-        
+
         return self.llmops.get_cost_summary(tenant_id=tenant_id, time_range_hours=time_range_hours)
 
     def generate(
@@ -501,6 +551,28 @@ class LiteLLMGateway:
         if messages is None:
             messages = [{"role": "user", "content": prompt}]
 
+        # Check cache first (if caching enabled and not streaming)
+        if self.cache and not stream and self.config.enable_caching:
+            cache_key = self._generate_cache_key(
+                prompt=prompt,
+                model=model,
+                messages=messages,
+                tenant_id=tenant_id,
+                **kwargs
+            )
+            cached_response = self.cache.get(cache_key, tenant_id=tenant_id)
+            if cached_response:
+                # Return cached response
+                if isinstance(cached_response, dict):
+                    return GenerateResponse(
+                        text=cached_response.get("text", ""),
+                        model=cached_response.get("model", model),
+                        usage=cached_response.get("usage"),
+                        finish_reason=cached_response.get("finish_reason"),
+                        raw_response=cached_response.get("raw_response")
+                    )
+                return cached_response
+
         # Rate limiting
         rate_limiter = self._get_rate_limiter(tenant_id)
         if rate_limiter:
@@ -517,7 +589,7 @@ class LiteLLMGateway:
         async def _generate() -> Any:
             """Internal generation function."""
             nonlocal prompt_tokens, completion_tokens, error_message, status
-            
+
             try:
                 if self.router:
                     response = await self.router.acompletion(  # type: ignore
@@ -553,7 +625,7 @@ class LiteLLMGateway:
                 # Classify error
                 error_classification = self._classify_error(e)
                 error_message = str(e)
-                
+
                 # Determine status
                 if "rate limit" in error_message.lower() or "429" in error_message:
                     status = LLMOperationStatus.RATE_LIMITED
@@ -603,7 +675,7 @@ class LiteLLMGateway:
 
         if stream:
             return response
-        
+
         # Log operation
         if self.llmops:
             latency_ms = (time.time() - start_time) * 1000
@@ -636,13 +708,39 @@ class LiteLLMGateway:
             usage = None
             finish_reason = None
 
-        return GenerateResponse(
+        generate_response = GenerateResponse(
             text=text,
             model=model_name,
             usage=usage,
             finish_reason=finish_reason,
             raw_response=response.__dict__ if hasattr(response, '__dict__') else response
         )
+
+        # Store in cache (if caching enabled and not streaming)
+        if self.cache and not stream and self.config.enable_caching and status == LLMOperationStatus.SUCCESS:
+            cache_key = self._generate_cache_key(
+                prompt=prompt,
+                model=model,
+                messages=messages,
+                tenant_id=tenant_id,
+                **kwargs
+            )
+            # Store response data for caching
+            cache_data = {
+                "text": text,
+                "model": model_name,
+                "usage": usage,
+                "finish_reason": finish_reason,
+                "raw_response": generate_response.raw_response
+            }
+            self.cache.set(
+                cache_key,
+                cache_data,
+                tenant_id=tenant_id,
+                ttl=self.config.cache_ttl
+            )
+
+        return generate_response
 
     def embed(
         self,

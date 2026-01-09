@@ -235,6 +235,47 @@ cost_summary = gateway.get_cost_summary(tenant_id="tenant1")
 print(f"Cost per 1K tokens: ${cost_summary['cost_per_1k_tokens']:.4f}")
 ```
 
+### Response Caching
+
+The gateway includes **automatic response caching** to reduce costs and improve performance:
+
+- **Automatic Cache Checking**: Checks cache before making LLM API calls
+- **Cache Key Generation**: Creates deterministic cache keys from request parameters
+- **Tenant Isolation**: Cache keys include tenant_id for multi-tenant isolation
+- **Configurable TTL**: Default 1-hour TTL, configurable per request
+- **Stream Exclusion**: Streaming responses are not cached
+- **Cache Integration**: Uses CacheMechanism component for storage
+
+**Example:**
+```python
+from src.core.litellm_gateway import GatewayConfig
+from src.core.cache_mechanism import CacheMechanism, CacheConfig
+
+# Create cache
+cache = CacheMechanism(CacheConfig(default_ttl=3600))
+
+# Configure gateway with caching
+config = GatewayConfig(
+    enable_caching=True,
+    cache_ttl=3600,  # 1 hour default
+    cache=cache
+)
+gateway = LiteLLMGateway(config=config)
+
+# First call - makes API call and caches result
+response1 = await gateway.generate_async("What is AI?", tenant_id="tenant1")
+
+# Second identical call - returns cached result (no API call)
+response2 = await gateway.generate_async("What is AI?", tenant_id="tenant1")
+# response2 is served from cache, saving API costs
+```
+
+**Benefits:**
+- **Cost Reduction**: Identical requests don't incur API costs
+- **Performance**: Cached responses are returned instantly
+- **Multi-Tenant Safe**: Tenant isolation prevents cache pollution
+- **Automatic**: No manual cache management required
+
 ### Validation/Guardrails Framework
 
 The gateway includes **validation and guardrails** for output quality:

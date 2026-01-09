@@ -13,6 +13,7 @@ from .functions import (
     create_rag_endpoints,
     create_agent_endpoints,
     create_gateway_endpoints,
+    create_unified_query_endpoint,
     add_health_check,
     add_api_versioning,
 )
@@ -28,6 +29,7 @@ __all__ = [
     "create_rag_endpoints",
     "create_agent_endpoints",
     "create_gateway_endpoints",
+    "create_unified_query_endpoint",
     # Utility functions
     "add_health_check",
     "add_api_versioning",
