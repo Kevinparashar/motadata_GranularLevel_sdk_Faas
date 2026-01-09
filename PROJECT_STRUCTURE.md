@@ -13,6 +13,14 @@ motadata-python-ai-sdk/
 │   │   ├── postgresql_database/ # PostgreSQL with pgvector
 │   │   │   └── vector_database/ # Vector operations
 │   │   ├── rag/                 # RAG system
+│   │   ├── machine_learning/    # Machine Learning components
+│   │   │   ├── ml_framework/    # ML framework (training, inference)
+│   │   │   │   ├── models/      # Model wrappers and factories
+│   │   │   │   └── utils/       # ML utilities
+│   │   │   ├── mlops/           # MLOps pipeline
+│   │   │   ├── ml_data_management/ # Data management
+│   │   │   ├── model_serving/   # Model serving
+│   │   │   └── use_cases/       # Use case templates
 │   │   ├── prompt_context_management/ # Prompt management
 │   │   ├── evaluation_observability/ # Observability
 │   │   ├── api_backend_services/ # API services
@@ -91,6 +99,12 @@ motadata-python-ai-sdk/
 All AI-related components are in `src/core/`:
 - `litellm_gateway/` - LLM gateway
 - `agno_agent_framework/` - Agent framework
+- `machine_learning/` - Machine Learning components
+  - `ml_framework/` - ML framework (training, inference, model management)
+  - `mlops/` - MLOps pipeline (experiments, deployment, monitoring)
+  - `ml_data_management/` - Data management and feature store
+  - `model_serving/` - Model serving infrastructure
+  - `use_cases/` - Use case templates for ITSM-specific models
 - `postgresql_database/` - Database with pgvector
 - `rag/` - RAG system
 - `prompt_context_management/` - Prompt management

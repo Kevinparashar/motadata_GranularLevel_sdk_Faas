@@ -54,9 +54,13 @@ This document outlines the dependencies between SDK components and provides a re
 | **Agent** | LiteLLM Gateway, Observability | Cache | API Backend, Prompt Context Management |
 | **Prompt Context Management** | Agent, Observability | LiteLLM Gateway, Cache | API Backend |
 | **RAG** | PostgreSQL Database, LiteLLM Gateway | Observability, Cache | API Backend, Cache |
-| **API Backend** | Agent, Gateway, RAG | All other components | None |
+| **ML Framework** | PostgreSQL Database, Cache | Observability | API Backend, MLOps |
+| **MLOps Pipeline** | ML Framework, PostgreSQL Database | Observability | API Backend |
+| **ML Data Management** | PostgreSQL Database | Observability | ML Framework, MLOps |
+| **Model Serving** | ML Framework | Observability | API Backend |
+| **API Backend** | Agent, Gateway, RAG, Model Serving | All other components | None |
 
-## Build 
+## Build
 
 
 These components have no dependencies and can be developed in parallel:
@@ -125,10 +129,34 @@ These components depend on multiple core and infrastructure components:
    - Can start: After Database and Gateway
    - Blocking: API Backend, Cache
 
-10. **API Backend** (src/core/api_backend_services/)
-    - Dependencies: Agent, Gateway, RAG
+10. **ML Framework** (src/core/machine_learning/ml_framework/)
+    - Dependencies: PostgreSQL Database, Cache, Observability
+    - Priority: **MEDIUM** - ML capabilities
+    - Can start: After Database, Cache, and Observability
+    - Blocking: MLOps, Model Serving, API Backend
+
+11. **MLOps Pipeline** (src/core/machine_learning/mlops/)
+    - Dependencies: ML Framework, PostgreSQL Database, Observability
+    - Priority: **MEDIUM** - MLOps capabilities
+    - Can start: After ML Framework, Database, and Observability
+    - Blocking: API Backend
+
+12. **ML Data Management** (src/core/machine_learning/ml_data_management/)
+    - Dependencies: PostgreSQL Database, Observability
+    - Priority: **MEDIUM** - Data management
+    - Can start: After Database and Observability
+    - Blocking: ML Framework, MLOps
+
+13. **Model Serving** (src/core/machine_learning/model_serving/)
+    - Dependencies: ML Framework, Observability
+    - Priority: **MEDIUM** - Model serving
+    - Can start: After ML Framework and Observability
+    - Blocking: API Backend
+
+14. **API Backend** (src/core/api_backend_services/)
+    - Dependencies: Agent, Gateway, RAG, Model Serving
     - Priority: **HIGH** - User-facing interface
-    - Can start: After Agent, Gateway, and RAG
+    - Can start: After Agent, Gateway, RAG, and Model Serving
     - Blocking: None (final component)
 
 
@@ -154,16 +182,24 @@ These components depend on multiple core and infrastructure components:
 - **Agent**: Integrates with Gateway, Observability, and Prompt Context Management
 - **RAG**: Integrates with Database, Gateway, and Cache
 - **Cache**: Integrates with Gateway and RAG
+- **ML Framework**: Integrates with Database, Cache, and Observability
+- **MLOps Pipeline**: Integrates with ML Framework, Database, and Observability
+- **ML Data Management**: Integrates with Database and Observability
+- **Model Serving**: Integrates with ML Framework and Observability
 
 - **Connectivity**: Integrates with Pool Implementation and Observability
 - **Pool Implementation**: Integrates with Database and Connectivity
-- **PostgreSQL Database**: Integrates with RAG and Observability
+- **PostgreSQL Database**: Integrates with RAG, ML Framework, MLOps, ML Data Management, and Observability
 - **Prompt Context Management**: Integrates with Agent and Observability
 
  ### Dependencies
-- **API Backend**: Depends on 3 major components (Agent, Gateway, RAG)
+- **API Backend**: Depends on 4 major components (Agent, Gateway, RAG, Model Serving)
 - **Agent**: Depends on Gateway (critical path)
 - **RAG**: Depends on Database and Gateway (critical path)
+- **ML Framework**: Depends on Database and Cache (critical path)
+- **MLOps Pipeline**: Depends on ML Framework and Database
+- **ML Data Management**: Depends on Database
+- **Model Serving**: Depends on ML Framework
 - **Cache**: Depends on Gateway and RAG
 - **Prompt Context Management**: Depends on Agent
 - **Connectivity**: Depends on Pool Implementation

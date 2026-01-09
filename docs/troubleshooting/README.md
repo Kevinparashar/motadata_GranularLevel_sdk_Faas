@@ -83,6 +83,38 @@ This directory contains comprehensive troubleshooting guides for all components 
    - Performance issues
    - Error handling issues
 
+### Machine Learning Components
+
+9. **[ML Framework Troubleshooting](ml_framework_troubleshooting.md)**
+   - Training failures
+   - Prediction errors
+   - Model loading issues
+   - Memory management problems
+   - Data processing errors
+   - Model registration issues
+   - Performance issues
+
+10. **[MLOps Pipeline Troubleshooting](mlops_troubleshooting.md)**
+    - Experiment tracking issues
+    - Model deployment failures
+    - Model monitoring problems
+    - Drift detection issues
+    - Pipeline execution errors
+
+11. **[ML Data Management Troubleshooting](ml_data_management_troubleshooting.md)**
+    - Data loading issues
+    - Data validation failures
+    - Feature store problems
+    - Data pipeline errors
+    - Data ingestion issues
+
+12. **[Model Serving Troubleshooting](model_serving_troubleshooting.md)**
+    - Server startup issues
+    - API request failures
+    - Batch processing problems
+    - Real-time prediction issues
+    - Performance problems
+
 ## How to Use These Guides
 
 ### Step 1: Identify the Component
@@ -96,6 +128,10 @@ Determine which component is experiencing issues:
 - **PostgreSQL Database**: Issues with database connections, queries, vectors
 - **Evaluation & Observability**: Issues with tracing, logging, metrics
 - **API Backend Services**: Issues with API endpoints, requests, responses
+- **ML Framework**: Issues with training, inference, model management
+- **MLOps Pipeline**: Issues with experiments, deployment, monitoring
+- **ML Data Management**: Issues with data loading, validation, feature store
+- **Model Serving**: Issues with API server, batch processing, predictions
 
 ### Step 2: Find the Problem
 
