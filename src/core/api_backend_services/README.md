@@ -67,6 +67,53 @@ The **Machine Learning Components** (`src/core/machine_learning/`) can be expose
 
 The backend services can integrate with ML components to provide ML capabilities through REST APIs, enabling external systems to train models, make predictions, and manage ML workflows.
 
+### Unified Query Endpoint
+
+The backend services provide a **unified query endpoint** that orchestrates Agent and RAG:
+- **Automatic Routing**: Automatically determines whether to use Agent or RAG based on query
+- **Dual Processing**: Can use both Agent and RAG for comprehensive responses
+- **Mode Selection**: Supports "auto", "agent", "rag", or "both" modes
+- **Single Entry Point**: One endpoint for all query types
+
+**Example:**
+```python
+from src.core.api_backend_services import (
+    create_api_app,
+    create_api_router,
+    create_unified_query_endpoint,
+    register_router
+)
+
+app = create_api_app()
+router = create_api_router(prefix="/api/v1")
+
+# Create unified endpoint
+create_unified_query_endpoint(
+    router=router,
+    agent_manager=agent_manager,
+    rag_system=rag_system,
+    gateway=gateway,
+    prefix="/query"
+)
+
+register_router(app, router)
+
+# Usage:
+# POST /api/v1/query
+# {
+#   "query": "What is AI?",
+#   "mode": "auto",  # or "agent", "rag", "both"
+#   "tenant_id": "tenant1",
+#   "user_id": "user123"
+# }
+```
+
+**Benefits:**
+- **Simplified Integration**: Single endpoint for all queries
+- **Intelligent Routing**: Automatically chooses best processing path
+- **Flexible**: Supports explicit mode selection when needed
+- **Comprehensive**: Can combine Agent and RAG responses
+
 ## Libraries Utilized
 
 - **fastapi**: Modern web framework for building APIs. It provides automatic API documentation, request validation, and async support.

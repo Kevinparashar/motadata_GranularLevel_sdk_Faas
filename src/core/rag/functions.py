@@ -20,6 +20,8 @@ def create_rag_system(
     gateway: LiteLLMGateway,
     embedding_model: str = "text-embedding-3-small",
     generation_model: str = "gpt-4",
+    enable_memory: bool = True,
+    memory_config: Optional[Dict[str, Any]] = None,
     **kwargs: Any
 ) -> RAGSystem:
     """
@@ -30,6 +32,8 @@ def create_rag_system(
         gateway: LiteLLM Gateway instance
         embedding_model: Model for embeddings
         generation_model: Model for generation
+        enable_memory: Enable memory for conversation context
+        memory_config: Optional memory configuration
         **kwargs: Additional RAG system configuration
 
     Returns:
@@ -38,13 +42,15 @@ def create_rag_system(
     Example:
         >>> db = DatabaseConnection(...)
         >>> gateway = LiteLLMGateway()
-        >>> rag = create_rag_system(db, gateway)
+        >>> rag = create_rag_system(db, gateway, enable_memory=True)
     """
     return RAGSystem(
         db=db,
         gateway=gateway,
         embedding_model=embedding_model,
         generation_model=generation_model,
+        enable_memory=enable_memory,
+        memory_config=memory_config,
         **kwargs
     )
 
@@ -107,7 +113,9 @@ def quick_rag_query(
     threshold: float = 0.7,
     max_tokens: int = 1000,
     use_query_rewriting: bool = True,
-    retrieval_strategy: str = "vector"
+    retrieval_strategy: str = "vector",
+    user_id: Optional[str] = None,
+    conversation_id: Optional[str] = None
 ) -> Dict[str, Any]:
     """
     Quick RAG query without manual setup (high-level convenience).
@@ -115,9 +123,14 @@ def quick_rag_query(
     Args:
         rag_system: RAGSystem instance
         query: User query
+        tenant_id: Optional tenant ID for multi-tenant SaaS
         top_k: Number of documents to retrieve
         threshold: Similarity threshold
         max_tokens: Maximum tokens in response
+        use_query_rewriting: Whether to rewrite query
+        retrieval_strategy: Retrieval strategy
+        user_id: Optional user ID for memory context
+        conversation_id: Optional conversation ID for memory context
 
     Returns:
         Dictionary with answer and retrieved documents
@@ -133,7 +146,9 @@ def quick_rag_query(
         threshold=threshold,
         max_tokens=max_tokens,
         use_query_rewriting=use_query_rewriting,
-        retrieval_strategy=retrieval_strategy
+        retrieval_strategy=retrieval_strategy,
+        user_id=user_id,
+        conversation_id=conversation_id
     )
 
 
@@ -145,7 +160,9 @@ async def quick_rag_query_async(
     threshold: float = 0.7,
     max_tokens: int = 1000,
     use_query_rewriting: bool = True,
-    retrieval_strategy: str = "vector"
+    retrieval_strategy: str = "vector",
+    user_id: Optional[str] = None,
+    conversation_id: Optional[str] = None
 ) -> Dict[str, Any]:
     """
     Quick async RAG query (high-level convenience).
@@ -153,9 +170,14 @@ async def quick_rag_query_async(
     Args:
         rag_system: RAGSystem instance
         query: User query
+        tenant_id: Optional tenant ID for multi-tenant SaaS
         top_k: Number of documents to retrieve
         threshold: Similarity threshold
         max_tokens: Maximum tokens in response
+        use_query_rewriting: Whether to rewrite query
+        retrieval_strategy: Retrieval strategy
+        user_id: Optional user ID for memory context
+        conversation_id: Optional conversation ID for memory context
 
     Returns:
         Dictionary with answer and retrieved documents
@@ -171,7 +193,9 @@ async def quick_rag_query_async(
         threshold=threshold,
         max_tokens=max_tokens,
         use_query_rewriting=use_query_rewriting,
-        retrieval_strategy=retrieval_strategy
+        retrieval_strategy=retrieval_strategy,
+        user_id=user_id,
+        conversation_id=conversation_id
     )
 
 
