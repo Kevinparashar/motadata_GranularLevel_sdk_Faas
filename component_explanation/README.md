@@ -86,10 +86,55 @@ This folder contains comprehensive documentation for each component of the Motad
    - Workflow
    - Customization
 
+### Machine Learning Components
+
+9. **[ML Framework](ml_framework_explanation.md)**
+   - ML System orchestration
+   - Model management and lifecycle
+   - Training and inference
+   - Data processing
+   - Model registry and versioning
+   - Memory management
+   - Exception handling
+   - Functions and utilities
+   - Workflow
+   - Customization
+
+10. **[MLOps Pipeline](mlops_explanation.md)**
+    - Pipeline orchestration
+    - Experiment tracking (MLflow)
+    - Model versioning and lineage
+    - Model deployment
+    - Model monitoring
+    - Drift detection
+    - Exception handling
+    - Functions and utilities
+    - Workflow
+    - Customization
+
+11. **[ML Data Management](ml_data_management_explanation.md)**
+    - Data lifecycle management
+    - Data loading and validation
+    - Feature store
+    - ETL pipelines
+    - Exception handling
+    - Functions and utilities
+    - Workflow
+    - Customization
+
+12. **[Model Serving](model_serving_explanation.md)**
+    - REST API server (FastAPI)
+    - Batch prediction service
+    - Real-time prediction service
+    - Exception handling
+    - Functions and utilities
+    - Workflow
+    - Customization
+
 ### Additional Components (To Be Added)
 
-9. **Connectivity Clients** (`connectivity_clients_explanation.md`) - Coming soon
-10. **Pool Implementation** (`pool_implementation_explanation.md`) - Coming soon
+13. **Connectivity Clients** (`connectivity_clients_explanation.md`) - Coming soon
+14. **Pool Implementation** (`pool_implementation_explanation.md`) - Coming soon
 
 ## Documentation Structure
 

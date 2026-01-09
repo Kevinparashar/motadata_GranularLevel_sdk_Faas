@@ -235,6 +235,94 @@ create_agent_endpoints(router, agent_manager)
 register_router(app, router)
 ```
 
+### 7. ML Framework ✅
+
+**Location:** `src/core/machine_learning/ml_framework/functions.py`
+
+#### Factory Functions
+- `create_ml_system()` - Create and configure ML system
+- `create_model_manager()` - Create model manager
+- `create_trainer()` - Create trainer
+- `create_predictor()` - Create predictor
+- `create_data_processor()` - Create data processor
+- `create_model_registry()` - Create model registry
+
+**Example:**
+```python
+from src.core.machine_learning.ml_framework import (
+    create_ml_system,
+    create_model_manager
+)
+
+ml_system = create_ml_system(db, tenant_id="tenant_123")
+model_manager = create_model_manager(db, tenant_id="tenant_123")
+```
+
+### 8. MLOps Pipeline ✅
+
+**Location:** `src/core/machine_learning/mlops/functions.py`
+
+#### Factory Functions
+- `create_mlops_pipeline()` - Create MLOps pipeline
+- `create_experiment_tracker()` - Create experiment tracker
+- `create_model_versioning()` - Create model versioning
+- `create_model_deployment()` - Create model deployment
+- `create_model_monitoring()` - Create model monitoring
+- `create_drift_detector()` - Create drift detector
+
+**Example:**
+```python
+from src.core.machine_learning.mlops import (
+    create_mlops_pipeline,
+    create_experiment_tracker
+)
+
+pipeline = create_mlops_pipeline("pipeline_1", tenant_id="tenant_123")
+tracker = create_experiment_tracker(tenant_id="tenant_123")
+```
+
+### 9. ML Data Management ✅
+
+**Location:** `src/core/machine_learning/ml_data_management/functions.py`
+
+#### Factory Functions
+- `create_data_manager()` - Create data manager
+- `create_data_loader()` - Create data loader
+- `create_data_validator()` - Create data validator
+- `create_feature_store()` - Create feature store
+- `create_data_pipeline()` - Create data pipeline
+
+**Example:**
+```python
+from src.core.machine_learning.ml_data_management import (
+    create_data_manager,
+    create_feature_store
+)
+
+data_manager = create_data_manager(db, tenant_id="tenant_123")
+feature_store = create_feature_store(db, tenant_id="tenant_123")
+```
+
+### 10. Model Serving ✅
+
+**Location:** `src/core/machine_learning/model_serving/functions.py`
+
+#### Factory Functions
+- `create_model_server()` - Create model server
+- `create_batch_predictor()` - Create batch predictor
+- `create_realtime_predictor()` - Create realtime predictor
+
+**Example:**
+```python
+from src.core.machine_learning.model_serving import (
+    create_model_server,
+    create_batch_predictor
+)
+
+server = create_model_server(model_manager, host="0.0.0.0", port=8000)
+batch_predictor = create_batch_predictor(model_manager, tenant_id="tenant_123")
+```
+
 ## Benefits
 
 1. **Easier Discovery**: Functions are easy to find and understand
@@ -282,6 +370,9 @@ from src.core.rag import create_rag_system, quick_rag_query
 from src.core.prompt_context_management import create_prompt_manager
 from src.core.cache_mechanism import create_memory_cache, cache_set
 from src.core.api_backend_services import create_api_app, create_rag_endpoints
+from src.core.machine_learning.ml_framework import create_ml_system
+from src.core.machine_learning.mlops import create_mlops_pipeline
+from src.core.machine_learning.model_serving import create_model_server
 
 # Create gateway
 gateway = create_gateway(providers=["openai"], default_model="gpt-4")
@@ -307,6 +398,15 @@ prompt_manager = create_prompt_manager(max_tokens=8000)
 cache = create_memory_cache(default_ttl=600)
 cache_set(cache, "key", "value", ttl=300)
 
+# Create ML system
+ml_system = create_ml_system(db, tenant_id="tenant_123")
+
+# Create MLOps pipeline
+pipeline = create_mlops_pipeline("ml_pipeline", tenant_id="tenant_123")
+
+# Create model server
+model_server = create_model_server(ml_system.model_manager, host="0.0.0.0", port=8001)
+
 # Create API app
 app = create_api_app(title="AI SDK API")
 router = create_api_router(prefix="/api/v1")
@@ -326,6 +426,10 @@ Comprehensive test coverage is provided for all function-driven API components:
 - **`test_api_functions.py`**: Tests for API backend functions
 - **`test_litellm_gateway_functions.py`**: Tests for LiteLLM Gateway functions
 - **`test_prompt_context_functions.py`**: Tests for prompt context management functions
+- **`test_ml_framework_functions.py`**: Tests for ML Framework functions
+- **`test_mlops_functions.py`**: Tests for MLOps Pipeline functions
+- **`test_ml_data_management_functions.py`**: Tests for ML Data Management functions
+- **`test_model_serving_functions.py`**: Tests for Model Serving functions
 
 ### Running Function Tests
 

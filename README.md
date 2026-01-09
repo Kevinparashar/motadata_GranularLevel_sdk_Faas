@@ -2,7 +2,7 @@
 
 ## Overview
 
-The Motadata Python AI SDK is a comprehensive, modular SDK for building AI-powered applications. It provides a unified interface for LLM operations, agent frameworks, RAG systems, and database operations, all designed with modularity and swappability in mind.
+The Motadata Python AI SDK is a comprehensive, modular SDK for building AI-powered applications. It provides a unified interface for LLM operations, agent frameworks, RAG systems, machine learning capabilities, and database operations, all designed with modularity and swappability in mind.
 
 ## Features
 
@@ -10,6 +10,7 @@ The Motadata Python AI SDK is a comprehensive, modular SDK for building AI-power
 - **Multi-Provider LLM Support**: Unified interface for OpenAI, Anthropic, Google Gemini, and other providers through LiteLLM Gateway with advanced rate limiting, request queuing, batching, and deduplication
 - **Autonomous AI Agents**: Create and manage intelligent agents with session management, bounded memory systems, tools, plugins, circuit breakers, and health checks
 - **RAG System**: Complete Retrieval-Augmented Generation with document processing, vector search, re-ranking, versioning, relevance scoring, incremental updates, and real-time synchronization
+- **Machine Learning Framework**: Comprehensive ML capabilities for training, inference, and model management with MLOps pipeline, data management, and model serving
 - **Vector Database Integration**: PostgreSQL with pgvector for efficient similarity search and embedding storage
 
 ### Developer Experience
@@ -48,6 +49,7 @@ The SDK follows a layered architecture with clear separation of concerns:
 
 ### Core Layer
 - **Agent Framework**: Autonomous agents with session, memory, tools, and plugins
+- **Machine Learning**: ML framework, MLOps pipeline, data management, and model serving
 - **Cache Mechanism**: Multi-backend caching for responses and embeddings
 - **Prompt Context Management**: Template system with versioning and context building
 
@@ -76,6 +78,12 @@ motadata-python-ai-sdk/
 │   └── core/                    # Core AI components
 │       ├── litellm_gateway/
 │       ├── agno_agent_framework/
+│       ├── machine_learning/    # ML components
+│       │   ├── ml_framework/
+│       │   ├── mlops/
+│       │   ├── ml_data_management/
+│       │   ├── model_serving/
+│       │   └── use_cases/
 │       ├── postgresql_database/
 │       ├── rag/
 │       ├── prompt_context_management/
@@ -137,23 +145,53 @@ motadata-python-ai-sdk/
    - **Document Validation** processes to ensure compliance with required formats
    - **Real-time Document Synchronization** for up-to-date information
 
-5. **Prompt Context Management** (`src/core/prompt_context_management/`)
+5. **Machine Learning Framework** (`src/core/machine_learning/`)
+   - **ML Framework** (`ml_framework/`): Core ML system for training, inference, and model management
+     - Unified interface for ML operations (MLSystem)
+     - Model lifecycle management (create, update, delete, archive, version)
+     - Training orchestration with hyperparameter management and validation
+     - Inference engine with preprocessing, postprocessing, and caching
+     - Data preprocessing and feature engineering
+     - Model versioning and registry
+     - Memory management with configurable limits
+     - Multi-tenant support with full tenant isolation
+   - **MLOps Pipeline** (`mlops/`): End-to-end MLOps capabilities
+     - Experiment tracking with MLflow integration
+     - Model versioning and lineage tracking
+     - Model deployment to different environments (dev, staging, prod)
+     - Model monitoring with performance metrics and alerting
+     - Drift detection (data drift, model drift, concept drift)
+   - **Data Management** (`ml_data_management/`): Data lifecycle and feature store
+     - Data ingestion, validation, transformation, and archival
+     - Feature store for centralized feature storage and retrieval
+     - Data quality checks and schema validation
+     - ETL pipelines for data processing
+   - **Model Serving** (`model_serving/`): Model serving infrastructure
+     - REST API server (FastAPI) for model predictions
+     - Batch prediction service for large-scale processing
+     - Real-time prediction service with caching
+   - **Use Cases** (`use_cases/`): Template structure for ITSM-specific ML models
+     - Base class interface (BaseMLModel) for all use case models
+     - Template for creating new ML models
+     - Framework for ticket classification, priority prediction, SLA prediction, etc.
+
+6. **Prompt Context Management** (`src/core/prompt_context_management/`)
    - Prompt templates and versioning
    - Context building and management
    - **Dynamic Prompting** capabilities that adjust based on context
    - **Automatic Prompt Optimization** techniques to maximize effectiveness
    - **Fallback Templates** to ensure continuity if a template is not found
 
-6. **Evaluation & Observability** (`src/core/evaluation_observability/`)
+7. **Evaluation & Observability** (`src/core/evaluation_observability/`)
    - Distributed tracing
    - Structured logging
    - Metrics collection
 
-7. **API Backend Services** (`src/core/api_backend_services/`)
+8. **API Backend Services** (`src/core/api_backend_services/`)
    - RESTful API endpoints
    - Backend integration
 
-8. **Cache Mechanism** (`src/core/cache_mechanism/`)
+9. **Cache Mechanism** (`src/core/cache_mechanism/`)
    - Response, embedding, and query result caching
    - In-memory (LRU + TTL) and optional Redis backend
    - Pattern-based invalidation and max-size enforcement
@@ -163,7 +201,7 @@ motadata-python-ai-sdk/
    - **Cache Validation Processes** to ensure the integrity of cached data
    - **Automatic Recovery Mechanisms** for cache failures
 
-9. **Connectivity Clients** (`connectivity_clients/`)
+10. **Connectivity Clients** (`connectivity_clients/`)
    - Client connection management
    - Connection pooling
    - Health monitoring

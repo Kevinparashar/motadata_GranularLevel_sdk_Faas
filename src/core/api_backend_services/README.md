@@ -57,6 +57,16 @@ This monitoring is essential for understanding API usage, optimizing performance
 
 The **Cache Mechanism** (`src/core/cache_mechanism/`) can be used by the backend services to cache API responses. Frequently accessed endpoints can cache their responses, improving performance and reducing backend load.
 
+### Integration with Machine Learning Components
+
+The **Machine Learning Components** (`src/core/machine_learning/`) can be exposed through API endpoints:
+- **ML Framework**: Endpoints for model training and inference
+- **Model Serving**: Endpoints for model predictions (can use Model Server directly)
+- **MLOps Pipeline**: Endpoints for experiment tracking and model deployment
+- **Data Management**: Endpoints for data ingestion and feature store access
+
+The backend services can integrate with ML components to provide ML capabilities through REST APIs, enabling external systems to train models, make predictions, and manage ML workflows.
+
 ## Libraries Utilized
 
 - **fastapi**: Modern web framework for building APIs. It provides automatic API documentation, request validation, and async support.
