@@ -182,11 +182,80 @@ Must include:
 
 ### Code Documentation
 
-- Docstrings for all public classes and methods
-- Type hints for all function parameters
-- Inline comments for complex logic
+- **Docstrings**: All public classes and methods must have clear docstrings explaining:
+  - What the function/class does
+  - Why it exists (purpose)
+  - Parameters and return types
+  - Example usage (if complex)
+  
+  ```python
+  def process_document(
+      self,
+      document: str,
+      chunk_size: int = 1000
+  ) -> List[DocumentChunk]:
+      """
+      Process a document into chunks for vector storage.
+      
+      This method splits documents into manageable chunks while preserving
+      semantic meaning, enabling efficient vector search and retrieval.
+      
+      Args:
+          document: The document text to process
+          chunk_size: Maximum size of each chunk in characters
+      
+      Returns:
+          List of DocumentChunk objects ready for embedding
+      
+      Raises:
+          DocumentProcessingError: If document processing fails
+      """
+      pass
+  ```
+
+- **Type Hints**: All function parameters and return types must use type hints
+- **Inline Comments**: Add comments for complex logic, non-obvious code, or important decisions
 
 ## Code Standards
+
+### PEP 8 Compliance
+
+All code must strictly follow PEP 8 guidelines:
+
+- **Naming Conventions:**
+  - Variables, functions, methods: `snake_case`
+  - Classes: `PascalCase`
+  - Constants: `UPPER_SNAKE_CASE`
+  - File names: `lowercase_with_underscores.py`
+
+- **Import Organization:**
+  Imports must be organized in three groups (separated by blank lines):
+  1. Standard library imports
+  2. Third-party imports
+  3. Local application/library specific imports
+
+  ```python
+  # Standard library imports
+  import asyncio
+  import json
+  from datetime import datetime
+  from typing import Any, Dict, List, Optional
+
+  # Third-party imports
+  from pydantic import BaseModel, Field
+  from litellm import acompletion
+
+  # Local application/library specific imports
+  from ..cache_mechanism import CacheMechanism
+  from ..utils.circuit_breaker import CircuitBreaker
+  from .exceptions import AgentExecutionError
+  ```
+
+- **Code Structure:**
+  - Functions should be small and single-purpose
+  - Clear separation of concerns
+  - No deeply nested logic without comments
+  - Logical ordering of code
 
 ### Formatting
 
@@ -209,24 +278,42 @@ def your_function(
 
 ### Error Handling
 
-The SDK uses a hybrid exception hierarchy approach:
+The SDK uses a hybrid exception hierarchy approach with **specific exception handling**:
+
 - **Base Exception**: `src/core/exceptions.py` - Contains `SDKError` base class
 - **Component Exceptions**: Each component has its own exceptions file (e.g., `src/core/agno_agent_framework/exceptions.py`, `src/core/rag/exceptions.py`)
 
-**Example:**
+**Important:** Always use specific exceptions, never generic `except Exception:`:
+
 ```python
 from src.core.exceptions import SDKError
 from src.core.agno_agent_framework.exceptions import AgentExecutionError
 from src.core.rag.exceptions import RetrievalError
+import logging
 
+logger = logging.getLogger(__name__)
+
+# ✅ GOOD: Specific exception handling
 try:
     result = await agent.execute_task(task)
 except AgentExecutionError as e:
     logger.error(f"Agent {e.agent_id} failed: {e.message}")
     # Handle agent-specific error
+except (ConnectionError, TimeoutError) as e:
+    logger.error(f"Network error: {e}")
+    # Handle network errors
 except SDKError as e:
     logger.error(f"SDK error: {e.message}")
     # Handle any SDK error
+except Exception as e:
+    logger.error(f"Unexpected error: {e}", exc_info=True)
+    # Only as last resort, with logging
+
+# ❌ BAD: Generic exception handling
+try:
+    result = await agent.execute_task(task)
+except Exception as e:  # Too broad!
+    print(f"Error: {e}")  # No logging!
 ```
 
 **Component Exception Files:**
@@ -238,14 +325,17 @@ except SDKError as e:
 
 1. **Modularity**: Design components to be independent
 2. **Swappability**: Use interfaces for swappable components
-3. **Error Handling**: Comprehensive error handling
-4. **Logging**: Use structured logging
+3. **Error Handling**: Use specific exceptions with meaningful error messages and logging
+4. **Logging**: Use structured logging with appropriate log levels (DEBUG, INFO, WARNING, ERROR)
 5. **Testing**: Maintain high test coverage (>80%)
-6. **Documentation**: Keep documentation up to date
-7. **Pipeline Design**: For multi-step processing, use pipeline patterns with validation at each step
-8. **Metadata Management**: Implement schema-based metadata validation and enrichment
-9. **Strategy Pattern**: Support multiple strategies/approaches (e.g., chunking strategies, retrieval strategies)
-10. **Preprocessing**: Include preprocessing steps for data normalization and cleaning
+6. **Documentation**: Keep documentation up to date with code changes
+7. **PEP 8 Compliance**: Follow all PEP 8 guidelines strictly (imports, naming, structure)
+8. **Import Organization**: Always organize imports in standard/third-party/local order
+9. **Pipeline Design**: For multi-step processing, use pipeline patterns with validation at each step
+10. **Metadata Management**: Implement schema-based metadata validation and enrichment
+11. **Strategy Pattern**: Support multiple strategies/approaches (e.g., chunking strategies, retrieval strategies)
+12. **Preprocessing**: Include preprocessing steps for data normalization and cleaning
+13. **No Silent Failures**: Always log errors; never silently catch and ignore exceptions
 
 ## Contribution Process
 
