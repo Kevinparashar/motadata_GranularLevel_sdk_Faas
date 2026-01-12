@@ -299,6 +299,14 @@ async def main():
         await example_leader_follower()
         await example_peer_to_peer()
         await example_parallel_workflow()
+    except (ConnectionError, TimeoutError) as e:
+        print(f"Network error (expected in demo): {e}\n")
+        print("Note: These examples demonstrate the orchestration API.")
+        print("Full implementation requires actual agent task handlers.\n")
+    except ValueError as e:
+        print(f"Validation error (expected in demo): {e}\n")
+        print("Note: These examples demonstrate the orchestration API.")
+        print("Full implementation requires actual agent task handlers.\n")
     except Exception as e:
         print(f"Example error (expected in demo): {e}\n")
         print("Note: These examples demonstrate the orchestration API.")

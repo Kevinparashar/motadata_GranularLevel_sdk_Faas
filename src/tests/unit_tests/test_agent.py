@@ -4,18 +4,23 @@ Unit Tests for Agent Framework Component
 Tests agent creation, task execution, and communication.
 """
 
-import pytest
-from unittest.mock import Mock, MagicMock, patch, AsyncMock
+# Standard library imports
 from datetime import datetime
+from unittest.mock import AsyncMock, MagicMock, Mock, patch
+
+# Third-party imports
+import pytest
+
+# Local application/library specific imports
 from src.core.agno_agent_framework import (
     Agent,
     AgentManager,
+    AgentMessage,
     AgentStatus,
     AgentTask,
-    AgentMessage
 )
-from src.core.agno_agent_framework.session import AgentSession, SessionManager
 from src.core.agno_agent_framework.memory import AgentMemory, MemoryType
+from src.core.agno_agent_framework.session import AgentSession, SessionManager
 from src.core.agno_agent_framework.tools import Tool, ToolRegistry
 
 
@@ -193,6 +198,7 @@ class TestToolRegistry:
     def test_execute_tool(self):
         """Test tool execution."""
         def add(a: int, b: int) -> int:
+            """Add two integers together."""
             return a + b
         
         tool = Tool(

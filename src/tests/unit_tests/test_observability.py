@@ -120,6 +120,9 @@ class TestExceptionTracking:
         
         try:
             raise ValueError("Test exception")
+        except ValueError as e:
+            manager.capture_exception(e, context={"user_id": "test123"})
+            # Should not raise exception
         except Exception as e:
             manager.capture_exception(e, context={"user_id": "test123"})
             # Should not raise exception

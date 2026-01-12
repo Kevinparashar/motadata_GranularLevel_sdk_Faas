@@ -100,6 +100,16 @@ async def main():
         print("  - Read component READMEs to learn about Agents, RAG, etc.")
         print("  - Check docs/ for detailed guides")
 
+    except (ConnectionError, TimeoutError) as e:
+        print(f"❌ Network error: {str(e)}")
+        print("\nTroubleshooting:")
+        print("1. Check your internet connection")
+        print("2. Verify the API endpoint is accessible")
+    except ValueError as e:
+        print(f"❌ Validation error: {str(e)}")
+        print("\nTroubleshooting:")
+        print("1. Check your API key format is correct")
+        print("2. Verify all required parameters are provided")
     except Exception as e:
         print(f"❌ Error: {str(e)}")
         print("\nTroubleshooting:")

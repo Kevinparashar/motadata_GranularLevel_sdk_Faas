@@ -4,11 +4,13 @@ Predictor
 Inference engine for model predictions with preprocessing, postprocessing, and caching.
 """
 
-from typing import Any, List, Optional
+# Standard library imports
 import logging
+from typing import Any, List, Optional
 
-from .model_manager import ModelManager
+# Local application/library specific imports
 from ...cache_mechanism import CacheMechanism
+from .model_manager import ModelManager
 
 logger = logging.getLogger(__name__)
 
@@ -60,8 +62,11 @@ class Predictor:
             result = model.predict(input_data)
             logger.debug("Prediction completed")
             return result
+        except (ValueError, AttributeError) as e:
+            logger.error(f"Prediction failed due to invalid input or model: {str(e)}", exc_info=True)
+            raise
         except Exception as e:
-            logger.error(f"Prediction failed: {str(e)}", exc_info=True)
+            logger.error(f"Unexpected error during prediction: {str(e)}", exc_info=True)
             raise
     
     def predict_batch(
@@ -83,8 +88,11 @@ class Predictor:
             results = model.predict(input_batch)
             logger.debug(f"Batch prediction completed: {len(results)} predictions")
             return results.tolist() if hasattr(results, 'tolist') else list(results)
+        except (ValueError, AttributeError) as e:
+            logger.error(f"Batch prediction failed due to invalid input or model: {str(e)}", exc_info=True)
+            raise
         except Exception as e:
-            logger.error(f"Batch prediction failed: {str(e)}", exc_info=True)
+            logger.error(f"Unexpected error during batch prediction: {str(e)}", exc_info=True)
             raise
     
     def predict_proba(
@@ -108,8 +116,11 @@ class Predictor:
             else:
                 logger.warning("Model does not support predict_proba")
                 return None
+        except (ValueError, AttributeError) as e:
+            logger.error(f"Probability prediction failed due to invalid input or model: {str(e)}", exc_info=True)
+            raise
         except Exception as e:
-            logger.error(f"Probability prediction failed: {str(e)}", exc_info=True)
+            logger.error(f"Unexpected error during probability prediction: {str(e)}", exc_info=True)
             raise
 
 

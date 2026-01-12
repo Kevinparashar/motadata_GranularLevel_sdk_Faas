@@ -126,6 +126,7 @@ class TestConvenienceFunctions:
     def test_add_endpoint_get(self, router):
         """Test add_endpoint with GET method."""
         def get_status():
+            """Get status endpoint handler."""
             return {"status": "ok"}
         
         add_endpoint(router, "/status", "GET", get_status)
@@ -136,6 +137,7 @@ class TestConvenienceFunctions:
     def test_add_endpoint_post(self, router):
         """Test add_endpoint with POST method."""
         def create_item():
+            """Create item endpoint handler."""
             return {"id": "123"}
         
         add_endpoint(router, "/items", "POST", create_item)
@@ -145,6 +147,7 @@ class TestConvenienceFunctions:
     def test_add_endpoint_put(self, router):
         """Test add_endpoint with PUT method."""
         def update_item():
+            """Update item endpoint handler."""
             return {"updated": True}
         
         add_endpoint(router, "/items/1", "PUT", update_item)
@@ -154,6 +157,7 @@ class TestConvenienceFunctions:
     def test_add_endpoint_delete(self, router):
         """Test add_endpoint with DELETE method."""
         def delete_item():
+            """Delete item endpoint handler."""
             return {"deleted": True}
         
         add_endpoint(router, "/items/1", "DELETE", delete_item)
