@@ -68,6 +68,8 @@ def main():
     # 4. Error Tracking
     try:
         raise ValueError("Example error for tracking")
+    except ValueError as e:
+        observability.capture_exception(e, context={"user_id": "user123"})
     except Exception as e:
         observability.capture_exception(e, context={"user_id": "user123"})
     

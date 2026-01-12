@@ -7,21 +7,29 @@ for creating and managing AI agents.
 Dependencies: LiteLLM Gateway, Evaluation & Observability
 """
 
+# Standard library imports
+import asyncio
 import os
 import sys
 from pathlib import Path
-import asyncio
-from dotenv import load_dotenv
+
+# Third-party imports
+try:
+    from dotenv import load_dotenv  # type: ignore
+except ImportError:
+    load_dotenv = None
 
 # Add project root to path
 project_root = Path(__file__).parent.parent.parent
 sys.path.insert(0, str(project_root))
 
-load_dotenv(project_root / ".env")
+if load_dotenv:
+    load_dotenv(project_root / ".env")
 
+# Local application/library specific imports
 from src.core.agno_agent_framework import Agent, AgentManager
-from src.core.agno_agent_framework.session import AgentSession, SessionManager
 from src.core.agno_agent_framework.memory import AgentMemory, MemoryType
+from src.core.agno_agent_framework.session import AgentSession, SessionManager
 from src.core.agno_agent_framework.tools import Tool, ToolRegistry
 from src.core.litellm_gateway import LiteLLMGateway
 
@@ -155,6 +163,10 @@ async def main():
             print(f"Task completed: {result.get('status')}")
             if 'result' in result:
                 print(f"Result: {result['result'][:100]}...")
+        except (ConnectionError, TimeoutError) as e:
+            print(f"Network error during task execution: {type(e).__name__}")
+        except ValueError as e:
+            print(f"Validation error during task execution: {type(e).__name__}")
         except Exception as e:
             print(f"Task execution error: {type(e).__name__}")
     

@@ -4,8 +4,11 @@ Model Server
 REST API server for model serving.
 """
 
-from typing import Dict, Any, Optional
+# Standard library imports
 import logging
+from typing import Any, Dict, Optional
+
+# Third-party imports
 from fastapi import FastAPI
 from fastapi.responses import JSONResponse
 
@@ -55,8 +58,12 @@ class ModelServer:
                 model = self.model_manager.load_model(model_id)
                 result = model.predict(input_data)
                 return JSONResponse({"prediction": result})
+            except (ValueError, KeyError) as e:
+                logger.error(f"Model prediction error: {str(e)}")
+                return JSONResponse({"error": f"Prediction error: {str(e)}"}, status_code=400)
             except Exception as e:
-                return JSONResponse({"error": str(e)}, status_code=500)
+                logger.error(f"Unexpected error during prediction: {str(e)}", exc_info=True)
+                return JSONResponse({"error": f"Internal server error: {str(e)}"}, status_code=500)
         
         @self.app.get("/health")
         async def health():

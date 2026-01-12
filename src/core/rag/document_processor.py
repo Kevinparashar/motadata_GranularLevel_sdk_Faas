@@ -4,17 +4,22 @@ Document Processing
 Handles document loading, chunking, preprocessing, and metadata handling for RAG.
 """
 
-from typing import List, Dict, Any, Optional, Callable
-from pathlib import Path
+# Standard library imports
 import hashlib
 import re
 from datetime import datetime
-from pydantic import BaseModel, Field, validator
 from enum import Enum
+from pathlib import Path
+from typing import Any, Callable, Dict, List, Optional
+
+# Third-party imports
+from pydantic import BaseModel, Field, validator
+
+# Local application/library specific imports
 from .exceptions import (
-    DocumentProcessingError,
     ChunkingError,
-    ValidationError
+    DocumentProcessingError,
+    ValidationError,
 )
 
 

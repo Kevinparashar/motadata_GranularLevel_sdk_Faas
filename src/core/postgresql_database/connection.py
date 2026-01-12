@@ -4,9 +4,12 @@ Database Connection Management
 Handles PostgreSQL database connections with connection pooling.
 """
 
+# Standard library imports
 import os
-from typing import Optional
 from contextlib import contextmanager
+from typing import Optional
+
+# Third-party imports
 import psycopg2
 from psycopg2 import pool, sql
 from psycopg2.extras import RealDictCursor
@@ -65,8 +68,10 @@ class DatabaseConnection:
                 user=self.config.user,
                 password=self.config.password,
             )
-        except Exception as e:
+        except (psycopg2.OperationalError, psycopg2.Error) as e:
             raise ConnectionError(f"Failed to create connection pool: {e}")
+        except Exception as e:
+            raise ConnectionError(f"Unexpected error creating connection pool: {e}")
     
     def close(self) -> None:
         """Close all connections in pool."""
@@ -107,7 +112,10 @@ class DatabaseConnection:
             try:
                 yield cursor
                 conn.commit()
-            except Exception:
+            except (psycopg2.IntegrityError, psycopg2.ProgrammingError, psycopg2.OperationalError) as e:
+                conn.rollback()
+                raise
+            except Exception as e:
                 conn.rollback()
                 raise
             finally:
@@ -155,7 +163,10 @@ class DatabaseConnection:
                 for query, params in queries:
                     cursor.execute(query, params)
                 conn.commit()
-            except Exception:
+            except (psycopg2.IntegrityError, psycopg2.ProgrammingError, psycopg2.OperationalError) as e:
+                conn.rollback()
+                raise
+            except Exception as e:
                 conn.rollback()
                 raise
             finally:
@@ -172,6 +183,8 @@ class DatabaseConnection:
             with self.get_cursor() as cursor:
                 cursor.execute("SELECT 1")
                 return True
-        except Exception:
+        except (psycopg2.OperationalError, ConnectionError) as e:
+            return False
+        except Exception as e:
             return False
 

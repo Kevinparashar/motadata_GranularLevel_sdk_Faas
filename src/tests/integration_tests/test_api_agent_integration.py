@@ -4,11 +4,16 @@ Integration Tests for API-Agent Integration
 Tests the integration between API Backend and Agent Framework.
 """
 
+# Standard library imports
+from unittest.mock import MagicMock, Mock
+
+# Third-party imports
 import pytest
-from unittest.mock import Mock, MagicMock
 from fastapi.testclient import TestClient
-from src.core.api_backend_services import APIService
+
+# Local application/library specific imports
 from src.core.agno_agent_framework import Agent, AgentManager
+from src.core.api_backend_services import APIService
 from src.core.litellm_gateway import LiteLLMGateway
 
 

@@ -7,19 +7,27 @@ for managing HTTP and WebSocket connections.
 Dependencies: Pool Implementation, Evaluation & Observability
 """
 
+# Standard library imports
+import asyncio
 import os
 import sys
 from pathlib import Path
-import asyncio
-from dotenv import load_dotenv
+
+# Third-party imports
+try:
+    from dotenv import load_dotenv  # type: ignore
+except ImportError:
+    load_dotenv = None
 
 # Add project root to path
 project_root = Path(__file__).parent.parent.parent
 sys.path.insert(0, str(project_root))
 
-load_dotenv(project_root / ".env")
+if load_dotenv:
+    load_dotenv(project_root / ".env")
 
-from connectivity_clients import HTTPClient, WebSocketClient, ClientManager
+# Local application/library specific imports
+from connectivity_clients import ClientManager, HTTPClient, WebSocketClient
 
 
 async def main():
@@ -38,6 +46,8 @@ async def main():
     try:
         response = await http_client.get("/endpoint", params={"key": "value"})
         print(f"GET Response status: {response.status_code}")
+    except (ConnectionError, TimeoutError) as e:
+        print(f"GET request (expected to fail in example): {type(e).__name__}")
     except Exception as e:
         print(f"GET request (expected to fail in example): {type(e).__name__}")
     
@@ -49,6 +59,8 @@ async def main():
             headers={"Content-Type": "application/json"}
         )
         print(f"POST Response status: {response.status_code}")
+    except (ConnectionError, TimeoutError) as e:
+        print(f"POST request (expected to fail in example): {type(e).__name__}")
     except Exception as e:
         print(f"POST request (expected to fail in example): {type(e).__name__}")
     

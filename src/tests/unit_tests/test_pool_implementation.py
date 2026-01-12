@@ -73,6 +73,7 @@ class TestThreadPool:
         pool = ThreadPool(max_workers=2)
         
         def task(x):
+            """Test task function that doubles the input."""
             return x * 2
         
         future = pool.submit(task, 5)
@@ -84,6 +85,7 @@ class TestThreadPool:
         pool = ThreadPool(max_workers=3)
         
         def task(x):
+            """Test task function that doubles the input after a short delay."""
             time.sleep(0.01)
             return x * 2
         
@@ -104,6 +106,7 @@ class TestThreadPool:
         pool = ThreadPool(max_workers=2)
         
         def task(x):
+            """Test task function that returns input after a delay."""
             time.sleep(0.1)
             return x
         

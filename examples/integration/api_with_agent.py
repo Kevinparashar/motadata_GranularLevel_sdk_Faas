@@ -4,31 +4,42 @@ API with Agent Integration Example
 Demonstrates how to expose Agent functionality via REST API.
 """
 
+# Standard library imports
 import os
 import sys
 from pathlib import Path
-from dotenv import load_dotenv
+
+# Third-party imports
 from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel
+
+try:
+    from dotenv import load_dotenv  # type: ignore
+except ImportError:
+    load_dotenv = None
 
 # Add project root to path
 project_root = Path(__file__).parent.parent.parent
 sys.path.insert(0, str(project_root))
 
-load_dotenv(project_root / ".env")
+if load_dotenv:
+    load_dotenv(project_root / ".env")
 
+# Local application/library specific imports
 from src.core.agno_agent_framework import Agent, AgentManager
 from src.core.litellm_gateway import LiteLLMGateway
 
 
 # Request/Response Models
 class AgentTaskRequest(BaseModel):
+    """Request model for agent task execution."""
     task_type: str
     parameters: dict
     priority: int = 0
 
 
 class AgentTaskResponse(BaseModel):
+    """Response model for agent task execution."""
     task_id: str
     status: str
     result: dict

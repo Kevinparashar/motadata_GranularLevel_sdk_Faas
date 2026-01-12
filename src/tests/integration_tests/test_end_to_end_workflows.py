@@ -4,13 +4,18 @@ End-to-End Integration Tests
 Tests complete workflows from start to finish.
 """
 
+# Standard library imports
+from unittest.mock import MagicMock, Mock, patch
+
+# Third-party imports
 import pytest
-from unittest.mock import Mock, MagicMock, patch
-from src.core.rag import RAGSystem
+
+# Local application/library specific imports
 from src.core.agno_agent_framework import Agent, AgentManager
+from src.core.cache_mechanism import CacheBackend, CacheManager
 from src.core.litellm_gateway import LiteLLMGateway
 from src.core.postgresql_database import PostgreSQLDatabase
-from src.core.cache_mechanism import CacheManager, CacheBackend
+from src.core.rag import RAGSystem
 
 
 @pytest.mark.integration
