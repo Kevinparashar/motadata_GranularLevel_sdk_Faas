@@ -209,6 +209,132 @@ class TestRAGSystem:
             assert "answer" in result
             assert result["answer"] == "Async answer"
 
+    def test_memory_integration_enabled(self):
+        """Test RAG with memory integration enabled."""
+        from src.core.agno_agent_framework.memory import AgentMemory
+        
+        mock_db = MagicMock()
+        mock_gateway = MagicMock()
+        
+        rag = RAGSystem(
+            db=mock_db,
+            gateway=mock_gateway,
+            enable_memory=True,
+            memory_config={
+                "max_episodic": 100,
+                "max_semantic": 200
+            }
+        )
+        
+        # Memory should be initialized
+        assert rag.memory is not None
+        assert isinstance(rag.memory, AgentMemory)
+
+    def test_memory_integration_disabled(self):
+        """Test RAG with memory integration disabled."""
+        mock_db = MagicMock()
+        mock_gateway = MagicMock()
+        
+        rag = RAGSystem(
+            db=mock_db,
+            gateway=mock_gateway,
+            enable_memory=False
+        )
+        
+        # Memory should not be initialized
+        assert rag.memory is None
+
+    @pytest.mark.asyncio
+    async def test_query_with_memory_context(self):
+        """Test RAG query with memory context retrieval."""
+        from src.core.agno_agent_framework.memory import AgentMemory
+        
+        mock_db = MagicMock()
+        mock_gateway = MagicMock()
+        
+        # Create RAG with memory
+        rag = RAGSystem(
+            db=mock_db,
+            gateway=mock_gateway,
+            enable_memory=True,
+            memory_config={"max_episodic": 100}
+        )
+        
+        # Store some memories
+        rag.memory.store(
+            content="Previous query about AI",
+            memory_type="episodic",
+            metadata={"query": "What is AI?"}
+        )
+        
+        # Mock gateway responses
+        mock_embedding_response = MagicMock()
+        mock_embedding_response.embeddings = [[0.1] * 1536]
+        mock_gateway.embed_async = AsyncMock(return_value=mock_embedding_response)
+        
+        mock_gen_response = MagicMock()
+        mock_gen_response.text = "Answer with context"
+        mock_gateway.generate_async = AsyncMock(return_value=mock_gen_response)
+        
+        # Mock vector search
+        with patch.object(rag.vector_ops, 'similarity_search') as mock_search:
+            mock_search.return_value = [
+                {"id": 1, "content": "Document", "similarity": 0.9}
+            ]
+            
+            result = await rag.query_async(
+                query="Tell me more",
+                user_id="test_user",
+                conversation_id="test_conv",
+                tenant_id="test_tenant"
+            )
+            
+            # Should use memory context
+            assert "answer" in result
+            # Memory should have been retrieved
+            assert rag.memory is not None
+
+    @pytest.mark.asyncio
+    async def test_memory_storage_after_query(self):
+        """Test that query-answer pairs are stored in memory."""
+        from src.core.agno_agent_framework.memory import AgentMemory
+        
+        mock_db = MagicMock()
+        mock_gateway = MagicMock()
+        
+        rag = RAGSystem(
+            db=mock_db,
+            gateway=mock_gateway,
+            enable_memory=True,
+            memory_config={"max_episodic": 100}
+        )
+        
+        initial_memory_size = len(rag.memory.episodic_memory)
+        
+        # Mock gateway responses
+        mock_embedding_response = MagicMock()
+        mock_embedding_response.embeddings = [[0.1] * 1536]
+        mock_gateway.embed_async = AsyncMock(return_value=mock_embedding_response)
+        
+        mock_gen_response = MagicMock()
+        mock_gen_response.text = "Answer"
+        mock_gateway.generate_async = AsyncMock(return_value=mock_gen_response)
+        
+        # Mock vector search
+        with patch.object(rag.vector_ops, 'similarity_search') as mock_search:
+            mock_search.return_value = []
+            
+            await rag.query_async(
+                query="Test query",
+                user_id="test_user",
+                conversation_id="test_conv",
+                tenant_id="test_tenant"
+            )
+            
+            # Memory should have stored the query-answer pair
+            final_memory_size = len(rag.memory.episodic_memory)
+            assert final_memory_size > initial_memory_size
+
 
 if __name__ == "__main__":
     pytest.main([__file__, "-v"])
