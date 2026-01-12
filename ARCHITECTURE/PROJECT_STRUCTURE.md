@@ -23,8 +23,11 @@ motadata-python-ai-sdk/
 │   │   │   └── use_cases/       # Use case templates
 │   │   ├── prompt_context_management/ # Prompt management
 │   │   ├── evaluation_observability/ # Observability
-│   │   ├── api_backend_services/ # API services
-│   │   ├── cache_mechanism/     # Caching
+│   │   ├── api_backend_services/ # API services (includes unified query endpoint)
+│   │   ├── cache_mechanism/     # Caching (used by Gateway and RAG)
+│   │   ├── feedback_loop/        # Feedback loop mechanism
+│   │   ├── llmops/              # LLMOps tracking and metrics
+│   │   ├── validation/          # Validation and guardrails
 │   │   └── interfaces.py        # Swappable interfaces
 │   │
 │   ├── tests/                    # Tests
@@ -109,8 +112,11 @@ All AI-related components are in `src/core/`:
 - `rag/` - RAG system
 - `prompt_context_management/` - Prompt management
 - `evaluation_observability/` - Observability
-- `api_backend_services/` - API services
-- `cache_mechanism/` - Caching
+- `api_backend_services/` - API services (includes unified query endpoint)
+- `cache_mechanism/` - Caching (used by Gateway and RAG)
+- `feedback_loop/` - Feedback loop mechanism
+- `llmops/` - LLMOps tracking and metrics
+- `validation/` - Validation and guardrails framework
 
 ### Infrastructure Components (root level)
 Infrastructure components are at the root level:
@@ -145,9 +151,11 @@ Infrastructure components are at the root level:
 
 ### Core Components
 ```python
-from src.core.litellm_gateway import LiteLLMGateway
-from src.core.rag import RAGSystem
-from src.core.agno_agent_framework import Agent
+from src.core.litellm_gateway import LiteLLMGateway, create_gateway
+from src.core.rag import RAGSystem, create_rag_system
+from src.core.agno_agent_framework import Agent, create_agent
+from src.core.api_backend_services import create_unified_query_endpoint
+from src.core.cache_mechanism import CacheMechanism, CacheConfig
 ```
 
 ### Infrastructure Components
