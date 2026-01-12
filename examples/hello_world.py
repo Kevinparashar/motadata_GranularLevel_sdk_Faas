@@ -56,10 +56,15 @@ async def main():
     # Using GPT-3.5-turbo for cost efficiency in Hello World example
     provider = "openai" if os.getenv("OPENAI_API_KEY") else ("anthropic" if os.getenv("ANTHROPIC_API_KEY") else "google")
 
+    # Determine the default model based on provider
+    default_model = "gpt-3.5-turbo" if provider == "openai" else ("claude-3-haiku-20240307" if provider == "anthropic" else "gemini-pro")
+
+    # Create gateway with provider and API key
+    # Note: create_gateway expects providers (list) and api_keys (dict)
     gateway = create_gateway(
-        api_key=api_key,
-        provider=provider,
-        default_model="gpt-3.5-turbo" if provider == "openai" else ("claude-3-haiku-20240307" if provider == "anthropic" else "gemini-pro")
+        providers=[provider],
+        default_model=default_model,
+        api_keys={provider: api_key}
     )
 
     print("✅ Gateway created successfully")
@@ -69,7 +74,7 @@ async def main():
     try:
         response = await gateway.generate_async(
             prompt="Say hello and introduce yourself in one sentence.",
-            model=gateway.config.default_model if hasattr(gateway.config, 'default_model') else "gpt-3.5-turbo"
+            model=default_model
         )
 
         # Step 4: Display the response
