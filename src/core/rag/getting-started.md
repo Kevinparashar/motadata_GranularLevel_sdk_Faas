@@ -47,6 +47,8 @@ from src.core.litellm_gateway import create_gateway
 - `cache`: Cache mechanism instance for caching results
 - `chunk_size`: Document chunk size (default: 1000)
 - `chunk_overlap`: Overlap between chunks (default: 200)
+- `enable_memory`: Enable conversation memory integration (default: True)
+- `memory_config`: Configuration for AgentMemory (episodic, semantic, long-term memory)
 
 ## Process Flow
 
@@ -66,7 +68,13 @@ rag = create_rag_system(
     db=db,
     gateway=gateway,
     embedding_model="text-embedding-3-small",
-    generation_model="gpt-4"
+    generation_model="gpt-4",
+    enable_memory=True,  # Enable conversation context
+    memory_config={
+        "max_episodic": 100,  # Store last 100 queries
+        "max_semantic": 200,  # Store 200 semantic patterns
+        "max_age_days": 30    # Auto-cleanup after 30 days
+    }
 )
 ```
 
@@ -79,6 +87,7 @@ create_rag_system()
   ├─> Initialize Retriever
   ├─> Initialize RAGGenerator
   ├─> Set up cache (if provided)
+  ├─> Initialize AgentMemory (if enable_memory=True)
   └─> Return RAGSystem instance
 ```
 
@@ -148,7 +157,9 @@ result = quick_rag_query(
     query="What is artificial intelligence?",
     top_k=5,
     threshold=0.7,
-    tenant_id="tenant_123"
+    tenant_id="tenant_123",
+    user_id="user_456",  # For memory context
+    conversation_id="conv_789"  # For conversation history
 )
 ```
 
@@ -158,10 +169,16 @@ result = quick_rag_query(
 - `top_k`: Number of top chunks to retrieve (default: 5)
 - `threshold`: Minimum similarity threshold (default: 0.7)
 - `tenant_id`: Optional tenant ID for multi-tenancy
+- `user_id`: Optional user ID for memory context (if memory enabled)
+- `conversation_id`: Optional conversation ID for conversation history (if memory enabled)
 
 **Internal Process:**
 ```
 query()
+  ├─> Retrieve conversation memory (if enable_memory=True)
+  │   ├─> Get relevant episodic memories
+  │   ├─> Get relevant semantic memories
+  │   └─> Build conversation context
   ├─> Generate query embedding
   │   └─> Call gateway.embed_async(query)
   ├─> Vector similarity search
@@ -173,12 +190,15 @@ query()
   │   └─> Sort by relevance
   ├─> Assemble context
   │   ├─> Combine top chunks
+  │   ├─> Add conversation context (from memory)
   │   ├─> Add metadata
   │   └─> Format for LLM
   ├─> Generate response
-  │   ├─> Build prompt with context
+  │   ├─> Build prompt with context + memory
   │   ├─> Call gateway.generate_async()
   │   └─> Get generated text
+  ├─> Store query-answer pair in memory (if enable_memory=True)
+  │   └─> Store in episodic memory
   └─> Return result with sources
 ```
 

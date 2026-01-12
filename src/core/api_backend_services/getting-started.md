@@ -14,7 +14,8 @@ from src.core.api_backend_services import (
     create_api_router,
     register_router,
     create_rag_endpoints,
-    create_agent_endpoints
+    create_agent_endpoints,
+    create_unified_query_endpoint
 )
 ```
 
@@ -99,11 +100,20 @@ def get_status():
 # Component endpoints
 create_rag_endpoints(router, rag_system, prefix="/rag")
 create_agent_endpoints(router, agent_manager, prefix="/agents")
+
+# Unified query endpoint (orchestrates Agent and RAG)
+create_unified_query_endpoint(
+    router=router,
+    agent_manager=agent_manager,
+    rag_system=rag_system,
+    gateway=gateway,
+    prefix="/query"
+)
 ```
 
 **Input:**
 - `router`: API router instance
-- Component instances (rag_system, agent_manager, etc.)
+- Component instances (rag_system, agent_manager, gateway, etc.)
 - `prefix`: URL prefix for endpoints
 
 **Internal Process:**
@@ -118,6 +128,13 @@ create_rag_endpoints()
 create_agent_endpoints()
   ├─> Add GET /agents endpoint
   ├─> Add POST /agents/{agent_id}/execute endpoint
+  ├─> Configure request validation
+  └─> Set up response formatting
+
+create_unified_query_endpoint()
+  ├─> Add POST /query endpoint
+  ├─> Configure automatic routing (auto/agent/rag/both modes)
+  ├─> Set up intelligent query routing
   ├─> Configure request validation
   └─> Set up response formatting
 ```
@@ -203,6 +220,29 @@ Response:
     "data": {
         "task_id": "task_123",
         "result": {...}
+    }
+}
+```
+
+**Unified Query Endpoint:**
+```python
+POST /api/v1/query
+{
+    "query": "What is AI?",
+    "mode": "auto",  # or "agent", "rag", "both"
+    "tenant_id": "tenant_123",
+    "user_id": "user_456",
+    "conversation_id": "conv_789"
+}
+
+Response:
+{
+    "status": "success",
+    "data": {
+        "answer": "AI is...",
+        "mode_used": "rag",  # or "agent", "both"
+        "sources": [...],  # if RAG was used
+        "agent_response": {...}  # if Agent was used
     }
 }
 ```

@@ -9,10 +9,11 @@ The RAG (Retrieval-Augmented Generation) System is a comprehensive solution for 
 1. [Document Processing](#document-processing)
 2. [Document Retrieval](#document-retrieval)
 3. [Response Generation](#response-generation)
-4. [Exception Handling](#exception-handling)
-5. [Functions](#functions)
-6. [Workflow](#workflow)
-7. [Customization](#customization)
+4. [Memory Integration](#memory-integration)
+5. [Exception Handling](#exception-handling)
+6. [Functions](#functions)
+7. [Workflow](#workflow)
+8. [Customization](#customization)
 
 ---
 
@@ -178,6 +179,78 @@ result = rag.query(
 
 print(f"Answer: {result['answer']}")
 print(f"Retrieved {result['num_documents']} documents")
+```
+
+---
+
+## Memory Integration
+
+### Functionality
+
+The RAG system integrates with **Agent Memory** to provide conversation context:
+
+- **Conversation History**: Retrieves previous queries and answers for context
+- **User Preferences**: Remembers user-specific preferences and patterns
+- **Context Enhancement**: Enhances query context with relevant memories
+- **Query-Answer Storage**: Stores query-answer pairs in episodic memory
+- **Automatic Context Building**: Automatically builds context from memory before query processing
+
+### Code Examples
+
+#### RAG with Memory Enabled
+
+```python
+from src.core.rag import create_rag_system
+
+# Create RAG with memory enabled (default)
+rag = create_rag_system(
+    db=db,
+    gateway=gateway,
+    enable_memory=True,  # Enable conversation memory
+    memory_config={
+        "max_episodic": 100,  # Store last 100 queries
+        "max_semantic": 200,  # Store 200 semantic patterns
+        "max_age_days": 30    # Auto-cleanup after 30 days
+    }
+)
+
+# Query with user context
+result = rag.query(
+    query="What did we discuss about AI?",
+    user_id="user123",
+    conversation_id="conv456",
+    tenant_id="tenant1"
+)
+# Memory automatically retrieves previous context
+```
+
+#### Memory-Enhanced Query Processing
+
+When memory is enabled, the query process includes:
+
+1. **Memory Retrieval**: Retrieves relevant episodic and semantic memories
+2. **Context Building**: Builds conversation context from memories
+3. **Query Enhancement**: Enhances query with conversation context
+4. **Response Generation**: Generates response with enhanced context
+5. **Memory Storage**: Stores query-answer pair in episodic memory
+
+```python
+# First query
+result1 = rag.query(
+    query="What is machine learning?",
+    user_id="user123",
+    conversation_id="conv456",
+    tenant_id="tenant1"
+)
+
+# Second query - memory provides context
+result2 = rag.query(
+    query="Can you explain it in simpler terms?",
+    user_id="user123",
+    conversation_id="conv456",  # Same conversation
+    tenant_id="tenant1"
+)
+# Memory automatically includes context from first query
 ```
 
 ---

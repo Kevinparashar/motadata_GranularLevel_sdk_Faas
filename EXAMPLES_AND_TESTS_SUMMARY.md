@@ -1,5 +1,7 @@
 # Examples and Tests Summary
 
+> **Note:** This document summarizes examples and tests. For current examples and usage, see [examples/README.md](examples/README.md) and component-specific documentation.
+
 This document summarizes all working examples and test suites added to the SDK.
 
 ## ✅ Completed Deliverables
