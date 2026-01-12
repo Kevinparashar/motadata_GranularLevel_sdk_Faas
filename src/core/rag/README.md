@@ -1,5 +1,43 @@
 # RAG System
 
+## When to Use This Component
+
+**✅ Use RAG System when:**
+- You have documents/knowledge bases to query
+- You need accurate answers from your own data
+- You want to answer questions about specific content
+- You're building document Q&A, knowledge bases, or chatbots with documents
+- You need to keep AI responses grounded in your data
+- You have a corpus of documents that users will query
+
+**❌ Don't use RAG System when:**
+- You don't have documents to query
+- You only need general AI chat (use Agent Framework)
+- You need real-time data that changes frequently
+- Your documents are too large or unstructured for effective retrieval
+- You only need simple document search (use database search instead)
+- Your use case doesn't require document-based answers
+
+**Simple Example:**
+```python
+from src.core.rag import create_rag_system, quick_rag_query
+from src.core.litellm_gateway import create_gateway
+
+gateway = create_gateway(api_key="your-key", provider="openai")
+rag = create_rag_system(db, gateway)
+
+# Ingest a document
+await rag.ingest_document_async("doc1", "Your document content here", "Document Title")
+
+# Query it
+result = await quick_rag_query(rag, "What is this document about?")
+print(result["answer"])
+```
+
+**Cost Note:** RAG queries cost ~$0.003-0.03 per query (embedding + generation). Caching can reduce costs by 50-90% for repeated queries.
+
+---
+
 ## Overview
 
 The RAG (Retrieval-Augmented Generation) System is a comprehensive solution for building context-aware AI applications. It combines document retrieval with LLM generation to provide accurate, contextually relevant responses based on a knowledge base of documents.

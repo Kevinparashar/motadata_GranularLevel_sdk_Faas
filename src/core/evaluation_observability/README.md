@@ -1,5 +1,36 @@
 # Evaluation & Observability
 
+## When to Use This Component
+
+**✅ Use Observability when:**
+- You're deploying to production
+- You need to debug issues or track performance
+- You want to monitor costs, token usage, and latency
+- You need distributed tracing across components
+- You're building enterprise applications
+- You need to track errors and system health
+- You want to optimize performance based on metrics
+
+**❌ Don't use Observability when:**
+- You're just prototyping or testing
+- You don't need monitoring or debugging
+- You're building simple scripts or demos
+- Overhead is a concern (minimal, but exists)
+- You're in early development phase
+
+**Note:** Observability is automatically integrated into all components. You just need to configure exporters.
+
+**Simple Setup:**
+```python
+# Observability is built-in to all components
+# Just configure exporters in your environment:
+# OTEL_EXPORTER_OTLP_ENDPOINT=http://localhost:4317
+```
+
+**Performance Impact:** Minimal overhead (~1-5% latency increase) with significant debugging benefits.
+
+---
+
 ## Overview
 
 The Evaluation & Observability component provides comprehensive traceability, logging, and monitoring capabilities for the entire SDK. It enables tracking of all operations, performance metrics, error monitoring, and system health monitoring across all components.

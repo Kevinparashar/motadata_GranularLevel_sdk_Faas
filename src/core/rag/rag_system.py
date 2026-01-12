@@ -353,7 +353,11 @@ class RAGSystem:
         Returns:
             Dictionary with answer and retrieved documents
         """
-        # Retrieve relevant memories if memory is enabled
+        # RAG QUERY PROCESS: Step-by-step retrieval and generation
+
+        # STEP 1: Retrieve relevant conversation memories (if memory enabled)
+        # This provides context from previous conversations to improve answer relevance
+        # Cost impact: Memory retrieval is free (no API call), improves answer quality
         memories = []
         memory_context = ""
         if self.memory:
@@ -367,19 +371,27 @@ class RAGSystem:
                     f"- {mem.content}" for mem in memories[:3]
                 ])
 
-        # Query rewriting for optimization
+        # STEP 2: Query rewriting for optimization
+        # Rewrites user query to be more effective for vector search
+        # Example: "What is X?" → "Explain X in detail" (better for retrieval)
         original_query = query
         if use_query_rewriting:
             query = self._rewrite_query(query)
 
+        # STEP 3: Check cache for previous identical queries
+        # COST OPTIMIZATION: Cache hits avoid expensive embedding + generation calls
+        # Cost saved per cache hit: ~$0.003-0.03 (embedding + generation)
         cache_key = f"rag:query:{tenant_id or 'global'}:{query}:{top_k}:{threshold}:{max_tokens}:{retrieval_strategy}"
         cached = self.cache.get(cache_key, tenant_id=tenant_id)
         if cached:
             return cached
 
         try:
-            # Use hybrid retrieval if specified
+            # STEP 4: Document retrieval (vector search in database)
+            # This finds the most relevant document chunks for the query
+            # Cost: ~$0.0001-0.001 per query (embedding generation for query)
             if retrieval_strategy == "hybrid":
+                # Hybrid: Combines vector search + keyword search for better results
                 retrieved_docs = self.retriever.retrieve_hybrid(
                     query=query,
                     top_k=top_k,
@@ -387,6 +399,7 @@ class RAGSystem:
                     tenant_id=tenant_id
                 )
             else:
+                # Vector-only: Fast, semantic similarity search
                 retrieved_docs = self.retriever.retrieve(
                     query=query,
                     top_k=top_k,
@@ -394,17 +407,23 @@ class RAGSystem:
                     tenant_id=tenant_id
                 )
 
-            # Enhance context with memory if available
+            # STEP 5: Enhance context with memory if available
+            # Combines retrieved documents with conversation memory for richer context
+            # This enables RAG to answer questions using both documents and conversation history
             enhanced_context = retrieved_docs
             if memory_context:
                 enhanced_context = [
                     {"title": "Previous Context", "content": memory_context, "source": "memory"}
                 ] + retrieved_docs
 
+            # STEP 6: Generate answer using LLM with retrieved context
+            # This is the generation step: LLM creates answer from retrieved documents
+            # Cost: ~$0.002-0.02 per generation (depends on model and context size)
+            # Context size = retrieved documents + memory, affects token usage and cost
             answer = await self.generator.generate_async(
-                query=original_query,  # Use original query for generation
+                query=original_query,  # Use original query for generation (not rewritten)
                 context_documents=enhanced_context,
-                max_tokens=max_tokens
+                max_tokens=max_tokens  # Limit response length to control cost
             )
 
             result = {

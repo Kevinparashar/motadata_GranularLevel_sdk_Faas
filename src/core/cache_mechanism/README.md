@@ -1,5 +1,41 @@
 # Cache Mechanism
 
+## When to Use This Component
+
+**✅ Use Cache Mechanism when:**
+- Same queries are asked multiple times
+- You want to reduce LLM API costs significantly
+- You need faster response times for repeated requests
+- You're building production systems with cost optimization
+- You have predictable query patterns
+- You want to cache embeddings, responses, or query results
+
+**❌ Don't use Cache Mechanism when:**
+- Every query is unique (no benefit from caching)
+- You need real-time data that changes constantly
+- You're in development/testing with no cost concerns
+- Cache invalidation would be too complex for your use case
+- Memory is extremely limited (in-memory cache uses RAM)
+
+**Simple Example:**
+```python
+from src.core.cache_mechanism import create_memory_cache, cache_set, cache_get
+
+cache = create_memory_cache(default_ttl=3600)
+
+# Set a value
+cache_set(cache, "user:123", {"name": "John"}, ttl=600)
+
+# Get it back (instant, no API call)
+value = cache_get(cache, "user:123")
+```
+
+**Cost Impact:** Caching can reduce LLM costs by **50-90%** for repeated queries. For example:
+- Without cache: 1000 queries × $0.01 = $10
+- With cache (50% hit rate): 500 API calls × $0.01 = $5 (saves $5)
+
+---
+
 ## Overview
 
 The Cache Mechanism component provides caching capabilities to improve performance, reduce costs, and enhance user experience. It offers in-memory (LRU + TTL) and Redis backends with pattern-based invalidation.

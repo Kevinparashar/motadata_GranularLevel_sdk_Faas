@@ -1,5 +1,38 @@
 # Agno Agent Framework
 
+## When to Use This Component
+
+**✅ Use Agent Framework when:**
+- You need multi-turn conversations with memory
+- You want autonomous agents that can execute tasks
+- You need agent-to-agent coordination
+- You're building chatbots, assistants, or task automation
+- You need workflow orchestration across multiple agents
+- You want agents that remember conversation context
+- You need agents that can use tools and plugins
+
+**❌ Don't use Agent Framework when:**
+- You only need simple one-off AI calls (use Gateway directly)
+- You don't need conversation memory
+- You're only doing document Q&A (use RAG System instead)
+- You need real-time streaming without conversation context
+- Your use case is too simple for agent complexity
+
+**Simple Example:**
+```python
+from src.core.agno_agent_framework import create_agent, chat_with_agent
+from src.core.litellm_gateway import create_gateway
+
+gateway = create_gateway(api_key="your-key", provider="openai")
+agent = create_agent("assistant", "Helpful Assistant", gateway)
+response = await chat_with_agent(agent, "Hello!")
+print(response["answer"])
+```
+
+**Cost Note:** Agent conversations cost ~$0.002-0.02 per message (depends on model and context size). Memory management helps optimize token usage.
+
+---
+
 ## Overview
 
 The Agno Agent Framework provides autonomous AI agent capabilities within the SDK. It enables the creation, management, and coordination of multiple AI agents that can execute tasks, communicate with each other, and work together to solve complex problems.

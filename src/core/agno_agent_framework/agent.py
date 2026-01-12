@@ -115,14 +115,14 @@ class Agent(BaseModel):
     # Reliability
     max_retries: int = 1
     retry_delay: float = 0.1
-    
+
     # Circuit Breaker for external service calls
     circuit_breaker: Optional[CircuitBreaker] = None
     circuit_breaker_config: Optional[CircuitBreakerConfig] = None
-    
+
     # Health Check
     health_check: Optional[HealthCheck] = None
-    
+
     # Metadata
     created_at: datetime = Field(default_factory=datetime.now)
     last_active: datetime = Field(default_factory=datetime.now)
@@ -293,7 +293,9 @@ class Agent(BaseModel):
                     llm_kwargs["tools"] = tools_schema
                     llm_kwargs["tool_choice"] = "auto"
 
-                # Make LLM call
+                # TASK EXECUTION: Make LLM call to get agent's response or tool calls
+                # This is the core agent reasoning step - the LLM decides what to do next
+                # Cost: ~$0.002-0.02 per call (depends on model and context size)
                 response = await self.gateway.generate_async(
                     prompt=messages[-1]["content"] if messages else final_prompt,
                     model=model,
@@ -305,12 +307,15 @@ class Agent(BaseModel):
                 response_text = response.text
                 finish_reason = getattr(response, 'finish_reason', None)
 
-                # Check for function calls in raw response
+                # TOOL CALLING: Check if LLM wants to call tools/functions
+                # If LLM requests tool calls, we execute them and feed results back to LLM
+                # This enables agents to perform actions (API calls, calculations, etc.)
                 function_calls = self._extract_function_calls(response)
 
                 # If no function calls, return the final response
+                # This is the simple case: agent provides direct answer without using tools
                 if not function_calls or finish_reason != "tool_calls":
-                    # Add assistant response to messages
+                    # Add assistant response to messages for conversation history
                     messages.append({"role": "assistant", "content": response_text})
 
                     return {
@@ -322,7 +327,8 @@ class Agent(BaseModel):
                         "iterations": iteration + 1
                     }
 
-                # Execute function calls
+                # TOOL EXECUTION LOOP: Execute tools requested by LLM
+                # This loop continues until LLM doesn't request more tools or max iterations reached
                 messages.append({"role": "assistant", "content": response_text})
 
                 for func_call in function_calls:
@@ -558,7 +564,7 @@ class Agent(BaseModel):
     ) -> None:
         """
         Attach an AgentMemory instance with optional persistence.
-        
+
         Args:
             persistence_path: Optional path for memory persistence
             tenant_id: Optional tenant ID
@@ -653,7 +659,7 @@ class Agent(BaseModel):
     ) -> None:
         """
         Attach a circuit breaker to the agent for external service calls.
-        
+
         Args:
             config: Optional circuit breaker configuration
         """
@@ -662,11 +668,11 @@ class Agent(BaseModel):
             name=f"agent_{self.agent_id}",
             config=self.circuit_breaker_config
         )
-    
+
     def attach_health_check(self) -> None:
         """Attach health check to the agent."""
         self.health_check = HealthCheck(name=f"agent_{self.agent_id}")
-        
+
         # Add default health checks
         async def check_gateway_health() -> HealthCheckResult:
             """Check if gateway is available."""
@@ -679,7 +685,7 @@ class Agent(BaseModel):
                 status=HealthStatus.HEALTHY,
                 message="Gateway available"
             )
-        
+
         async def check_memory_health() -> HealthCheckResult:
             """Check if memory is functioning."""
             if not self.memory:
@@ -691,7 +697,7 @@ class Agent(BaseModel):
                 status=HealthStatus.HEALTHY,
                 message="Memory available"
             )
-        
+
         async def check_status_health() -> HealthCheckResult:
             """Check agent status."""
             if self.status == AgentStatus.ERROR:
@@ -708,31 +714,31 @@ class Agent(BaseModel):
                 status=HealthStatus.HEALTHY,
                 message=f"Agent status: {self.status.value}"
             )
-        
+
         self.health_check.add_check(check_gateway_health)
         self.health_check.add_check(check_memory_health)
         self.health_check.add_check(check_status_health)
-    
+
     async def get_health(self) -> Dict[str, Any]:
         """
         Get agent health status.
-        
+
         Returns:
             Dictionary with health information
         """
         if not self.health_check:
             self.attach_health_check()
-        
+
         if not self.health_check:
             return {
                 "name": f"agent_{self.agent_id}",
                 "status": "unknown",
                 "message": "Health check not available"
             }
-        
+
         result = await self.health_check.check()
         health_info = self.health_check.get_health()
-        
+
         # Add agent-specific metrics
         health_info.update({
             "agent_id": self.agent_id,
@@ -742,9 +748,9 @@ class Agent(BaseModel):
             "last_active": self.last_active.isoformat(),
             "circuit_breaker": self.circuit_breaker.get_stats() if self.circuit_breaker else None
         })
-        
+
         return health_info
-    
+
     def add_prompt_template(
         self,
         name: str,

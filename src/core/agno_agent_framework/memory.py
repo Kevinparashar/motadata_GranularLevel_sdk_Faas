@@ -122,11 +122,15 @@ class AgentMemory:
             tags=tags or []
         )
 
+        # BOUNDED MEMORY: Enforce memory limits to prevent unbounded growth
+        # This ensures memory usage stays within configured limits, preventing memory leaks
+        # and controlling token usage in prompts (more memory = more tokens = higher cost)
         if memory_type == MemoryType.SHORT_TERM:
             self._short_term.append(memory)
-            # Trim if exceeds max
+            # Trim if exceeds max (evict least important items first)
+            # This keeps the most important recent memories for agent context
             if len(self._short_term) > self.max_short_term:
-                # Remove least important items
+                # Remove least important items (LRU-like eviction based on importance)
                 self._short_term.sort(key=lambda m: m.importance)
                 self._short_term = self._short_term[-self.max_short_term:]
 
@@ -144,8 +148,12 @@ class AgentMemory:
                     self._long_term.pop(item.memory_id, None)
 
         elif memory_type == MemoryType.EPISODIC:
+            # EPISODIC MEMORY: Stores conversation episodes (query-answer pairs)
+            # Used by RAG system to provide conversation context
+            # FIFO eviction: oldest episodes removed first (maintains recent conversation history)
             self._episodic.append(memory)
             # Trim if exceeds max (FIFO - remove oldest)
+            # This ensures we keep recent conversation context while limiting memory size
             if len(self._episodic) > self.max_episodic:
                 self._episodic = self._episodic[-self.max_episodic:]
 
@@ -310,31 +318,31 @@ class AgentMemory:
         self._persist()
 
         return consolidated
-    
+
     def cleanup_expired(self, max_age_days: Optional[int] = None) -> int:
         """
         Remove memories older than specified days.
-        
+
         Args:
             max_age_days: Maximum age in days (uses instance default if None)
-        
+
         Returns:
             Number of memories removed
         """
         from datetime import timedelta
-        
+
         max_age = max_age_days or self.max_age_days
         if max_age is None:
             return 0
-        
+
         cutoff = datetime.now() - timedelta(days=max_age)
         removed = 0
-        
+
         # Clean short-term
         before = len(self._short_term)
         self._short_term = [m for m in self._short_term if m.timestamp > cutoff]
         removed += before - len(self._short_term)
-        
+
         # Clean long-term
         to_remove = [
             mid for mid, m in self._long_term.items()
@@ -343,12 +351,12 @@ class AgentMemory:
         for mid in to_remove:
             self._long_term.pop(mid, None)
             removed += 1
-        
+
         # Clean episodic
         before = len(self._episodic)
         self._episodic = [m for m in self._episodic if m.timestamp > cutoff]
         removed += before - len(self._episodic)
-        
+
         # Clean semantic
         to_remove = [
             mid for mid, m in self._semantic.items()
@@ -357,16 +365,16 @@ class AgentMemory:
         for mid in to_remove:
             self._semantic.pop(mid, None)
             removed += 1
-        
+
         if removed > 0:
             self._persist()
-        
+
         return removed
-    
+
     def check_memory_pressure(self) -> Dict[str, Any]:
         """
         Check if memory usage is high.
-        
+
         Returns:
             Dictionary with memory pressure information
         """
@@ -376,16 +384,16 @@ class AgentMemory:
             len(self._episodic) +
             len(self._semantic)
         )
-        
+
         max_total = (
             self.max_short_term +
             self.max_long_term +
             self.max_episodic +
             self.max_semantic
         )
-        
+
         usage_ratio = total / max_total if max_total > 0 else 0
-        
+
         return {
             "total_memories": total,
             "max_total": max_total,
@@ -414,39 +422,48 @@ class AgentMemory:
                 }
             }
         }
-    
+
     def handle_memory_pressure(self) -> int:
         """
         Automatically clean up when under memory pressure.
-        
+
+        MEMORY PRESSURE HANDLING:
+        - Triggered when memory usage > 80% of limits
+        - First: Remove expired memories (older than max_age_days)
+        - Then: Remove least important memories (bottom 10%)
+        - This prevents memory from growing unbounded and keeps token usage controlled
+
         Returns:
             Number of memories removed
         """
         pressure = self.check_memory_pressure()
-        
+
         if not pressure["under_pressure"]:
             return 0
-        
-        # Clean up old memories first
+
+        # STEP 1: Clean up old memories first (age-based eviction)
+        # This removes memories that are past their expiration date
         removed = self.cleanup_expired(max_age_days=7)
-        
-        # If still under pressure, remove least important
+
+        # STEP 2: If still under pressure, remove least important memories
+        # This is importance-based eviction: keeps important memories, removes less important ones
         if self.check_memory_pressure()["under_pressure"]:
-            # Remove least important from all types
+            # Collect all memories from all types
             all_memories = (
                 list(self._short_term) +
                 list(self._long_term.values()) +
                 list(self._episodic) +
                 list(self._semantic.values())
             )
+            # Sort by importance (lowest first) and access count (least accessed first)
             all_memories.sort(key=lambda m: (m.importance, m.access_count))
-            
-            # Remove bottom 10%
+
+            # Remove bottom 10% (least important and least accessed)
             to_remove = all_memories[:max(1, len(all_memories) // 10)]
             for memory in to_remove:
                 self.forget(memory.memory_id)
                 removed += 1
-        
+
         return removed
 
     def get_stats(self) -> Dict[str, Any]:
