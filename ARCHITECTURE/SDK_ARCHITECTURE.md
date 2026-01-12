@@ -79,11 +79,12 @@ The Motadata AI SDK is a comprehensive, modular framework designed for integrati
 
 **Key Features**:
 - Multi-provider support
-- Response caching (cost optimization)
+- **Automatic response caching** (checks cache before API calls, stores after)
 - Rate limiting per tenant
 - Circuit breaker for provider failures
 - Request deduplication
 - LLMOps tracking
+- Cache key generation with tenant isolation
 
 ---
 
@@ -133,9 +134,10 @@ The Motadata AI SDK is a comprehensive, modular framework designed for integrati
 - Document chunking strategies (fixed, sentence, paragraph, semantic)
 - Query rewriting and optimization
 - Query result caching
-- Memory integration (conversation context)
+- **Agent Memory integration** (automatic conversation context retrieval and storage)
 - Incremental document updates
 - Real-time synchronization
+- Memory-enhanced query processing (episodic and semantic memory)
 
 ---
 
@@ -254,6 +256,28 @@ The Motadata AI SDK is a comprehensive, modular framework designed for integrati
 
 ---
 
+#### 2.1.9 API Backend Services
+**Purpose**: RESTful API endpoints for SDK functionality
+
+**Responsibilities**:
+- Expose SDK components via HTTP APIs
+- Provide unified query endpoint (orchestrates Agent and RAG)
+- Handle request validation and routing
+- Support intelligent query routing (auto/agent/rag/both modes)
+
+**Integration Points**:
+- Uses: Agent Framework, RAG System, Gateway
+- Used by: External systems, SaaS backend services
+
+**Key Features**:
+- **Unified query endpoint** (automatic routing between Agent and RAG)
+- Component-specific endpoints (Agent, RAG, Gateway)
+- Request validation
+- Response formatting
+- Error handling
+
+---
+
 ### 2.2 Supporting Components
 
 #### 2.2.1 Feedback Loop
@@ -316,23 +340,34 @@ User Request (SaaS Platform)
     │   ├─> [TRACE START] OpenTelemetry Span
     │   ├─> [LOG] Structured Logging
     │   │
-    │   ├─> Cache Check
+    │   ├─> Unified Query Endpoint (if using API Backend)
+    │   │   ├─> Auto-routing (Agent/RAG/Both)
+    │   │   └─> Intelligent query routing
+    │   │
+    │   ├─> Memory Retrieval (if RAG with memory enabled)
+    │   │   ├─> Episodic Memory (previous queries/answers)
+    │   │   └─> Semantic Memory (user preferences, patterns)
+    │   │
+    │   ├─> Cache Check (Component-level)
     │   │   └─> If cached: Return cached result
     │   │
     │   ├─> Component Processing
     │   │   ├─> Agent: Task execution, tool calling
-    │   │   ├─> RAG: Document retrieval, generation
+    │   │   ├─> RAG: Document retrieval, generation (with memory context)
     │   │   └─> ML: Model prediction
     │   │
     │   ├─> Gateway Call (if LLM needed)
-    │   │   ├─> Cache Check
+    │   │   ├─> **Gateway Cache Check** (automatic, before API call)
+    │   │   │   └─> If cached: Return cached response (no API call)
     │   │   ├─> Rate Limiting
-    │   │   ├─> LLM API Call
+    │   │   ├─> LLM API Call (only if cache miss)
     │   │   ├─> Validation
-    │   │   ├─> Cache Store
+    │   │   ├─> **Gateway Cache Store** (automatic, after successful call)
     │   │   └─> LLMOps Logging
     │   │
     │   ├─> Memory Store (if applicable)
+    │   │   ├─> RAG: Store query-answer pair in episodic memory
+    │   │   └─> Agent: Store task results in memory
     │   ├─> [TRACE END] Close Span
     │   └─> Return Result
     │
@@ -373,7 +408,9 @@ Document Input
     │   └─> Preprocessing
     │
     ├─> Gateway (Embedding Generation)
-    │   └─> Batch Embedding API Call
+    │   ├─> Gateway Cache Check (for embeddings)
+    │   └─> Batch Embedding API Call (if cache miss)
+    │   └─> Gateway Cache Store (after generation)
     │
     ├─> Database Storage
     │   ├─> Store Document Metadata
@@ -382,6 +419,35 @@ Document Input
     │
     └─> Cache Invalidation
         └─> Invalidate related query caches
+```
+
+### 3.4 RAG Query Flow (with Memory Integration)
+
+```
+User Query
+    │
+    ├─> RAG System
+    │   ├─> Memory Retrieval (if enabled)
+    │   │   ├─> Episodic Memory (previous queries)
+    │   │   └─> Semantic Memory (user preferences)
+    │   │
+    │   ├─> Query Embedding (via Gateway)
+    │   │   └─> Gateway Cache Check/Store
+    │   │
+    │   ├─> Vector Similarity Search
+    │   │   └─> Retrieve relevant documents
+    │   │
+    │   ├─> Context Building
+    │   │   ├─> Combine retrieved documents
+    │   │   └─> Add memory context
+    │   │
+    │   ├─> Response Generation (via Gateway)
+    │   │   └─> Gateway Cache Check/Store
+    │   │
+    │   └─> Memory Storage
+    │       └─> Store query-answer pair in episodic memory
+    │
+    └─> Response to User
 ```
 
 ---

@@ -168,22 +168,30 @@ pip install opentelemetry-api opentelemetry-sdk structlog
 ## Library Purposes Summary
 
 ### Core Functionality
-- **litellm**: Primary LLM interface
-- **pydantic**: Data validation
-- **httpx**: HTTP operations
+- **litellm**: Primary LLM interface with multi-provider support
+- **pydantic**: Data validation and settings management
+- **httpx**: HTTP operations with async support
 
 ### Data Storage
-- **psycopg2-binary**: Database connectivity
-- **redis**: Caching layer
+- **psycopg2-binary**: PostgreSQL database connectivity
+- **redis**: Distributed caching layer (optional, in-memory fallback)
+- **cachetools**: In-memory caching utilities
 
 ### Development
-- **pytest**: Testing
-- **black/isort**: Code quality
+- **pytest**: Testing framework
+- **black/isort**: Code quality and PEP 8 compliance
+- **mypy**: Type checking
+- **ruff**: Fast linter
 
 ### Observability
-- **opentelemetry**: Tracing
-- **structlog**: Logging
-- **prometheus-client**: Metrics
+- **opentelemetry**: Distributed tracing
+- **structlog**: Structured logging
+- **prometheus-client**: Metrics collection
+
+### Recent Enhancements
+- **Gateway Cache**: Automatic response caching using cachetools/redis
+- **Memory Integration**: Agent Memory for conversation context (built-in)
+- **Unified Query**: Single endpoint for Agent/RAG orchestration (FastAPI)
 
 ## Swappable Libraries
 

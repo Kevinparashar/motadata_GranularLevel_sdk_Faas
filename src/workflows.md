@@ -15,7 +15,8 @@ This document provides a comprehensive visual and textual representation of the 
                              ▼
 ┌─────────────────────────────────────────────────────────────────┐
 │              API Backend Services (src/core/)                    │
-│              (Request Validation & Routing)                       │
+│    (Request Validation & Routing - Unified Query Endpoint)      │
+│              (Auto-routing: Agent/RAG/Both)                      │
 └────────────────────────────┬────────────────────────────────────┘
                              │
                 ┌────────────┴────────────┐
@@ -24,12 +25,14 @@ This document provides a comprehensive visual and textual representation of the 
     ┌───────────────────┐    ┌───────────────────┐
     │  Agent Framework  │    │   RAG System      │
     │  (src/core/)      │    │  (src/core/)      │
+    │  + Memory         │    │  + Memory         │
     └─────────┬─────────┘    └─────────┬─────────┘
               │                        │
               │                        │
     ┌─────────▼─────────┐    ┌─────────▼─────────┐
     │  LiteLLM Gateway │    │  Vector Database  │
     │  (src/core/)     │    │  (src/core/)      │
+    │  + Cache         │    │                   │
     └─────────┬─────────┘    └─────────┬─────────┘
               │                        │
               └────────────┬───────────┘
@@ -61,13 +64,18 @@ API Backend Services (Validate Request)
     ▼
 RAG System (src/core/rag/)
     │
+    ├─→ Agent Memory (Retrieve Conversation Context, if enabled)
+    │   ├─→ Episodic Memory (Previous queries/answers)
+    │   └─→ Semantic Memory (User preferences, patterns)
+    │
     ├─→ Query Rewriting (Optional: Expand abbreviations, normalize)
     │
     ├─→ Cache Mechanism (Check Cache for Query Results)
     │
-    ├─→ Prompt Context Management (Build Prompt)
+    ├─→ Prompt Context Management (Build Prompt with Memory Context)
     │
     ├─→ LiteLLM Gateway (Generate Query Embedding)
+    │   └─→ Gateway Cache (Check cache before API call)
     │
     ├─→ Retriever
     │   ├─→ Vector Database (Similarity Search)
@@ -76,9 +84,12 @@ RAG System (src/core/rag/)
     │
     ├─→ PostgreSQL Database (Retrieve Documents with Metadata)
     │
-    ├─→ Context Building (Assemble retrieved documents)
+    ├─→ Context Building (Assemble retrieved documents + memory context)
     │
     ├─→ LiteLLM Gateway (Generate Response with Context)
+    │   └─→ Gateway Cache (Store response in cache)
+    │
+    ├─→ Agent Memory (Store Query-Answer Pair in Episodic Memory)
     │
     ├─→ Cache Mechanism (Store Query Result)
     │
@@ -101,8 +112,10 @@ Agent Framework
     ├─→ Agent (Execute Task)
     │
     ├─→ LiteLLM Gateway (LLM Reasoning)
+    │   └─→ Gateway Cache (Check cache before API call, store after)
     │
     ├─→ RAG System (Knowledge Retrieval, if needed)
+    │   └─→ RAG Memory (Retrieve conversation context)
     │
     ├─→ Database (Store Results)
     │
@@ -193,13 +206,23 @@ Completed Task
    ↓
 2. API Backend (Validate & Route)
    ↓
+   ├─→ Unified Query Endpoint (Auto-routing: Agent/RAG/Both)
+   └─→ Component-Specific Endpoints (Direct routing)
+   ↓
 3. Component Selection (Agent/RAG/Other)
    ↓
 4. Component Processing
+   ├─→ Memory Retrieval (if enabled)
+   ├─→ Cache Check (Gateway cache, RAG cache)
+   └─→ Context Building
    ↓
 5. Gateway/Database Operations
+   ├─→ Gateway Cache (Check before API call, store after)
+   └─→ Database Queries
    ↓
 6. Response Generation
+   ├─→ Memory Storage (Store query-answer pairs)
+   └─→ Cache Storage (Store results)
    ↓
 7. Observability Logging
    ↓
@@ -261,20 +284,31 @@ Return to Pool
 Request
     │
     ▼
-Cache Check
+Cache Check (Multiple Levels)
     │
-    ├─→ Cache Hit → Return Cached
+    ├─→ Gateway Cache (LLM Response Cache)
+    │   ├─→ Cache Hit → Return Cached Response (No API call)
+    │   └─→ Cache Miss → Continue to LLM API call
     │
-    └─→ Cache Miss
-         │
-         ▼
-    Execute Operation
-         │
-         ▼
-    Store in Cache
-         │
-         ▼
-    Return Result
+    ├─→ RAG Cache (Query Result Cache)
+    │   ├─→ Cache Hit → Return Cached Result
+    │   └─→ Cache Miss → Continue to RAG Processing
+    │
+    └─→ Memory Cache (Conversation Context)
+        ├─→ Cache Hit → Use Cached Context
+        └─→ Cache Miss → Build New Context
+    │
+    ▼
+Execute Operation (if cache miss)
+    │
+    ▼
+Store in Cache (Multiple Levels)
+    ├─→ Gateway Cache (Store LLM response)
+    ├─→ RAG Cache (Store query result)
+    └─→ Memory Cache (Store conversation context)
+    │
+    ▼
+Return Result
 ```
 
 ## Observability Workflow
@@ -311,14 +345,25 @@ Start Trace
 ### Between Components
 
 1. **Gateway ↔ Agents**: Agents use gateway for LLM operations (both in src/core/)
+   - Gateway cache automatically checks/stores responses
 2. **Gateway ↔ RAG**: RAG uses gateway for embeddings and generation (both in src/core/)
+   - Gateway cache automatically checks/stores responses
 3. **RAG ↔ Database**: RAG stores/retrieves documents and embeddings (both in src/core/)
-4. **Agents ↔ Database**: Agents store tasks and results (both in src/core/)
-5. **Cache ↔ All**: All components can use cache (src/core/)
-6. **Observability ↔ All**: All operations are traced and logged (src/core/)
-7. **Pool ↔ Database**: Database uses pool for connections (root/ ↔ src/core/)
-8. **Connectivity ↔ All**: All components use connectivity clients (root/ ↔ src/core/)
-9. **Governance ↔ All**: Governance framework applies to all components (root/)
+4. **RAG ↔ Memory**: RAG integrates with Agent Memory for conversation context (both in src/core/)
+   - Memory retrieval before query processing
+   - Memory storage after query completion
+5. **Agents ↔ Database**: Agents store tasks and results (both in src/core/)
+6. **Cache ↔ All**: All components can use cache (src/core/)
+   - Gateway cache: Automatic LLM response caching
+   - RAG cache: Query result caching
+   - Memory cache: Conversation context caching
+7. **API Backend ↔ Agent/RAG**: Unified query endpoint orchestrates both (src/core/)
+   - Automatic routing based on query type
+   - Dual processing support (both Agent and RAG)
+8. **Observability ↔ All**: All operations are traced and logged (src/core/)
+9. **Pool ↔ Database**: Database uses pool for connections (root/ ↔ src/core/)
+10. **Connectivity ↔ All**: All components use connectivity clients (root/ ↔ src/core/)
+11. **Governance ↔ All**: Governance framework applies to all components (root/)
 
 ### External Services
 
