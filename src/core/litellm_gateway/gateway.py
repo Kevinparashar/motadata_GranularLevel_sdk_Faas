@@ -5,27 +5,38 @@ Provides a unified interface for interacting with multiple LLM providers
 through LiteLLM, with support for streaming, function calling, and embeddings.
 """
 
+# Standard library imports
+import asyncio
+import hashlib
+import json
 import os
-from typing import Any, Dict, List, Optional, AsyncIterator
-from litellm import completion, acompletion, embedding, aembedding
+import time
+from datetime import datetime
+from pathlib import Path
+from typing import Any, AsyncIterator, Dict, List, Optional
+
+# Third-party imports
+from litellm import acompletion, aembedding, completion, embedding
+from pydantic import BaseModel, Field
+
 try:
     from litellm.router import Router  # type: ignore
 except ImportError:
     from litellm import Router  # type: ignore  # Fallback for older versions
-from pydantic import BaseModel, Field
-from ..utils.circuit_breaker import CircuitBreaker, CircuitBreakerConfig, CircuitState
-from ..utils.health_check import HealthCheck, HealthStatus, HealthCheckResult
-from .rate_limiter import RateLimiter, RateLimitConfig, RequestDeduplicator, RequestBatcher
-from ..llmops import LLMOps, LLMOperationType, LLMOperationStatus
-from ..validation import ValidationManager, ValidationLevel
+
+# Local application/library specific imports
+from ..cache_mechanism import CacheConfig, CacheMechanism
 from ..feedback_loop import FeedbackLoop, FeedbackType
-from ..cache_mechanism import CacheMechanism, CacheConfig
-from datetime import datetime
-from pathlib import Path
-import asyncio
-import time
-import hashlib
-import json
+from ..llmops import LLMOps, LLMOperationStatus, LLMOperationType
+from ..utils.circuit_breaker import CircuitBreaker, CircuitBreakerConfig, CircuitState
+from ..utils.health_check import HealthCheck, HealthCheckResult, HealthStatus
+from ..validation import ValidationLevel, ValidationManager
+from .rate_limiter import (
+    RateLimitConfig,
+    RateLimiter,
+    RequestBatcher,
+    RequestDeduplicator,
+)
 
 
 class GatewayConfig(BaseModel):

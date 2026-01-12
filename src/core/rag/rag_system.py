@@ -4,15 +4,22 @@ RAG System
 Complete Retrieval-Augmented Generation system.
 """
 
-from typing import List, Dict, Any, Optional
+# Standard library imports
+import logging
+from typing import Any, Dict, List, Optional
+
+# Local application/library specific imports
+from ..agno_agent_framework.memory import AgentMemory, MemoryType
+from ..cache_mechanism import CacheConfig, CacheMechanism
+from ..litellm_gateway import LiteLLMGateway
 from ..postgresql_database.connection import DatabaseConnection
 from ..postgresql_database.vector_operations import VectorOperations
-from ..litellm_gateway import LiteLLMGateway
-from ..cache_mechanism import CacheMechanism, CacheConfig
-from ..agno_agent_framework.memory import AgentMemory, MemoryType
-from .document_processor import DocumentProcessor, DocumentChunk
-from .retriever import Retriever
+from .document_processor import DocumentChunk, DocumentProcessor
 from .generator import RAGGenerator
+from .retriever import Retriever
+
+# Set up logger
+logger = logging.getLogger(__name__)
 
 
 class RAGSystem:
@@ -146,8 +153,9 @@ class RAGSystem:
                             embedding,
                             self.embedding_model
                         ))
-        except Exception:
-            # If batch fails, fall back to individual processing for resilience
+        except (ConnectionError, TimeoutError, ValueError) as e:
+            # If batch fails due to network/timeout/validation errors, fall back to individual processing
+            logger.warning(f"Batch embedding failed, falling back to individual processing: {e}")
             embeddings_data = []
             for chunk in chunks:
                 try:
@@ -162,8 +170,13 @@ class RAGSystem:
                             embedding,
                             self.embedding_model
                         ))
-                except Exception:
-                    # skip failed chunk embedding to keep ingestion resilient
+                except (ConnectionError, TimeoutError, ValueError) as chunk_error:
+                    # Skip failed chunk embedding to keep ingestion resilient
+                    logger.warning(f"Failed to embed chunk, skipping: {chunk_error}")
+                    continue
+                except Exception as chunk_error:
+                    # Log unexpected errors but continue processing
+                    logger.error(f"Unexpected error embedding chunk: {chunk_error}", exc_info=True)
                     continue
 
         # Batch insert embeddings
@@ -316,12 +329,32 @@ class RAGSystem:
                 )
 
             return result
-        except Exception as e:
+        except (ConnectionError, TimeoutError) as e:
+            # Network/connection errors
+            logger.error(f"Network error during RAG query: {e}")
             return {
                 "answer": None,
                 "retrieved_documents": [],
                 "num_documents": 0,
-                "error": str(e),
+                "error": f"Network error: {str(e)}",
+            }
+        except ValueError as e:
+            # Validation/parameter errors
+            logger.error(f"Validation error during RAG query: {e}")
+            return {
+                "answer": None,
+                "retrieved_documents": [],
+                "num_documents": 0,
+                "error": f"Validation error: {str(e)}",
+            }
+        except Exception as e:
+            # Unexpected errors - log and return generic error
+            logger.error(f"Unexpected error during RAG query: {e}", exc_info=True)
+            return {
+                "answer": None,
+                "retrieved_documents": [],
+                "num_documents": 0,
+                "error": f"An error occurred: {str(e)}",
             }
 
     async def query_async(
@@ -453,12 +486,32 @@ class RAGSystem:
                 )
 
             return result
-        except Exception as e:
+        except (ConnectionError, TimeoutError) as e:
+            # Network/connection errors
+            logger.error(f"Network error during async RAG query: {e}")
             return {
                 "answer": None,
                 "retrieved_documents": [],
                 "num_documents": 0,
-                "error": str(e),
+                "error": f"Network error: {str(e)}",
+            }
+        except ValueError as e:
+            # Validation/parameter errors
+            logger.error(f"Validation error during async RAG query: {e}")
+            return {
+                "answer": None,
+                "retrieved_documents": [],
+                "num_documents": 0,
+                "error": f"Validation error: {str(e)}",
+            }
+        except Exception as e:
+            # Unexpected errors - log and return generic error
+            logger.error(f"Unexpected error during async RAG query: {e}", exc_info=True)
+            return {
+                "answer": None,
+                "retrieved_documents": [],
+                "num_documents": 0,
+                "error": f"An error occurred: {str(e)}",
             }
 
     async def ingest_document_async(
@@ -528,8 +581,9 @@ class RAGSystem:
                             embedding,
                             self.embedding_model
                         ))
-        except Exception:
-            # If batch fails, fall back to individual processing for resilience
+        except (ConnectionError, TimeoutError, ValueError) as e:
+            # If batch fails due to network/timeout/validation errors, fall back to individual processing
+            logger.warning(f"Batch embedding failed in async ingestion, falling back to individual processing: {e}")
             embeddings_data = []
             for chunk in chunks:
                 try:
@@ -544,8 +598,13 @@ class RAGSystem:
                             embedding,
                             self.embedding_model
                         ))
-                except Exception:
-                    # skip failed chunk embedding to keep ingestion resilient
+                except (ConnectionError, TimeoutError, ValueError) as chunk_error:
+                    # Skip failed chunk embedding to keep ingestion resilient
+                    logger.warning(f"Failed to embed chunk in async ingestion, skipping: {chunk_error}")
+                    continue
+                except Exception as chunk_error:
+                    # Log unexpected errors but continue processing
+                    logger.error(f"Unexpected error embedding chunk in async ingestion: {chunk_error}", exc_info=True)
                     continue
 
         # Batch insert embeddings
@@ -585,9 +644,13 @@ class RAGSystem:
                         metadata=doc.get("metadata")
                     )
                     document_ids.append(doc_id)
-                except Exception:
-                    # Log error but continue with other documents
-                    # In production, you might want to log this properly
+                except (ValueError, ConnectionError) as e:
+                    # Log specific errors but continue with other documents
+                    logger.warning(f"Failed to ingest document in batch, skipping: {e}")
+                    continue
+                except Exception as e:
+                    # Log unexpected errors but continue processing
+                    logger.error(f"Unexpected error ingesting document in batch: {e}", exc_info=True)
                     continue
 
         return document_ids
@@ -635,8 +698,13 @@ class RAGSystem:
                         continue
                     else:
                         document_ids.append(result)
-            except Exception:
-                # Continue with next batch even if current batch fails
+            except (ConnectionError, TimeoutError, ValueError) as e:
+                # Log specific errors and continue with next batch
+                logger.warning(f"Batch processing failed, continuing with next batch: {e}")
+                continue
+            except Exception as e:
+                # Log unexpected errors but continue processing
+                logger.error(f"Unexpected error in batch processing: {e}", exc_info=True)
                 continue
 
         return document_ids
@@ -725,7 +793,13 @@ class RAGSystem:
             self.cache.invalidate_pattern(f"rag:doc:{document_id}")
 
             return True
-        except Exception:
+        except (ConnectionError, ValueError) as e:
+            # Log specific errors
+            logger.error(f"Error updating document {document_id}: {e}")
+            return False
+        except Exception as e:
+            # Log unexpected errors
+            logger.error(f"Unexpected error updating document {document_id}: {e}", exc_info=True)
             return False
 
     def delete_document(self, document_id: str) -> bool:
@@ -751,7 +825,13 @@ class RAGSystem:
             self.cache.invalidate_pattern(f"rag:query:*")
 
             return True
-        except Exception:
+        except (ConnectionError, ValueError) as e:
+            # Log specific errors
+            logger.error(f"Error deleting document {document_id}: {e}")
+            return False
+        except Exception as e:
+            # Log unexpected errors
+            logger.error(f"Unexpected error deleting document {document_id}: {e}", exc_info=True)
             return False
 
     def _delete_document_chunks(self, document_id: str) -> None:

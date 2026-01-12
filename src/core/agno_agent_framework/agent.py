@@ -4,24 +4,29 @@ Agno Agent Framework - Core Agent Implementation
 Provides the base agent class and agent management functionality.
 """
 
-from typing import Any, Dict, List, Optional, Callable
-from pydantic import BaseModel, Field
-from enum import Enum
+# Standard library imports
 import asyncio
 import json
 from datetime import datetime
-from .memory import AgentMemory, MemoryType
-from .tools import ToolRegistry, ToolExecutor, Tool
-from .exceptions import (
-    AgentExecutionError,
-    AgentConfigurationError,
-    AgentStateError,
-    MemoryWriteError
-)
-from ..utils.circuit_breaker import CircuitBreaker, CircuitBreakerConfig, CircuitState
-from ..utils.health_check import HealthCheck, HealthStatus, HealthCheckResult
+from enum import Enum
+from typing import Any, Callable, Dict, List, Optional
 
-# Import Prompt Context Management
+# Third-party imports
+from pydantic import BaseModel, Field
+
+# Local application/library specific imports
+from ..utils.circuit_breaker import CircuitBreaker, CircuitBreakerConfig, CircuitState
+from ..utils.health_check import HealthCheck, HealthCheckResult, HealthStatus
+from .exceptions import (
+    AgentConfigurationError,
+    AgentExecutionError,
+    AgentStateError,
+    MemoryWriteError,
+)
+from .memory import AgentMemory, MemoryType
+from .tools import Tool, ToolExecutor, ToolRegistry
+
+# Import Prompt Context Management (optional dependency)
 try:
     from ..prompt_context_management import PromptContextManager, create_prompt_manager
 except ImportError:
