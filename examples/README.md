@@ -6,6 +6,7 @@ This directory contains working code examples for all SDK components, organized 
 
 ```
 examples/
+├── hello_world.py           # Quick Start example (start here!)
 ├── basic_usage/              # Simple, single-component examples
 ├── integration/              # Multi-component integration examples
 ├── end_to_end/              # Complete end-to-end workflows
@@ -16,6 +17,24 @@ examples/
 ```
 
 See [USE_CASES_STRUCTURE.md](USE_CASES_STRUCTURE.md) for detailed use case structure and management guidelines.
+
+## Quick Start Example
+
+**New to the SDK?** Start here:
+
+```bash
+# Run the Hello World example (5 minutes)
+python examples/hello_world.py
+```
+
+This simple example demonstrates:
+- Creating a gateway connection
+- Making your first AI call
+- Getting a response
+
+See the [root README.md](../../README.md#-quick-start-5-minutes) for full Quick Start instructions.
+
+---
 
 ## Running Examples
 
@@ -97,11 +116,12 @@ See [use_cases/README.md](use_cases/README.md) for the use cases index.
 
 ## Learning Path
 
-1. Start with **basic_usage** examples to understand each component
-2. Study **integration** examples to see component interactions
-3. Review **end_to_end** examples for complete system understanding
-4. Explore **use_cases** to see real-world implementations
-5. Use **use_cases/template** to build your own use cases
+1. **Start here**: Run `hello_world.py` to verify your setup and make your first AI call
+2. Start with **basic_usage** examples to understand each component
+3. Study **integration** examples to see component interactions
+4. Review **end_to_end** examples for complete system understanding
+5. Explore **use_cases** to see real-world implementations
+6. Use **use_cases/template** to build your own use cases
 
 ## Creating New Use Cases
 
