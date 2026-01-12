@@ -9,11 +9,12 @@ The API Backend Services component provides RESTful API endpoints and backend in
 1. [API Application](#api-application)
 2. [API Routing](#api-routing)
 3. [Endpoint Creation](#endpoint-creation)
-4. [Request Validation](#request-validation)
-5. [Exception Handling](#exception-handling)
-6. [Functions](#functions)
-7. [Workflow](#workflow)
-8. [Customization](#customization)
+4. [Unified Query Endpoint](#unified-query-endpoint)
+5. [Request Validation](#request-validation)
+6. [Exception Handling](#exception-handling)
+7. [Functions](#functions)
+8. [Workflow](#workflow)
+9. [Customization](#customization)
 
 ---
 

@@ -1,5 +1,7 @@
 # Developer Guide
 
+> **Note:** This guide is for SDK contributors and maintainers. For using the SDK, see the main [README.md](README.md) and component-specific documentation.
+
 ## Guidelines for Developers
 
 This guide provides guidelines for developers on adding new components, folder structures, and relevant files.

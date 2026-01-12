@@ -7,17 +7,18 @@ The LiteLLM Gateway is the central AI operations hub for the entire SDK. It prov
 ## Table of Contents
 
 1. [Gateway Operations](#gateway-operations)
-2. [Rate Limiting and Queuing](#rate-limiting-and-queuing)
-3. [Request Batching and Deduplication](#request-batching-and-deduplication)
-4. [Circuit Breaker](#circuit-breaker)
-5. [Health Monitoring](#health-monitoring)
-6. [LLMOps Integration](#llmops-integration)
-7. [Validation and Guardrails](#validation-and-guardrails)
-8. [Feedback Loop](#feedback-loop)
-9. [Exception Handling](#exception-handling)
-10. [Functions](#functions)
-11. [Workflow](#workflow)
-12. [Customization](#customization)
+2. [Response Caching](#response-caching)
+3. [Rate Limiting and Queuing](#rate-limiting-and-queuing)
+4. [Request Batching and Deduplication](#request-batching-and-deduplication)
+5. [Circuit Breaker](#circuit-breaker)
+6. [Health Monitoring](#health-monitoring)
+7. [LLMOps Integration](#llmops-integration)
+8. [Validation and Guardrails](#validation-and-guardrails)
+9. [Feedback Loop](#feedback-loop)
+10. [Exception Handling](#exception-handling)
+11. [Functions](#functions)
+12. [Workflow](#workflow)
+13. [Customization](#customization)
 
 ---
 

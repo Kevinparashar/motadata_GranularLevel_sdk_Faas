@@ -1,5 +1,6 @@
 # Motadata Python AI SDK - Development Story
 
+> **Note:** This document tracks the development history and approach. For current SDK features and usage, see the main [README.md](README.md) and component-specific documentation.
 
 ### Component Overview
 

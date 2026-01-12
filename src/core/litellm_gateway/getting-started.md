@@ -48,12 +48,26 @@ from src.core.litellm_gateway import create_gateway, generate_text, generate_tex
 
 **Code:**
 ```python
+# Basic gateway creation
 gateway = create_gateway(
     api_key="your-api-key",
     provider="openai",
     default_model="gpt-4",
     timeout=60.0,
     max_retries=3
+)
+
+# Gateway with cache enabled
+from src.core.cache_mechanism import CacheMechanism, CacheConfig
+
+cache = CacheMechanism(CacheConfig(default_ttl=3600))  # 1 hour TTL
+gateway = create_gateway(
+    api_key="your-api-key",
+    provider="openai",
+    default_model="gpt-4",
+    enable_caching=True,
+    cache_ttl=3600,  # 1 hour default
+    cache=cache
 )
 ```
 
@@ -65,6 +79,7 @@ create_gateway()
   ├─> Configure rate limiter
   ├─> Set up circuit breaker
   ├─> Initialize health monitor
+  ├─> Initialize cache mechanism (if enabled)
   └─> Return gateway instance
 ```
 
@@ -353,7 +368,41 @@ config = GatewayConfig(
 )
 
 gateway = LiteLLMGateway(config=config)
-# Identical requests return cached response
+# Identical requests within deduplication window return cached result
+```
+
+### Response Caching
+
+```python
+from src.core.cache_mechanism import CacheMechanism, CacheConfig
+
+# Create cache mechanism
+cache = CacheMechanism(CacheConfig(default_ttl=3600))  # 1 hour TTL
+
+# Create gateway with caching enabled
+gateway = create_gateway(
+    api_key="your-api-key",
+    provider="openai",
+    default_model="gpt-4",
+    enable_caching=True,
+    cache_ttl=3600,  # 1 hour default
+    cache=cache
+)
+
+# First request - makes API call and caches response
+response1 = await gateway.generate_async(
+    prompt="What is AI?",
+    model="gpt-4",
+    tenant_id="tenant_123"
+)
+
+# Second identical request - uses cached response (no API call)
+response2 = await gateway.generate_async(
+    prompt="What is AI?",
+    model="gpt-4",
+    tenant_id="tenant_123"
+)
+# response2 uses cached result from response1 (faster, cheaper)
 ```
 
 ### Error Handling
