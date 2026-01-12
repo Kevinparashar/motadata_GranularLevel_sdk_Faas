@@ -17,10 +17,14 @@ Expected Output:
 
 import os
 import asyncio
-from dotenv import load_dotenv
 
-# Load environment variables from .env file
-load_dotenv()
+# Load environment variables from .env file (optional)
+try:
+    from dotenv import load_dotenv  # type: ignore
+    load_dotenv()
+except ImportError:
+    # python-dotenv not installed, will use environment variables directly
+    pass
 
 # Import the gateway factory function
 from src.core.litellm_gateway import create_gateway
