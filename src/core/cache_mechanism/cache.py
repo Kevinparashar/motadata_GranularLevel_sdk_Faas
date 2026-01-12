@@ -51,20 +51,37 @@ class CacheMechanism:
         return f"{self.config.namespace}:{key}"
 
     def set(self, key: str, value: Any, tenant_id: Optional[str] = None, ttl: Optional[int] = None) -> None:
+        """
+        Store a value in cache with TTL.
+
+        COST IMPACT: Caching responses saves LLM API costs.
+        - Cache hit = $0 cost (no API call)
+        - Cache miss = normal API cost (~$0.001-0.01 per call)
+        - Typical savings: 50-90% cost reduction for repeated queries
+        """
         ttl = ttl or self.config.default_ttl
         expires_at = time.time() + ttl
         namespaced = self._namespaced_key(key, tenant_id=tenant_id)
 
         if self.backend == "redis":
+            # Redis backend: Distributed cache, survives process restarts
             self._client.set(namespaced, value, ex=ttl)
             return
 
-        # memory backend with LRU eviction
+        # MEMORY BACKEND: In-memory LRU cache with TTL
+        # LRU (Least Recently Used) eviction: removes least recently accessed items when full
+        # This keeps frequently accessed items in cache, maximizing cache hit rate
         self._store[namespaced] = (value, expires_at)
-        self._store.move_to_end(namespaced)
-        self._evict_if_needed()
+        self._store.move_to_end(namespaced)  # Mark as recently used (LRU)
+        self._evict_if_needed()  # Remove oldest items if cache is full
 
     def get(self, key: str, tenant_id: Optional[str] = None) -> Optional[Any]:
+        """
+        Retrieve a value from cache.
+
+        PERFORMANCE: Cache hits are instant (<1ms), avoiding expensive API calls.
+        Returns None if key not found or expired (cache miss).
+        """
         namespaced = self._namespaced_key(key, tenant_id=tenant_id)
 
         if self.backend == "redis":
@@ -72,17 +89,18 @@ class CacheMechanism:
             return value
 
         if namespaced not in self._store:
-            return None
+            return None  # Cache miss
 
         value, expires_at = self._store[namespaced]
         if expires_at < time.time():
-            # expired
+            # TTL expired: Remove from cache (cache miss)
             self._store.pop(namespaced, None)
             return None
 
-        # refresh LRU ordering
+        # LRU: Mark as recently used (move to end of OrderedDict)
+        # This ensures frequently accessed items stay in cache longer
         self._store.move_to_end(namespaced)
-        return value
+        return value  # Cache hit: return cached value
 
     def delete(self, key: str, tenant_id: Optional[str] = None) -> None:
         namespaced = self._namespaced_key(key, tenant_id=tenant_id)

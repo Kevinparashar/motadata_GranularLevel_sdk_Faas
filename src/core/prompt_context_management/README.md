@@ -1,5 +1,36 @@
 # Prompt Context Management
 
+## When to Use This Component
+
+**✅ Use Prompt Context Management when:**
+- You have multiple prompts that need versioning
+- You want to A/B test different prompts
+- You need to manage prompt templates centrally
+- You want to optimize prompts automatically
+- You're building production systems with prompt engineering
+- You need to build context from conversation history
+- You want to enforce token limits and truncation
+
+**❌ Don't use Prompt Context Management when:**
+- You only use simple hardcoded prompts
+- You don't need prompt versioning or A/B testing
+- Your prompts are always the same
+- You're building simple prototypes
+- You don't need context building from history
+
+**Simple Example:**
+```python
+from src.core.prompt_context_management import create_prompt_manager
+
+prompt_manager = create_prompt_manager(max_tokens=8000)
+template = prompt_manager.add_template("analysis", "Analyze: {text}")
+context = prompt_manager.build_context("What is AI?", include_history=True)
+```
+
+**Note:** This component is automatically used by Agent Framework. You typically don't need to use it directly unless building custom prompt systems.
+
+---
+
 ## Overview
 
 The Prompt Context Management component provides a unified system for managing prompts, templates, and context throughout the SDK. It handles prompt template creation, versioning, context building, and prompt optimization to ensure consistent and effective LLM interactions.

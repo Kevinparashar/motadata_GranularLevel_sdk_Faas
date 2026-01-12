@@ -1,5 +1,34 @@
 # LiteLLM Gateway
 
+## When to Use This Component
+
+**✅ Use LiteLLM Gateway when:**
+- You need to call AI models (OpenAI, Anthropic, Google, etc.)
+- You want a unified interface for multiple LLM providers
+- You need embeddings for vector search
+- You want built-in rate limiting, caching, and cost tracking
+- You're building Agents, RAG systems, or any AI-powered feature
+- You need to switch between providers easily
+
+**❌ Don't use LiteLLM Gateway when:**
+- You only need simple HTTP calls to a single provider (use provider SDK directly)
+- You don't need AI capabilities at all
+- You're building a non-AI application
+- You need direct provider-specific features not supported by LiteLLM
+
+**Simple Example:**
+```python
+from src.core.litellm_gateway import create_gateway
+
+gateway = create_gateway(api_key="your-key", provider="openai")
+response = await gateway.generate_async("Hello, world!")
+print(response.text)
+```
+
+**Cost Note:** Gateway calls cost ~$0.001-0.01 per request (depends on model). Enable caching to reduce costs by 50-90% for repeated queries.
+
+---
+
 ## Overview
 
 The LiteLLM Gateway serves as the central AI operations hub for the entire SDK. It provides a unified interface for interacting with multiple Large Language Model (LLM) providers, abstracting away provider-specific complexities and enabling seamless integration across all AI components.

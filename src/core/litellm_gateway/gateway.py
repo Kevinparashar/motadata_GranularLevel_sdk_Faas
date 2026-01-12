@@ -343,27 +343,32 @@ class LiteLLMGateway:
         """
         Generate cache key for LLM request.
 
+        This creates a deterministic cache key based on request parameters.
+        Identical requests (same prompt, model, tenant) will have the same key,
+        enabling cache hits and cost savings.
+
         Args:
             prompt: Input prompt
             model: Model identifier
             messages: Optional messages list
-            tenant_id: Optional tenant ID
+            tenant_id: Optional tenant ID (ensures tenant isolation in cache)
             **kwargs: Additional parameters
 
         Returns:
-            Cache key string
+            Cache key string (format: "gateway:generate:{model}:{hash}")
         """
         # Create deterministic key from request parameters
+        # All parameters are included to ensure cache key uniqueness
         key_data = {
             "prompt": prompt,
             "model": model,
             "messages": messages,
-            "tenant_id": tenant_id,
-            **{k: v for k, v in kwargs.items() if k not in ["stream"]}  # Exclude stream
+            "tenant_id": tenant_id,  # Tenant isolation: same prompt for different tenants = different cache keys
+            **{k: v for k, v in kwargs.items() if k not in ["stream"]}  # Exclude stream (streaming can't be cached)
         }
 
-        # Create hash for consistent key
-        key_string = json.dumps(key_data, sort_keys=True)
+        # Create hash for consistent key (SHA256, truncated to 16 chars for efficiency)
+        key_string = json.dumps(key_data, sort_keys=True)  # Sort keys for deterministic hashing
         key_hash = hashlib.sha256(key_string.encode()).hexdigest()[:16]
 
         return f"gateway:generate:{model}:{key_hash}"
@@ -551,7 +556,9 @@ class LiteLLMGateway:
         if messages is None:
             messages = [{"role": "user", "content": prompt}]
 
-        # Check cache first (if caching enabled and not streaming)
+        # COST OPTIMIZATION: Check cache first (if caching enabled and not streaming)
+        # Cache hits avoid expensive LLM API calls, reducing costs by 50-90% for repeated queries
+        # Example: Without cache: $0.01 per call. With 50% cache hit rate: $0.005 average cost
         if self.cache and not stream and self.config.enable_caching:
             cache_key = self._generate_cache_key(
                 prompt=prompt,
@@ -562,7 +569,8 @@ class LiteLLMGateway:
             )
             cached_response = self.cache.get(cache_key, tenant_id=tenant_id)
             if cached_response:
-                # Return cached response
+                # Cache hit: Return immediately without API call (saves cost and latency)
+                # Cost saved: ~$0.001-0.01 per cached response (depends on model)
                 if isinstance(cached_response, dict):
                     return GenerateResponse(
                         text=cached_response.get("text", ""),
@@ -716,7 +724,9 @@ class LiteLLMGateway:
             raw_response=response.__dict__ if hasattr(response, '__dict__') else response
         )
 
-        # Store in cache (if caching enabled and not streaming)
+        # COST OPTIMIZATION: Store successful response in cache for future requests
+        # This enables future identical requests to be served from cache, avoiding API costs
+        # Cache TTL: Default 3600 seconds (1 hour). Adjust based on your data freshness needs
         if self.cache and not stream and self.config.enable_caching and status == LLMOperationStatus.SUCCESS:
             cache_key = self._generate_cache_key(
                 prompt=prompt,
@@ -726,6 +736,7 @@ class LiteLLMGateway:
                 **kwargs
             )
             # Store response data for caching
+            # Future identical requests will use this cached response, saving API costs
             cache_data = {
                 "text": text,
                 "model": model_name,
@@ -737,7 +748,7 @@ class LiteLLMGateway:
                 cache_key,
                 cache_data,
                 tenant_id=tenant_id,
-                ttl=self.config.cache_ttl
+                ttl=self.config.cache_ttl  # Cache duration in seconds
             )
 
         return generate_response

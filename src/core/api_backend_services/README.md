@@ -1,5 +1,38 @@
 # API Backend Services
 
+## When to Use This Component
+
+**✅ Use API Backend Services when:**
+- You need REST endpoints for external systems
+- You're building a standalone API service
+- You want to expose SDK functionality via HTTP
+- You need API endpoints for Agents, RAG, or Gateway
+- You're not using AWS API Gateway (or need additional endpoints)
+- You want unified query endpoints that orchestrate multiple components
+
+**❌ Don't use API Backend Services when:**
+- You're using AWS API Gateway with Lambda (SDK is used as library)
+- You only need direct Python usage (no API needed)
+- You're building internal tools without API requirements
+- You're integrating SDK into existing backend (use SDK as library)
+
+**Simple Example:**
+```python
+from src.core.api_backend_services import create_api_app, create_unified_query_endpoint
+from src.core.litellm_gateway import create_gateway
+from src.core.agno_agent_framework import create_agent
+
+gateway = create_gateway(api_key="your-key", provider="openai")
+agent = create_agent("assistant", "AI Assistant", gateway)
+
+app = create_api_app(title="AI SDK API")
+create_unified_query_endpoint(app, agent, rag=None, gateway=gateway)
+```
+
+**Note:** If using AWS API Gateway, you typically use SDK components directly in Lambda functions rather than this API component.
+
+---
+
 ## Overview
 
 The API Backend Services component provides RESTful API endpoints and backend integration for the SDK. It exposes SDK functionality through HTTP APIs, enabling external systems and applications to interact with the SDK's capabilities.

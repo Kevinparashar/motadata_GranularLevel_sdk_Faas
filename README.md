@@ -1,5 +1,45 @@
 # Motadata Python AI SDK
 
+## 🚀 Quick Start (5 Minutes)
+
+**Get started in 5 minutes!**
+
+```bash
+# 1. Install dependencies
+pip install -r requirements.txt
+
+# 2. Set your API key
+export OPENAI_API_KEY='your-api-key-here'
+# Or create .env file: echo "OPENAI_API_KEY=your-key" > .env
+
+# 3. Run Hello World
+python examples/hello_world.py
+```
+
+**Expected Output:**
+```
+🚀 Motadata AI SDK - Hello World Example
+✅ API key found
+📡 Creating gateway connection...
+✅ Gateway created successfully
+🤖 Sending request to AI...
+============================================================
+AI Response:
+============================================================
+Hello! I'm an AI assistant ready to help you.
+============================================================
+✅ Success! SDK is working correctly.
+📊 Model used: gpt-3.5-turbo
+💰 Tokens used: 15
+```
+
+**Next Steps:**
+- Try [Basic Usage Examples](#examples-and-tutorials)
+- Explore [Component Guides](#project-components)
+- Check [When to Use What](#when-to-use-what) for component selection
+
+---
+
 ## Overview
 
 The Motadata Python AI SDK is a comprehensive, modular SDK for building AI-powered applications. It provides a unified interface for LLM operations, agent frameworks, RAG systems, machine learning capabilities, and database operations, all designed with modularity and swappability in mind.
@@ -34,7 +74,29 @@ The Motadata Python AI SDK is a comprehensive, modular SDK for building AI-power
 - **Feedback Loop**: Continuous learning mechanism with user feedback collection and processing
 - **Multi-Tenancy**: Full tenant isolation and context management across all components
 
+## When to Use What
+
+**Quick Decision Guide:**
+
+- **Need AI text generation?** → Use [LiteLLM Gateway](src/core/litellm_gateway/README.md)
+- **Building a chatbot or assistant?** → Use [Agent Framework](src/core/agno_agent_framework/README.md)
+- **Answering questions from documents?** → Use [RAG System](src/core/rag/README.md)
+- **Want to reduce API costs?** → Use [Cache Mechanism](src/core/cache_mechanism/README.md)
+- **Need monitoring and debugging?** → Use [Observability](src/core/evaluation_observability/README.md)
+- **Managing prompts and templates?** → Use [Prompt Context Management](src/core/prompt_context_management/README.md)
+- **Building REST APIs?** → Use [API Backend Services](src/core/api_backend_services/README.md)
+
+**For detailed guidance on each component, see their individual README files which include:**
+- ✅ When to use this component
+- ❌ When NOT to use this component
+- Simple code examples
+- Cost and performance notes
+
+---
+
 ## Architecture Overview
+
+For a simple, beginner-friendly explanation of how data flows through the SDK, see [Architecture Overview](docs/architecture_overview.md).
 
 The SDK follows a layered architecture with clear separation of concerns:
 
