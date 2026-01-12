@@ -32,6 +32,7 @@ ENV/
 *.swp
 *.swo
 *~
+.pythonpath.txt
 
 # Environment variables
 .env
