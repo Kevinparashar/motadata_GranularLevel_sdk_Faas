@@ -115,6 +115,28 @@ This directory contains comprehensive troubleshooting guides for all components 
     - Real-time prediction issues
     - Performance problems
 
+### Core Platform Integrations
+
+13. **[NATS Integration Troubleshooting](nats_integration_troubleshooting.md)**
+    - Connection failures
+    - Message publishing issues
+    - Subscription problems
+    - Performance issues
+    - Error handling
+
+14. **[OTEL Integration Troubleshooting](otel_integration_troubleshooting.md)**
+    - Tracing issues
+    - Metrics collection problems
+    - Performance overhead
+    - Export failures
+    - Configuration problems
+
+15. **[CODEC Integration Troubleshooting](codec_integration_troubleshooting.md)**
+    - Encoding/decoding failures
+    - Schema validation issues
+    - Version migration problems
+    - Performance issues
+
 ## How to Use These Guides
 
 ### Step 1: Identify the Component
@@ -132,6 +154,9 @@ Determine which component is experiencing issues:
 - **MLOps Pipeline**: Issues with experiments, deployment, monitoring
 - **ML Data Management**: Issues with data loading, validation, feature store
 - **Model Serving**: Issues with API server, batch processing, predictions
+- **NATS Integration**: Issues with messaging, connections, performance
+- **OTEL Integration**: Issues with tracing, metrics, observability
+- **CODEC Integration**: Issues with serialization, schema validation, versioning
 
 ### Step 2: Find the Problem
 

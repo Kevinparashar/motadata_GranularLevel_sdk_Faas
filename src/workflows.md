@@ -42,6 +42,14 @@ This document provides a comprehensive visual and textual representation of the 
               │  PostgreSQL Database │
               │  (src/core/)         │
               └──────────────────────┘
+                           │
+                           ▼
+    ┌──────────────────────────────────────┐
+    │     Core Platform Integrations        │
+    │  ┌──────┐  ┌──────┐  ┌──────┐       │
+    │  │ NATS │  │ OTEL │  │CODEC │       │
+    │  └──────┘  └──────┘  └──────┘       │
+    └──────────────────────────────────────┘
 ```
 
 ## Component Interaction Workflows
@@ -328,12 +336,29 @@ Start Trace
    - Dual processing support (both Agent and RAG)
 8. **Observability ↔ All**: All operations are traced and logged (src/core/)
 
+### Core Platform Integrations
+
+9. **NATS ↔ All**: Asynchronous messaging for all AI components (src/integrations/)
+   - Agent-to-agent communication via `ai.agent.message.{tenant_id}`
+   - Gateway request queuing via `ai.gateway.requests.{tenant_id}`
+   - RAG document ingestion via `ai.rag.ingest.{tenant_id}`
+   - RAG query processing via `ai.rag.queries.{tenant_id}`
+10. **OTEL ↔ All**: Distributed tracing and metrics for all operations (src/integrations/)
+    - Trace propagation across all components
+    - Metrics collection for performance monitoring
+    - Token usage and cost tracking
+11. **CODEC ↔ All**: Message serialization for all NATS communications (src/integrations/)
+    - Agent message encoding/decoding
+    - Gateway request/response serialization
+    - RAG document and query payload encoding
+
 ### External Services
 
 1. **LLM Providers**: Via LiteLLM Gateway
 2. **PostgreSQL**: Direct database connections
 3. **Redis**: For caching (optional)
-4. **Message Queues**: For async operations (optional)
+4. **NATS Server**: For messaging (via Core SDK wrapper)
+5. **OTEL Collector**: For observability data export (via Core SDK bootstrap)
 
 ## Workflow Best Practices
 
