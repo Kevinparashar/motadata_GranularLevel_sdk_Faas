@@ -18,10 +18,10 @@ sys.path.insert(0, str(project_root))
 
 load_dotenv(project_root / ".env")
 
-from src.core.litellm_gateway import LiteLLMGateway
+from src.core.litellm_gateway import create_gateway
 
 
-def main():
+async def main():
     """Demonstrate basic gateway features."""
     
     # Check for API key
@@ -33,18 +33,20 @@ def main():
     
     # Initialize gateway
     provider = "openai" if os.getenv("OPENAI_API_KEY") else "anthropic"
-    gateway = LiteLLMGateway(
-        api_key=api_key,
-        provider=provider
+    default_model = "gpt-3.5-turbo" if provider == "openai" else "claude-3-haiku-20240307"
+    gateway = create_gateway(
+        providers=[provider],
+        default_model=default_model,
+        api_keys={provider: api_key}
     )
     
     try:
         # 1. Text Generation
         print("=== Text Generation ===")
         
-        response = gateway.generate(
+        response = await gateway.generate_async(
             prompt="Explain quantum computing in one sentence.",
-            model="gpt-4" if provider == "openai" else "claude-3-opus-20240229",
+            model=default_model,
             max_tokens=100
         )
         
@@ -56,9 +58,9 @@ def main():
         print("\n=== Streaming Generation ===")
         
         print("Streaming response:")
-        for chunk in gateway.stream(
+        async for chunk in gateway.stream_async(
             prompt="Count from 1 to 5:",
-            model="gpt-4" if provider == "openai" else "claude-3-opus-20240229",
+            model=default_model,
             max_tokens=50
         ):
             if hasattr(chunk, 'choices') and chunk.choices:
@@ -70,7 +72,7 @@ def main():
         # 3. Embeddings
         print("\n=== Embeddings ===")
         
-        embedding_response = gateway.embed(
+        embedding_response = await gateway.embed_async(
             texts=["Hello, world!", "This is a test."],
             model="text-embedding-3-small" if provider == "openai" else "text-embedding-ada-002"
         )
@@ -97,9 +99,9 @@ def main():
         ]
         
         try:
-            response = gateway.generate(
+            response = await gateway.generate_async(
                 prompt="What's the weather in San Francisco?",
-                model="gpt-4" if provider == "openai" else "claude-3-opus-20240229",
+                model=default_model,
                 functions=functions,
                 function_call="auto"
             )
@@ -109,11 +111,17 @@ def main():
         
         print("\n✅ LiteLLM Gateway example completed successfully!")
         
+    except (ConnectionError, TimeoutError) as e:
+        print(f"❌ Network error: {e}")
+        print("Make sure you have a valid API key and internet connection.")
+    except ValueError as e:
+        print(f"❌ Validation error: {e}")
     except Exception as e:
         print(f"❌ Error: {e}")
         print("Make sure you have a valid API key and internet connection.")
 
 
 if __name__ == "__main__":
-    main()
+    import asyncio
+    asyncio.run(main())
 

@@ -19,8 +19,8 @@ sys.path.insert(0, str(project_root))
 load_dotenv(project_root / ".env")
 
 from src.core.rag import RAGSystem
-from src.core.postgresql_database import PostgreSQLDatabase
-from src.core.litellm_gateway import LiteLLMGateway
+from src.core.postgresql_database import DatabaseConnection, DatabaseConfig
+from src.core.litellm_gateway import create_gateway
 
 
 def main():
@@ -34,17 +34,22 @@ def main():
     
     # Initialize dependencies
     provider = "openai" if os.getenv("OPENAI_API_KEY") else "anthropic"
-    gateway = LiteLLMGateway(api_key=api_key, provider=provider)
+    default_model = "gpt-3.5-turbo" if provider == "openai" else "claude-3-haiku-20240307"
+    gateway = create_gateway(
+        providers=[provider],
+        default_model=default_model,
+        api_keys={provider: api_key}
+    )
     
-    db_config = {
-        "host": os.getenv("POSTGRES_HOST", "localhost"),
-        "port": int(os.getenv("POSTGRES_PORT", 5432)),
-        "database": os.getenv("POSTGRES_DB", "motadata_sdk"),
-        "user": os.getenv("POSTGRES_USER", "postgres"),
-        "password": os.getenv("POSTGRES_PASSWORD", "")
-    }
+    db_config = DatabaseConfig(
+        host=os.getenv("POSTGRES_HOST", "localhost"),
+        port=int(os.getenv("POSTGRES_PORT", 5432)),
+        database=os.getenv("POSTGRES_DB", "motadata_sdk"),
+        user=os.getenv("POSTGRES_USER", "postgres"),
+        password=os.getenv("POSTGRES_PASSWORD", "")
+    )
     
-    db = PostgreSQLDatabase(**db_config)
+    db = DatabaseConnection(db_config)
     
     try:
         # Connect to database
@@ -56,7 +61,7 @@ def main():
             db=db,
             gateway=gateway,
             embedding_model="text-embedding-3-small" if provider == "openai" else "text-embedding-ada-002",
-            generation_model="gpt-4" if provider == "openai" else "claude-3-opus-20240229"
+            generation_model=default_model
         )
         
         # 1. Document Ingestion
@@ -152,7 +157,7 @@ def main():
         import traceback
         traceback.print_exc()
     finally:
-        db.disconnect()
+        db.close()
         print("\n✅ Database connection closed")
     
     print("\n✅ RAG example completed successfully!")

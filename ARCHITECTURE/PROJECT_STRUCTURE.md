@@ -37,32 +37,18 @@ motadata-python-ai-sdk/
 │   ├── workflows.md             # Workflow diagrams
 │   └── libraries.md              # Library list
 │
-├── connectivity_clients/         # Outside src (root level)
-│   ├── __init__.py
-│   └── README.md
-│
-├── pool_implementation/          # Outside src (root level)
-│   ├── __init__.py
-│   └── README.md
-│
-├── governance_framework/         # Outside src (root level)
-│   ├── __init__.py
-│   └── README.md
-│
 ├── examples/                     # Working code examples
 │   ├── README.md
 │   ├── USE_CASES_STRUCTURE.md   # Use cases structure guide
 │   ├── basic_usage/              # Basic component examples
 │   │   ├── 01_observability_basic.py
-│   │   ├── 02_pool_implementation_basic.py
-│   │   ├── 03_postgresql_database_basic.py
-│   │   ├── 04_connectivity_basic.py
-│   │   ├── 05_litellm_gateway_basic.py
-│   │   ├── 06_cache_basic.py
-│   │   ├── 07_agent_basic.py
-│   │   ├── 08_prompt_context_basic.py
-│   │   ├── 09_rag_basic.py
-│   │   └── 10_api_backend_basic.py
+│   │   ├── 02_postgresql_database_basic.py
+│   │   ├── 03_litellm_gateway_basic.py
+│   │   ├── 04_cache_basic.py
+│   │   ├── 05_agent_basic.py
+│   │   ├── 06_prompt_context_basic.py
+│   │   ├── 07_rag_basic.py
+│   │   └── 08_api_backend_basic.py
 │   ├── integration/              # Integration examples
 │   │   ├── agent_with_rag.py
 │   │   └── api_with_agent.py
@@ -118,16 +104,9 @@ All AI-related components are in `src/core/`:
 - `llmops/` - LLMOps tracking and metrics
 - `validation/` - Validation and guardrails framework
 
-### Infrastructure Components (root level)
-Infrastructure components are at the root level:
-- `connectivity_clients/` - Client connectivity
-- `pool_implementation/` - Resource pooling
-- `governance_framework/` - Governance and policies
-
 ### Tests (src/tests/)
 - `unit_tests/` - Unit tests for all components
   - `test_observability.py` - Observability tests
-  - `test_pool_implementation.py` - Pool tests
   - `test_postgresql_database.py` - Database tests
   - `test_litellm_gateway.py` - Gateway tests
   - `test_cache.py` - Cache tests
@@ -139,7 +118,7 @@ Infrastructure components are at the root level:
   - `test_end_to_end_workflows.py` - End-to-end workflows
 
 ### Examples (examples/)
-- `basic_usage/` - Working examples for each component (10 examples)
+- `basic_usage/` - Working examples for each component (8 examples)
 - `integration/` - Multi-component integration examples (2 examples)
 - `end_to_end/` - Complete workflow examples (1 example)
 - `use_cases/` - Real-world use case implementations
@@ -158,17 +137,10 @@ from src.core.api_backend_services import create_unified_query_endpoint
 from src.core.cache_mechanism import CacheMechanism, CacheConfig
 ```
 
-### Infrastructure Components
-```python
-from connectivity_clients import ClientManager
-from pool_implementation import ConnectionPool
-from governance_framework import SecurityPolicy
-```
 
 ## Rationale
 
 - **Core components in src/core/**: All AI/LLM related functionality
-- **Infrastructure outside src/**: Shared infrastructure used by all components
 - **Modular design**: Easy to swap components via interfaces
-- **Clear separation**: Infrastructure vs. business logic
+- **Clear separation**: Components organized by functionality
 

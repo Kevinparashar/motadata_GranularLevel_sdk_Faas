@@ -4,18 +4,16 @@
 
 ### Component Overview
 
-The SDK consists of 10 core components:
+The SDK consists of 7 core components:
 
 1. **Agent** (src/core/agno_agent_framework/) - Autonomous AI agents with session, memory, tools, and plugins
 2. **API Backend** (src/core/api_backend_services/) - RESTful API endpoints with authentication and rate limiting
 3. **Cache** (src/core/cache_mechanism/) - Response caching for LLM calls and embedding cache
-4. **Connectivity** (connectivity_clients/) - Unified client connection management with health monitoring
-5. **Evaluation & Observability** (src/core/evaluation_observability/) - Distributed tracing, logging, and metrics
-6. **LiteLLM Gateway** (src/core/litellm_gateway/) - Unified interface for multiple LLM providers
-7. **Pool Implementation** (pool_implementation/) - Connection pooling for databases and APIs
-8. **PostgreSQL Database** (src/core/postgresql_database/) - PostgreSQL with pgvector for vector operations
-9. **Prompt Context Management** (src/core/prompt_context_management/) - Template-based prompt system with versioning
-10. **RAG** (src/core/rag/) - Retrieval-Augmented Generation system with document processing and retrieval
+4. **Evaluation & Observability** (src/core/evaluation_observability/) - Distributed tracing, logging, and metrics
+5. **LiteLLM Gateway** (src/core/litellm_gateway/) - Unified interface for multiple LLM providers
+6. **PostgreSQL Database** (src/core/postgresql_database/) - PostgreSQL with pgvector for vector operations
+7. **Prompt Context Management** (src/core/prompt_context_management/) - Template-based prompt system with versioning
+8. **RAG** (src/core/rag/) - Retrieval-Augmented Generation system with document processing and retrieval
 
 
 
@@ -67,11 +65,9 @@ For each component, the following activities are performed:
 
 ```
 Foundation Layer (No Dependencies):
-├── Evaluation & Observability
-└── Pool Implementation
+└── Evaluation & Observability
 
 Infrastructure Layer:
-├── Connectivity (depends on: Pool Implementation, Observability)
 ├── PostgreSQL Database (depends on: Observability)
 └── LiteLLM Gateway (depends on: Observability, Cache)
 
@@ -91,9 +87,7 @@ Application Layer:
 | Component | Depends On | Required By |
 |-----------|------------|-------------|
 | Evaluation & Observability | None | All components |
-| Pool Implementation | None | Connectivity, PostgreSQL Database |
-| Connectivity | Pool Implementation, Observability | API Backend |
-| PostgreSQL Database | Observability | RAG, Pool Implementation |
+| PostgreSQL Database | Observability | RAG |
 | LiteLLM Gateway | Observability, Cache | Agent, RAG, API Backend |
 | Cache | Gateway, RAG | LiteLLM Gateway |
 | Agent | LiteLLM Gateway, Observability | API Backend, Prompt Context Management |
@@ -231,7 +225,7 @@ Application Layer:
 
 ---
 
-### 6. LiteLLM Gateway Component (src/core/litellm_gateway/)
+### 5. LiteLLM Gateway Component (src/core/litellm_gateway/)
 
 #### Dependencies
 - **Evaluation & Observability**: Required for tracing and metrics collection
@@ -255,31 +249,7 @@ Application Layer:
 
 ---
 
-### 7. Pool Implementation Component (pool_implementation/)
-
-#### Dependencies
-- **PostgreSQL Database**: Required for database connection pooling
-- **Connectivity Clients**: Required for resource management integration
-
-#### Prerequisites
-- PostgreSQL Database component must be completed (for connection pooling)
-- Connectivity Clients component must be completed (for resource management)
-
-#### Key Actions
-
-**Platform Testing:**
-- Develop test suite for pool operations, resource lifecycle, thread management, and pool exhaustion scenarios
-
-**Developer Tooling:**
-- Implement pool statistics utilities, resource monitoring, and pool debugging tools
-
-**Platform Integration:**
-- Integrate with PostgreSQL Database for connection pooling
-- Integrate with Connectivity Clients for resource management
-
----
-
-### 8. PostgreSQL Database Component (src/core/postgresql_database/)
+### 6. PostgreSQL Database Component (src/core/postgresql_database/)
 
 #### Dependencies
 - **Evaluation & Observability**: Required for query tracing and performance metrics
@@ -304,7 +274,7 @@ Application Layer:
 
 ---
 
-### 9. Prompt Context Management Component (src/core/prompt_context_management/)
+### 7. Prompt Context Management Component (src/core/prompt_context_management/)
 
 #### Dependencies
 - **Agent Framework**: Required for prompt injection into agents
@@ -328,7 +298,7 @@ Application Layer:
 
 ---
 
-### 10. RAG Component (src/core/rag/)
+### 8. RAG Component (src/core/rag/)
 
 #### Dependencies
 - **PostgreSQL Database**: Required for vector storage and similarity search

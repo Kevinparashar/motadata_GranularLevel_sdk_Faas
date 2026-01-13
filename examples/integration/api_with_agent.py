@@ -48,9 +48,16 @@ class AgentTaskResponse(BaseModel):
 # Initialize components
 api_key = os.getenv("OPENAI_API_KEY") or os.getenv("ANTHROPIC_API_KEY")
 provider = "openai" if os.getenv("OPENAI_API_KEY") else "anthropic"
+default_model = "gpt-3.5-turbo" if provider == "openai" else "claude-3-haiku-20240307"
 
 if api_key:
-    gateway = LiteLLMGateway(api_key=api_key, provider=provider)
+    from src.core.litellm_gateway import create_gateway
+    
+    gateway = create_gateway(
+        providers=[provider],
+        default_model=default_model,
+        api_keys={provider: api_key}
+    )
     agent_manager = AgentManager()
     
     # Create default agent
@@ -59,7 +66,7 @@ if api_key:
         name="API Agent",
         description="Agent exposed via API",
         gateway=gateway,
-        llm_model="gpt-4" if provider == "openai" else "claude-3-opus-20240229"
+        llm_model=default_model
     )
     agent_manager.register_agent(default_agent)
 
