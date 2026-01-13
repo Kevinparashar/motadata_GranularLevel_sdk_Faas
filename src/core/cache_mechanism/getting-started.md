@@ -450,6 +450,6 @@ print(f"Memory usage: {stats['memory_mb']} MB")
 ## Next Steps
 
 - See [README.md](README.md) for detailed component documentation
-- Check [component_explanation/cache_mechanism_explanation.md](../../../component_explanation/cache_mechanism_explanation.md) for comprehensive guide
+- Check [docs/components/cache_mechanism_explanation.md](../../../docs/components/cache_mechanism_explanation.md) for comprehensive guide
 - Review [troubleshooting guide](../../../docs/troubleshooting/cache_mechanism_troubleshooting.md) for common issues
 

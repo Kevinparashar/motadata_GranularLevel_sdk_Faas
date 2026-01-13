@@ -197,6 +197,6 @@ features = feature_store.get_feature(
 ## Next Steps
 
 - See [README.md](README.md) for detailed component documentation
-- Check [component_explanation/ml_data_management_explanation.md](../../../../component_explanation/ml_data_management_explanation.md) for comprehensive guide
+- Check [docs/components/ml_data_management_explanation.md](../../../../docs/components/ml_data_management_explanation.md) for comprehensive guide
 - Review [troubleshooting guide](../../../../docs/troubleshooting/ml_data_management_troubleshooting.md) for common issues
 

@@ -389,6 +389,6 @@ except ModelNotFoundError as e:
 ## Next Steps
 
 - See [README.md](README.md) for detailed component documentation
-- Check [component_explanation/ml_framework_explanation.md](../../../../component_explanation/ml_framework_explanation.md) for comprehensive guide
+- Check [docs/components/ml_framework_explanation.md](../../../../docs/components/ml_framework_explanation.md) for comprehensive guide
 - Review [troubleshooting guide](../../../../docs/troubleshooting/ml_framework_troubleshooting.md) for common issues
 

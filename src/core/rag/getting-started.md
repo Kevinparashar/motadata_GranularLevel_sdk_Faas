@@ -518,7 +518,7 @@ result = quick_rag_query(
 ## Next Steps
 
 - See [README.md](README.md) for detailed component documentation
-- Check [component_explanation/rag_system_explanation.md](../../../component_explanation/rag_system_explanation.md) for comprehensive guide
+- Check [docs/components/rag_system_explanation.md](../../../docs/components/rag_system_explanation.md) for comprehensive guide
 - Review [troubleshooting guide](../../../docs/troubleshooting/rag_system_troubleshooting.md) for common issues
 - Explore [examples/basic_usage/06_rag_basic.py](../../../examples/basic_usage/06_rag_basic.py) for more examples
 

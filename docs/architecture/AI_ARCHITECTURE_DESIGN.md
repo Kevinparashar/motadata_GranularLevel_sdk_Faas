@@ -1925,7 +1925,7 @@ user_data = memory.export_user_data(user_id, tenant_id)
 src/core/{component}/
 ├── README.md                    # Component overview
 ├── getting-started.md           # Quick start guide
-└── {component}_explanation.md   # Detailed explanation (in component_explanation/)
+└── {component}_explanation.md   # Detailed explanation (in docs/components/)
 ```
 
 **Content**:

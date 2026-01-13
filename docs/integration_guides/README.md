@@ -22,6 +22,6 @@ This directory contains integration guides for core platform components (NATS, O
 
 ## Related Documentation
 
-- [CORE_COMPONENTS_INTEGRATION_STORY.md](../../CORE_COMPONENTS_INTEGRATION_STORY.md) - Complete integration story and architecture
+- [CORE_COMPONENTS_INTEGRATION_STORY.md](../components/CORE_COMPONENTS_INTEGRATION_STORY.md) - Complete integration story and architecture
 - Component-specific README files in `src/core/` directories
 

@@ -84,7 +84,7 @@ See `use_cases/README.md` for instructions on creating new ITSM-specific ML mode
 
 ## Related Documentation
 
-- Component explanations: `component_explanation/`
+- Component explanations: `docs/components/`
 - Troubleshooting guides: `docs/troubleshooting/`
 
 

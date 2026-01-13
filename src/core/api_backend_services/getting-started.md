@@ -421,7 +421,7 @@ register_router(app, v2_router)
 ## Next Steps
 
 - See [README.md](README.md) for detailed component documentation
-- Check [component_explanation/api_backend_services_explanation.md](../../../component_explanation/api_backend_services_explanation.md) for comprehensive guide
+- Check [docs/components/api_backend_services_explanation.md](../../../docs/components/api_backend_services_explanation.md) for comprehensive guide
 - Review [troubleshooting guide](../../../docs/troubleshooting/api_backend_services_troubleshooting.md) for common issues
 - Run API: `uvicorn app:app --reload`
 

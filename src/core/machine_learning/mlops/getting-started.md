@@ -406,6 +406,6 @@ deployment.deploy_model(
 ## Next Steps
 
 - See [README.md](README.md) for detailed component documentation
-- Check [component_explanation/mlops_explanation.md](../../../../component_explanation/mlops_explanation.md) for comprehensive guide
+- Check [docs/components/mlops_explanation.md](../../../../docs/components/mlops_explanation.md) for comprehensive guide
 - Review [troubleshooting guide](../../../../docs/troubleshooting/mlops_troubleshooting.md) for common issues
 
