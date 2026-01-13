@@ -1,0 +1,11 @@
+# Document Q&A Use Case Requirements
+
+# Core SDK dependencies
+# TODO: Add Core SDK NATS, OTEL, CODEC dependencies when available
+
+# AI SDK dependencies
+-r ../../../requirements.txt
+
+# Additional dependencies for this use case
+python-dotenv>=1.0.0
+
