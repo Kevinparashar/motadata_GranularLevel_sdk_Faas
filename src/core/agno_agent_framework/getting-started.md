@@ -387,7 +387,7 @@ result1 = await agent1.execute_task(task1)
 ## Next Steps
 
 - See [README.md](README.md) for detailed component documentation
-- Check [component_explanation/agno_agent_framework_explanation.md](../../../component_explanation/agno_agent_framework_explanation.md) for comprehensive guide
+- Check [docs/components/agno_agent_framework_explanation.md](../../../docs/components/agno_agent_framework_explanation.md) for comprehensive guide
 - Review [troubleshooting guide](../../../docs/troubleshooting/agent_troubleshooting.md) for common issues
 - Explore [examples/basic_usage/07_agent_basic.py](../../../examples/basic_usage/07_agent_basic.py) for more examples
 

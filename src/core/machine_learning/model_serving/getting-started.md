@@ -140,6 +140,6 @@ server.start_server()
 ## Next Steps
 
 - See [README.md](README.md) for detailed component documentation
-- Check [component_explanation/model_serving_explanation.md](../../../../component_explanation/model_serving_explanation.md) for comprehensive guide
+- Check [docs/components/model_serving_explanation.md](../../../../docs/components/model_serving_explanation.md) for comprehensive guide
 - Review [troubleshooting guide](../../../../docs/troubleshooting/model_serving_troubleshooting.md) for common issues
 

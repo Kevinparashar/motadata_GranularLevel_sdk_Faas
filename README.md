@@ -820,8 +820,8 @@ See `src/tests/unit_tests/README.md` and `src/tests/integration_tests/README.md`
 - **Component Documentation**: See individual README files in each component folder
 - **Examples**: See `examples/README.md` for working code examples
 - **Tests**: See `src/tests/` for test suites and validation examples
-- **Workflows**: See `src/workflows.md` for detailed workflow diagrams
-- **Libraries**: See `src/libraries.md` for complete library list
+- **Workflows**: See `docs/workflows.md` for detailed workflow diagrams
+- **Libraries**: See `docs/libraries.md` for complete library list
 - **Developer Guide**: See `README_DEVELOPER.md` for development guidelines
 - **Ground Truth Analysis**: See `GROUND_TRUTH_ANALYSIS.md` for SDK as reference implementation guide
 - **OpenTelemetry Guide**: See `OTEL_IMPLEMENTATION_GUIDE.md` for comprehensive OTEL integration and observability
@@ -829,7 +829,10 @@ See `src/tests/unit_tests/README.md` and `src/tests/integration_tests/README.md`
   - `nats_integration_guide.md` - NATS messaging integration
   - `otel_integration_guide.md` - OpenTelemetry observability integration
   - `codec_integration_guide.md` - CODEC serialization integration
-- **Integration Story**: See `CORE_COMPONENTS_INTEGRATION_STORY.md` for comprehensive integration architecture and workflow
+- **Integration Story**: See `docs/components/CORE_COMPONENTS_INTEGRATION_STORY.md` for comprehensive integration architecture and workflow
+- **End-to-End Flow**: See `docs/AI_SDK_END_TO_END_FLOW.md` for complete development to runtime execution flow
+- **Architecture**: See `docs/architecture/` for detailed architecture documentation
+- **Component Explanations**: See `docs/components/` for comprehensive component documentation
 
 ## Modularity and Swappability
 

@@ -446,7 +446,7 @@ llmops = LLMOps(storage_path="./llmops_data")
 ## Next Steps
 
 - See [README.md](README.md) for detailed component documentation
-- Check [component_explanation/litellm_gateway_explanation.md](../../../component_explanation/litellm_gateway_explanation.md) for comprehensive guide
+- Check [docs/components/litellm_gateway_explanation.md](../../../docs/components/litellm_gateway_explanation.md) for comprehensive guide
 - Review [troubleshooting guide](../../../docs/troubleshooting/litellm_gateway_troubleshooting.md) for common issues
 - Explore [examples/basic_usage/05_litellm_gateway_basic.py](../../../examples/basic_usage/05_litellm_gateway_basic.py) for more examples
 

@@ -46,8 +46,7 @@ motadata-python-ai-sdk/
 │   │       ├── benchmark_otel_overhead.py
 │   │       └── benchmark_codec_serialization.py
 │   │
-│   ├── workflows.md             # Workflow diagrams
-│   └── libraries.md              # Library list
+│   └── (workflows.md and libraries.md moved to docs/)
 │
 ├── examples/                     # Working code examples
 │   ├── README.md
@@ -89,9 +88,16 @@ motadata-python-ai-sdk/
 │
 ├── README.md                     # Main documentation
 ├── README_DEVELOPER.md          # Developer guide
-├── PROJECT_STRUCTURE.md         # This file
-├── EXAMPLES_AND_TESTS_SUMMARY.md # Examples and tests summary
-└── SDK_DEVELOPMENT_STORY.md     # Development story
+├── docs/                         # Consolidated documentation
+│   ├── components/              # Component explanations
+│   ├── architecture/           # Architecture documentation
+│   ├── troubleshooting/        # Troubleshooting guides
+│   ├── integration_guides/     # Integration guides
+│   ├── workflows.md           # Workflow diagrams
+│   ├── libraries.md            # Library list
+│   ├── AI_SDK_END_TO_END_FLOW.md # End-to-end flow
+│   ├── BUILDING_NEW_USECASE_GUIDE.md # Use case guide
+│   └── SDK_DEVELOPMENT_STORY.md # Development story
 ```
 
 ## Component Locations

@@ -393,6 +393,6 @@ print(f"Active connections: {health['active_connections']}")
 ## Next Steps
 
 - See [README.md](README.md) for detailed component documentation
-- Check [component_explanation/postgresql_database_explanation.md](../../../component_explanation/postgresql_database_explanation.md) for comprehensive guide
+- Check [docs/components/postgresql_database_explanation.md](../../../docs/components/postgresql_database_explanation.md) for comprehensive guide
 - Review [troubleshooting guide](../../../docs/troubleshooting/postgresql_database_troubleshooting.md) for common issues
 

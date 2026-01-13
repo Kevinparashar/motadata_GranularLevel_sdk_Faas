@@ -344,6 +344,6 @@ prompt = render_prompt(
 ## Next Steps
 
 - See [README.md](README.md) for detailed component documentation
-- Check [component_explanation/prompt_context_management_explanation.md](../../../component_explanation/prompt_context_management_explanation.md) for comprehensive guide
+- Check [docs/components/prompt_context_management_explanation.md](../../../docs/components/prompt_context_management_explanation.md) for comprehensive guide
 - Review [troubleshooting guide](../../../docs/troubleshooting/prompt_context_management_troubleshooting.md) for common issues
 
