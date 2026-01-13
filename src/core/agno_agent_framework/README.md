@@ -37,6 +37,29 @@ print(response["answer"])
 
 The Agno Agent Framework provides autonomous AI agent capabilities within the SDK. It enables the creation, management, and coordination of multiple AI agents that can execute tasks, communicate with each other, and work together to solve complex problems.
 
+### Multi-Tenancy Support
+
+The Agent Framework fully supports **multi-tenant SaaS architectures** through the `tenant_id` parameter:
+
+- **Tenant Isolation**: Each agent can be associated with a specific tenant via `tenant_id`
+- **Task Validation**: When executing tasks, `tenant_id` is validated to ensure tenant isolation
+- **Memory Isolation**: Agent memory is automatically scoped by `tenant_id` when using persistent storage
+- **Data Security**: All agent operations respect tenant boundaries for secure multi-tenant deployments
+
+**Example:**
+```python
+# Create agent with tenant_id
+agent = create_agent(
+    "agent1", 
+    "Assistant", 
+    gateway,
+    tenant_id="tenant_abc"  # Multi-tenant support
+)
+
+# Execute task with tenant validation
+result = await agent.execute_task(task, tenant_id="tenant_abc")
+```
+
 ## Purpose and Functionality
 
 The framework implements a multi-agent system where each agent is an autonomous entity capable of:
@@ -140,11 +163,12 @@ from src.core.agno_agent_framework import (
 
 # Create a basic agent
 gateway = LiteLLMGateway()
-agent = create_agent("agent1", "Assistant", gateway)
+agent = create_agent("agent1", "Assistant", gateway, tenant_id="tenant_123")
 
 # Create agent with memory pre-configured (with bounded memory)
 agent = create_agent_with_memory(
     "agent2", "Analyst", gateway,
+    tenant_id="tenant_123",  # Multi-tenant support
     memory_config={
         "persistence_path": "/tmp/memory.json",
         "max_episodic": 500,  # Limit episodic memory (ticket history)
@@ -156,6 +180,7 @@ agent = create_agent_with_memory(
 # Create agent with prompt management pre-configured
 agent = create_agent_with_prompt_management(
     "agent3", "Helper", gateway,
+    tenant_id="tenant_123",  # Multi-tenant support
     system_prompt="You are a helpful AI assistant.",
     role_template="assistant_role",
     max_context_tokens=8000
@@ -177,6 +202,7 @@ tool = Tool(
 
 agent = create_agent_with_tools(
     "agent4", "Calculator", gateway,
+    tenant_id="tenant_123",  # Multi-tenant support
     tools=[tool],
     enable_tool_calling=True,
     max_tool_iterations=10
@@ -206,6 +232,7 @@ from src.core.agno_agent_framework import (
 response = await chat_with_agent(
     agent,
     "What is AI?",
+    tenant_id="tenant_123",  # Multi-tenant support
     context={"user_id": "user123"}
 )
 print(response["answer"])
@@ -361,6 +388,7 @@ agent = create_agent_with_prompt_management(
     agent_id="agent1",
     name="Assistant",
     gateway=gateway,
+    tenant_id="tenant_123",  # Multi-tenant support
     system_prompt="You are a helpful AI assistant specialized in technical questions.",
     role_template="technical_assistant",
     max_context_tokens=8000
@@ -483,30 +511,28 @@ if pressure["under_pressure"]:
 
 ## Task Execution Flow
 
-1. **Task Submission**: A task is submitted to an agent through the `add_task()` method, which adds it to the agent's task queue.
-2. **Task Selection**: The agent selects the highest priority task from its queue.
-3. **Prompt Building**: If prompt management is enabled:
+1. **Task Submission**: A task is submitted to an agent through the `add_task()` method or `execute_task()` method, which adds it to the agent's task queue.
+2. **Tenant Validation**: If `tenant_id` is provided in `execute_task()`, it is validated against the agent's `tenant_id` to ensure tenant isolation. If validation fails, an `AgentConfigurationError` is raised.
+3. **Task Selection**: The agent selects the highest priority task from its queue.
+4. **Prompt Building**: If prompt management is enabled:
    - System prompt is added (if configured)
    - Role template is rendered (if configured)
    - Relevant memories are retrieved and added as context
    - Conversation history is included
-4. **Tool Preparation**: If tools are registered and tool calling is enabled:
+5. **Tool Preparation**: If tools are registered and tool calling is enabled:
    - Tool schemas are prepared for LLM function calling
    - Tools are included in the LLM request
-5. **LLM Call**: The enhanced prompt (and tools) is sent to the LiteLLM Gateway
-6. **Tool Execution Loop** (if tool calling enabled):
+6. **LLM Call**: The enhanced prompt (and tools) is sent to the LiteLLM Gateway with `tenant_id` context for proper isolation.
+7. **Tool Execution Loop** (if tool calling enabled):
    - LLM response is checked for function calls
    - If function calls are present:
      - Tools are executed with provided arguments
      - Tool results are fed back to the LLM
      - Process repeats until no more function calls or max iterations reached
-7. **Result Processing**: Final LLM response is processed and returned
-8. **Memory Storage**: Task result is stored in agent memory (if memory is attached)
+8. **Result Processing**: Final LLM response is processed and returned
+9. **Memory Storage**: Task result is stored in agent memory (if memory is attached) with `tenant_id` scoping
    - Token budget is enforced
-4. **LLM Reasoning**: The agent uses the LiteLLM Gateway with the enhanced prompt to generate responses or make decisions.
-5. **Task Execution**: The agent executes the task based on its capabilities and the LLM's guidance.
-6. **Result Storage**: Task results can be stored in memory and database for persistence.
-7. **Status Update**: The agent updates its status and notifies the observability system.
+10. **Status Update**: The agent updates its status and notifies the observability system with tenant context.
 
 ## Error Handling
 
@@ -594,7 +620,9 @@ See `examples/integration/multi_agent_orchestration.py` for complete examples.
 7. **Circuit Breaker Configuration**: Configure circuit breakers appropriately for your use case to prevent cascading failures.
 8. **Health Monitoring**: Regularly check agent health to detect issues early.
 9. **Memory Management**: Set appropriate memory bounds for long-running agents to prevent memory leaks.
-10. **Troubleshooting**: Refer to `docs/troubleshooting/agent_troubleshooting.md` for common issues and solutions.
+10. **Multi-Tenancy**: Always provide `tenant_id` when creating agents in multi-tenant environments to ensure proper tenant isolation and data security.
+11. **Tenant Validation**: When executing tasks, ensure the `tenant_id` matches the agent's `tenant_id` to prevent cross-tenant data access.
+12. **Troubleshooting**: Refer to `docs/troubleshooting/agent_troubleshooting.md` for common issues and solutions.
 
 ## Examples and Tests
 
