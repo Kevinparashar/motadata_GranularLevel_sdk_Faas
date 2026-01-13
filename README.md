@@ -258,6 +258,31 @@ motadata-python-ai-sdk/
    - **Cache Validation Processes** to ensure the integrity of cached data
    - **Automatic Recovery Mechanisms** for cache failures
 
+### Core Platform Integrations (src/integrations/)
+
+10. **NATS Integration** (`src/integrations/nats_integration/`)
+    - Asynchronous messaging for all AI components
+    - Agent-to-agent communication via pub/sub
+    - Gateway request queuing and response delivery
+    - RAG document ingestion and query processing queues
+    - Multi-tenant topic isolation
+    - Error handling and reconnection logic
+
+11. **OTEL Integration** (`src/integrations/otel_integration/`)
+    - Distributed tracing across all components
+    - Metrics collection for performance monitoring
+    - Structured logging with trace context
+    - Token usage and cost tracking
+    - Trace propagation through NATS messages
+    - Integration with OTEL collector
+
+12. **CODEC Integration** (`src/integrations/codec_integration/`)
+    - Message encoding/decoding for NATS communications
+    - Schema versioning and migration
+    - Message validation and error handling
+    - Support for multiple encoding formats
+    - Agent message, Gateway request/response, and RAG payload serialization
+
 
 ## Flow and Interconnections
 
@@ -284,6 +309,9 @@ Response with Observability
 - **Agents ↔ Memory**: Agents use memory for context-aware prompt building
 - **Cache ↔ All**: All components can use caching
 - **Observability ↔ All**: All operations are traced and logged
+- **NATS ↔ All**: Asynchronous messaging for all AI components
+- **OTEL ↔ All**: Distributed tracing and metrics for all operations
+- **CODEC ↔ NATS**: Message serialization for all NATS communications
 
 ## Requirements and Prerequisites
 
@@ -759,6 +787,9 @@ The SDK includes comprehensive test suites:
   - `test_agent_rag_integration.py` - Agent-RAG integration
   - `test_api_agent_integration.py` - API-Agent integration
   - `test_end_to_end_workflows.py` - Complete workflow tests
+  - `test_nats_integration.py` - NATS messaging integration
+  - `test_otel_integration.py` - OpenTelemetry observability integration
+  - `test_codec_integration.py` - CODEC serialization integration
 
 ### Running Tests
 ```bash
@@ -794,6 +825,11 @@ See `src/tests/unit_tests/README.md` and `src/tests/integration_tests/README.md`
 - **Developer Guide**: See `README_DEVELOPER.md` for development guidelines
 - **Ground Truth Analysis**: See `GROUND_TRUTH_ANALYSIS.md` for SDK as reference implementation guide
 - **OpenTelemetry Guide**: See `OTEL_IMPLEMENTATION_GUIDE.md` for comprehensive OTEL integration and observability
+- **Core Platform Integrations**: See `docs/integration_guides/` for NATS, OTEL, and CODEC integration guides
+  - `nats_integration_guide.md` - NATS messaging integration
+  - `otel_integration_guide.md` - OpenTelemetry observability integration
+  - `codec_integration_guide.md` - CODEC serialization integration
+- **Integration Story**: See `CORE_COMPONENTS_INTEGRATION_STORY.md` for comprehensive integration architecture and workflow
 
 ## Modularity and Swappability
 

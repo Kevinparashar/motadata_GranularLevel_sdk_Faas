@@ -46,6 +46,23 @@ Benchmarks measure:
   - Batch insert performance
   - Connection pool performance
 
+### Core Platform Integration Benchmarks
+
+- **`benchmark_nats_performance.py`**: NATS messaging performance
+  - Agent messaging latency (< 10ms P95 target)
+  - RAG queue throughput (> 100 msg/sec target)
+  - Gateway queuing performance (< 5ms P95 target)
+
+- **`benchmark_otel_overhead.py`**: OTEL observability overhead
+  - Tracing overhead (< 5% of operation time target)
+  - Metrics collection overhead (< 2% target)
+  - Logging overhead (< 1% target)
+
+- **`benchmark_codec_serialization.py`**: CODEC serialization performance
+  - Agent message serialization (< 1ms P95 target)
+  - RAG payload encoding (< 2ms P95 target)
+  - Schema validation latency (< 0.5ms P95 target)
+
 ### System Benchmarks
 
 - **`load_test_api.py`**: API endpoint load testing
@@ -137,6 +154,11 @@ Benchmarks output detailed statistics:
 - **Health Endpoint**: < 100ms avg, < 200ms P95
 - **Success Rate**: > 99%
 - **Concurrent Requests**: > 95% success
+
+#### Core Platform Integrations
+- **NATS Messaging**: < 10ms P95 latency for agent messaging
+- **OTEL Overhead**: < 5% tracing overhead, < 2% metrics overhead
+- **CODEC Serialization**: < 1ms P95 for agent messages, < 2ms for RAG payloads
 
 #### Stress Tests
 - **Gateway Stress**: > 90% success under high load

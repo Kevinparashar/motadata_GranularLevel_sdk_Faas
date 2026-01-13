@@ -16,6 +16,26 @@ Integration tests verify that multiple components work together correctly. They 
   - API service with agent
   - Agent task execution via API
 
+### Core Platform Integration Tests
+
+- **`test_nats_integration.py`**: Tests NATS messaging integration
+  - NATS integration with Agent Framework (messaging, task distribution)
+  - NATS integration with LiteLLM Gateway (request queuing, response delivery)
+  - NATS integration with RAG System (document ingestion, query processing)
+  - NATS error handling (connection failures, timeouts)
+
+- **`test_otel_integration.py`**: Tests OpenTelemetry observability integration
+  - OTEL integration with LiteLLM Gateway (tracing, metrics, token tracking)
+  - OTEL integration with RAG System (query tracing, retrieval performance)
+  - OTEL integration with Agent Framework (task tracing, memory tracking)
+  - OTEL trace propagation across components
+
+- **`test_codec_integration.py`**: Tests CODEC serialization integration
+  - CODEC integration with Agent Framework (message encoding/decoding)
+  - CODEC integration with LiteLLM Gateway (request/response serialization)
+  - CODEC integration with RAG System (document and query encoding)
+  - CODEC schema validation and versioning
+
 ### End-to-End Tests
 
 - **`test_end_to_end_workflows.py`**: Tests complete workflows from start to finish

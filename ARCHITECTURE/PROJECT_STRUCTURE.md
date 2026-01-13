@@ -30,9 +30,21 @@ motadata-python-ai-sdk/
 │   │   ├── validation/          # Validation and guardrails
 │   │   └── interfaces.py        # Swappable interfaces
 │   │
+│   ├── integrations/             # Core platform integrations
+│   │   ├── nats_integration/    # NATS messaging integration
+│   │   ├── otel_integration/    # OpenTelemetry observability integration
+│   │   └── codec_integration/   # CODEC serialization integration
+│   │
 │   ├── tests/                    # Tests
 │   │   ├── unit_tests/          # Unit tests
-│   │   └── integration_tests/   # Integration tests
+│   │   ├── integration_tests/   # Integration tests
+│   │   │   ├── test_nats_integration.py
+│   │   │   ├── test_otel_integration.py
+│   │   │   └── test_codec_integration.py
+│   │   └── benchmarks/          # Performance benchmarks
+│   │       ├── benchmark_nats_performance.py
+│   │       ├── benchmark_otel_overhead.py
+│   │       └── benchmark_codec_serialization.py
 │   │
 │   ├── workflows.md             # Workflow diagrams
 │   └── libraries.md              # Library list
@@ -104,6 +116,12 @@ All AI-related components are in `src/core/`:
 - `llmops/` - LLMOps tracking and metrics
 - `validation/` - Validation and guardrails framework
 
+### Integration Modules (src/integrations/)
+Core platform component integrations:
+- `nats_integration/` - NATS messaging integration for async communication
+- `otel_integration/` - OpenTelemetry observability integration for tracing and metrics
+- `codec_integration/` - CODEC serialization integration for message encoding/decoding
+
 ### Tests (src/tests/)
 - `unit_tests/` - Unit tests for all components
   - `test_observability.py` - Observability tests
@@ -116,6 +134,13 @@ All AI-related components are in `src/core/`:
   - `test_agent_rag_integration.py` - Agent-RAG integration
   - `test_api_agent_integration.py` - API-Agent integration
   - `test_end_to_end_workflows.py` - End-to-end workflows
+  - `test_nats_integration.py` - NATS integration tests
+  - `test_otel_integration.py` - OTEL integration tests
+  - `test_codec_integration.py` - CODEC integration tests
+- `benchmarks/` - Performance benchmarks
+  - `benchmark_nats_performance.py` - NATS performance benchmarks
+  - `benchmark_otel_overhead.py` - OTEL overhead benchmarks
+  - `benchmark_codec_serialization.py` - CODEC serialization benchmarks
 
 ### Examples (examples/)
 - `basic_usage/` - Working examples for each component (8 examples)
@@ -135,6 +160,12 @@ from src.core.rag import RAGSystem, create_rag_system
 from src.core.agno_agent_framework import Agent, create_agent
 from src.core.api_backend_services import create_unified_query_endpoint
 from src.core.cache_mechanism import CacheMechanism, CacheConfig
+
+### Integration Modules
+```python
+from src.integrations.nats_integration import NATSClient
+from src.integrations.otel_integration import OTELTracer, OTELMetrics
+from src.integrations.codec_integration import CodecSerializer
 ```
 
 
