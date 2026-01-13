@@ -131,6 +131,37 @@ This folder contains comprehensive documentation for each component of the Motad
     - Workflow
     - Customization
 
+### Core Platform Integrations
+
+13. **[NATS Integration](nats_integration_explanation.md)**
+    - Asynchronous messaging
+    - Agent-to-agent communication
+    - Gateway request queuing
+    - RAG document processing queues
+    - Pub/Sub patterns
+    - Error handling
+    - Workflow
+    - Customization
+
+14. **[OTEL Integration](otel_integration_explanation.md)**
+    - Distributed tracing
+    - Metrics collection
+    - Structured logging
+    - Trace propagation
+    - Performance monitoring
+    - Error tracking
+    - Workflow
+    - Customization
+
+15. **[CODEC Integration](codec_integration_explanation.md)**
+    - Message encoding/decoding
+    - Schema versioning
+    - Message validation
+    - Version migration
+    - Error handling
+    - Workflow
+    - Customization
+
 
 ## Documentation Structure
 

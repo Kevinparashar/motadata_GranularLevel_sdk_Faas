@@ -154,6 +154,24 @@ All components have comprehensive unit tests:
    - Agent with RAG workflow
    - Multi-component integration
 
+4. **`test_nats_integration.py`** - NATS Integration Tests
+   - Agent Framework NATS messaging
+   - Gateway NATS queuing
+   - RAG System NATS queues
+   - Error handling
+
+5. **`test_otel_integration.py`** - OTEL Integration Tests
+   - Gateway tracing and metrics
+   - RAG System observability
+   - Agent Framework tracing
+   - Trace propagation
+
+6. **`test_codec_integration.py`** - CODEC Integration Tests
+   - Agent message encoding/decoding
+   - Gateway request/response serialization
+   - RAG document encoding
+   - Schema validation
+
 ### 3. Documentation Updates
 
 All documentation files have been updated to reference examples and tests:
@@ -213,7 +231,14 @@ motadata-python-ai-sdk/
 │   └── integration_tests/
 │       ├── test_agent_rag_integration.py
 │       ├── test_api_agent_integration.py
-│       └── test_end_to_end_workflows.py
+│       ├── test_end_to_end_workflows.py
+│       ├── test_nats_integration.py
+│       ├── test_otel_integration.py
+│       └── test_codec_integration.py
+│   └── benchmarks/
+│       ├── benchmark_nats_performance.py
+│       ├── benchmark_otel_overhead.py
+│       └── benchmark_codec_serialization.py
 │
 └── Documentation Updates:
     ├── README.md (updated)
