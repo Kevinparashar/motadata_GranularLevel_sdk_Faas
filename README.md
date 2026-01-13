@@ -102,12 +102,10 @@ The SDK follows a layered architecture with clear separation of concerns:
 
 ### Foundation Layer
 - **Evaluation & Observability**: Provides tracing, logging, and metrics for all components
-- **Pool Implementation**: Manages connection and resource pooling
 
 ### Infrastructure Layer
 - **LiteLLM Gateway**: Unified interface for multiple LLM providers
 - **PostgreSQL Database**: Vector database with pgvector for embeddings
-- **Connectivity Clients**: Service connection management with health monitoring
 
 ### Core Layer
 - **Agent Framework**: Autonomous agents with session, memory, tools, and plugins
@@ -152,9 +150,6 @@ motadata-python-ai-sdk/
 │       ├── evaluation_observability/
 │       ├── api_backend_services/
 │       └── cache_mechanism/
-├── connectivity_clients/         # Outside src
-├── pool_implementation/          # Outside src
-├── governance_framework/        # Outside src
 └── src/tests/                   # Tests
 ```
 
@@ -263,21 +258,6 @@ motadata-python-ai-sdk/
    - **Cache Validation Processes** to ensure the integrity of cached data
    - **Automatic Recovery Mechanisms** for cache failures
 
-10. **Connectivity Clients** (`connectivity_clients/`)
-   - Client connection management
-   - Connection pooling
-   - Health monitoring
-
-10. **Pool Implementation** (`pool_implementation/`)
-    - Resource pooling
-    - Connection management
-    - Thread pool management
-
-11. **Governance Framework** (`governance_framework/`)
-    - Security policies
-    - Code review guidelines
-    - Release processes
-    - Documentation standards
 
 ## Flow and Interconnections
 
@@ -716,15 +696,13 @@ The SDK includes comprehensive working examples and tutorials:
 ### Basic Usage Examples
 - **Component Examples**: See `examples/basic_usage/` for working examples of each component
   - `01_observability_basic.py` - Observability and tracing
-  - `02_pool_implementation_basic.py` - Connection and thread pooling
-  - `03_postgresql_database_basic.py` - Database operations
-  - `04_connectivity_basic.py` - HTTP and WebSocket clients
-  - `05_litellm_gateway_basic.py` - LLM operations
-  - `06_cache_basic.py` - Caching strategies
-  - `07_agent_basic.py` - Agent framework
-  - `08_prompt_context_basic.py` - Prompt management
-  - `09_rag_basic.py` - RAG system
-  - `10_api_backend_basic.py` - REST API endpoints
+  - `02_postgresql_database_basic.py` - Database operations
+  - `03_litellm_gateway_basic.py` - LLM operations
+  - `04_cache_basic.py` - Caching strategies
+  - `05_agent_basic.py` - Agent framework
+  - `06_prompt_context_basic.py` - Prompt management
+  - `07_rag_basic.py` - RAG system
+  - `08_api_backend_basic.py` - REST API endpoints
 
 ### Integration Examples
 - **Component Integration**: See `examples/integration/` for multi-component examples
@@ -762,7 +740,6 @@ The SDK includes comprehensive test suites:
 ### Unit Tests
 - **Component Tests**: See `src/tests/unit_tests/` for component-specific tests
   - `test_observability.py` - Observability tests
-  - `test_pool_implementation.py` - Pool tests
   - `test_postgresql_database.py` - Database tests
   - `test_litellm_gateway.py` - Gateway tests
   - `test_cache.py` - Cache tests

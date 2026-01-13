@@ -49,7 +49,6 @@ unit_tests/
 │   ├── test_litellm_gateway.py          # LiteLLM Gateway class tests
 │   ├── test_rag.py                      # RAG system class tests
 │   ├── test_postgresql_database.py      # Database tests
-│   ├── test_pool_implementation.py      # Pool implementation tests
 │   └── test_observability.py           # Observability tests
 │
 └── Function-Driven API Tests

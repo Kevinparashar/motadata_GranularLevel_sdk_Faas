@@ -5,22 +5,30 @@ Demonstrates how to integrate Agent Framework with RAG system
 to create an agent that can answer questions using retrieved context.
 """
 
+# Standard library imports
 import os
 import sys
-from pathlib import Path
 import asyncio
-from dotenv import load_dotenv
+from pathlib import Path
+
+# Third-party imports
+try:
+    from dotenv import load_dotenv  # type: ignore
+except ImportError:
+    load_dotenv = None
 
 # Add project root to path
 project_root = Path(__file__).parent.parent.parent
 sys.path.insert(0, str(project_root))
 
-load_dotenv(project_root / ".env")
+if load_dotenv:
+    load_dotenv(project_root / ".env")
 
+# Local application/library specific imports
 from src.core.agno_agent_framework import Agent, AgentManager
 from src.core.rag import RAGSystem
-from src.core.postgresql_database import PostgreSQLDatabase
-from src.core.litellm_gateway import LiteLLMGateway
+from src.core.postgresql_database import DatabaseConnection, DatabaseConfig
+from src.core.litellm_gateway import create_gateway
 
 
 async def main():
@@ -33,19 +41,24 @@ async def main():
         return
     
     provider = "openai" if os.getenv("OPENAI_API_KEY") else "anthropic"
+    default_model = "gpt-3.5-turbo" if provider == "openai" else "claude-3-haiku-20240307"
     
     # Initialize components
-    gateway = LiteLLMGateway(api_key=api_key, provider=provider)
+    gateway = create_gateway(
+        providers=[provider],
+        default_model=default_model,
+        api_keys={provider: api_key}
+    )
     
-    db_config = {
-        "host": os.getenv("POSTGRES_HOST", "localhost"),
-        "port": int(os.getenv("POSTGRES_PORT", 5432)),
-        "database": os.getenv("POSTGRES_DB", "motadata_sdk"),
-        "user": os.getenv("POSTGRES_USER", "postgres"),
-        "password": os.getenv("POSTGRES_PASSWORD", "")
-    }
+    db_config = DatabaseConfig(
+        host=os.getenv("POSTGRES_HOST", "localhost"),
+        port=int(os.getenv("POSTGRES_PORT", 5432)),
+        database=os.getenv("POSTGRES_DB", "motadata_sdk"),
+        user=os.getenv("POSTGRES_USER", "postgres"),
+        password=os.getenv("POSTGRES_PASSWORD", "")
+    )
     
-    db = PostgreSQLDatabase(**db_config)
+    db = DatabaseConnection(db_config)
     db.connect()
     
     # Initialize RAG system
@@ -53,7 +66,7 @@ async def main():
         db=db,
         gateway=gateway,
         embedding_model="text-embedding-3-small" if provider == "openai" else "text-embedding-ada-002",
-        generation_model="gpt-4" if provider == "openai" else "claude-3-opus-20240229"
+        generation_model=default_model
     )
     
     # Ingest sample documents
@@ -85,7 +98,7 @@ async def main():
         name="RAG Assistant",
         description="An agent that uses RAG to answer questions",
         gateway=gateway,
-        llm_model="gpt-4" if provider == "openai" else "claude-3-opus-20240229"
+        llm_model=default_model
     )
     
     # Add RAG capability
@@ -151,7 +164,7 @@ Answer:
         
         response = await gateway.generate_async(
             prompt=prompt,
-            model=agent.llm_model or "gpt-4",
+            model=agent.llm_model or default_model,
             max_tokens=300
         )
         
@@ -170,7 +183,7 @@ Answer:
     print(f"Sources: {', '.join(result['sources'])}")
     
     # Cleanup
-    db.disconnect()
+    db.close()
     print("\n✅ Agent-RAG integration example completed!")
 
 

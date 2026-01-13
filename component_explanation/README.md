@@ -131,10 +131,6 @@ This folder contains comprehensive documentation for each component of the Motad
     - Workflow
     - Customization
 
-### Additional Components (To Be Added)
-
-13. **Connectivity Clients** (`connectivity_clients_explanation.md`) - Coming soon
-14. **Pool Implementation** (`pool_implementation_explanation.md`) - Coming soon
 
 ## Documentation Structure
 

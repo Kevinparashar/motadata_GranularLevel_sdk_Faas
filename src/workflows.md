@@ -42,13 +42,6 @@ This document provides a comprehensive visual and textual representation of the 
               │  PostgreSQL Database │
               │  (src/core/)         │
               └──────────────────────┘
-                           │
-                           ▼
-    ┌──────────────────────────────────────┐
-    │  Connectivity Clients (root/)       │
-    │  Pool Implementation (root/)        │
-    │  Governance Framework (root/)        │
-    └──────────────────────────────────────┘
 ```
 
 ## Component Interaction Workflows
@@ -250,33 +243,6 @@ Operation
              └─→ Error Response
 ```
 
-## Connection Management Workflow
-
-```
-Connection Request
-    │
-    ▼
-Pool Implementation (root/pool_implementation/)
-    │
-    ├─→ Check Available Connection
-    │   │
-    │   ├─→ Available → Return Connection
-    │   │
-    │   └─→ Not Available
-    │       │
-    │       ├─→ Create New (if under max)
-    │       │
-    │       └─→ Wait for Release
-    │
-    ▼
-Connection Usage
-    │
-    ▼
-Connection Release
-    │
-    ▼
-Return to Pool
-```
 
 ## Caching Workflow
 
@@ -361,9 +327,6 @@ Start Trace
    - Automatic routing based on query type
    - Dual processing support (both Agent and RAG)
 8. **Observability ↔ All**: All operations are traced and logged (src/core/)
-9. **Pool ↔ Database**: Database uses pool for connections (root/ ↔ src/core/)
-10. **Connectivity ↔ All**: All components use connectivity clients (root/ ↔ src/core/)
-11. **Governance ↔ All**: Governance framework applies to all components (root/)
 
 ### External Services
 

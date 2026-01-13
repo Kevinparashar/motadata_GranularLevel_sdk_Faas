@@ -5,24 +5,31 @@ End-to-end example demonstrating a complete question-answering system
 using RAG, Agents, and API Backend.
 """
 
+# Standard library imports
 import os
 import sys
-from pathlib import Path
-from dotenv import load_dotenv
 import asyncio
+from pathlib import Path
+
+# Third-party imports
+try:
+    from dotenv import load_dotenv  # type: ignore
+except ImportError:
+    load_dotenv = None
 
 # Add project root to path
 project_root = Path(__file__).parent.parent.parent
 sys.path.insert(0, str(project_root))
 
-load_dotenv(project_root / ".env")
+if load_dotenv:
+    load_dotenv(project_root / ".env")
 
+# Local application/library specific imports
 from src.core.rag import RAGSystem
-from src.core.postgresql_database import PostgreSQLDatabase
-from src.core.litellm_gateway import LiteLLMGateway
+from src.core.postgresql_database import DatabaseConnection, DatabaseConfig
+from src.core.litellm_gateway import create_gateway
 from src.core.agno_agent_framework import Agent, AgentManager
-from src.core.cache_mechanism import CacheManager, CacheBackend
-from src.core.evaluation_observability import ObservabilityManager
+from src.core.cache_mechanism import CacheMechanism, CacheConfig
 
 
 async def main():
@@ -39,52 +46,49 @@ async def main():
         return
     
     provider = "openai" if os.getenv("OPENAI_API_KEY") else "anthropic"
+    default_model = "gpt-3.5-turbo" if provider == "openai" else "claude-3-haiku-20240307"
     
-    # 1. Initialize Observability
-    print("\n[1/6] Initializing Observability...")
-    observability = ObservabilityManager(
-        service_name="qa-system",
-        environment="production"
+    # 1. Initialize Cache
+    print("\n[1/6] Initializing Cache...")
+    cache_config = CacheConfig(backend="memory", default_ttl=3600, max_size=2048)
+    cache = CacheMechanism(cache_config)
+    print("✅ Cache initialized")
+    
+    # 2. Initialize Database
+    print("[2/6] Initializing Database...")
+    db_config = DatabaseConfig(
+        host=os.getenv("POSTGRES_HOST", "localhost"),
+        port=int(os.getenv("POSTGRES_PORT", 5432)),
+        database=os.getenv("POSTGRES_DB", "motadata_sdk"),
+        user=os.getenv("POSTGRES_USER", "postgres"),
+        password=os.getenv("POSTGRES_PASSWORD", "")
     )
-    logger = observability.get_logger("qa-system")
-    logger.info("Q&A System starting")
     
-    # 2. Initialize Cache
-    print("[2/6] Initializing Cache...")
-    cache = CacheManager(backend=CacheBackend.MEMORY)
-    logger.info("Cache initialized")
-    
-    # 3. Initialize Database
-    print("[3/6] Initializing Database...")
-    db_config = {
-        "host": os.getenv("POSTGRES_HOST", "localhost"),
-        "port": int(os.getenv("POSTGRES_PORT", 5432)),
-        "database": os.getenv("POSTGRES_DB", "motadata_sdk"),
-        "user": os.getenv("POSTGRES_USER", "postgres"),
-        "password": os.getenv("POSTGRES_PASSWORD", "")
-    }
-    
-    db = PostgreSQLDatabase(**db_config)
+    db = DatabaseConnection(db_config)
     db.connect()
-    logger.info("Database connected")
+    print("✅ Database connected")
     
-    # 4. Initialize Gateway
-    print("[4/6] Initializing LiteLLM Gateway...")
-    gateway = LiteLLMGateway(api_key=api_key, provider=provider)
-    logger.info("Gateway initialized")
+    # 3. Initialize Gateway
+    print("[3/6] Initializing LiteLLM Gateway...")
+    gateway = create_gateway(
+        providers=[provider],
+        default_model=default_model,
+        api_keys={provider: api_key}
+    )
+    print("✅ Gateway initialized")
     
-    # 5. Initialize RAG System
-    print("[5/6] Initializing RAG System...")
+    # 4. Initialize RAG System
+    print("[4/6] Initializing RAG System...")
     rag = RAGSystem(
         db=db,
         gateway=gateway,
         embedding_model="text-embedding-3-small" if provider == "openai" else "text-embedding-ada-002",
-        generation_model="gpt-4" if provider == "openai" else "claude-3-opus-20240229"
+        generation_model=default_model
     )
-    logger.info("RAG system initialized")
+    print("✅ RAG system initialized")
     
-    # 6. Ingest Knowledge Base
-    print("\n[6/6] Ingesting Knowledge Base...")
+    # 5. Ingest Knowledge Base
+    print("[5/6] Ingesting Knowledge Base...")
     knowledge_base = [
         {
             "title": "SDK Overview",
@@ -128,23 +132,23 @@ async def main():
             metadata={"category": "sdk_documentation"}
         )
         document_ids.append(doc_id)
-        logger.info(f"Ingested document: {doc['title']}")
+        print(f"  ✅ Ingested: {doc['title']}")
     
     print(f"✅ Ingested {len(document_ids)} documents")
     
-    # 7. Create Q&A Agent
-    print("\n[7/7] Creating Q&A Agent...")
+    # 6. Create Q&A Agent
+    print("[6/6] Creating Q&A Agent...")
     agent = Agent(
         agent_id="qa-agent-001",
         name="Q&A Assistant",
         description="An intelligent assistant that answers questions using RAG",
         gateway=gateway,
-        llm_model="gpt-4" if provider == "openai" else "claude-3-opus-20240229"
+        llm_model=default_model
     )
     
     agent_manager = AgentManager()
     agent_manager.register_agent(agent)
-    logger.info("Agent created and registered")
+    print("✅ Agent created and registered")
     
     # 8. Interactive Q&A Loop
     print("\n" + "=" * 60)
@@ -172,17 +176,12 @@ async def main():
             continue
         
         # Query RAG system
-        with observability.start_trace("rag_query") as span:
-            span.set_attribute("query", question)
-            
-            result = rag.query(
-                query=question,
-                top_k=2,
-                threshold=0.7,
-                max_tokens=300
-            )
-            
-            span.set_attribute("documents_retrieved", result["num_documents"])
+        result = rag.query(
+            query=question,
+            top_k=2,
+            threshold=0.7,
+            max_tokens=300
+        )
         
         # Cache the result
         cache.set(cache_key, result, ttl=3600)
@@ -190,28 +189,21 @@ async def main():
         # Display answer
         print(f"✅ Answer: {result['answer']}")
         print(f"📚 Sources: {', '.join([doc.get('title', 'Unknown') for doc in result['retrieved_documents']])}")
-        
-        # Log metrics
-        observability.get_metrics().increment_counter("qa.queries.total")
-        observability.get_metrics().increment_counter("qa.queries.cache_miss")
     
     # 9. System Statistics
     print("\n" + "=" * 60)
     print("System Statistics")
     print("=" * 60)
     
-    cache_stats = cache.get_stats()
-    print(f"Cache hits: {cache_stats.get('hits', 0)}")
-    print(f"Cache misses: {cache_stats.get('misses', 0)}")
-    
+    # Get agent status
     agent_status = agent.get_status()
     print(f"Agent status: {agent_status['status']}")
-    print(f"Agent capabilities: {len(agent_status['capabilities'])}")
+    print(f"Agent capabilities: {len(agent_status.get('capabilities', []))}")
     
     # Cleanup
     print("\n[Cleanup] Closing connections...")
-    db.disconnect()
-    logger.info("Q&A System shutdown complete")
+    db.close()
+    print("✅ Q&A System shutdown complete")
     
     print("\n✅ Complete Q&A system example finished successfully!")
     print("=" * 60)

@@ -18,7 +18,7 @@ sys.path.insert(0, str(project_root))
 
 load_dotenv(project_root / ".env")
 
-from src.core.postgresql_database import PostgreSQLDatabase
+from src.core.postgresql_database import DatabaseConnection, DatabaseConfig
 from src.core.postgresql_database.vector_operations import VectorOperations
 
 
@@ -26,15 +26,15 @@ def main():
     """Demonstrate basic database operations."""
     
     # Initialize database connection
-    db_config = {
-        "host": os.getenv("POSTGRES_HOST", "localhost"),
-        "port": int(os.getenv("POSTGRES_PORT", 5432)),
-        "database": os.getenv("POSTGRES_DB", "motadata_sdk"),
-        "user": os.getenv("POSTGRES_USER", "postgres"),
-        "password": os.getenv("POSTGRES_PASSWORD", "")
-    }
+    db_config = DatabaseConfig(
+        host=os.getenv("POSTGRES_HOST", "localhost"),
+        port=int(os.getenv("POSTGRES_PORT", 5432)),
+        database=os.getenv("POSTGRES_DB", "motadata_sdk"),
+        user=os.getenv("POSTGRES_USER", "postgres"),
+        password=os.getenv("POSTGRES_PASSWORD", "")
+    )
     
-    db = PostgreSQLDatabase(**db_config)
+    db = DatabaseConnection(db_config)
     
     try:
         # Connect to database
@@ -101,7 +101,7 @@ def main():
         print(f"❌ Error: {e}")
         raise
     finally:
-        db.disconnect()
+        db.close()
         print("✅ Database connection closed")
     
     print("\n✅ PostgreSQL database example completed successfully!")

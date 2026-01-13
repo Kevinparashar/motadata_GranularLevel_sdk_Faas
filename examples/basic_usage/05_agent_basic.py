@@ -31,7 +31,7 @@ from src.core.agno_agent_framework import Agent, AgentManager
 from src.core.agno_agent_framework.memory import AgentMemory, MemoryType
 from src.core.agno_agent_framework.session import AgentSession, SessionManager
 from src.core.agno_agent_framework.tools import Tool, ToolRegistry
-from src.core.litellm_gateway import LiteLLMGateway
+from src.core.litellm_gateway import create_gateway
 
 
 async def main():
@@ -45,7 +45,12 @@ async def main():
         return
     
     provider = "openai" if os.getenv("OPENAI_API_KEY") else "anthropic"
-    gateway = LiteLLMGateway(api_key=api_key, provider=provider)
+    default_model = "gpt-3.5-turbo" if provider == "openai" else "claude-3-haiku-20240307"
+    gateway = create_gateway(
+        providers=[provider],
+        default_model=default_model,
+        api_keys={provider: api_key}
+    )
     
     # 1. Create an Agent
     print("=== Creating Agent ===")
@@ -55,7 +60,7 @@ async def main():
         name="Assistant Agent",
         description="A helpful AI assistant",
         gateway=gateway,
-        llm_model="gpt-4" if provider == "openai" else "claude-3-opus-20240229"
+        llm_model=default_model
     )
     
     # Add capabilities
@@ -148,7 +153,7 @@ async def main():
         task_type="llm_query",
         parameters={
             "prompt": "Explain what AI is in one sentence.",
-            "model": "gpt-4" if provider == "openai" else "claude-3-opus-20240229"
+            "model": default_model
         },
         priority=1
     )

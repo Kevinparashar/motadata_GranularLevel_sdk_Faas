@@ -75,11 +75,9 @@ Examples are organized following the component dependency order:
 
 1. **Foundation Layer** (No dependencies)
    - Evaluation & Observability
-   - Pool Implementation
 
 2. **Infrastructure Layer**
    - PostgreSQL Database
-   - Connectivity
    - LiteLLM Gateway
 
 3. **Core Layer**
