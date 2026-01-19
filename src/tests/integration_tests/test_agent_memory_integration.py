@@ -4,9 +4,9 @@ Integration Tests for Agent-Memory Integration
 Tests the integration between Agent Framework and Agent Memory.
 """
 
-import pytest
+import pytest  # pyright: ignore[reportMissingImports]
 from unittest.mock import Mock, MagicMock, patch, AsyncMock
-from src.core.agno_agent_framework import Agent
+from src.core.agno_agent_framework import Agent, AgentTask
 from src.core.agno_agent_framework.memory import AgentMemory, MemoryType
 from src.core.litellm_gateway import LiteLLMGateway, GatewayConfig
 
@@ -18,18 +18,29 @@ class TestAgentMemoryIntegration:
     @pytest.fixture
     def mock_gateway(self):
         """Create mock gateway."""
-        with patch('src.core.litellm_gateway.gateway.litellm') as mock_litellm:
-            config = GatewayConfig()
-            gateway = LiteLLMGateway(config=config)
-            gateway._litellm = mock_litellm
-
+        config = GatewayConfig()
+        gateway = LiteLLMGateway(config=config)
+        
+        # Mock the router's acompletion method if router exists
+        if gateway.router:
             mock_response = MagicMock()
             mock_response.choices = [MagicMock()]
+            mock_response.choices[0].message = MagicMock()
             mock_response.choices[0].message.content = "Agent response"
             mock_response.model = "gpt-4"
-            mock_litellm.acompletion = AsyncMock(return_value=mock_response)
+            gateway.router.acompletion = AsyncMock(return_value=mock_response)
+        else:
+            # Create a mock router if none exists
+            mock_router = MagicMock()
+            mock_response = MagicMock()
+            mock_response.choices = [MagicMock()]
+            mock_response.choices[0].message = MagicMock()
+            mock_response.choices[0].message.content = "Agent response"
+            mock_response.model = "gpt-4"
+            mock_router.acompletion = AsyncMock(return_value=mock_response)
+            gateway.router = mock_router
 
-            return gateway
+        return gateway
 
     @pytest.fixture
     def agent_with_memory(self, mock_gateway):
@@ -50,25 +61,51 @@ class TestAgentMemoryIntegration:
         """Test that memory is properly attached to agent."""
         assert agent_with_memory.memory is not None
         assert isinstance(agent_with_memory.memory, AgentMemory)
+        
+    def test_memory_store_and_retrieve(self, agent_with_memory):
+        """Test basic memory store and retrieve operations."""
+        assert agent_with_memory.memory is not None
+        agent_with_memory.memory.store(
+            content="Test memory",
+            memory_type=MemoryType.EPISODIC
+        )
+        memories = agent_with_memory.memory.retrieve(
+            query="Test",
+            memory_type=MemoryType.EPISODIC,
+            limit=10
+        )
+        assert len(memories) > 0
 
     @pytest.mark.asyncio
     async def test_memory_storage_during_task(self, agent_with_memory):
         """Test that agent stores memories during task execution."""
-        initial_size = len(agent_with_memory.memory.episodic_memory)
-
-        await agent_with_memory.execute_task_async(
-            task_type="llm_query",
-            parameters={"prompt": "Test task"},
-            tenant_id="test_tenant"
+        assert agent_with_memory.memory is not None
+        # Get initial episodic memory count
+        initial_memories = agent_with_memory.memory.retrieve(
+            memory_type=MemoryType.EPISODIC,
+            limit=1000
         )
+        initial_size = len(initial_memories)
+
+        task = AgentTask(
+            task_id="test_task_1",
+            task_type="llm_query",
+            parameters={"prompt": "Test task"}
+        )
+        await agent_with_memory.execute_task(task, tenant_id="test_tenant")
 
         # Memory should have stored task information
-        final_size = len(agent_with_memory.memory.episodic_memory)
+        final_memories = agent_with_memory.memory.retrieve(
+            memory_type=MemoryType.EPISODIC,
+            limit=1000
+        )
+        final_size = len(final_memories)
         assert final_size >= initial_size
 
     @pytest.mark.asyncio
     async def test_memory_retrieval_for_context(self, agent_with_memory):
         """Test that agent retrieves relevant memories for context."""
+        assert agent_with_memory.memory is not None
         # Store some memories
         agent_with_memory.memory.store(
             content="Previous task about AI",
@@ -78,15 +115,21 @@ class TestAgentMemoryIntegration:
 
         # Mock memory retrieval
         with patch.object(agent_with_memory.memory, 'retrieve') as mock_retrieve:
-            mock_retrieve.return_value = [
-                {"content": "Previous task about AI", "relevance": 0.9}
-            ]
-
-            await agent_with_memory.execute_task_async(
-                task_type="llm_query",
-                parameters={"prompt": "Tell me more about AI"},
-                tenant_id="test_tenant"
+            from src.core.agno_agent_framework.memory import MemoryItem
+            mock_memory_item = MemoryItem(
+                memory_id="test_mem_1",
+                agent_id=agent_with_memory.agent_id,
+                memory_type=MemoryType.EPISODIC,
+                content="Previous task about AI"
             )
+            mock_retrieve.return_value = [mock_memory_item]
+
+            task = AgentTask(
+                task_id="test_task_2",
+                task_type="llm_query",
+                parameters={"prompt": "Tell me more about AI"}
+            )
+            await agent_with_memory.execute_task(task, tenant_id="test_tenant")
 
             # Memory should have been retrieved for context
             mock_retrieve.assert_called()
@@ -99,6 +142,7 @@ class TestAgentMemoryIntegration:
             gateway=mock_gateway
         )
         agent1.attach_memory(max_episodic=100)
+        assert agent1.memory is not None
 
         agent2 = Agent(
             agent_id="agent_2",
@@ -106,6 +150,7 @@ class TestAgentMemoryIntegration:
             gateway=mock_gateway
         )
         agent2.attach_memory(max_episodic=100)
+        assert agent2.memory is not None
 
         # Store memory in agent1
         agent1.memory.store(
@@ -117,7 +162,7 @@ class TestAgentMemoryIntegration:
         memories = agent2.memory.retrieve(
             query="Agent 1",
             memory_type=MemoryType.EPISODIC,
-            top_k=5
+            limit=5
         )
         assert len(memories) == 0
 
@@ -133,6 +178,7 @@ class TestAgentMemoryIntegration:
         )
         agent.attach_memory(max_episodic=max_episodic)
 
+        assert agent.memory is not None
         # Store more memories than max
         for i in range(max_episodic + 5):
             agent.memory.store(
@@ -140,12 +186,17 @@ class TestAgentMemoryIntegration:
                 memory_type=MemoryType.EPISODIC
             )
 
-        # Memory should be bounded
-        assert len(agent.memory.episodic_memory) <= max_episodic
+        # Memory should be bounded - check by retrieving all episodic memories
+        episodic_memories = agent.memory.retrieve(
+            memory_type=MemoryType.EPISODIC,
+            limit=1000
+        )
+        assert len(episodic_memories) <= max_episodic
 
     @pytest.mark.asyncio
     async def test_memory_cleanup_expired(self, agent_with_memory):
         """Test that expired memories are cleaned up."""
+        assert agent_with_memory.memory is not None
         # Store memory with short age
         agent_with_memory.memory.store(
             content="Temporary memory",
@@ -159,12 +210,14 @@ class TestAgentMemoryIntegration:
         # Expired memory should be removed
         memories = agent_with_memory.memory.retrieve(
             query="Temporary",
-            memory_type=MemoryType.EPISODIC
+            memory_type=MemoryType.EPISODIC,
+            limit=10
         )
         assert len(memories) == 0
 
     def test_memory_types_separation(self, agent_with_memory):
         """Test that different memory types are stored separately."""
+        assert agent_with_memory.memory is not None
         # Store episodic memory
         agent_with_memory.memory.store(
             content="Episodic memory",
@@ -180,11 +233,13 @@ class TestAgentMemoryIntegration:
         # Retrieve each type separately
         episodic = agent_with_memory.memory.retrieve(
             query="Episodic",
-            memory_type=MemoryType.EPISODIC
+            memory_type=MemoryType.EPISODIC,
+            limit=10
         )
         semantic = agent_with_memory.memory.retrieve(
             query="Semantic",
-            memory_type=MemoryType.SEMANTIC
+            memory_type=MemoryType.SEMANTIC,
+            limit=10
         )
 
         assert len(episodic) > 0

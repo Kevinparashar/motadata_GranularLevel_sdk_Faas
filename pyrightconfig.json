@@ -5,13 +5,27 @@
   "typeCheckingMode": "basic",
   "reportMissingImports": "warning",
   "reportMissingTypeStubs": false,
+  "reportMissingModuleSource": "none",
   "pythonPlatform": "Linux",
   "executionEnvironments": [
+    {
+      "root": ".",
+      "pythonVersion": "3.12",
+      "pythonPlatform": "Linux",
+      "extraPaths": ["."]
+    },
     {
       "root": "src",
       "pythonVersion": "3.12",
       "pythonPlatform": "Linux",
-      "extraPaths": []
+      "extraPaths": ["."]
+    },
+    {
+      "root": "src/tests",
+      "pythonVersion": "3.12",
+      "pythonPlatform": "Linux",
+      "extraPaths": ["..", "../.."],
+      "reportMissingImports": "none"
     }
   ]
 }
