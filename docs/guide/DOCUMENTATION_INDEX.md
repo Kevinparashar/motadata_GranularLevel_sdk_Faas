@@ -1,0 +1,266 @@
+# SDK Documentation Index & Search Guide
+
+**Quick Navigation:** Find what you need fast!
+
+---
+
+## 📚 Documentation Structure
+
+### Getting Started
+- **[Quick Start Guide](../README.md#quick-start-5-minutes)** - Get up and running in 5 minutes
+- **[Installation Guide](../README.md#installation)** - Detailed installation instructions
+- **[Hello World Example](../../examples/hello_world.py)** - Simplest possible example
+
+### Core Components
+
+#### Agent Framework
+- **[Agent Framework Overview](../src/core/agno_agent_framework/README.md)** - Complete agent framework guide
+- **[Agent Functions](../src/core/agno_agent_framework/functions.py)** - Factory and convenience functions
+- **[Agent Explanation](../components/agno_agent_framework_explanation.md)** - Detailed component explanation
+- **[Agent Troubleshooting](../troubleshooting/agent_troubleshooting.md)** - Common issues and solutions
+
+#### Prompt-Based Generator
+- **[Prompt Generator Guide](../guides/prompt_based_creation_guide.md)** - How to create agents/tools from prompts
+- **[Prompt Generator Explanation](../components/prompt_based_generator_explanation.md)** - Component details
+- **[Prompt Generator Troubleshooting](../troubleshooting/prompt_generator_troubleshooting.md)** - Troubleshooting guide
+
+#### LiteLLM Gateway
+- **[Gateway Overview](../src/core/litellm_gateway/README.md)** - Gateway documentation
+- **[Gateway Explanation](../components/litellm_gateway_explanation.md)** - Detailed explanation
+- **[Gateway Troubleshooting](../troubleshooting/litellm_gateway_troubleshooting.md)** - Common issues
+
+#### RAG System
+- **[RAG Overview](../src/core/rag/README.md)** - RAG system documentation
+- **[RAG Explanation](../components/rag_system_explanation.md)** - Component details
+- **[RAG Troubleshooting](../troubleshooting/rag_system_troubleshooting.md)** - Troubleshooting
+
+### Architecture & Design
+- **[SDK Architecture](../architecture/SDK_ARCHITECTURE.md)** - Overall architecture
+- **[AI Architecture Design](../architecture/AI_ARCHITECTURE_DESIGN.md)** - AI-specific architecture
+- **[Component Categorization](../architecture/COMPONENT_CATEGORIZATION.md)** - Component types
+- **[Component Dependencies](../architecture/COMPONENT_DEPENDENCIES.md)** - Dependency graph
+- **[Project Structure](../architecture/PROJECT_STRUCTURE.md)** - File structure
+
+### Integration Guides
+- **[NATS Integration](../integration_guides/nats_integration_guide.md)** - NATS messaging integration
+- **[OTEL Integration](../integration_guides/otel_integration_guide.md)** - OpenTelemetry integration
+- **[CODEC Integration](../integration_guides/codec_integration_guide.md)** - Serialization integration
+- **[Core Components Integration](../components/CORE_COMPONENTS_INTEGRATION_STORY.md)** - Integration story
+
+### Troubleshooting
+- **[Troubleshooting Index](../troubleshooting/README.md)** - All troubleshooting guides
+- **[Agent Troubleshooting](../troubleshooting/agent_troubleshooting.md)**
+- **[Gateway Troubleshooting](../troubleshooting/litellm_gateway_troubleshooting.md)**
+- **[RAG Troubleshooting](../troubleshooting/rag_system_troubleshooting.md)**
+
+---
+
+## 🔍 Quick Search by Topic
+
+### By Functionality
+
+#### Creating Agents
+- **From scratch:** [Agent Framework README](../src/core/agno_agent_framework/README.md#creating-agents)
+- **From prompts:** [Prompt-Based Creation Guide](guides/prompt_based_creation_guide.md)
+- **With memory:** [Agent with Memory](../src/core/agno_agent_framework/functions.py#create_agent_with_memory)
+- **With tools:** [Agent with Tools](../src/core/agno_agent_framework/functions.py#create_agent_with_tools)
+
+#### Configuration
+- **Agent config:** [Agent Config Options](../src/core/utils/config_discovery.py#get_agent_config_options)
+- **Gateway config:** [Gateway Config Options](../src/core/utils/config_discovery.py#get_gateway_config_options)
+- **RAG config:** [RAG Config Options](../src/core/utils/config_discovery.py#get_rag_config_options)
+- **Config validation:** [Config Validator](../src/core/utils/config_validator.py)
+
+#### Error Handling
+- **Error types:** [Exception Hierarchy](../README.md#error-handling)
+- **Error utilities:** [Error Handler](../src/core/utils/error_handler.py)
+- **Common errors:** [Troubleshooting Guides](../troubleshooting/README.md)
+
+#### Integration
+- **NATS:** [NATS Integration Guide](integration_guides/nats_integration_guide.md)
+- **OTEL:** [OTEL Integration Guide](integration_guides/otel_integration_guide.md)
+- **CODEC:** [CODEC Integration Guide](integration_guides/codec_integration_guide.md)
+
+### By Use Case
+
+#### Customer Support
+- **Agent creation:** [Agent Framework](../src/core/agno_agent_framework/README.md)
+- **RAG for knowledge base:** [RAG System](../src/core/rag/README.md)
+- **Prompt management:** [Prompt Context Management](../src/core/prompt_context_management/README.md)
+
+#### Document Q&A
+- **RAG setup:** [RAG System](../src/core/rag/README.md)
+- **Document processing:** [RAG Document Processing](../src/core/rag/README.md#document-processing)
+- **Query examples:** [RAG Examples](../examples/basic_usage/07_rag_basic.py)
+
+#### Multi-Agent Systems
+- **Agent orchestration:** [Agent Orchestrator](../src/core/agno_agent_framework/orchestration.py)
+- **Agent communication:** [Agent Framework](../src/core/agno_agent_framework/README.md#agent-communication)
+- **Workflow management:** [Workflows](../src/workflows.md)
+
+### By Component Type
+
+#### Core Components
+- **Agent Framework:** [Agent Framework](../src/core/agno_agent_framework/README.md)
+- **LiteLLM Gateway:** [Gateway](../src/core/litellm_gateway/README.md)
+- **RAG System:** [RAG](../src/core/rag/README.md)
+- **Prompt Generator:** [Prompt Generator](components/prompt_based_generator_explanation.md)
+
+#### Infrastructure
+- **Database:** [PostgreSQL Database](../src/core/postgresql_database/README.md)
+- **Cache:** [Cache Mechanism](../src/core/cache_mechanism/README.md)
+- **Observability:** [Evaluation & Observability](../src/core/evaluation_observability/README.md)
+
+---
+
+## 🗂️ Documentation by Category
+
+### 📖 Guides & Tutorials
+- [Building New Use Cases](BUILDING_NEW_USECASE_GUIDE.md)
+- [Prompt-Based Creation Guide](guides/prompt_based_creation_guide.md)
+- [SDK Development Story](SDK_DEVELOPMENT_STORY.md)
+
+### 🏗️ Architecture
+- [SDK Architecture](architecture/SDK_ARCHITECTURE.md)
+- [AI Architecture Design](architecture/AI_ARCHITECTURE_DESIGN.md)
+- [Component Categorization](architecture/COMPONENT_CATEGORIZATION.md)
+- [Component Dependencies](architecture/COMPONENT_DEPENDENCIES.md)
+- [Function-Driven API](architecture/FUNCTION_DRIVEN_API.md)
+- [REST/FastAPI Architecture](architecture/REST_FASTAPI_ARCHITECTURE.md)
+
+### 🔧 Components
+- [Agent Framework](components/agno_agent_framework_explanation.md)
+- [LiteLLM Gateway](components/litellm_gateway_explanation.md)
+- [RAG System](components/rag_system_explanation.md)
+- [Prompt Generator](components/prompt_based_generator_explanation.md)
+- [All Components](components/README.md)
+
+### 🔌 Integration
+- [NATS Integration](integration_guides/nats_integration_guide.md)
+- [OTEL Integration](integration_guides/otel_integration_guide.md)
+- [CODEC Integration](integration_guides/codec_integration_guide.md)
+- [Core Components Integration](components/CORE_COMPONENTS_INTEGRATION_STORY.md)
+
+### 🐛 Troubleshooting
+- [Troubleshooting Index](../troubleshooting/README.md)
+- [Agent Issues](troubleshooting/agent_troubleshooting.md)
+- [Gateway Issues](troubleshooting/litellm_gateway_troubleshooting.md)
+- [RAG Issues](troubleshooting/rag_system_troubleshooting.md)
+
+---
+
+## 🔎 Search Tips
+
+### Finding Code Examples
+1. Check `examples/` directory
+2. Look for "Example" sections in component READMEs
+3. Search for function names in component files
+
+### Finding Configuration Options
+1. Use `print_config_options('component_name')` in Python
+2. Check component README files
+3. See [Config Discovery](../src/core/utils/config_discovery.py)
+
+### Finding Error Solutions
+1. Check [Troubleshooting Index](troubleshooting/README.md)
+2. Search for error message in troubleshooting guides
+3. Check component-specific troubleshooting files
+
+### Finding API Reference
+1. Check component `functions.py` files
+2. See component README files
+3. Check [Function-Driven API](architecture/FUNCTION_DRIVEN_API.md)
+
+---
+
+## 📋 Quick Reference
+
+### Common Tasks
+
+#### Create an Agent
+```python
+from src.core.agno_agent_framework import create_agent
+from src.core.litellm_gateway import create_gateway
+
+gateway = create_gateway(api_keys={"openai": "sk-..."})
+agent = create_agent("agent1", "My Agent", gateway)
+```
+📖 [Full Guide](../src/core/agno_agent_framework/README.md#creating-agents)
+
+#### Create Agent from Prompt
+```python
+from src.core.prompt_based_generator import create_agent_from_prompt
+
+agent = await create_agent_from_prompt(
+    "Create a customer support agent",
+    gateway=gateway
+)
+```
+📖 [Full Guide](guides/prompt_based_creation_guide.md)
+
+#### Setup RAG System
+```python
+from src.core.rag import create_rag_system
+
+rag = create_rag_system(db, gateway, tenant_id="tenant_123")
+```
+📖 [Full Guide](../src/core/rag/README.md)
+
+#### Discover Configuration
+```python
+from src.core.utils import print_config_options
+
+print_config_options('agent')  # See all agent config options
+```
+📖 [Full Guide](../src/core/utils/config_discovery.py)
+
+---
+
+## 🔗 Cross-References
+
+### Related Documentation
+- **[Main README](../README.md)** - Project overview and quick start
+- **[Developer Guide](../README_DEVELOPER.md)** - Development guidelines
+- **[Professional Evaluation](PROFESSIONAL_SDK_EVALUATION.md)** - SDK quality assessment
+
+### External Resources
+- **[Examples Directory](../examples/)** - Code examples
+- **[Tests Directory](../src/tests/)** - Test files and benchmarks
+- **[Component Source](../src/core/)** - Source code
+
+---
+
+## 📝 Document Sizes & Navigation
+
+### Large Documents (Use TOC)
+- [Component Categorization](architecture/COMPONENT_CATEGORIZATION.md) - 954 lines
+- [Agent Framework Explanation](components/agno_agent_framework_explanation.md) - 1540 lines
+- [SDK Architecture](architecture/SDK_ARCHITECTURE.md) - Large document
+- [AI Architecture Design](architecture/AI_ARCHITECTURE_DESIGN.md) - Large document
+
+**Tip:** Use your editor's outline/TOC feature or search within document (Ctrl+F / Cmd+F)
+
+### Medium Documents
+- Most component READMEs
+- Integration guides
+- Troubleshooting guides
+
+### Quick Reference Documents
+- This index
+- Quick start guides
+- Function reference files
+
+---
+
+## 🆘 Need Help?
+
+1. **Quick Start:** [README Quick Start](../README.md#quick-start-5-minutes)
+2. **Examples:** [Examples Directory](../examples/)
+3. **Troubleshooting:** [Troubleshooting Index](troubleshooting/README.md)
+4. **Component Help:** Check component-specific README files
+
+---
+
+**Last Updated:** 2025-01-XX  
+**SDK Version:** 0.1.0
+

@@ -16,6 +16,8 @@ export OPENAI_API_KEY='your-api-key-here'
 python examples/hello_world.py
 ```
 
+**📚 Documentation:** See [Documentation Index](docs/guide/DOCUMENTATION_INDEX.md) for complete navigation
+
 **Expected Output:**
 ```
 🚀 Motadata AI SDK - Hello World Example
@@ -730,6 +732,30 @@ register_router(app, router)
 ```
 
 See component-specific README files for detailed function documentation.
+
+## 📚 Documentation
+
+**Quick Navigation:**
+- **[Documentation Index](docs/guide/DOCUMENTATION_INDEX.md)** - Complete topic-based navigation
+- **[Quick Reference](docs/guide/QUICK_REFERENCE.md)** - Common tasks and APIs at a glance
+- **[Navigation Helper](docs/guide/NAVIGATION_HELPER.md)** - Search strategies and document maps
+- **[All Documentation](docs/README.md)** - Documentation hub
+
+**Search Documentation:**
+```bash
+# Search docs from command line
+python docs/guide/search_docs.py search "create agent"
+python docs/guide/search_docs.py topic "configuration"
+python docs/guide/search_docs.py function "create_agent"
+python docs/guide/search_docs.py list  # List all documentation files
+```
+
+**Documentation Structure:**
+- **Guides** - How-to guides and tutorials
+- **Architecture** - System design and architecture
+- **Components** - Component-specific documentation
+- **Integration** - Integration guides (NATS, OTEL, CODEC)
+- **Troubleshooting** - Problem-solving guides
 
 ## Examples and Tutorials
 
