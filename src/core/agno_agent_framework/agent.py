@@ -202,8 +202,11 @@ class Agent(BaseModel):
         # Validate tenant_id if provided
         if tenant_id is not None and self.tenant_id is not None:
             if tenant_id != self.tenant_id:
-                raise AgentConfigurationError(
+                from ..utils.error_handler import create_error_with_suggestion
+                raise create_error_with_suggestion(
+                    AgentConfigurationError,
                     message=f"Tenant ID mismatch: task tenant_id ({tenant_id}) does not match agent tenant_id ({self.tenant_id})",
+                    suggestion="Ensure tenant_id matches:\n  - Use the same tenant_id when creating agent and executing tasks\n  - Or omit tenant_id from task to use agent's tenant_id\n  - For multi-tenant systems, verify tenant isolation",
                     agent_id=self.agent_id
                 )
         # Use agent's tenant_id if task doesn't provide one
@@ -239,8 +242,29 @@ class Agent(BaseModel):
                 if attempt < max(1, self.max_retries):
                     await asyncio.sleep(self.retry_delay)
                     continue
-                raise AgentExecutionError(
-                    message=f"Agent execution failed: {str(e)}",
+                from ..utils.error_handler import create_error_with_suggestion
+                error_msg = str(e)
+                suggestion = "Common fixes:\n"
+                if "timeout" in error_msg.lower():
+                    suggestion += "  - Increase timeout in gateway configuration\n"
+                    suggestion += "  - Check network connectivity\n"
+                elif "rate limit" in error_msg.lower() or "429" in error_msg:
+                    suggestion += "  - Implement rate limiting\n"
+                    suggestion += "  - Reduce request frequency\n"
+                    suggestion += "  - Use request batching\n"
+                elif "api key" in error_msg.lower() or "authentication" in error_msg.lower():
+                    suggestion += "  - Verify API key is correct\n"
+                    suggestion += "  - Check API key has required permissions\n"
+                    suggestion += "  - Ensure API key is not expired\n"
+                else:
+                    suggestion += "  - Check agent configuration\n"
+                    suggestion += "  - Verify gateway is properly initialized\n"
+                    suggestion += "  - Review task parameters\n"
+                
+                raise create_error_with_suggestion(
+                    AgentExecutionError,
+                    message=f"Agent execution failed: {error_msg}",
+                    suggestion=suggestion,
                     agent_id=self.agent_id,
                     task_type=task.task_type if task else None,
                     execution_stage="execution",
@@ -637,8 +661,11 @@ class Agent(BaseModel):
         elif PromptContextManager and create_prompt_manager:
             self.prompt_manager = create_prompt_manager(max_tokens=max_tokens)
         else:
-            raise AgentConfigurationError(
+            from ..utils.error_handler import create_error_with_suggestion
+            raise create_error_with_suggestion(
+                AgentConfigurationError,
                 message="PromptContextManager is not available",
+                suggestion="Install prompt_context_management component:\n  - Ensure it's included in dependencies\n  - Import: from src.core.prompt_context_management import create_prompt_manager\n  - Or pass prompt_manager parameter when creating agent",
                 agent_id=self.agent_id,
                 config_key="prompt_manager"
             )
@@ -776,8 +803,11 @@ class Agent(BaseModel):
             self.attach_prompt_manager()
 
         if not self.prompt_manager:
-            raise AgentConfigurationError(
+            from ..utils.error_handler import create_error_with_suggestion
+            raise create_error_with_suggestion(
+                AgentConfigurationError,
                 message="Prompt manager is not available",
+                suggestion="Initialize prompt manager:\n  - Call agent.attach_prompt_management() first\n  - Or pass prompt_manager when creating agent\n  - Or install prompt_context_management component",
                 agent_id=self.agent_id,
                 config_key="prompt_manager"
             )

@@ -47,6 +47,7 @@ The Motadata Python AI SDK is a comprehensive, modular SDK for building AI-power
 ## Features
 
 ### Core AI Capabilities
+- **Prompt-Based Creation**: Create agents and tools from natural language prompts - describe what you want in plain English and the system generates fully configured agents and tools automatically
 - **Multi-Provider LLM Support**: Unified interface for OpenAI, Anthropic, Google Gemini, and other providers through LiteLLM Gateway with advanced rate limiting, request queuing, batching, and deduplication
 - **Autonomous AI Agents**: Create and manage intelligent agents with session management, bounded memory systems, tools, plugins, circuit breakers, and health checks
 - **RAG System**: Complete Retrieval-Augmented Generation with document processing, vector search, re-ranking, versioning, relevance scoring, incremental updates, and real-time synchronization
@@ -80,6 +81,7 @@ The Motadata Python AI SDK is a comprehensive, modular SDK for building AI-power
 
 - **Need AI text generation?** → Use [LiteLLM Gateway](src/core/litellm_gateway/README.md)
 - **Building a chatbot or assistant?** → Use [Agent Framework](src/core/agno_agent_framework/README.md)
+- **Want to create agents/tools from natural language?** → Use [Prompt-Based Generator](src/core/prompt_based_generator/README.md)
 - **Answering questions from documents?** → Use [RAG System](src/core/rag/README.md)
 - **Want to reduce API costs?** → Use [Cache Mechanism](src/core/cache_mechanism/README.md)
 - **Need monitoring and debugging?** → Use [Observability](src/core/evaluation_observability/README.md)
@@ -109,6 +111,7 @@ The SDK follows a layered architecture with clear separation of concerns:
 
 ### Core Layer
 - **Agent Framework**: Autonomous agents with session, memory, tools, and plugins
+- **Prompt-Based Generator**: Create agents and tools from natural language prompts
 - **Machine Learning**: ML framework, MLOps pipeline, data management, and model serving
 - **Cache Mechanism**: Multi-backend caching for responses and embeddings
 - **Prompt Context Management**: Template system with versioning and context building
@@ -147,6 +150,7 @@ motadata-python-ai-sdk/
 │       ├── postgresql_database/
 │       ├── rag/
 │       ├── prompt_context_management/
+│       ├── prompt_based_generator/  # Prompt-based agent/tool creation
 │       ├── evaluation_observability/
 │       ├── api_backend_services/
 │       └── cache_mechanism/
@@ -183,12 +187,22 @@ motadata-python-ai-sdk/
    - **Built-in Health Checks** for monitoring agent performance and availability
    - **Integrated Prompt Context Management** with system prompts, role templates, and context assembly
 
-3. **PostgreSQL Database** (`src/core/postgresql_database/`)
+3. **Prompt-Based Generator** (`src/core/prompt_based_generator/`)
+   - Create agents from natural language prompts
+   - Create tools from natural language prompts
+   - Automatic configuration extraction and generation
+   - Code generation and validation for tools
+   - Access control framework for resources
+   - Feedback collection and processing
+   - Caching of interpretations and configurations
+   - Memory management for generated resources
+
+4. **PostgreSQL Database** (`src/core/postgresql_database/`)
    - PostgreSQL with pgvector extension
    - Vector similarity search
    - Document and embedding storage
 
-4. **RAG System** (`src/core/rag/`)
+5. **RAG System** (`src/core/rag/`)
    - Retrieval-Augmented Generation
    - Enhanced chunking pipeline with preprocessing, multiple strategies (fixed, sentence, paragraph, semantic)
    - Advanced metadata handling: automatic extraction, validation, enrichment, and schema support

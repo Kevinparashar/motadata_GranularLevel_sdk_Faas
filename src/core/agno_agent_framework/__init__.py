@@ -62,6 +62,20 @@ from .functions import (
     load_agent_state,
 )
 
+# Import Prompt-Based Generator functions (optional)
+try:
+    from ..prompt_based_generator import (
+        create_agent_from_prompt,
+        create_tool_from_prompt,
+        rate_agent,
+        rate_tool
+    )
+except ImportError:
+    create_agent_from_prompt = None
+    create_tool_from_prompt = None
+    rate_agent = None
+    rate_tool = None
+
 __all__ = [
     # Core classes
     "Agent",
@@ -109,4 +123,9 @@ __all__ = [
     "retry_on_failure",
     "save_agent_state",
     "load_agent_state",
+    # Prompt-based creation functions (optional)
+    "create_agent_from_prompt",
+    "create_tool_from_prompt",
+    "rate_agent",
+    "rate_tool",
 ]
