@@ -43,6 +43,7 @@ class FeedbackItem:
     metadata: Dict[str, Any] = field(default_factory=dict)
     tenant_id: Optional[str] = None
     agent_id: Optional[str] = None
+    tool_id: Optional[str] = None  # Added for tool feedback support
 
 
 class FeedbackLoop:

@@ -4,19 +4,27 @@ Agno Agent Framework - High-Level Functions
 Factory functions, convenience functions, and utilities for agent framework.
 """
 
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Optional, TypeVar, Callable, cast
 from .agent import Agent, AgentManager, AgentTask, AgentStatus
 from .memory import AgentMemory, MemoryType
 from .session import AgentSession, SessionManager
-from .tools import ToolRegistry, ToolExecutor
+from .tools import Tool, ToolRegistry, ToolExecutor
 from .plugins import PluginManager
 from .orchestration import AgentOrchestrator, WorkflowPipeline
+from ..utils.type_helpers import GatewayProtocol, ConfigDict, MetadataDict
 
 # Import Prompt Context Management
 try:
     from ..prompt_context_management import create_prompt_manager
 except ImportError:
     create_prompt_manager = None
+
+# Import Prompt-Based Generator (optional)
+try:
+    from ..prompt_based_generator import create_agent_from_prompt, create_tool_from_prompt
+except ImportError:
+    create_agent_from_prompt = None
+    create_tool_from_prompt = None
 
 
 # ============================================================================
@@ -26,7 +34,7 @@ except ImportError:
 def create_agent(
     agent_id: str,
     name: str,
-    gateway: Any,
+    gateway: GatewayProtocol,
     tenant_id: Optional[str] = None,
     description: str = "",
     llm_model: Optional[str] = None,
@@ -68,9 +76,9 @@ def create_agent(
 def create_agent_with_memory(
     agent_id: str,
     name: str,
-    gateway: Any,
+    gateway: GatewayProtocol,
     tenant_id: Optional[str] = None,
-    memory_config: Optional[Dict[str, Any]] = None,
+    memory_config: Optional[ConfigDict] = None,
     **kwargs: Any
 ) -> Agent:
     """
@@ -189,10 +197,10 @@ def create_agent_with_prompt_management(
 def create_agent_with_tools(
     agent_id: str,
     name: str,
-    gateway: Any,
+    gateway: GatewayProtocol,
     tenant_id: Optional[str] = None,
-    tools: Optional[List[Any]] = None,
-    tool_registry: Optional[Any] = None,
+    tools: Optional[List[Tool]] = None,
+    tool_registry: Optional[ToolRegistry] = None,
     enable_tool_calling: bool = True,
     max_tool_iterations: int = 10,
     **kwargs: Any
@@ -287,7 +295,7 @@ async def execute_task(
     parameters: Dict[str, Any],
     tenant_id: Optional[str] = None,
     priority: int = 0
-) -> Any:
+) -> Dict[str, Any]:  # Task result is typically a dict
     """
     Execute a task on an agent (high-level convenience function).
 
@@ -392,7 +400,7 @@ async def delegate_task(
     task_type: str,
     parameters: Dict[str, Any],
     priority: int = 5
-) -> Any:
+) -> Dict[str, Any]:  # Task result is typically a dict
     """
     Delegate a task from one agent to another (high-level convenience).
 
@@ -513,7 +521,10 @@ def retry_on_failure(
     import asyncio
     from functools import wraps
 
-    def decorator(func: Any) -> Any:
+    from typing import TypeVar, Callable, cast
+    F = TypeVar('F', bound=Callable[..., Any])
+    
+    def decorator(func: F) -> F:
         @wraps(func)
         async def async_wrapper(*args, **kwargs):
             last_error = None
@@ -542,8 +553,8 @@ def retry_on_failure(
                         raise last_error
 
         if asyncio.iscoroutinefunction(func):
-            return async_wrapper
-        return sync_wrapper
+            return cast(F, async_wrapper)
+        return cast(F, sync_wrapper)
 
     return decorator
 
@@ -567,7 +578,7 @@ def save_agent_state(
 
 def load_agent_state(
     file_path: str,
-    gateway: Any
+    gateway: GatewayProtocol
 ) -> Agent:
     """
     Load agent state from disk (utility function).

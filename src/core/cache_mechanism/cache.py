@@ -133,5 +133,52 @@ class CacheMechanism:
         while len(self._store) > self.config.max_size:
             # Pop oldest (LRU)
             self._store.popitem(last=False)
+    
+    def cache_prompt_interpretation(
+        self,
+        prompt_hash: str,
+        interpretation: Any,
+        tenant_id: Optional[str] = None,
+        ttl: Optional[int] = None
+    ) -> None:
+        """
+        Cache prompt interpretation result.
+        
+        Args:
+            prompt_hash: Hash of the prompt
+            interpretation: Interpretation result (will be JSON serialized)
+            tenant_id: Optional tenant ID
+            ttl: Optional TTL override
+        """
+        import json
+        if isinstance(interpretation, dict):
+            interpretation = json.dumps(interpretation)
+        self.set(f"prompt_interp:{prompt_hash}", interpretation, tenant_id=tenant_id, ttl=ttl)
+    
+    def get_prompt_interpretation(
+        self,
+        prompt_hash: str,
+        tenant_id: Optional[str] = None
+    ) -> Optional[Any]:
+        """
+        Get cached prompt interpretation.
+        
+        Args:
+            prompt_hash: Hash of the prompt
+            tenant_id: Optional tenant ID
+            
+        Returns:
+            Cached interpretation or None
+        """
+        import json
+        cached = self.get(f"prompt_interp:{prompt_hash}", tenant_id=tenant_id)
+        if cached:
+            try:
+                if isinstance(cached, str):
+                    return json.loads(cached)
+                return cached
+            except Exception:
+                return None
+        return None
 
 

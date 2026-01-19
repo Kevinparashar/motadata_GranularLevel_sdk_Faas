@@ -1,30 +1,76 @@
 """
-Core Utilities
+Shared Utilities
 
-Shared utilities for circuit breaking, health checks, and other common functionality.
+Common utilities used across SDK components.
 """
 
-from .circuit_breaker import (
-    CircuitBreaker,
-    CircuitBreakerConfig,
-    CircuitState,
-    CircuitBreakerStats
+from .error_handler import (
+    ErrorHandler,
+    create_error_with_suggestion
 )
-
-from .health_check import (
-    HealthCheck,
-    HealthStatus,
-    HealthCheckResult
+from .type_helpers import (
+    GatewayProtocol,
+    AgentProtocol,
+    ToolProtocol,
+    CacheProtocol,
+    ConfigDict,
+    MetadataDict,
+    ParametersDict,
+    ResultDict,
+    ensure_type,
+    optional_type
+)
+from .config_builders import (
+    AgentConfigBuilder,
+    ToolConfigBuilder,
+    GatewayConfigBuilder,
+    create_agent_config,
+    create_tool_config,
+    create_gateway_config
+)
+from .config_validator import (
+    ConfigurationError,
+    ConfigValidator,
+    ConfigHelper
+)
+from .config_discovery import (
+    get_agent_config_options,
+    get_gateway_config_options,
+    get_rag_config_options,
+    print_config_options,
+    discover_config
 )
 
 __all__ = [
-    "CircuitBreaker",
-    "CircuitBreakerConfig",
-    "CircuitState",
-    "CircuitBreakerStats",
-    "HealthCheck",
-    "HealthStatus",
-    "HealthCheckResult"
+    # Error handling
+    "ErrorHandler",
+    "create_error_with_suggestion",
+    # Type helpers
+    "GatewayProtocol",
+    "AgentProtocol",
+    "ToolProtocol",
+    "CacheProtocol",
+    "ConfigDict",
+    "MetadataDict",
+    "ParametersDict",
+    "ResultDict",
+    "ensure_type",
+    "optional_type",
+    # Configuration builders
+    "AgentConfigBuilder",
+    "ToolConfigBuilder",
+    "GatewayConfigBuilder",
+    "create_agent_config",
+    "create_tool_config",
+    "create_gateway_config",
+    # Configuration validation
+    "ConfigurationError",
+    "ConfigValidator",
+    "ConfigHelper",
+    # Configuration discovery
+    "get_agent_config_options",
+    "get_gateway_config_options",
+    "get_rag_config_options",
+    "print_config_options",
+    "discover_config",
 ]
-
-

@@ -76,7 +76,12 @@ class RateLimiter:
         future = asyncio.Future()
         async with self.queue_lock:
             if len(self.queue) >= self.config.max_queue_size:
-                raise RuntimeError(f"Rate limit queue full (max: {self.config.max_queue_size})")
+                from ..utils.error_handler import create_error_with_suggestion
+                raise create_error_with_suggestion(
+                    RuntimeError,
+                    message=f"Rate limit queue full (max: {self.config.max_queue_size})",
+                    suggestion="Consider:\n  - Increasing max_queue_size in rate limit config\n  - Reducing request rate\n  - Using request batching to reduce queue pressure\n  - Implementing client-side rate limiting"
+                )
             self.queue.append((future, datetime.now()))
         
         # Wait for token with timeout
@@ -86,7 +91,12 @@ class RateLimiter:
             async with self.queue_lock:
                 # Remove from queue if still there
                 self.queue = deque([(f, t) for f, t in self.queue if f != future])
-            raise TimeoutError("Rate limit queue timeout exceeded")
+            from ..utils.error_handler import create_error_with_suggestion
+            raise create_error_with_suggestion(
+                TimeoutError,
+                message="Rate limit queue timeout exceeded",
+                suggestion="Consider:\n  - Increasing queue_timeout in rate limit config\n  - Reducing request rate\n  - Using request batching\n  - Implementing exponential backoff on client side\n  - Checking if rate limits are too restrictive"
+            )
     
     async def _refill_tokens(self) -> None:
         """Refill tokens based on elapsed time."""
