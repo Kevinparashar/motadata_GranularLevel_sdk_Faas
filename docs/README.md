@@ -1,142 +1,173 @@
 # SDK Documentation
 
-This directory contains all SDK documentation consolidated in one place for easy navigation.
+**Welcome to the Motadata Python AI SDK Documentation**
 
-## Documentation Structure
+---
 
-```
-docs/
-├── README.md                          # This file - Documentation index
-├── architecture_overview.md          # High-level architecture overview
-│
-├── components/                       # Component explanations
-│   ├── README.md                    # Component documentation index
-│   ├── agno_agent_framework_explanation.md
-│   ├── litellm_gateway_explanation.md
-│   ├── rag_system_explanation.md
-│   ├── cache_mechanism_explanation.md
-│   ├── prompt_context_management_explanation.md
-│   ├── postgresql_database_explanation.md
-│   ├── evaluation_observability_explanation.md
-│   ├── api_backend_services_explanation.md
-│   ├── ml_framework_explanation.md
-│   ├── mlops_explanation.md
-│   ├── ml_data_management_explanation.md
-│   ├── model_serving_explanation.md
-│   ├── nats_integration_explanation.md
-│   ├── otel_integration_explanation.md
-│   ├── codec_integration_explanation.md
-│   └── CORE_COMPONENTS_INTEGRATION_STORY.md
-│
-├── architecture/                    # Architecture documentation
-│   ├── PROJECT_STRUCTURE.md        # Project structure
-│   ├── SDK_ARCHITECTURE.md         # SDK architecture
-│   ├── AI_ARCHITECTURE_DESIGN.md   # AI architecture design
-│   ├── COMPONENT_CATEGORIZATION.md  # Component categorization
-│   ├── COMPONENT_DEPENDENCIES.md   # Component dependencies
-│   ├── EXAMPLES_AND_TESTS_SUMMARY.md # Examples and tests
-│   ├── FUNCTION_DRIVEN_API.md      # Function-driven API
-│   └── MISSING_COMPONENTS_ANALYSIS.md # Component analysis
-│
-├── troubleshooting/                 # Troubleshooting guides
-│   ├── README.md                   # Troubleshooting index
-│   ├── agent_troubleshooting.md
-│   ├── litellm_gateway_troubleshooting.md
-│   ├── rag_system_troubleshooting.md
-│   ├── cache_mechanism_troubleshooting.md
-│   ├── prompt_context_management_troubleshooting.md
-│   ├── postgresql_database_troubleshooting.md
-│   ├── evaluation_observability_troubleshooting.md
-│   ├── api_backend_services_troubleshooting.md
-│   ├── ml_framework_troubleshooting.md
-│   ├── mlops_troubleshooting.md
-│   ├── ml_data_management_troubleshooting.md
-│   ├── model_serving_troubleshooting.md
-│   ├── nats_integration_troubleshooting.md
-│   ├── otel_integration_troubleshooting.md
-│   └── codec_integration_troubleshooting.md
-│
-├── integration_guides/             # Integration guides
-│   ├── README.md                   # Integration guides index
-│   ├── nats_integration_guide.md
-│   ├── otel_integration_guide.md
-│   └── codec_integration_guide.md
-│
-├── workflows.md                     # Workflow diagrams
-├── libraries.md                     # Library list
-├── AI_SDK_END_TO_END_FLOW.md       # End-to-end flow documentation
-├── BUILDING_NEW_USECASE_GUIDE.md    # Use case building guide
-└── SDK_DEVELOPMENT_STORY.md        # Development story
-```
+## 🚀 Quick Start
 
-## Quick Navigation
+- **[Documentation Index](guide/DOCUMENTATION_INDEX.md)** - Complete navigation guide
+- **[Quick Reference](guide/QUICK_REFERENCE.md)** - Common tasks and APIs
+- **[Navigation Helper](guide/NAVIGATION_HELPER.md)** - Find information fast
+- **[Main README](../README.md)** - Project overview and installation
+
+---
+
+## 📚 Documentation Structure
 
 ### Getting Started
-- **Main README**: See root `README.md` for quick start
-- **Developer Guide**: See root `README_DEVELOPER.md`
-- **Architecture Overview**: See `architecture_overview.md`
+- **[Quick Start Guide](../README.md#quick-start-5-minutes)** - Get up and running in 5 minutes
+- **[Installation Guide](../README.md#installation)** - Detailed installation
+- **[Hello World Example](../examples/hello_world.py)** - Simplest example
+
+### Core Documentation
+
+#### 📖 Guides
+- **[Building New Use Cases](BUILDING_NEW_USECASE_GUIDE.md)** - How to build use cases
+- **[Prompt-Based Creation Guide](guides/prompt_based_creation_guide.md)** - Create agents/tools from prompts
+- **[SDK Development Story](SDK_DEVELOPMENT_STORY.md)** - Development approach
+
+#### 🏗️ Architecture
+- **[SDK Architecture](architecture/SDK_ARCHITECTURE.md)** - Overall architecture
+- **[AI Architecture Design](architecture/AI_ARCHITECTURE_DESIGN.md)** - AI-specific design
+- **[Component Categorization](architecture/COMPONENT_CATEGORIZATION.md)** - Component types
+- **[Component Dependencies](architecture/COMPONENT_DEPENDENCIES.md)** - Dependency graph
+- **[Function-Driven API](architecture/FUNCTION_DRIVEN_API.md)** - API design
+- **[REST/FastAPI Architecture](architecture/REST_FASTAPI_ARCHITECTURE.md)** - API layer design
+
+#### 🔧 Components
+- **[All Components](components/README.md)** - Component overview
+- **[Agent Framework](components/agno_agent_framework_explanation.md)** - Agent system
+- **[LiteLLM Gateway](components/litellm_gateway_explanation.md)** - LLM gateway
+- **[RAG System](components/rag_system_explanation.md)** - RAG system
+- **[Prompt Generator](components/prompt_based_generator_explanation.md)** - Prompt-based generation
+
+#### 🔌 Integration
+- **[Integration Guides](integration_guides/README.md)** - Integration overview
+- **[NATS Integration](integration_guides/nats_integration_guide.md)** - Messaging integration
+- **[OTEL Integration](integration_guides/otel_integration_guide.md)** - Observability integration
+- **[CODEC Integration](integration_guides/codec_integration_guide.md)** - Serialization integration
+- **[Core Components Integration](components/CORE_COMPONENTS_INTEGRATION_STORY.md)** - Integration story
+
+#### 🐛 Troubleshooting
+- **[Troubleshooting Index](troubleshooting/README.md)** - All troubleshooting guides
+- **[Agent Troubleshooting](troubleshooting/agent_troubleshooting.md)**
+- **[Gateway Troubleshooting](troubleshooting/litellm_gateway_troubleshooting.md)**
+- **[RAG Troubleshooting](troubleshooting/rag_system_troubleshooting.md)**
+
+---
+
+## 🔍 Finding Information
+
+### By Topic
+Use the **[Documentation Index](guide/DOCUMENTATION_INDEX.md)** to find documentation by:
+- Functionality (creating agents, configuration, error handling)
+- Use case (customer support, document Q&A, multi-agent systems)
+- Component type (core, infrastructure)
+
+### By Task
+Use the **[Quick Reference](guide/QUICK_REFERENCE.md)** for:
+- Common code snippets
+- Configuration examples
+- Error handling patterns
+- API quick lookup
+
+### By Navigation
+Use the **[Navigation Helper](guide/NAVIGATION_HELPER.md)** for:
+- Document maps and sizes
+- Search strategies
+- Cross-reference maps
+- Common navigation paths
+
+---
+
+## 📋 Quick Links
+
+### Most Used
+- **[Documentation Index](guide/DOCUMENTATION_INDEX.md)** - Complete navigation
+- **[Quick Reference](guide/QUICK_REFERENCE.md)** - Common tasks
+- **[Navigation Helper](guide/NAVIGATION_HELPER.md)** - Find information fast
+- **[Troubleshooting Index](troubleshooting/README.md)** - Fix issues
+- **[Main README](../README.md)** - Project overview
 
 ### Component Documentation
-- **Component Explanations**: See `components/` directory
-- **Component README**: See `components/README.md` for index
+- [Agent Framework](../src/core/agno_agent_framework/README.md)
+- [Gateway](../src/core/litellm_gateway/README.md)
+- [RAG System](../src/core/rag/README.md)
+- [Prompt Generator](../src/core/prompt_based_generator/README.md)
 
-### Architecture
-- **Project Structure**: See `architecture/PROJECT_STRUCTURE.md`
-- **SDK Architecture**: See `architecture/SDK_ARCHITECTURE.md`
-- **AI Architecture Design**: See `architecture/AI_ARCHITECTURE_DESIGN.md`
+### Examples
+- [Examples Directory](../examples/)
+- [Basic Usage Examples](../examples/basic_usage/)
+- [Integration Examples](../examples/integration/)
+- [Use Cases](../examples/use_cases/)
 
-### Troubleshooting
-- **Troubleshooting Guides**: See `troubleshooting/` directory
-- **Troubleshooting Index**: See `troubleshooting/README.md`
+---
 
-### Integration
-- **Integration Guides**: See `integration_guides/` directory
-- **End-to-End Flow**: See `AI_SDK_END_TO_END_FLOW.md`
-- **Integration Story**: See `components/CORE_COMPONENTS_INTEGRATION_STORY.md`
+## 🎯 Common Tasks
 
-### Development
-- **Workflows**: See `workflows.md`
-- **Libraries**: See `libraries.md`
-- **Building Use Cases**: See `BUILDING_NEW_USECASE_GUIDE.md`
-- **Development Story**: See `SDK_DEVELOPMENT_STORY.md`
+### Create an Agent
+```python
+from src.core.agno_agent_framework import create_agent
+from src.core.litellm_gateway import create_gateway
 
-## Documentation Types
+gateway = create_gateway(api_keys={"openai": "sk-..."})
+agent = create_agent("agent1", "My Agent", gateway)
+```
+📖 [Full Guide](../src/core/agno_agent_framework/README.md)
 
-### Component Explanations (`components/`)
-Detailed documentation for each SDK component, including:
-- Overview and purpose
-- Core functionality
-- Code examples
-- Workflows
-- Customization options
-- Best practices
+### Discover Configuration
+```python
+from src.core.utils import print_config_options
 
-### Architecture Documentation (`architecture/`)
-High-level architecture and design documentation:
-- Project structure
-- Component dependencies
-- Architecture design
-- API design
+print_config_options('agent')  # See all options
+```
+📖 [Full Guide](../src/core/utils/config_discovery.py)
 
-### Troubleshooting Guides (`troubleshooting/`)
-Problem-solving guides for common issues:
-- Error diagnosis
-- Resolution steps
-- Best practices
-- Common pitfalls
+### Handle Errors
+```python
+from src.core.agno_agent_framework.exceptions import AgentExecutionError
 
-### Integration Guides (`integration_guides/`)
-Guides for integrating platform components:
-- NATS integration
-- OTEL integration
-- CODEC integration
+try:
+    result = await agent.execute_task(task)
+except AgentExecutionError as e:
+    print(f"Error: {e.message}")
+    print(f"Suggestion: {e.suggestion}")
+```
+📖 [Full Guide](../README.md#error-handling)
 
-## Contributing to Documentation
+---
 
-When adding or updating documentation:
-1. Place component explanations in `components/`
-2. Place architecture docs in `architecture/`
-3. Place troubleshooting guides in `troubleshooting/`
-4. Update this README if adding new sections
-5. Follow existing documentation structure and style
+## 📖 Documentation Features
 
+### ✅ Search & Navigation
+- **Documentation Index** - Complete topic-based index
+- **Quick Reference** - Fast lookup for common tasks
+- **Navigation Helper** - Search strategies and document maps
+- **Cross-references** - Links between related documents
+
+### ✅ Organization
+- **By component** - Component-specific documentation
+- **By topic** - Topic-based organization
+- **By use case** - Use case examples
+- **By task** - Task-based guides
+
+### ✅ Accessibility
+- **Table of contents** - In large documents
+- **Quick links** - Fast access to common docs
+- **Code examples** - In every guide
+- **Cross-references** - Links to related content
+
+---
+
+## 🆘 Need Help?
+
+1. **Quick Start:** [README Quick Start](../README.md#quick-start-5-minutes)
+2. **Examples:** [Examples Directory](../examples/)
+3. **Troubleshooting:** [Troubleshooting Index](troubleshooting/README.md)
+4. **Search:** [Documentation Index](DOCUMENTATION_INDEX.md)
+
+---
+
+**Last Updated:** 2025-01-XX  
+**SDK Version:** 0.1.0
