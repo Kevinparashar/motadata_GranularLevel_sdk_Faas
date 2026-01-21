@@ -372,6 +372,16 @@ agent = await create_agent_from_prompt(
 - Run [RAG Example](../examples/basic_usage/07_rag_basic.py)
 - Try [Agent with RAG](../examples/integration/agent_with_rag.py)
 
+### Advanced Features
+
+The SDK includes production-grade advanced features for optimization and quality assurance:
+
+- **Vector Index Management**: Automatic creation and reindexing of IVFFlat and HNSW indexes for optimal RAG search performance
+- **KV Cache**: Attention key-value caching for LLM generation, reducing latency by 20-50% for repeated contexts
+- **Hallucination Detection**: Automatic detection of ungrounded responses in RAG systems, ensuring answers are supported by retrieved documents
+
+📖 **[Advanced Features Documentation](components/advanced_features.md)**
+
 ### Advanced Capabilities
 - Study [Prompt-Based Generator](components/prompt_based_generator_explanation.md)
 - Try [Prompt-Based Examples](../examples/prompt_based/)
@@ -616,6 +626,7 @@ Check Cache (by prompt hash + tenant)
 - **[Quick Reference](guide/QUICK_REFERENCE.md)** - Common tasks
 - **[Navigation Helper](guide/NAVIGATION_HELPER.md)** - Find information fast
 - **[Prompt-Based Creation](prompt_based_creation_guide.md)** - Create agents from prompts
+- **[Advanced Features](components/advanced_features.md)** - Vector indexes, KV cache, hallucination detection
 
 ### Troubleshooting
 - **[Troubleshooting Index](troubleshooting/README.md)** - All troubleshooting guides

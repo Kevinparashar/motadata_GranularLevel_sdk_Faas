@@ -52,6 +52,12 @@
 - **[OTEL Integration](../integration_guides/otel_integration_guide.md)** - OpenTelemetry integration
 - **[CODEC Integration](../integration_guides/codec_integration_guide.md)** - Serialization integration
 
+### Advanced Features
+- **[Advanced Features Overview](../components/advanced_features.md)** - Vector indexes, KV cache, hallucination detection
+- **[Vector Index Management](../components/advanced_features.md#vector-index-management)** - IVFFlat and HNSW index management
+- **[KV Cache](../components/advanced_features.md#kv-cache-for-llm-generation)** - Attention key-value caching for LLM optimization
+- **[Hallucination Detection](../components/advanced_features.md#hallucination-detection)** - Grounding verification for RAG responses
+
 ### Troubleshooting
 - **[Troubleshooting Index](../troubleshooting/README.md)** - All troubleshooting guides
 - **[Agent Troubleshooting](../troubleshooting/agent_troubleshooting.md)**

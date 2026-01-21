@@ -99,6 +99,41 @@ print(response.embeddings)
 
 ---
 
+## Response Caching
+
+### Functionality
+
+Response caching provides:
+- **Automatic Caching**: Caches responses automatically
+- **TTL Support**: Configurable time-to-live
+- **Cache Invalidation**: Manual and automatic invalidation
+- **Cost Reduction**: Reduces API costs by avoiding duplicate requests
+- **KV Cache**: Stores attention key-value pairs for LLM generation optimization, reducing latency by 20-50% for long contexts (see [Advanced Features](advanced_features.md#kv-cache-for-llm-generation))
+
+### Code Examples
+
+```python
+# Enable KV caching in gateway config
+config = GatewayConfig(
+    enable_kv_caching=True,
+    kv_cache_default_ttl=3600,  # 1 hour
+    kv_cache_max_size=1000
+)
+
+gateway = LiteLLMGateway(config=config)
+
+# Generation automatically uses KV cache for repeated contexts
+response = await gateway.generate_async(
+    prompt="Long context with repeated information...",
+    model="gpt-4",
+    tenant_id="tenant_123"
+)
+```
+
+**Note**: For detailed KV cache documentation, see [Advanced Features](advanced_features.md#kv-cache-for-llm-generation).
+
+---
+
 ## Rate Limiting and Queuing
 
 ### Functionality
