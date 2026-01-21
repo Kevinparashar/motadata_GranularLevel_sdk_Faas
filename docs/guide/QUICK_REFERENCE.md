@@ -44,6 +44,13 @@ from src.core.prompt_based_generator import (
     create_tool_from_prompt
 )
 
+# Data Ingestion
+from src.core.data_ingestion import (
+    upload_and_process,
+    upload_and_process_async,
+    create_ingestion_service
+)
+
 # RAG
 from src.core.rag import create_rag_system
 

@@ -6,7 +6,14 @@ This folder contains comprehensive documentation for each component of the Motad
 
 ### Core Components
 
-1. **[Agno Agent Framework](agno_agent_framework_explanation.md)**
+1. **[Data Ingestion Service](../src/core/data_ingestion/README.md)**
+   - Simple file upload interface
+   - Automatic processing and integration
+   - Multi-modal data support
+   - Validation and cleansing
+   - Integration with RAG, Agents, Cache
+
+2. **[Agno Agent Framework](agno_agent_framework_explanation.md)**
    - Agents functionality and interactions
    - Memory management
    - Exception handling
@@ -15,7 +22,7 @@ This folder contains comprehensive documentation for each component of the Motad
    - Workflow
    - Customization
 
-2. **[LiteLLM Gateway](litellm_gateway_explanation.md)**
+3. **[LiteLLM Gateway](litellm_gateway_explanation.md)**
    - Gateway operations
    - Rate limiting and queuing
    - Request batching and deduplication
@@ -29,7 +36,7 @@ This folder contains comprehensive documentation for each component of the Motad
    - Workflow
    - Customization
 
-3. **[RAG System](rag_system_explanation.md)**
+4. **[RAG System](rag_system_explanation.md)**
    - Document processing and ingestion
    - Document retrieval (vector, hybrid, keyword)
    - Response generation
@@ -38,7 +45,7 @@ This folder contains comprehensive documentation for each component of the Motad
    - Workflow
    - Customization
 
-4. **[Cache Mechanism](cache_mechanism_explanation.md)**
+5. **[Cache Mechanism](cache_mechanism_explanation.md)**
    - Cache operations (set, get, delete)
    - Cache backends (memory, Redis)
    - Advanced features (warming, monitoring, sharding)
@@ -47,7 +54,7 @@ This folder contains comprehensive documentation for each component of the Motad
    - Workflow
    - Customization
 
-5. **[Prompt Context Management](prompt_context_management_explanation.md)**
+6. **[Prompt Context Management](prompt_context_management_explanation.md)**
    - Template management
    - Context building
    - Dynamic prompting
@@ -58,7 +65,7 @@ This folder contains comprehensive documentation for each component of the Motad
    - Workflow
    - Customization
 
-6. **[PostgreSQL Database](postgresql_database_explanation.md)**
+7. **[PostgreSQL Database](postgresql_database_explanation.md)**
    - Database connection management
    - Vector operations with pgvector
    - Query execution
@@ -67,7 +74,7 @@ This folder contains comprehensive documentation for each component of the Motad
    - Workflow
    - Customization
 
-7. **[Evaluation & Observability](evaluation_observability_explanation.md)**
+8. **[Evaluation & Observability](evaluation_observability_explanation.md)**
    - Distributed tracing
    - Structured logging
    - Metrics collection
@@ -76,7 +83,7 @@ This folder contains comprehensive documentation for each component of the Motad
    - Workflow
    - Customization
 
-8. **[API Backend Services](api_backend_services_explanation.md)**
+9. **[API Backend Services](api_backend_services_explanation.md)**
    - API application creation
    - API routing
    - Endpoint creation

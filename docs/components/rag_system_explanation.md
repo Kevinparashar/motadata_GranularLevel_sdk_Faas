@@ -22,10 +22,15 @@ The RAG (Retrieval-Augmented Generation) System is a comprehensive solution for 
 ### Functionality
 
 Document processing handles the ingestion and preparation of documents for retrieval:
-- **Document Loading**: Loads documents from various sources (text, HTML, JSON)
+- **Multi-Modal Document Loading**: Loads documents from various sources and formats
+  - Text files: `.txt`, `.md`, `.html`, `.json`
+  - Documents: `.pdf`, `.doc`, `.docx`, `.rtf`
+  - Audio: `.mp3`, `.wav`, `.m4a`, `.ogg` (with transcription)
+  - Video: `.mp4`, `.avi`, `.mov`, `.mkv` (with transcription)
+  - Images: `.jpg`, `.png`, `.gif`, `.bmp` (with OCR and description)
 - **Preprocessing**: Normalizes text, cleans content, handles encoding
 - **Chunking**: Splits documents into manageable chunks using multiple strategies
-- **Metadata Extraction**: Automatically extracts metadata (title, dates, tags, language)
+- **Metadata Extraction**: Automatically extracts metadata (title, dates, tags, language, file properties)
 - **Metadata Validation**: Validates metadata against schemas
 - **Embedding Generation**: Generates vector embeddings for chunks
 

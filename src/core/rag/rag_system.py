@@ -14,6 +14,12 @@ from ..cache_mechanism import CacheConfig, CacheMechanism
 from ..litellm_gateway import LiteLLMGateway
 from ..postgresql_database.connection import DatabaseConnection
 from ..postgresql_database.vector_operations import VectorOperations
+from ..postgresql_database.vector_index_manager import (
+    VectorIndexManager,
+    create_vector_index_manager,
+    IndexType,
+    IndexDistance
+)
 from .document_processor import DocumentChunk, DocumentProcessor
 from .generator import RAGGenerator
 from .retriever import Retriever
@@ -73,7 +79,24 @@ class RAGSystem:
 
         # Initialize components
         self.vector_ops = VectorOperations(db)
-        self.document_processor = DocumentProcessor()
+        
+        # Initialize vector index manager
+        self.index_manager = create_vector_index_manager(db)
+        
+        # Initialize document processor with multimodal support
+        processor_kwargs = {
+            "chunk_size": kwargs.get("chunk_size", 1000),
+            "chunk_overlap": kwargs.get("chunk_overlap", 200),
+            "chunking_strategy": kwargs.get("chunking_strategy", "fixed"),
+            "min_chunk_size": kwargs.get("min_chunk_size", 50),
+            "max_chunk_size": kwargs.get("max_chunk_size", 2000),
+            "enable_preprocessing": kwargs.get("enable_preprocessing", True),
+            "enable_metadata_extraction": kwargs.get("enable_metadata_extraction", True),
+            "enable_multimodal": kwargs.get("enable_multimodal", True),
+            "gateway": gateway  # Pass gateway for image description generation
+        }
+        self.document_processor = DocumentProcessor(**processor_kwargs)
+        
         self.retriever = Retriever(
             vector_ops=self.vector_ops,
             gateway=gateway,
@@ -87,7 +110,8 @@ class RAGSystem:
     def ingest_document(
         self,
         title: str,
-        content: str,
+        content: Optional[str] = None,
+        file_path: Optional[str] = None,
         tenant_id: Optional[str] = None,
         source: Optional[str] = None,
         metadata: Optional[Dict[str, Any]] = None
@@ -95,9 +119,17 @@ class RAGSystem:
         """
         Ingest a document into the RAG system.
 
+        Supports both direct content and file paths for multi-modal data:
+        - Text files: .txt, .md, .html, .json
+        - Documents: .pdf, .doc, .docx
+        - Audio: .mp3, .wav, .m4a, .ogg (with transcription)
+        - Video: .mp4, .avi, .mov, .mkv (with transcription and frame extraction)
+        - Images: .jpg, .png, .gif, .bmp (with OCR and description)
+
         Args:
             title: Document title
-            content: Document content
+            content: Document content (if provided directly)
+            file_path: Path to file (for multi-modal loading)
             tenant_id: Optional tenant ID for multi-tenant SaaS
             source: Optional source URL/path
             metadata: Optional metadata
@@ -105,6 +137,20 @@ class RAGSystem:
         Returns:
             Document ID
         """
+        # Load from file if file_path provided
+        if file_path:
+            content, loaded_metadata = self.document_processor.load_document(file_path)
+            if metadata:
+                metadata.update(loaded_metadata)
+            else:
+                metadata = loaded_metadata
+            if not source:
+                source = file_path
+        
+        # Ensure content is provided
+        if not content:
+            raise ValueError("Either 'content' or 'file_path' must be provided")
+        
         # Insert document with tenant_id
         query = """
         INSERT INTO documents (title, content, metadata, source, tenant_id)
@@ -117,7 +163,7 @@ class RAGSystem:
 
         result = self.db.execute_query(
             query,
-            (title, content, metadata_json, source),
+            (title, content, metadata_json, source, tenant_id),
             fetch_one=True
         )
 
@@ -182,6 +228,15 @@ class RAGSystem:
         # Batch insert embeddings
         if embeddings_data:
             self.vector_ops.batch_insert_embeddings(embeddings_data)
+            
+            # Auto-reindex after batch insert (non-blocking)
+            try:
+                self.index_manager.auto_reindex_on_embedding_change(
+                    table_name="embeddings",
+                    column_name="embedding"
+                )
+            except Exception as e:
+                logger.warning(f"Auto-reindexing failed (non-critical): {str(e)}")
 
         return document_id
 
@@ -610,6 +665,15 @@ class RAGSystem:
         # Batch insert embeddings
         if embeddings_data:
             self.vector_ops.batch_insert_embeddings(embeddings_data)
+            
+            # Auto-reindex after batch insert (non-blocking)
+            try:
+                self.index_manager.auto_reindex_on_embedding_change(
+                    table_name="embeddings",
+                    column_name="embedding"
+                )
+            except Exception as e:
+                logger.warning(f"Auto-reindexing failed (non-critical): {str(e)}")
 
         return document_id
 
@@ -709,6 +773,58 @@ class RAGSystem:
 
         return document_ids
 
+    def create_index(
+        self,
+        index_type: IndexType = IndexType.IVFFLAT,
+        distance: IndexDistance = IndexDistance.COSINE,
+        **kwargs: Any
+    ) -> bool:
+        """
+        Create a vector index for optimal search performance.
+        
+        Args:
+            index_type: Type of index (IVFFlat or HNSW)
+            distance: Distance metric (cosine, l2, inner_product)
+            **kwargs: Additional index parameters
+        
+        Returns:
+            True if index created successfully
+        """
+        return self.index_manager.create_index(
+            table_name="embeddings",
+            column_name="embedding",
+            index_type=index_type,
+            distance=distance,
+            **kwargs
+        )
+    
+    def reindex(
+        self,
+        concurrently: bool = True
+    ) -> List[str]:
+        """
+        Reindex all vector indexes (useful after embedding model changes or bulk updates).
+        
+        Args:
+            concurrently: Whether to rebuild concurrently (non-blocking)
+        
+        Returns:
+            List of reindexed index names
+        """
+        return self.index_manager.reindex_table(
+            table_name="embeddings",
+            concurrently=concurrently
+        )
+    
+    def get_index_info(self) -> List[Dict[str, Any]]:
+        """
+        Get information about all vector indexes.
+        
+        Returns:
+            List of index information dictionaries
+        """
+        return self.index_manager.list_indexes(table_name="embeddings")
+
     def update_document(
         self,
         document_id: str,
@@ -784,6 +900,15 @@ class RAGSystem:
 
                         if embeddings_data:
                             self.vector_ops.batch_insert_embeddings(embeddings_data)
+            
+            # Auto-reindex after batch insert (non-blocking)
+            try:
+                self.index_manager.auto_reindex_on_embedding_change(
+                    table_name="embeddings",
+                    column_name="embedding"
+                )
+            except Exception as e:
+                logger.warning(f"Auto-reindexing failed (non-critical): {str(e)}")
 
                 # Update content in database
                 query = "UPDATE documents SET content = %s WHERE id = %s;"

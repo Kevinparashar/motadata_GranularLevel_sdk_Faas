@@ -6,7 +6,16 @@ This directory contains comprehensive troubleshooting guides for all components 
 
 ### Core Components
 
-1. **[Agent Framework Troubleshooting](agent_troubleshooting.md)**
+1. **[Data Ingestion Service Troubleshooting](data_ingestion_troubleshooting.md)**
+   - File upload failures
+   - Format validation errors
+   - Processing errors
+   - Multi-modal loading issues
+   - RAG ingestion failures
+   - Cache integration problems
+   - Batch processing errors
+
+2. **[Agent Framework Troubleshooting](agent_troubleshooting.md)**
    - Agent execution failures
    - Circuit breaker issues
    - Health check problems
@@ -15,7 +24,7 @@ This directory contains comprehensive troubleshooting guides for all components 
    - LLM Gateway connection problems
    - Performance issues
 
-2. **[LiteLLM Gateway Troubleshooting](litellm_gateway_troubleshooting.md)**
+3. **[LiteLLM Gateway Troubleshooting](litellm_gateway_troubleshooting.md)**
    - Connection failures
    - Rate limiting issues
    - Circuit breaker problems
@@ -26,7 +35,7 @@ This directory contains comprehensive troubleshooting guides for all components 
    - Validation errors
    - Performance issues
 
-3. **[RAG System Troubleshooting](rag_system_troubleshooting.md)**
+4. **[RAG System Troubleshooting](rag_system_troubleshooting.md)**
    - Document ingestion failures
    - Retrieval issues
    - Generation errors
@@ -36,7 +45,7 @@ This directory contains comprehensive troubleshooting guides for all components 
    - Performance issues
    - Cache issues
 
-4. **[Cache Mechanism Troubleshooting](cache_mechanism_troubleshooting.md)**
+5. **[Cache Mechanism Troubleshooting](cache_mechanism_troubleshooting.md)**
    - Cache misses
    - Memory backend issues
    - Redis backend issues
@@ -46,7 +55,7 @@ This directory contains comprehensive troubleshooting guides for all components 
    - Cache warming issues
    - Sharding problems
 
-5. **[Prompt Context Management Troubleshooting](prompt_context_management_troubleshooting.md)**
+6. **[Prompt Context Management Troubleshooting](prompt_context_management_troubleshooting.md)**
    - Template not found errors
    - Template rendering issues
    - Context window problems
@@ -56,7 +65,7 @@ This directory contains comprehensive troubleshooting guides for all components 
    - Optimization issues
    - Fallback template problems
 
-6. **[PostgreSQL Database Troubleshooting](postgresql_database_troubleshooting.md)**
+7. **[PostgreSQL Database Troubleshooting](postgresql_database_troubleshooting.md)**
    - Connection failures
    - Connection pool issues
    - Query execution errors
@@ -65,7 +74,7 @@ This directory contains comprehensive troubleshooting guides for all components 
    - Transaction problems
    - Performance issues
 
-7. **[Evaluation & Observability Troubleshooting](evaluation_observability_troubleshooting.md)**
+8. **[Evaluation & Observability Troubleshooting](evaluation_observability_troubleshooting.md)**
    - Tracing issues
    - Logging problems
    - Metrics collection issues
@@ -73,7 +82,7 @@ This directory contains comprehensive troubleshooting guides for all components 
    - Performance impact
    - Configuration problems
 
-8. **[API Backend Services Troubleshooting](api_backend_services_troubleshooting.md)**
+9. **[API Backend Services Troubleshooting](api_backend_services_troubleshooting.md)**
    - API startup issues
    - Request validation errors
    - Authentication problems
@@ -142,9 +151,10 @@ This directory contains comprehensive troubleshooting guides for all components 
 ### Step 1: Identify the Component
 
 Determine which component is experiencing issues:
+- **Data Ingestion Service**: Issues with file uploads, processing, format validation, multi-modal loading
 - **Agent Framework**: Issues with agent execution, tools, memory
 - **LiteLLM Gateway**: Issues with LLM API calls, rate limiting, providers
-- **RAG System**: Issues with document ingestion, retrieval, generation
+- **RAG System**: Issues with document ingestion, retrieval, generation, multi-modal processing
 - **Cache Mechanism**: Issues with caching, Redis, memory
 - **Prompt Context Management**: Issues with templates, context, tokens
 - **PostgreSQL Database**: Issues with database connections, queries, vectors

@@ -14,6 +14,11 @@
 
 ### Core Components
 
+#### Data Ingestion Service
+- **[Data Ingestion Overview](../src/core/data_ingestion/README.md)** - Simple file upload interface
+- **[Data Ingestion Explanation](../components/data_ingestion_explanation.md)** - Comprehensive component guide
+- **[Multi-Modal Processing](../components/multimodal_data_processing.md)** - Format support details
+
 #### Agent Framework
 - **[Agent Framework Overview](../src/core/agno_agent_framework/README.md)** - Complete agent framework guide
 - **[Agent Functions](../src/core/agno_agent_framework/functions.py)** - Factory and convenience functions

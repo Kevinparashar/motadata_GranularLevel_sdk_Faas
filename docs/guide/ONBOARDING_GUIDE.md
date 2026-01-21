@@ -100,9 +100,9 @@ SaaS Backend (Business Logic)
     ↓
 AI SDK Components (Agents/RAG/ML)
     ↓
-LiteLLM Gateway (LLM Provider Abstraction)
+LiteLLM Gateway (provides model access, handles API calls, rate limiting, caching)
     ↓
-LLM Providers (OpenAI, Anthropic, etc.)
+LLM Providers (OpenAI, Anthropic, Google, etc. - actual model execution)
 ```
 
 For detailed architecture information, see:
@@ -115,7 +115,32 @@ For detailed architecture information, see:
 
 The SDK consists of several core components, each serving a specific purpose:
 
-### 1. LiteLLM Gateway
+### 1. Data Ingestion Service
+**Purpose**: Simple, unified interface for uploading and processing data files
+
+**What it does**:
+- **One-Line Upload**: Simply provide a file path, everything else is automatic
+- **Automatic Processing**: Detects format, extracts content, processes data
+- **Automatic Integration**: Automatically ingests into RAG, caches content, makes available to agents
+- **Multi-Modal Support**: Handles text, PDF, DOC/DOCX, audio, video, and images
+- **Data Validation**: Validates file format, size, and content
+- **Data Cleansing**: Normalizes and cleanses data for quality
+
+**Supported Data Formats**:
+- **Text**: `.txt`, `.md`, `.markdown`, `.html`, `.json`
+- **Documents**: `.pdf`, `.doc`, `.docx`, `.rtf`
+- **Audio**: `.mp3`, `.wav`, `.m4a`, `.ogg` (with automatic transcription)
+- **Video**: `.mp4`, `.avi`, `.mov`, `.mkv` (with transcription and frame extraction)
+- **Images**: `.jpg`, `.png`, `.gif`, `.bmp` (with OCR and description)
+- **Structured**: `.csv`, `.json`, `.xml`, `.xlsx`, `.xls`
+
+**When to use**: When you want to upload files and have them automatically work with all AI components
+
+📖 **[Full Documentation](../src/core/data_ingestion/README.md)** | **[Multi-Modal Processing](components/multimodal_data_processing.md)**
+
+---
+
+### 2. LiteLLM Gateway
 **Purpose**: Unified interface for multiple LLM providers
 
 **What it does**:
@@ -130,7 +155,7 @@ The SDK consists of several core components, each serving a specific purpose:
 
 ---
 
-### 2. Agent Framework
+### 3. Agent Framework
 **Purpose**: Create autonomous AI agents that can execute tasks
 
 **What it does**:
@@ -145,22 +170,30 @@ The SDK consists of several core components, each serving a specific purpose:
 
 ---
 
-### 3. RAG System
+### 4. RAG System
 **Purpose**: Answer questions from documents using retrieval-augmented generation
 
 **What it does**:
-- Processes and chunks documents
+- Processes and chunks documents from multiple formats
+- **Multi-Modal Data Support**: Handles text, PDF, DOC/DOCX, audio, video, and images
 - Creates embeddings and stores in vector database
 - Retrieves relevant context for queries
 - Generates answers using retrieved context
 
-**When to use**: Document Q&A, knowledge base systems, semantic search
+**Supported Data Formats**:
+- **Text**: `.txt`, `.md`, `.markdown`, `.html`, `.json`
+- **Documents**: `.pdf`, `.doc`, `.docx`, `.rtf`
+- **Audio**: `.mp3`, `.wav`, `.m4a`, `.ogg` (with automatic transcription)
+- **Video**: `.mp4`, `.avi`, `.mov`, `.mkv` (with transcription and frame extraction)
+- **Images**: `.jpg`, `.png`, `.gif`, `.bmp` (with OCR and description)
+
+**When to use**: Document Q&A, knowledge base systems, semantic search, multi-modal content analysis
 
 📖 **[Full Documentation](components/rag_system_explanation.md)** | **[Component README](../src/core/rag/README.md)**
 
 ---
 
-### 4. Prompt-Based Generator
+### 5. Prompt-Based Generator
 **Purpose**: Create agents and tools from natural language prompts
 
 **What it does**:
@@ -175,7 +208,7 @@ The SDK consists of several core components, each serving a specific purpose:
 
 ---
 
-### 5. Cache Mechanism
+### 6. Cache Mechanism
 **Purpose**: Reduce API costs by caching LLM responses
 
 **What it does**:
@@ -190,7 +223,7 @@ The SDK consists of several core components, each serving a specific purpose:
 
 ---
 
-### 6. PostgreSQL Database
+### 7. PostgreSQL Database
 **Purpose**: Vector database for embeddings and structured data
 
 **What it does**:
@@ -205,7 +238,7 @@ The SDK consists of several core components, each serving a specific purpose:
 
 ---
 
-### 7. Evaluation & Observability
+### 8. Evaluation & Observability
 **Purpose**: Monitor, trace, and debug SDK operations
 
 **What it does**:
@@ -220,7 +253,7 @@ The SDK consists of several core components, each serving a specific purpose:
 
 ---
 
-### 8. Other Components
+### 9. Other Components
 
 - **Prompt Context Management**: Template-based prompts with versioning
 - **API Backend Services**: RESTful API endpoints
@@ -242,9 +275,13 @@ Agent Framework (receives query)
     ↓
 RAG System (retrieves relevant documents)
     ↓
-LiteLLM Gateway (generates answer using context)
+LiteLLM Gateway (provides LLM model, handles API calls to providers)
     ↓
-Cache Mechanism (stores response)
+LLM Provider (OpenAI/Anthropic/Google - generates answer using context)
+    ↓
+LiteLLM Gateway (returns response)
+    ↓
+Cache Mechanism (stores response for future use)
     ↓
 Response to User
 ```
@@ -269,7 +306,7 @@ response = await agent.execute_task(
 
 ---
 
-### Example 2: Multi-Agent System
+### Example 3: Multi-Agent System
 
 ```
 User Request: "Analyze this incident and create a change request"
@@ -277,10 +314,12 @@ User Request: "Analyze this incident and create a change request"
 Orchestrator Agent (coordinates)
     ↓
     ├─→ Analysis Agent (analyzes incident)
-    │   └─→ LiteLLM Gateway
+    │   └─→ LiteLLM Gateway (provides model access)
+    │       └─→ LLM Provider (generates analysis)
     │
     └─→ Change Agent (creates change request)
-        └─→ LiteLLM Gateway
+        └─→ LiteLLM Gateway (provides model access)
+            └─→ LLM Provider (generates change request)
     ↓
 Response to User
 ```
@@ -293,7 +332,7 @@ Response to User
 
 ---
 
-### Example 3: Prompt-Based Agent Creation
+### Example 4: Prompt-Based Agent Creation
 
 ```
 User Prompt: "Create a customer support agent that can handle refunds"
@@ -322,60 +361,37 @@ agent = await create_agent_from_prompt(
 
 ## Learning Path
 
-### Week 1: Foundation
+### Foundation
+- Read [Main README](../README.md) for the quick start
+- Run the [Hello World example](../examples/hello_world.py)
+- Understand [LiteLLM Gateway](components/litellm_gateway_explanation.md)
+- Study [Agent Framework](components/agno_agent_framework_explanation.md)
+- Try [Basic Agent Example](../examples/basic_usage/05_agent_basic.py)
+- Understand [Cache Mechanism](components/cache_mechanism_explanation.md)
+- Review [RAG System](components/rag_system_explanation.md)
+- Run [RAG Example](../examples/basic_usage/07_rag_basic.py)
+- Try [Agent with RAG](../examples/integration/agent_with_rag.py)
 
-**Day 1-2: Setup and Basics**
-1. Read [Main README](../README.md) - Quick start
-2. Run [Hello World example](../examples/hello_world.py)
-3. Understand [LiteLLM Gateway](components/litellm_gateway_explanation.md)
+### Advanced Capabilities
+- Study [Prompt-Based Generator](components/prompt_based_generator_explanation.md)
+- Try [Prompt-Based Examples](../examples/prompt_based/)
+- Understand [Observability](components/evaluation_observability_explanation.md)
+- Read [SDK Architecture](architecture/SDK_ARCHITECTURE.md)
+- Study [AI Architecture Design](architecture/AI_ARCHITECTURE_DESIGN.md)
+- Review [REST/FastAPI Architecture](architecture/REST_FASTAPI_ARCHITECTURE.md)
+- Review [Integration Guides](integration_guides/README.md)
+- Study NATS, OTEL, and CODEC integrations
+- Build a complete use case
 
-**Day 3-4: Core Components**
-1. Study [Agent Framework](components/agno_agent_framework_explanation.md)
-2. Try [Basic Agent Example](../examples/basic_usage/05_agent_basic.py)
-3. Understand [Cache Mechanism](components/cache_mechanism_explanation.md)
-
-**Day 5: Integration**
-1. Review [RAG System](components/rag_system_explanation.md)
-2. Run [RAG Example](../examples/basic_usage/07_rag_basic.py)
-3. Try [Agent with RAG](../examples/integration/agent_with_rag.py)
-
----
-
-### Week 2: Advanced Features
-
-**Day 1-2: Advanced Components**
-1. Study [Prompt-Based Generator](components/prompt_based_generator_explanation.md)
-2. Try [Prompt-Based Examples](../examples/prompt_based/)
-3. Understand [Observability](components/evaluation_observability_explanation.md)
-
-**Day 3-4: Architecture Deep Dive**
-1. Read [SDK Architecture](architecture/SDK_ARCHITECTURE.md)
-2. Study [AI Architecture Design](architecture/AI_ARCHITECTURE_DESIGN.md)
-3. Review [REST/FastAPI Architecture](architecture/REST_FASTAPI_ARCHITECTURE.md)
-
-**Day 5: Integration Patterns**
-1. Review [Integration Guides](integration_guides/README.md)
-2. Study NATS, OTEL, CODEC integrations
-3. Build a complete use case
-
----
-
-### Week 3: Production Readiness
-
-**Day 1-2: Error Handling & Testing**
-1. Study error handling patterns
-2. Review [Troubleshooting Guides](troubleshooting/README.md)
-3. Write tests for your components
-
-**Day 3-4: Multi-Tenancy & Security**
-1. Understand tenant isolation
-2. Review security best practices
-3. Test multi-tenant scenarios
-
-**Day 5: Performance & Optimization**
-1. Study caching strategies
-2. Review performance metrics
-3. Optimize your implementations
+### Production Readiness
+- Study error handling patterns
+- Review [Troubleshooting Guides](troubleshooting/README.md)
+- Write tests for your components
+- Understand tenant isolation and security best practices
+- Test multi-tenant scenarios
+- Study caching strategies
+- Review performance metrics
+- Optimize implementations
 
 ---
 
@@ -407,7 +423,7 @@ print(result)
 
 ---
 
-### Workflow 2: Setting Up RAG System
+### Workflow 3: Setting Up RAG System
 
 ```python
 from src.core.rag import create_rag_system
@@ -437,7 +453,7 @@ results = await rag.query("What is the main topic?", limit=5)
 
 ---
 
-### Workflow 3: Creating Agent from Prompt
+### Workflow 4: Creating Agent from Prompt
 
 ```python
 from src.core.prompt_based_generator import create_agent_from_prompt
@@ -461,7 +477,7 @@ response = await agent.execute_task("A customer wants a refund for order #12345"
 
 ---
 
-### Workflow 4: Multi-Agent Orchestration
+### Workflow 5: Multi-Agent Orchestration
 
 ```python
 from src.core.agno_agent_framework import create_agent, create_orchestrator
@@ -618,6 +634,5 @@ Check Cache (by prompt hash + tenant)
 
 **Welcome to the team! 🚀**
 
-**Last Updated:** 2025-01-XX  
 **SDK Version:** 0.1.0
 

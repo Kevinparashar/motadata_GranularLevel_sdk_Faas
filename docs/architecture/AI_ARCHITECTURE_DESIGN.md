@@ -339,7 +339,92 @@ Training Request
 
 ## 3. Component Breakdown
 
-### 3.1 AI Gateway (LiteLLM) - Heart of All Components
+### 3.1 Data Ingestion Service - Unified File Processing
+
+**Purpose**: Simple, one-line interface for uploading and processing data files with automatic integration into all AI components.
+
+**Key Responsibilities**:
+- **File Validation**: Validates file format, size, and content
+- **Multi-Modal Processing**: Handles text, PDF, audio, video, images, structured data
+- **Data Cleansing**: Normalizes and cleanses data for quality
+- **Automatic Integration**: Automatically ingests into RAG, caches content, makes available to agents
+- **Batch Processing**: Supports batch and asynchronous file processing
+
+**Integration Points**:
+- **Uses**: Multi-Modal Loader, RAG System, Cache Mechanism, Gateway (for vision models)
+- **Used by**: Application backend for file uploads
+- **Integrates with**: All AI components automatically
+
+**Key Features**:
+- One-line file upload: `upload_and_process("file.pdf", rag_system=rag, cache=cache)`
+- Automatic format detection and processing
+- Multi-format support (text, PDF, audio, video, images, structured data)
+- Automatic RAG ingestion
+- Automatic caching
+- Data validation and cleansing
+- Multi-tenant support
+
+**Data Flow**:
+```
+File Upload
+    │
+    ▼
+┌─────────────────────────────────────┐
+│  File Validation                    │
+│  - Format check                     │
+│  - Size validation                  │
+│  - Content validation               │
+└─────────────────────────────────────┘
+    │
+    ▼
+┌─────────────────────────────────────┐
+│  Multi-Modal Processing             │
+│  - Text extraction                  │
+│  - PDF parsing                      │
+│  - Audio transcription              │
+│  - Video transcription + frames     │
+│  - Image OCR + description          │
+└─────────────────────────────────────┘
+    │
+    ▼
+┌─────────────────────────────────────┐
+│  Data Cleansing                     │
+│  - Normalize text                   │
+│  - Remove control chars             │
+│  - Clean whitespace                 │
+└─────────────────────────────────────┘
+    │
+    ▼
+┌─────────────────────────────────────┐
+│  Automatic Integration              │
+│  - Cache processed content          │
+│  - Ingest into RAG                  │
+│  - Make available to agents         │
+└─────────────────────────────────────┘
+```
+
+**Usage Example**:
+```python
+from src.core.data_ingestion import upload_and_process
+
+# One line - everything automatic!
+result = upload_and_process(
+    "document.pdf",
+    rag_system=rag,
+    cache=cache,
+    tenant_id="tenant_123"
+)
+
+# File is now:
+# - Validated and processed
+# - Cached for fast access
+# - Ingested into RAG (searchable)
+# - Available to agents
+```
+
+---
+
+### 3.2 AI Gateway (LiteLLM) - Heart of All Components
 
 **Purpose**: Central hub for all AI operations
 
@@ -387,7 +472,7 @@ gateway = create_gateway(
 
 ---
 
-### 3.2 Agent Framework
+### 3.3 Agent Framework
 
 **Purpose**: Autonomous AI agents for task execution
 
@@ -433,12 +518,13 @@ agent = create_agent(
 
 ---
 
-### 3.3 RAG System
+### 3.4 RAG System
 
 **Purpose**: Retrieval-Augmented Generation for knowledge-based queries
 
 **Key Responsibilities**:
-- Document ingestion and processing
+- **Multi-Modal Document Ingestion**: Process documents from various formats (text, PDF, audio, video, images)
+- Document processing and chunking
 - Vector embedding generation
 - Similarity search (pgvector)
 - Query rewriting and optimization
