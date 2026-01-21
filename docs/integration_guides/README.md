@@ -24,4 +24,6 @@ This directory contains integration guides for core platform components (NATS, O
 
 - [CORE_COMPONENTS_INTEGRATION_STORY.md](../components/CORE_COMPONENTS_INTEGRATION_STORY.md) - Complete integration story and architecture
 - Component-specific README files in `src/core/` directories
+- [FaaS Integrations](../src/faas/integrations/README.md) - NATS, OTEL, CODEC for FaaS services
+- [FaaS Implementation Guide](../architecture/FAAS_IMPLEMENTATION_GUIDE.md) - FaaS architecture with integrations
 

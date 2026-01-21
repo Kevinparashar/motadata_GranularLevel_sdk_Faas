@@ -43,6 +43,14 @@ Integration tests verify that multiple components work together correctly. They 
   - Agent with RAG workflow
   - Multi-component integration scenarios
 
+### FaaS Service Integration Tests
+
+- **`test_faas/test_service_integration.py`**: Tests FaaS service-to-service communication
+  - Agent Service calling Gateway Service
+  - RAG Service calling Gateway Service
+  - Service-to-service error handling
+  - HTTP request/response validation
+
 ## Purpose
 
 Integration tests ensure:

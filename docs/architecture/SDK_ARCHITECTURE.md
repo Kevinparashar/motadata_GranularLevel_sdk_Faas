@@ -692,7 +692,188 @@ Shared Infrastructure
 
 ---
 
-## 8. Security Architecture
+## 8. FaaS Architecture
+
+### 8.1 FaaS Overview
+
+The SDK supports a **Function as a Service (FaaS)** architecture where each AI component can be deployed as an independent microservice. This enables:
+
+- **Independent Scaling**: Each service scales independently based on demand
+- **Service Isolation**: Services can be deployed, updated, and scaled separately
+- **Microservices Integration**: Easy integration with existing microservices architectures
+- **Multiple Deployment Options**: Docker, Kubernetes, AWS Lambda support
+
+### 8.2 FaaS Architecture Pattern
+
+```
+┌─────────────────────────────────────────────────────────────┐
+│                    External Clients                          │
+│  (Web Apps, Mobile Apps, Third-party Integrations)        │
+└─────────────────────────────────────────────────────────────┘
+                            │
+                            │ HTTPS
+                            │
+┌─────────────────────────────────────────────────────────────┐
+│              AWS API Gateway (Edge Layer)                    │
+│  - JWT Authentication  - Rate Limiting  - Request Routing  │
+└─────────────────────────────────────────────────────────────┘
+                            │
+                            │ HTTP (GET, POST, PUT, DELETE)
+                            │
+        ┌───────────────────┼───────────────────┐
+        │                   │                   │
+        ▼                   ▼                   ▼
+┌──────────────┐   ┌──────────────┐   ┌──────────────┐
+│ Agent Service│   │ RAG Service │   │ ML Service   │
+│              │   │             │   │              │
+│ - Create    │   │ - Ingest    │   │ - Train     │
+│ - Execute   │   │ - Query     │   │ - Predict   │
+│ - Chat      │   │ - Search    │   │ - Serve     │
+│ - Manage    │   │ - Update    │   │ - Monitor   │
+└──────┬───────┘   └──────┬──────┘   └──────┬──────┘
+       │                  │                  │
+       └──────────┬───────┴──────────┬───────┘
+                  │                  │
+                  ▼                  ▼
+         ┌─────────────────┐  ┌──────────────┐
+         │ Gateway Service │  │Cache Service │
+         │                 │  │              │
+         │ - Generate     │  │ - Get        │
+         │ - Embed        │  │ - Set        │
+         │ - Stream       │  │ - Invalidate │
+         └─────────────────┘  └──────────────┘
+                  │
+                  │
+         ┌────────┴────────┐
+         │                 │
+         ▼                 ▼
+┌─────────────────┐  ┌──────────────┐
+│ Prompt Service  │  │Data Ingestion│
+│                 │  │   Service    │
+│ - Templates     │  │              │
+│ - Context       │  │ - Upload     │
+│ - Versioning    │  │ - Process    │
+└─────────────────┘  └──────────────┘
+                  │
+                  │
+         ┌────────┴────────┐
+         │                 │
+         ▼                 ▼
+┌──────────────────────────────────────┐
+│      Integration Layer               │
+│  - NATS (Message Bus)                │
+│  - OTEL (Observability)              │
+│  - CODEC (Serialization)             │
+└──────────────────────────────────────┘
+                  │
+                  ▼
+         ┌─────────────────┐
+         │  State Storage  │
+         │  - PostgreSQL   │
+         │  - Redis        │
+         └─────────────────┘
+```
+
+### 8.3 FaaS Services
+
+Each AI component is available as an independent service:
+
+1. **Agent Service** (`src/faas/services/agent_service/`)
+   - Agent CRUD operations
+   - Task execution
+   - Chat interactions
+   - Memory management
+
+2. **RAG Service** (`src/faas/services/rag_service/`)
+   - Document ingestion
+   - Query processing
+   - Vector search
+   - Document management
+
+3. **Gateway Service** (`src/faas/services/gateway_service/`)
+   - Text generation
+   - Embedding generation
+   - Streaming generation
+   - Provider management
+
+4. **ML Service** (`src/faas/services/ml_service/`)
+   - Model training
+   - Model inference
+   - Batch prediction
+   - Model deployment
+
+5. **Cache Service** (`src/faas/services/cache_service/`)
+   - Get/Set/Delete operations
+   - Cache invalidation
+   - Tenant-scoped caching
+
+6. **Prompt Service** (`src/faas/services/prompt_service/`)
+   - Template CRUD
+   - Prompt rendering
+   - Context building
+
+7. **Data Ingestion Service** (`src/faas/services/data_ingestion_service/`)
+   - File upload
+   - File processing
+   - Auto-ingestion into RAG
+
+8. **Prompt Generator Service** (`src/faas/services/prompt_generator_service/`)
+   - Agent creation from prompts
+   - Tool creation from prompts
+   - Feedback collection
+   - Permission management
+
+9. **LLMOps Service** (`src/faas/services/llmops_service/`)
+   - LLM operation logging
+   - Operation query and history
+   - Metrics and analytics
+   - Cost analysis and tracking
+
+### 8.4 Service Communication
+
+Services communicate via:
+- **Direct HTTP**: Synchronous service-to-service calls
+- **NATS Messaging**: Asynchronous event-driven communication
+- **Shared State**: PostgreSQL for persistent state, Redis for caching
+
+### 8.5 FaaS vs Library Mode
+
+The SDK supports both usage modes:
+
+**Library Mode** (Default):
+- Import SDK components directly
+- In-process execution
+- Lower latency
+- Simpler deployment
+
+**FaaS Mode**:
+- Deploy components as services
+- HTTP-based communication
+- Independent scaling
+- Microservices architecture
+
+**Both modes use the same core business logic** (`src/core/`), ensuring consistency and maintainability.
+
+### 8.6 FaaS Deployment
+
+FaaS services support multiple deployment options:
+- **Docker**: Containerized deployment
+- **Kubernetes**: Orchestrated container deployment
+- **AWS Lambda**: Serverless deployment
+
+See [FaaS Deployment Guides](../deployment/) for detailed instructions.
+
+### 8.7 FaaS Documentation
+
+For complete FaaS documentation, see:
+- [FaaS Implementation Guide](FAAS_IMPLEMENTATION_GUIDE.md)
+- [FaaS Structure Summary](FAAS_STRUCTURE_SUMMARY.md)
+- [FaaS Completion Summary](FAAS_COMPLETION_SUMMARY.md)
+- [FaaS README](../../src/faas/README.md)
+
+---
+
+## 9. Security Architecture
 
 ### 8.1 Security Layers
 
@@ -728,7 +909,7 @@ Shared Infrastructure
 
 ---
 
-## 9. Component Interaction Matrix
+## 10. Component Interaction Matrix
 
 | Component | Uses | Used By | Communicates Via |
 |-----------|------|---------|------------------|
@@ -742,7 +923,7 @@ Shared Infrastructure
 
 ---
 
-## 10. Technology Stack
+## 11. Technology Stack
 
 ### 10.1 SDK Technologies
 
@@ -784,7 +965,7 @@ Shared Infrastructure
 
 ---
 
-## 11. Key Design Decisions
+## 12. Key Design Decisions
 
 ### 11.1 Why Library, Not Service?
 
@@ -846,7 +1027,7 @@ agent = Agent(
 
 ---
 
-## 12. Performance Considerations
+## 13. Performance Considerations
 
 ### 12.1 Caching Strategy
 
@@ -889,7 +1070,7 @@ agent = Agent(
 
 ---
 
-## 13. Monitoring and Observability
+## 14. Monitoring and Observability
 
 ### 13.1 Metrics
 
@@ -941,7 +1122,7 @@ agent = Agent(
 
 ---
 
-## 14. Error Handling
+## 15. Error Handling
 
 ### 14.1 Error Hierarchy
 
@@ -977,7 +1158,7 @@ SDKError (base)
 
 ---
 
-## 15. Future Extensibility
+## 16. Future Extensibility
 
 ### 15.1 Plugin System
 
@@ -1007,7 +1188,7 @@ SDKError (base)
 
 ---
 
-## 16. Summary
+## 17. Summary
 
 ### 16.1 Architecture Highlights
 

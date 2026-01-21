@@ -50,6 +50,15 @@ The Motadata Python AI SDK is a comprehensive, modular SDK for building AI-power
 
 ## Features
 
+### FaaS Architecture (New!)
+- **Function as a Service**: Transform SDK into microservices-ready FaaS architecture
+- **AI Component Services**: Each AI component (Agent, RAG, Gateway, ML, Cache, Prompt, Data Ingestion) as independent service
+- **Service-to-Service Communication**: Direct HTTP calls and NATS messaging for async communication
+- **Integration Layer**: NATS, OTEL, CODEC placeholders ready for implementation
+- **Shared Components**: Common contracts, middleware, configuration management across all services
+- **Deployment Options**: Docker, Kubernetes, AWS Lambda support
+- See [FaaS Documentation](src/faas/README.md) and [FaaS Implementation Guide](docs/architecture/FAAS_IMPLEMENTATION_GUIDE.md) for details
+
 ### Core AI Capabilities
 - **Data Ingestion Service**: Simple one-line file upload that automatically processes any format (text, PDF, audio, video, images) and integrates with RAG, Agents, and Cache - just upload and everything works
 - **Prompt-Based Creation**: Create agents and tools from natural language prompts - describe what you want in plain English and the system generates fully configured agents and tools automatically
@@ -93,6 +102,7 @@ The Motadata Python AI SDK is a comprehensive, modular SDK for building AI-power
 - **Need monitoring and debugging?** → Use [Observability](src/core/evaluation_observability/README.md)
 - **Managing prompts and templates?** → Use [Prompt Context Management](src/core/prompt_context_management/README.md)
 - **Building REST APIs?** → Use [API Backend Services](src/core/api_backend_services/README.md)
+- **Deploying as microservices?** → Use [FaaS Services](src/faas/README.md)
 
 **For detailed guidance on each component, see their individual README files which include:**
 - ✅ When to use this component
@@ -144,23 +154,51 @@ The SDK follows a layered architecture with clear separation of concerns:
 ```
 motadata-python-ai-sdk/
 ├── src/
-│   └── core/                    # Core AI components
-│       ├── litellm_gateway/
-│       ├── agno_agent_framework/
-│       ├── machine_learning/    # ML components
-│       │   ├── ml_framework/
-│       │   ├── mlops/
-│       │   ├── ml_data_management/
-│       │   ├── model_serving/
-│       │   └── use_cases/
-│       ├── postgresql_database/
-│       ├── rag/
-│       ├── prompt_context_management/
-│       ├── prompt_based_generator/  # Prompt-based agent/tool creation
-│       ├── evaluation_observability/
-│       ├── api_backend_services/
-│       └── cache_mechanism/
-└── src/tests/                   # Tests
+│   ├── core/                    # Core AI components (Business Logic)
+│   │   ├── litellm_gateway/
+│   │   ├── agno_agent_framework/
+│   │   ├── machine_learning/    # ML components
+│   │   │   ├── ml_framework/
+│   │   │   ├── mlops/
+│   │   │   ├── ml_data_management/
+│   │   │   ├── model_serving/
+│   │   │   └── use_cases/
+│   │   ├── postgresql_database/
+│   │   ├── rag/
+│   │   ├── prompt_context_management/
+│   │   ├── prompt_based_generator/  # Prompt-based agent/tool creation
+│   │   ├── evaluation_observability/
+│   │   ├── api_backend_services/
+│   │   └── cache_mechanism/
+│   ├── faas/                    # FaaS Services (API Layer)
+│   │   ├── services/            # AI Component Services
+│   │   │   ├── agent_service/
+│   │   │   ├── rag_service/
+│   │   │   ├── gateway_service/
+│   │   │   ├── ml_service/
+│   │   │   ├── cache_service/
+│   │   │   ├── prompt_service/
+│   │   │   └── data_ingestion_service/
+│   │   ├── integrations/        # Integration Layer
+│   │   │   ├── nats.py
+│   │   │   ├── otel.py
+│   │   │   └── codec.py
+│   │   └── shared/              # Shared Components
+│   │       ├── contracts.py
+│   │       ├── middleware.py
+│   │       ├── config.py
+│   │       └── exceptions.py
+│   └── tests/                   # Tests
+├── docs/                        # Documentation
+│   ├── architecture/            # Architecture documentation
+│   ├── components/              # Component explanations
+│   ├── deployment/              # Deployment guides
+│   ├── integration_guides/      # Integration guides
+│   └── troubleshooting/        # Troubleshooting guides
+└── examples/                    # Code examples
+    ├── basic_usage/             # Basic usage examples
+    ├── faas/                   # FaaS service examples
+    └── integration/            # Integration examples
 ```
 
 ## Project Components
@@ -277,6 +315,63 @@ motadata-python-ai-sdk/
    - **Automatic Cache Sharding** for improved performance and scalability
    - **Cache Validation Processes** to ensure the integrity of cached data
    - **Automatic Recovery Mechanisms** for cache failures
+
+### FaaS Services (in src/faas/)
+
+Each AI component is also available as an independent REST API service for microservices deployment:
+
+1. **Agent Service** (`src/faas/services/agent_service/`)
+   - Agent CRUD operations via REST API
+   - Task execution endpoints
+   - Chat interaction endpoints
+   - Memory management endpoints
+
+2. **RAG Service** (`src/faas/services/rag_service/`)
+   - Document ingestion via REST API
+   - Query processing endpoints
+   - Vector search endpoints
+   - Document management endpoints
+
+3. **Gateway Service** (`src/faas/services/gateway_service/`)
+   - Text generation endpoints
+   - Embedding generation endpoints
+   - Streaming generation support
+   - Provider management endpoints
+
+4. **ML Service** (`src/faas/services/ml_service/`)
+   - Model training endpoints
+   - Model inference endpoints
+   - Batch prediction endpoints
+   - Model deployment endpoints
+
+5. **Cache Service** (`src/faas/services/cache_service/`)
+   - Get/Set/Delete cache operations
+   - Cache invalidation endpoints
+   - Tenant-scoped caching
+
+6. **Prompt Service** (`src/faas/services/prompt_service/`)
+   - Template CRUD endpoints
+   - Prompt rendering endpoints
+   - Context building endpoints
+
+7. **Data Ingestion Service** (`src/faas/services/data_ingestion_service/`)
+   - File upload endpoints
+   - File processing endpoints
+   - Auto-ingestion into RAG
+
+8. **Prompt Generator Service** (`src/faas/services/prompt_generator_service/`)
+   - Agent creation from prompts via REST API
+   - Tool creation from prompts via REST API
+   - Feedback collection endpoints
+   - Permission management endpoints
+
+9. **LLMOps Service** (`src/faas/services/llmops_service/`)
+   - LLM operation logging endpoints
+   - Operation query and history endpoints
+   - Metrics and analytics endpoints
+   - Cost analysis and tracking endpoints
+
+**See [FaaS Documentation](src/faas/README.md) and [FaaS Implementation Guide](docs/architecture/FAAS_IMPLEMENTATION_GUIDE.md) for complete details.**
 
 ### Core Platform Integrations (src/integrations/)
 

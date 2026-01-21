@@ -9,6 +9,12 @@ examples/
 ├── hello_world.py           # Quick Start example (start here!)
 ├── basic_usage/              # Simple, single-component examples
 ├── integration/              # Multi-component integration examples
+├── faas/                    # FaaS service examples (NEW!)
+│   ├── README.md           # FaaS examples guide
+│   ├── agent_service_example.py
+│   ├── rag_service_example.py
+│   ├── gateway_service_example.py
+│   └── complete_workflow_example.py
 ├── end_to_end/              # Complete end-to-end workflows
 └── use_cases/               # Real-world use case implementations
     ├── README.md            # Use cases index
@@ -94,6 +100,15 @@ Examples are organized following the component dependency order:
 ### Basic Usage
 Simple examples showing how to use each component independently.
 
+### FaaS Services
+Examples demonstrating how to use AI components as REST API services:
+- `agent_service_example.py` - Using Agent Service via HTTP API
+- `rag_service_example.py` - Using RAG Service via HTTP API
+- `gateway_service_example.py` - Using Gateway Service via HTTP API
+- `complete_workflow_example.py` - Complete workflow using multiple FaaS services
+
+See [faas/README.md](faas/README.md) for detailed FaaS examples documentation.
+
 ### Integration
 Examples showing how multiple components work together:
 - `agent_with_rag.py` - Agent using RAG for context
@@ -117,9 +132,10 @@ See [use_cases/README.md](use_cases/README.md) for the use cases index.
 1. **Start here**: Run `hello_world.py` to verify your setup and make your first AI call
 2. Start with **basic_usage** examples to understand each component
 3. Study **integration** examples to see component interactions
-4. Review **end_to_end** examples for complete system understanding
-5. Explore **use_cases** to see real-world implementations
-6. Use **use_cases/template** to build your own use cases
+4. **For microservices**: Explore **faas/** examples to see how to use components as services
+5. Review **end_to_end** examples for complete system understanding
+6. Explore **use_cases** to see real-world implementations
+7. Use **use_cases/template** to build your own use cases
 
 ## Creating New Use Cases
 

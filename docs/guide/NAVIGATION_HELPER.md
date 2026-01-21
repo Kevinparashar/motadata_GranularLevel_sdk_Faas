@@ -109,7 +109,15 @@ See [Agent Framework Explanation](../components/agno_agent_framework_explanation
 ### "I want to understand architecture"
 1. [SDK Architecture](../architecture/SDK_ARCHITECTURE.md)
 2. [AI Architecture Design](../architecture/AI_ARCHITECTURE_DESIGN.md)
-3. [Component Dependencies](../architecture/COMPONENT_DEPENDENCIES.md)
+3. [FaaS Architecture](../architecture/FAAS_IMPLEMENTATION_GUIDE.md)
+4. [Component Dependencies](../architecture/COMPONENT_DEPENDENCIES.md)
+
+### "I want to deploy as services"
+1. [FaaS Overview](../../src/faas/README.md)
+2. [FaaS Implementation Guide](../architecture/FAAS_IMPLEMENTATION_GUIDE.md)
+3. [Docker Deployment](../deployment/DOCKER_DEPLOYMENT.md)
+4. [Kubernetes Deployment](../deployment/KUBERNETES_DEPLOYMENT.md)
+5. [AWS Lambda Deployment](../deployment/AWS_LAMBDA_DEPLOYMENT.md)
 
 ---
 

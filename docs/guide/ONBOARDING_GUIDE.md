@@ -40,7 +40,7 @@ The **Motadata Python AI SDK** is a comprehensive, modular framework for buildin
 
 1. **Modularity**: Each component is independent and swappable
 2. **Multi-Tenancy**: Full tenant isolation across all components
-3. **Library-Based**: Import as a library, not a service
+3. **Dual Mode**: Can be used as a library (`src/core/`) or as services (`src/faas/`)
 4. **Function-Driven API**: Simple factory functions for component creation
 5. **Observability-First**: Built-in tracing, logging, and metrics
 
@@ -610,6 +610,7 @@ Check Cache (by prompt hash + tenant)
 - **[SDK Architecture](architecture/SDK_ARCHITECTURE.md)** - Overall architecture
 - **[AI Architecture Design](architecture/AI_ARCHITECTURE_DESIGN.md)** - Detailed AI architecture
 - **[REST/FastAPI Architecture](architecture/REST_FASTAPI_ARCHITECTURE.md)** - API layer design
+- **[FaaS Architecture](architecture/FAAS_IMPLEMENTATION_GUIDE.md)** - FaaS services-based architecture
 
 ### Components
 - **[All Components](components/README.md)** - Component overview
@@ -620,6 +621,15 @@ Check Cache (by prompt hash + tenant)
 - **[NATS Integration](integration_guides/nats_integration_guide.md)**
 - **[OTEL Integration](integration_guides/otel_integration_guide.md)**
 - **[CODEC Integration](integration_guides/codec_integration_guide.md)**
+- **[FaaS Integrations](../src/faas/integrations/README.md)** - NATS, OTEL, CODEC for FaaS services
+
+### FaaS Services
+- **[FaaS Overview](../src/faas/README.md)** - FaaS architecture and services
+- **[FaaS Implementation Guide](architecture/FAAS_IMPLEMENTATION_GUIDE.md)** - Complete implementation guide
+- **[FaaS Examples](../../examples/faas/)** - FaaS service usage examples
+- **[FaaS Deployment](../deployment/)** - Docker, Kubernetes, AWS Lambda guides
+- **[Prompt Generator Service](../src/faas/services/prompt_generator_service/README.md)** - Prompt-based creation service
+- **[LLMOps Service](../src/faas/services/llmops_service/README.md)** - LLM operations monitoring service
 
 ### Guides & Tools
 - **[Documentation Index](guide/DOCUMENTATION_INDEX.md)** - Complete navigation

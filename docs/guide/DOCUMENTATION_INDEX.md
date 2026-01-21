@@ -45,12 +45,28 @@
 - **[SDK Architecture](../architecture/SDK_ARCHITECTURE.md)** - Overall architecture
 - **[AI Architecture Design](../architecture/AI_ARCHITECTURE_DESIGN.md)** - AI-specific architecture
 - **[REST/FastAPI Architecture](../architecture/REST_FASTAPI_ARCHITECTURE.md)** - API layer design
+- **[FaaS Architecture](../architecture/FAAS_IMPLEMENTATION_GUIDE.md)** - FaaS services-based architecture
+- **[FaaS Structure Summary](../architecture/FAAS_STRUCTURE_SUMMARY.md)** - FaaS folder structure and organization
+- **[FaaS Completion Summary](../architecture/FAAS_COMPLETION_SUMMARY.md)** - FaaS implementation status
+- **[FaaS Stateless Implementation](../architecture/FAAS_STATELESS_IMPLEMENTATION.md)** - Stateless architecture and HTTP client utilities
+
+### FaaS Services
+- **[FaaS Overview](../src/faas/README.md)** - FaaS architecture and services overview
+- **[FaaS Implementation Guide](../architecture/FAAS_IMPLEMENTATION_GUIDE.md)** - Complete FaaS implementation guide
+- **[Agent Service](../src/faas/services/agent_service/README.md)** - Agent Framework as a service
+- **[RAG Service](../src/faas/services/rag_service/)** - RAG System as a service
+- **[Gateway Service](../src/faas/services/gateway_service/)** - LiteLLM Gateway as a service
+- **[Prompt Generator Service](../src/faas/services/prompt_generator_service/)** - Prompt-Based Generator as a service
+- **[LLMOps Service](../src/faas/services/llmops_service/)** - LLMOps as a service
+- **[FaaS Examples](../../examples/faas/)** - FaaS service usage examples
+- **[FaaS Deployment](../deployment/)** - Docker, Kubernetes, AWS Lambda deployment guides
 
 ### Integration Guides
 - **[Integration Guides Overview](../integration_guides/README.md)** - Integration overview
 - **[NATS Integration](../integration_guides/nats_integration_guide.md)** - NATS messaging integration
 - **[OTEL Integration](../integration_guides/otel_integration_guide.md)** - OpenTelemetry integration
 - **[CODEC Integration](../integration_guides/codec_integration_guide.md)** - Serialization integration
+- **[FaaS Integrations](../src/faas/integrations/README.md)** - NATS, OTEL, CODEC for FaaS services
 
 ### Advanced Features
 - **[Advanced Features Overview](../components/advanced_features.md)** - Vector indexes, KV cache, hallucination detection
@@ -135,6 +151,8 @@
 - [SDK Architecture](../architecture/SDK_ARCHITECTURE.md) - Overall architecture
 - [AI Architecture Design](../architecture/AI_ARCHITECTURE_DESIGN.md) - AI-specific architecture
 - [REST/FastAPI Architecture](../architecture/REST_FASTAPI_ARCHITECTURE.md) - API layer design
+- [FaaS Implementation Guide](../architecture/FAAS_IMPLEMENTATION_GUIDE.md) - FaaS services architecture
+- [FaaS Structure Summary](../architecture/FAAS_STRUCTURE_SUMMARY.md) - FaaS organization
 
 ### 🔧 Components
 - [Agent Framework](../components/agno_agent_framework_explanation.md)
@@ -148,6 +166,12 @@
 - [NATS Integration](../integration_guides/nats_integration_guide.md)
 - [OTEL Integration](../integration_guides/otel_integration_guide.md)
 - [CODEC Integration](../integration_guides/codec_integration_guide.md)
+
+### ☁️ FaaS Services
+- [FaaS Overview](../src/faas/README.md) - Services-based architecture
+- [FaaS Implementation Guide](../architecture/FAAS_IMPLEMENTATION_GUIDE.md) - Complete guide
+- [FaaS Examples](../../examples/faas/) - Usage examples
+- [FaaS Deployment](../deployment/) - Deployment guides
 
 ### 🐛 Troubleshooting
 - [Troubleshooting Index](../troubleshooting/README.md)

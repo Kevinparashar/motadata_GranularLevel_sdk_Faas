@@ -76,8 +76,10 @@ This document provides a comprehensive list of all libraries used in the SDK, th
 | Library | Version | Purpose |
 |---------|---------|---------|
 | `fastapi` | >=0.100.0 | Modern web framework for APIs |
+| `starlette` | >=0.27.0 | ASGI framework (FastAPI dependency, used for middleware) |
 | `uvicorn` | >=0.23.0 | ASGI server |
 | `pydantic` | >=2.0.0 | Request/response validation |
+| `mangum` | >=0.17.0 | AWS Lambda adapter for ASGI applications (optional, for Lambda deployment) |
 
 ### Utilities
 
@@ -86,6 +88,18 @@ This document provides a comprehensive list of all libraries used in the SDK, th
 | `numpy` | >=1.24.0 | Numerical operations for vectors |
 | `python-dateutil` | >=2.8.2 | Date/time utilities |
 | `typing-extensions` | >=4.5.0 | Extended type hints |
+
+## FaaS-Specific Libraries
+
+### Service Integration
+
+| Library | Version | Purpose | Status |
+|---------|---------|---------|--------|
+| `nats-py` | >=2.0.0 | NATS message bus client | ⏳ Planned (placeholder ready) |
+| `msgpack` | >=1.0.0 | MessagePack serialization | ⏳ Planned (placeholder ready) |
+| `protobuf` | >=4.0.0 | Protocol Buffers serialization | ⏳ Planned (placeholder ready) |
+
+**Note**: FaaS services currently use JSON for serialization. NATS, MessagePack, and Protobuf integrations are placeholders ready for implementation.
 
 ## Component-Specific Libraries
 
@@ -163,6 +177,12 @@ pip install redis cachetools
 
 # With observability
 pip install opentelemetry-api opentelemetry-sdk structlog
+
+# For AWS Lambda deployment
+pip install mangum
+
+# For FaaS integrations (when implemented)
+pip install nats-py msgpack protobuf
 ```
 
 ## Library Purposes Summary
@@ -192,6 +212,7 @@ pip install opentelemetry-api opentelemetry-sdk structlog
 - **Gateway Cache**: Automatic response caching using cachetools/redis
 - **Memory Integration**: Agent Memory for conversation context (built-in)
 - **Unified Query**: Single endpoint for Agent/RAG orchestration (FastAPI)
+- **FaaS Architecture**: Services-based architecture with FastAPI, Starlette middleware, and integration placeholders
 
 ## Swappable Libraries
 
@@ -205,6 +226,10 @@ The SDK is designed to allow swapping of certain libraries:
 
 ### HTTP Clients
 - **httpx** ↔ **aiohttp** ↔ **requests**: HTTP client swapping
+
+### FaaS Deployment
+- **mangum**: AWS Lambda deployment (optional, only for Lambda)
+- **uvicorn**: Local/container deployment (default)
 
 ## License Compatibility
 

@@ -9,6 +9,7 @@ through LiteLLM, with support for streaming, function calling, and embeddings.
 import asyncio
 import hashlib
 import json
+import logging
 import os
 import time
 from datetime import datetime
@@ -28,6 +29,9 @@ except ImportError:
 from ..cache_mechanism import CacheConfig, CacheMechanism
 from ..feedback_loop import FeedbackLoop, FeedbackType
 from ..llmops import LLMOps, LLMOperationStatus, LLMOperationType
+
+# Set up logger
+logger = logging.getLogger(__name__)
 from ..utils.circuit_breaker import CircuitBreaker, CircuitBreakerConfig, CircuitState
 from ..utils.health_check import HealthCheck, HealthCheckResult, HealthStatus
 from ..validation import ValidationLevel, ValidationManager
@@ -498,6 +502,19 @@ class LiteLLMGateway:
         if messages is None:
             messages = [{"role": "user", "content": prompt}]
 
+        # KV Cache: Check for cached prompt context (for attention optimization)
+        kv_cache_key: Optional[str] = None
+        if self.kv_cache and not stream:
+            kv_cache_key = self.kv_cache.generate_cache_key(
+                prompt=prompt,
+                model=model,
+                messages=messages
+            )
+            # Check for cached KV entry (could contain attention states or context)
+            cached_kv = self.kv_cache.get_kv_cache(kv_cache_key, tenant_id=tenant_id)
+            if cached_kv:
+                logger.debug(f"KV cache hit for prompt context: {kv_cache_key[:50]}...")
+
         if self.router:
             response = self.router.completion(
                 model=model,
@@ -550,13 +567,34 @@ class LiteLLMGateway:
             text = str(response) if response else ""
             raw_response = {"response": str(response)} if response else None
 
-        return GenerateResponse(
+        result = GenerateResponse(
             text=text or "",
             model=model_name or model,
             usage=usage,
             finish_reason=finish_reason,
             raw_response=raw_response
         )
+
+        # KV Cache: Store prompt context hash for future optimization
+        if self.kv_cache and kv_cache_key:
+            try:
+                from .kv_cache import KVCacheEntry
+                # Store prompt context metadata (attention states would be stored here in production)
+                kv_entry = KVCacheEntry(
+                    cache_key=kv_cache_key,
+                    keys=[],  # Would contain attention keys in production
+                    values=[],  # Would contain attention values in production
+                    metadata={
+                        "prompt": prompt[:100],  # Store prompt prefix for reference
+                        "model": model,
+                        "timestamp": datetime.now().isoformat()
+                    }
+                )
+                self.kv_cache.set_kv_cache(kv_entry, tenant_id=tenant_id)
+            except Exception as e:
+                logger.debug(f"Failed to store KV cache entry: {e}")
+
+        return result
 
     async def generate_async(
         self,
@@ -583,6 +621,19 @@ class LiteLLMGateway:
         """
         if messages is None:
             messages = [{"role": "user", "content": prompt}]
+
+        # KV Cache: Check for cached prompt context (for attention optimization)
+        kv_cache_key: Optional[str] = None
+        if self.kv_cache and not stream:
+            kv_cache_key = self.kv_cache.generate_cache_key(
+                prompt=prompt,
+                model=model,
+                messages=messages
+            )
+            # Check for cached KV entry (could contain attention states or context)
+            cached_kv = self.kv_cache.get_kv_cache(kv_cache_key, tenant_id=tenant_id)
+            if cached_kv:
+                logger.debug(f"KV cache hit for prompt context: {kv_cache_key[:50]}...")
 
         # COST OPTIMIZATION: Check cache first (if caching enabled and not streaming)
         # Cache hits avoid expensive LLM API calls, reducing costs by 50-90% for repeated queries
@@ -751,6 +802,25 @@ class LiteLLMGateway:
             finish_reason=finish_reason,
             raw_response=response.__dict__ if hasattr(response, '__dict__') else response
         )
+
+        # KV Cache: Store prompt context hash for future optimization
+        if self.kv_cache and kv_cache_key:
+            try:
+                from .kv_cache import KVCacheEntry
+                # Store prompt context metadata (attention states would be stored here in production)
+                kv_entry = KVCacheEntry(
+                    cache_key=kv_cache_key,
+                    keys=[],  # Would contain attention keys in production
+                    values=[],  # Would contain attention values in production
+                    metadata={
+                        "prompt": prompt[:100],  # Store prompt prefix for reference
+                        "model": model,
+                        "timestamp": datetime.now().isoformat()
+                    }
+                )
+                self.kv_cache.set_kv_cache(kv_entry, tenant_id=tenant_id)
+            except Exception as e:
+                logger.debug(f"Failed to store KV cache entry: {e}")
 
         # COST OPTIMIZATION: Store successful response in cache for future requests
         # This enables future identical requests to be served from cache, avoiding API costs
