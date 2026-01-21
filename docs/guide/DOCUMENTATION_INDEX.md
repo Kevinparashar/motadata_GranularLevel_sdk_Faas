@@ -7,6 +7,7 @@
 ## 📚 Documentation Structure
 
 ### Getting Started
+- **[Onboarding Guide](../ONBOARDING_GUIDE.md)** - **START HERE** - Complete guide for new team members
 - **[Quick Start Guide](../README.md#quick-start-5-minutes)** - Get up and running in 5 minutes
 - **[Installation Guide](../README.md#installation)** - Detailed installation instructions
 - **[Hello World Example](../../examples/hello_world.py)** - Simplest possible example
@@ -20,7 +21,7 @@
 - **[Agent Troubleshooting](../troubleshooting/agent_troubleshooting.md)** - Common issues and solutions
 
 #### Prompt-Based Generator
-- **[Prompt Generator Guide](../guides/prompt_based_creation_guide.md)** - How to create agents/tools from prompts
+- **[Prompt Generator Guide](../prompt_based_creation_guide.md)** - How to create agents/tools from prompts
 - **[Prompt Generator Explanation](../components/prompt_based_generator_explanation.md)** - Component details
 - **[Prompt Generator Troubleshooting](../troubleshooting/prompt_generator_troubleshooting.md)** - Troubleshooting guide
 
@@ -35,17 +36,16 @@
 - **[RAG Troubleshooting](../troubleshooting/rag_system_troubleshooting.md)** - Troubleshooting
 
 ### Architecture & Design
+- **[Onboarding Guide](../ONBOARDING_GUIDE.md)** - Complete architecture overview and component integration
 - **[SDK Architecture](../architecture/SDK_ARCHITECTURE.md)** - Overall architecture
 - **[AI Architecture Design](../architecture/AI_ARCHITECTURE_DESIGN.md)** - AI-specific architecture
-- **[Component Categorization](../architecture/COMPONENT_CATEGORIZATION.md)** - Component types
-- **[Component Dependencies](../architecture/COMPONENT_DEPENDENCIES.md)** - Dependency graph
-- **[Project Structure](../architecture/PROJECT_STRUCTURE.md)** - File structure
+- **[REST/FastAPI Architecture](../architecture/REST_FASTAPI_ARCHITECTURE.md)** - API layer design
 
 ### Integration Guides
+- **[Integration Guides Overview](../integration_guides/README.md)** - Integration overview
 - **[NATS Integration](../integration_guides/nats_integration_guide.md)** - NATS messaging integration
 - **[OTEL Integration](../integration_guides/otel_integration_guide.md)** - OpenTelemetry integration
 - **[CODEC Integration](../integration_guides/codec_integration_guide.md)** - Serialization integration
-- **[Core Components Integration](../components/CORE_COMPONENTS_INTEGRATION_STORY.md)** - Integration story
 
 ### Troubleshooting
 - **[Troubleshooting Index](../troubleshooting/README.md)** - All troubleshooting guides
@@ -61,7 +61,7 @@
 
 #### Creating Agents
 - **From scratch:** [Agent Framework README](../src/core/agno_agent_framework/README.md#creating-agents)
-- **From prompts:** [Prompt-Based Creation Guide](guides/prompt_based_creation_guide.md)
+- **From prompts:** [Prompt-Based Creation Guide](../prompt_based_creation_guide.md)
 - **With memory:** [Agent with Memory](../src/core/agno_agent_framework/functions.py#create_agent_with_memory)
 - **With tools:** [Agent with Tools](../src/core/agno_agent_framework/functions.py#create_agent_with_tools)
 
@@ -77,9 +77,9 @@
 - **Common errors:** [Troubleshooting Guides](../troubleshooting/README.md)
 
 #### Integration
-- **NATS:** [NATS Integration Guide](integration_guides/nats_integration_guide.md)
-- **OTEL:** [OTEL Integration Guide](integration_guides/otel_integration_guide.md)
-- **CODEC:** [CODEC Integration Guide](integration_guides/codec_integration_guide.md)
+- **NATS:** [NATS Integration Guide](../integration_guides/nats_integration_guide.md)
+- **OTEL:** [OTEL Integration Guide](../integration_guides/otel_integration_guide.md)
+- **CODEC:** [CODEC Integration Guide](../integration_guides/codec_integration_guide.md)
 
 ### By Use Case
 
@@ -96,7 +96,7 @@
 #### Multi-Agent Systems
 - **Agent orchestration:** [Agent Orchestrator](../src/core/agno_agent_framework/orchestration.py)
 - **Agent communication:** [Agent Framework](../src/core/agno_agent_framework/README.md#agent-communication)
-- **Workflow management:** [Workflows](../src/workflows.md)
+- **Integration patterns:** [Onboarding Guide](../ONBOARDING_GUIDE.md#integration-patterns)
 
 ### By Component Type
 
@@ -104,7 +104,7 @@
 - **Agent Framework:** [Agent Framework](../src/core/agno_agent_framework/README.md)
 - **LiteLLM Gateway:** [Gateway](../src/core/litellm_gateway/README.md)
 - **RAG System:** [RAG](../src/core/rag/README.md)
-- **Prompt Generator:** [Prompt Generator](components/prompt_based_generator_explanation.md)
+- **Prompt Generator:** [Prompt Generator](../components/prompt_based_generator_explanation.md)
 
 #### Infrastructure
 - **Database:** [PostgreSQL Database](../src/core/postgresql_database/README.md)
@@ -116,30 +116,27 @@
 ## 🗂️ Documentation by Category
 
 ### 📖 Guides & Tutorials
-- [Building New Use Cases](BUILDING_NEW_USECASE_GUIDE.md)
-- [Prompt-Based Creation Guide](guides/prompt_based_creation_guide.md)
-- [SDK Development Story](SDK_DEVELOPMENT_STORY.md)
+- **[Onboarding Guide](../ONBOARDING_GUIDE.md)** - **START HERE** - Complete guide for new team members
+- [Prompt-Based Creation Guide](../prompt_based_creation_guide.md) - Create agents/tools from prompts
 
 ### 🏗️ Architecture
-- [SDK Architecture](architecture/SDK_ARCHITECTURE.md)
-- [AI Architecture Design](architecture/AI_ARCHITECTURE_DESIGN.md)
-- [Component Categorization](architecture/COMPONENT_CATEGORIZATION.md)
-- [Component Dependencies](architecture/COMPONENT_DEPENDENCIES.md)
-- [Function-Driven API](architecture/FUNCTION_DRIVEN_API.md)
-- [REST/FastAPI Architecture](architecture/REST_FASTAPI_ARCHITECTURE.md)
+- [Onboarding Guide](../ONBOARDING_GUIDE.md) - Architecture overview and component integration
+- [SDK Architecture](../architecture/SDK_ARCHITECTURE.md) - Overall architecture
+- [AI Architecture Design](../architecture/AI_ARCHITECTURE_DESIGN.md) - AI-specific architecture
+- [REST/FastAPI Architecture](../architecture/REST_FASTAPI_ARCHITECTURE.md) - API layer design
 
 ### 🔧 Components
-- [Agent Framework](components/agno_agent_framework_explanation.md)
-- [LiteLLM Gateway](components/litellm_gateway_explanation.md)
-- [RAG System](components/rag_system_explanation.md)
-- [Prompt Generator](components/prompt_based_generator_explanation.md)
-- [All Components](components/README.md)
+- [Agent Framework](../components/agno_agent_framework_explanation.md)
+- [LiteLLM Gateway](../components/litellm_gateway_explanation.md)
+- [RAG System](../components/rag_system_explanation.md)
+- [Prompt Generator](../components/prompt_based_generator_explanation.md)
+- [All Components](../components/README.md)
 
 ### 🔌 Integration
-- [NATS Integration](integration_guides/nats_integration_guide.md)
-- [OTEL Integration](integration_guides/otel_integration_guide.md)
-- [CODEC Integration](integration_guides/codec_integration_guide.md)
-- [Core Components Integration](components/CORE_COMPONENTS_INTEGRATION_STORY.md)
+- [Integration Guides Overview](../integration_guides/README.md)
+- [NATS Integration](../integration_guides/nats_integration_guide.md)
+- [OTEL Integration](../integration_guides/otel_integration_guide.md)
+- [CODEC Integration](../integration_guides/codec_integration_guide.md)
 
 ### 🐛 Troubleshooting
 - [Troubleshooting Index](../troubleshooting/README.md)
@@ -162,14 +159,14 @@
 3. See [Config Discovery](../src/core/utils/config_discovery.py)
 
 ### Finding Error Solutions
-1. Check [Troubleshooting Index](troubleshooting/README.md)
+1. Check [Troubleshooting Index](../troubleshooting/README.md)
 2. Search for error message in troubleshooting guides
 3. Check component-specific troubleshooting files
 
 ### Finding API Reference
 1. Check component `functions.py` files
 2. See component README files
-3. Check [Function-Driven API](architecture/FUNCTION_DRIVEN_API.md)
+3. Check [Onboarding Guide](../ONBOARDING_GUIDE.md) for integration patterns
 
 ---
 
@@ -196,7 +193,7 @@ agent = await create_agent_from_prompt(
     gateway=gateway
 )
 ```
-📖 [Full Guide](guides/prompt_based_creation_guide.md)
+📖 [Full Guide](../prompt_based_creation_guide.md)
 
 #### Setup RAG System
 ```python
@@ -219,9 +216,10 @@ print_config_options('agent')  # See all agent config options
 ## 🔗 Cross-References
 
 ### Related Documentation
+- **[Onboarding Guide](../ONBOARDING_GUIDE.md)** - **START HERE** - Complete guide for new team members
 - **[Main README](../README.md)** - Project overview and quick start
-- **[Developer Guide](../README_DEVELOPER.md)** - Development guidelines
-- **[Professional Evaluation](PROFESSIONAL_SDK_EVALUATION.md)** - SDK quality assessment
+- **[Developer Guide](../../README_DEVELOPER.md)** - Development guidelines
+- **[Professional Evaluation](../PROFESSIONAL_SDK_EVALUATION.md)** - SDK quality assessment
 
 ### External Resources
 - **[Examples Directory](../examples/)** - Code examples
@@ -233,10 +231,10 @@ print_config_options('agent')  # See all agent config options
 ## 📝 Document Sizes & Navigation
 
 ### Large Documents (Use TOC)
-- [Component Categorization](architecture/COMPONENT_CATEGORIZATION.md) - 954 lines
-- [Agent Framework Explanation](components/agno_agent_framework_explanation.md) - 1540 lines
-- [SDK Architecture](architecture/SDK_ARCHITECTURE.md) - Large document
-- [AI Architecture Design](architecture/AI_ARCHITECTURE_DESIGN.md) - Large document
+- [Onboarding Guide](../ONBOARDING_GUIDE.md) - Complete overview
+- [Agent Framework Explanation](../components/agno_agent_framework_explanation.md) - 1540 lines
+- [SDK Architecture](../architecture/SDK_ARCHITECTURE.md) - Large document
+- [AI Architecture Design](../architecture/AI_ARCHITECTURE_DESIGN.md) - Large document
 
 **Tip:** Use your editor's outline/TOC feature or search within document (Ctrl+F / Cmd+F)
 
@@ -254,10 +252,11 @@ print_config_options('agent')  # See all agent config options
 
 ## 🆘 Need Help?
 
-1. **Quick Start:** [README Quick Start](../README.md#quick-start-5-minutes)
-2. **Examples:** [Examples Directory](../examples/)
-3. **Troubleshooting:** [Troubleshooting Index](troubleshooting/README.md)
-4. **Component Help:** Check component-specific README files
+1. **New to the SDK?** Start with [Onboarding Guide](../ONBOARDING_GUIDE.md)
+2. **Quick Start:** [README Quick Start](../README.md#quick-start-5-minutes)
+3. **Examples:** [Examples Directory](../examples/)
+4. **Troubleshooting:** [Troubleshooting Index](../troubleshooting/README.md)
+5. **Component Help:** Check component-specific README files
 
 ---
 

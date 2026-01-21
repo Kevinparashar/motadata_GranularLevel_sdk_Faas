@@ -16,7 +16,9 @@ export OPENAI_API_KEY='your-api-key-here'
 python examples/hello_world.py
 ```
 
-**📚 Documentation:** See [Documentation Index](docs/guide/DOCUMENTATION_INDEX.md) for complete navigation
+**📚 Documentation:** 
+- **[Onboarding Guide](docs/ONBOARDING_GUIDE.md)** - **START HERE** for new team members
+- [Documentation Index](docs/guide/DOCUMENTATION_INDEX.md) - Complete navigation
 
 **Expected Output:**
 ```
