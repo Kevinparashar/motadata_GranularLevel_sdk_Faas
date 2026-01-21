@@ -996,9 +996,12 @@ retrieved_docs = rag.retriever.retrieve_hybrid(
 5. **Query Rewriting**: Enable query rewriting for better retrieval quality
 6. **Hybrid Retrieval**: Use hybrid retrieval for diverse query types
 7. **Caching**: Enable caching for frequently asked questions
-8. **Tenant Isolation**: Always provide tenant_id for multi-tenant deployments
-9. **Error Handling**: Implement comprehensive error handling
-10. **Monitoring**: Monitor retrieval quality and generation performance
+8. **Vector Indexes**: Use IVFFlat for large datasets, HNSW for high-dimensional vectors (see [Advanced Features](advanced_features.md#vector-index-management))
+9. **Reindexing**: Reindex vector indexes after model changes or bulk updates
+10. **Hallucination Detection**: Enable hallucination detection for production RAG systems (see [Advanced Features](advanced_features.md#hallucination-detection))
+11. **Tenant Isolation**: Always provide tenant_id for multi-tenant deployments
+12. **Error Handling**: Implement comprehensive error handling
+13. **Monitoring**: Monitor retrieval quality and generation performance
 
 ---
 

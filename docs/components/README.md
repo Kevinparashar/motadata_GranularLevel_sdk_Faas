@@ -29,6 +29,7 @@ This folder contains comprehensive documentation for each component of the Motad
    - Circuit breaker
    - Health monitoring
    - LLMOps integration
+   - KV cache for attention optimization
    - Validation and guardrails
    - Feedback loop
    - Exception handling
@@ -40,6 +41,8 @@ This folder contains comprehensive documentation for each component of the Motad
    - Document processing and ingestion
    - Document retrieval (vector, hybrid, keyword)
    - Response generation
+   - Vector index management and reindexing
+   - Hallucination detection
    - Exception handling
    - Functions and utilities
    - Workflow
@@ -68,13 +71,20 @@ This folder contains comprehensive documentation for each component of the Motad
 7. **[PostgreSQL Database](postgresql_database_explanation.md)**
    - Database connection management
    - Vector operations with pgvector
+   - Vector index management (IVFFlat, HNSW)
    - Query execution
    - Exception handling
    - Functions and utilities
    - Workflow
    - Customization
 
-8. **[Evaluation & Observability](evaluation_observability_explanation.md)**
+8. **[Advanced Features](advanced_features.md)**
+   - Vector index management and reindexing
+   - KV cache for LLM generation optimization
+   - Hallucination detection for RAG responses
+   - Performance optimization strategies
+
+9. **[Evaluation & Observability](evaluation_observability_explanation.md)**
    - Distributed tracing
    - Structured logging
    - Metrics collection
@@ -83,7 +93,7 @@ This folder contains comprehensive documentation for each component of the Motad
    - Workflow
    - Customization
 
-9. **[API Backend Services](api_backend_services_explanation.md)**
+10. **[API Backend Services](api_backend_services_explanation.md)**
    - API application creation
    - API routing
    - Endpoint creation
@@ -95,7 +105,7 @@ This folder contains comprehensive documentation for each component of the Motad
 
 ### Machine Learning Components
 
-9. **[ML Framework](ml_framework_explanation.md)**
+11. **[ML Framework](ml_framework_explanation.md)**
    - ML System orchestration
    - Model management and lifecycle
    - Training and inference
@@ -107,7 +117,7 @@ This folder contains comprehensive documentation for each component of the Motad
    - Workflow
    - Customization
 
-10. **[MLOps Pipeline](mlops_explanation.md)**
+12. **[MLOps Pipeline](mlops_explanation.md)**
     - Pipeline orchestration
     - Experiment tracking (MLflow)
     - Model versioning and lineage
@@ -119,7 +129,7 @@ This folder contains comprehensive documentation for each component of the Motad
     - Workflow
     - Customization
 
-11. **[ML Data Management](ml_data_management_explanation.md)**
+13. **[ML Data Management](ml_data_management_explanation.md)**
     - Data lifecycle management
     - Data loading and validation
     - Feature store
@@ -129,7 +139,7 @@ This folder contains comprehensive documentation for each component of the Motad
     - Workflow
     - Customization
 
-12. **[Model Serving](model_serving_explanation.md)**
+14. **[Model Serving](model_serving_explanation.md)**
     - REST API server (FastAPI)
     - Batch prediction service
     - Real-time prediction service
@@ -140,7 +150,7 @@ This folder contains comprehensive documentation for each component of the Motad
 
 ### Core Platform Integrations
 
-13. **[NATS Integration](nats_integration_explanation.md)**
+15. **[NATS Integration](nats_integration_explanation.md)**
     - Asynchronous messaging
     - Agent-to-agent communication
     - Gateway request queuing
@@ -150,7 +160,7 @@ This folder contains comprehensive documentation for each component of the Motad
     - Workflow
     - Customization
 
-14. **[OTEL Integration](otel_integration_explanation.md)**
+16. **[OTEL Integration](otel_integration_explanation.md)**
     - Distributed tracing
     - Metrics collection
     - Structured logging
@@ -160,7 +170,7 @@ This folder contains comprehensive documentation for each component of the Motad
     - Workflow
     - Customization
 
-15. **[CODEC Integration](codec_integration_explanation.md)**
+17. **[CODEC Integration](codec_integration_explanation.md)**
     - Message encoding/decoding
     - Schema versioning
     - Message validation

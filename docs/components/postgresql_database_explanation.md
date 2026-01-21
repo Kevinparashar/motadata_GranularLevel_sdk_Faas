@@ -75,7 +75,8 @@ Vector operations provide pgvector functionality:
 - **Embedding Storage**: Stores vector embeddings
 - **Similarity Search**: Performs efficient similarity searches
 - **Batch Operations**: Supports batch insertion
-- **Indexing**: Supports vector indexes for performance
+- **Indexing**: Supports vector indexes for performance (IVFFlat, HNSW)
+- **Index Management**: Create, drop, and reindex vector indexes for optimal performance
 
 ### Code Examples
 
@@ -117,6 +118,49 @@ for result in results:
     print(f"Document: {result['title']}")
     print(f"Similarity: {result['similarity']}")
 ```
+
+#### Vector Index Management
+
+```python
+from src.core.postgresql_database import VectorIndexManager, IndexType, IndexDistance, create_vector_index_manager
+
+# Create index manager
+index_manager = create_vector_index_manager(db)
+
+# Create IVFFlat index for large datasets
+index_manager.create_index(
+    table_name="embeddings",
+    column_name="embedding",
+    index_type=IndexType.IVFFLAT,
+    distance_metric=IndexDistance.COSINE,
+    index_params={"lists": 100}
+)
+
+# Create HNSW index for high-dimensional vectors
+index_manager.create_index(
+    table_name="embeddings",
+    column_name="embedding",
+    index_type=IndexType.HNSW,
+    distance_metric=IndexDistance.COSINE,
+    index_params={"m": 16, "ef_construction": 64}
+)
+
+# Reindex after model change or bulk updates
+index_manager.reindex(
+    table_name="embeddings",
+    column_name="embedding",
+    index_type=IndexType.IVFFLAT,
+    concurrently=True  # Non-blocking reindex
+)
+
+# Get index information
+index_info = index_manager.get_index_info("embeddings", "embedding")
+if index_info:
+    print(f"Index: {index_info['index_name']}")
+    print(f"Type: {index_info['index_type']}")
+```
+
+**Note**: For detailed vector index management documentation, see [Advanced Features](advanced_features.md#vector-index-management).
 
 ---
 

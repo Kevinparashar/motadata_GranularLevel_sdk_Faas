@@ -347,6 +347,64 @@ validator.validate_range(
 
 ---
 
+## 🚀 Advanced Features
+
+### Vector Index Management
+```python
+from src.core.rag import create_rag_system, IndexType, IndexDistance
+
+rag = create_rag_system(db, gateway)
+
+# Create IVFFlat index
+rag.index_manager.create_index(
+    table_name="embeddings",
+    column_name="embedding",
+    index_type=IndexType.IVFFLAT,
+    index_params={"lists": 100}
+)
+
+# Reindex after model change
+rag.reindex_vector_index(
+    table_name="embeddings",
+    column_name="embedding",
+    concurrently=True
+)
+```
+
+### KV Cache for LLM Generation
+```python
+from src.core.litellm_gateway import create_gateway
+
+gateway = create_gateway(
+    api_keys={"openai": "sk-..."},
+    enable_kv_caching=True,
+    kv_cache_default_ttl=3600
+)
+
+# Generation automatically uses KV cache
+response = await gateway.generate_async(
+    prompt="Long context...",
+    model="gpt-4"
+)
+```
+
+### Hallucination Detection
+```python
+from src.core.rag import create_rag_system, create_hallucination_detector
+
+rag = create_rag_system(db, gateway, enable_hallucination_detection=True)
+
+# Query with automatic hallucination detection
+result = await rag.query("What is our refund policy?")
+
+if 'hallucination_result' in result:
+    hallucination = result['hallucination_result']
+    if hallucination['is_hallucination']:
+        print(f"Warning: Potential hallucination (confidence: {hallucination['confidence']})")
+```
+
+---
+
 ## 🔗 Quick Links
 
 - **[Full Documentation Index](DOCUMENTATION_INDEX.md)** - Complete documentation navigation
@@ -367,6 +425,10 @@ validator.validate_range(
 | Generate text | `gateway.generate("prompt", "gpt-4")` |
 | Create RAG | `create_rag_system(db, gateway)` |
 | Query RAG | `await rag.query("question")` |
+| Create vector index | `rag.index_manager.create_index(...)` |
+| Reindex | `rag.reindex_vector_index(...)` |
+| Enable KV cache | `create_gateway(..., enable_kv_caching=True)` |
+| Enable hallucination detection | `create_rag_system(..., enable_hallucination_detection=True)` |
 | Discover config | `print_config_options('agent')` |
 | Validate config | `discover_config('gateway', config)` |
 
