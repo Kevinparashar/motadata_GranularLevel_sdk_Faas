@@ -405,11 +405,60 @@ if 'hallucination_result' in result:
 
 ---
 
+## ☁️ FaaS Services
+
+### Using Agent Service
+```python
+import httpx
+
+async with httpx.AsyncClient() as client:
+    response = await client.post(
+        "http://localhost:8083/api/v1/agents",
+        json={"name": "My Agent", "llm_model": "gpt-4"},
+        headers={"X-Tenant-ID": "tenant_123"}
+    )
+    agent = response.json()
+```
+
+### Using RAG Service
+```python
+async with httpx.AsyncClient() as client:
+    # Ingest document
+    await client.post(
+        "http://localhost:8082/api/v1/rag/documents",
+        json={"title": "Doc", "content": "..."},
+        headers={"X-Tenant-ID": "tenant_123"}
+    )
+    
+    # Query
+    response = await client.post(
+        "http://localhost:8082/api/v1/rag/query",
+        json={"query": "What is AI?", "top_k": 5},
+        headers={"X-Tenant-ID": "tenant_123"}
+    )
+```
+
+### Using Gateway Service
+```python
+async with httpx.AsyncClient() as client:
+    response = await client.post(
+        "http://localhost:8080/api/v1/gateway/generate",
+        json={"prompt": "Hello", "model": "gpt-4"},
+        headers={"X-Tenant-ID": "tenant_123"}
+    )
+    result = response.json()
+```
+
+📖 **[FaaS Examples](../../examples/faas/)** | **[FaaS Documentation](../src/faas/README.md)**
+
+---
+
 ## 🔗 Quick Links
 
 - **[Full Documentation Index](DOCUMENTATION_INDEX.md)** - Complete documentation navigation
 - **[Main README](../../README.md)** - Project overview
 - **[Examples](../../examples/)** - Code examples
+- **[FaaS Examples](../../examples/faas/)** - FaaS service examples
 - **[Troubleshooting](../troubleshooting/README.md)** - Common issues
 
 ---
@@ -431,6 +480,11 @@ if 'hallucination_result' in result:
 | Enable hallucination detection | `create_rag_system(..., enable_hallucination_detection=True)` |
 | Discover config | `print_config_options('agent')` |
 | Validate config | `discover_config('gateway', config)` |
+| Use Agent Service | `POST http://agent-service:8083/api/v1/agents` |
+| Use RAG Service | `POST http://rag-service:8082/api/v1/rag/query` |
+| Use Gateway Service | `POST http://gateway-service:8080/api/v1/gateway/generate` |
+| Use Prompt Generator Service | `POST http://prompt-generator-service:8087/api/v1/prompt/agents` |
+| Use LLMOps Service | `POST http://llmops-service:8088/api/v1/llmops/operations` |
 
 ---
 

@@ -45,6 +45,7 @@ class RAGSystem:
         cache_config: Optional[CacheConfig] = None,
         enable_memory: bool = True,
         memory_config: Optional[Dict[str, Any]] = None,
+        **kwargs: Any
     ):
         """
         Initialize RAG system.
@@ -58,6 +59,15 @@ class RAGSystem:
             cache_config: Optional cache configuration
             enable_memory: Enable memory for conversation context
             memory_config: Optional memory configuration
+            **kwargs: Additional configuration options:
+                - chunk_size: Document chunk size (default: 1000)
+                - chunk_overlap: Chunk overlap size (default: 200)
+                - chunking_strategy: Chunking strategy (default: "fixed")
+                - min_chunk_size: Minimum chunk size (default: 50)
+                - max_chunk_size: Maximum chunk size (default: 2000)
+                - enable_preprocessing: Enable preprocessing (default: True)
+                - enable_metadata_extraction: Enable metadata extraction (default: True)
+                - enable_multimodal: Enable multimodal support (default: True)
         """
         self.db = db
         self.gateway = gateway

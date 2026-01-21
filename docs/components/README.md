@@ -179,6 +179,72 @@ This folder contains comprehensive documentation for each component of the Motad
     - Workflow
     - Customization
 
+### FaaS Services
+
+18. **[FaaS Services Overview](../../src/faas/README.md)**
+    - Services-based architecture
+    - Service-to-service communication
+    - Integration layer (NATS, OTEL, CODEC)
+    - Shared components
+
+19. **[Agent Service](../../src/faas/services/agent_service/README.md)**
+    - Agent Framework as REST API service
+    - Agent CRUD operations
+    - Task execution
+    - Chat interactions
+    - Memory management
+
+20. **[RAG Service](../../src/faas/services/rag_service/)**
+    - RAG System as REST API service
+    - Document ingestion
+    - Query processing
+    - Vector search
+    - Document management
+
+21. **[Gateway Service](../../src/faas/services/gateway_service/)**
+    - LiteLLM Gateway as REST API service
+    - Text generation
+    - Embedding generation
+    - Streaming generation
+    - Provider management
+
+22. **[ML Service](../../src/faas/services/ml_service/)**
+    - ML Framework as REST API service
+    - Model training
+    - Model inference
+    - Batch prediction
+    - Model deployment
+
+23. **[Cache Service](../../src/faas/services/cache_service/)**
+    - Cache Mechanism as REST API service
+    - Get/Set/Delete operations
+    - Cache invalidation
+    - Tenant-scoped caching
+
+24. **[Prompt Service](../../src/faas/services/prompt_service/)**
+    - Prompt Context Management as REST API service
+    - Template CRUD
+    - Prompt rendering
+    - Context building
+
+25. **[Data Ingestion Service](../../src/faas/services/data_ingestion_service/)**
+    - Data Ingestion as REST API service
+    - File upload
+    - File processing
+    - Auto-ingestion into RAG
+
+26. **[Prompt Generator Service](../../src/faas/services/prompt_generator_service/)**
+    - Prompt-Based Generator as REST API service
+    - Agent creation from prompts
+    - Tool creation from prompts
+    - Feedback collection
+    - Permission management
+
+27. **[LLMOps Service](../../src/faas/services/llmops_service/)**
+    - LLMOps as REST API service
+    - Operation logging
+    - Metrics and analytics
+    - Cost tracking
 
 ## Documentation Structure
 

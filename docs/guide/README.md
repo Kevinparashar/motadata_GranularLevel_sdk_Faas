@@ -32,6 +32,7 @@
 - **[SDK Architecture](architecture/SDK_ARCHITECTURE.md)** - Overall architecture
 - **[AI Architecture Design](architecture/AI_ARCHITECTURE_DESIGN.md)** - AI-specific design
 - **[REST/FastAPI Architecture](architecture/REST_FASTAPI_ARCHITECTURE.md)** - API layer design
+- **[FaaS Architecture](architecture/FAAS_IMPLEMENTATION_GUIDE.md)** - FaaS services-based architecture
 
 #### 🔧 Components
 - **[All Components](components/README.md)** - Component overview
@@ -45,6 +46,13 @@
 - **[NATS Integration](integration_guides/nats_integration_guide.md)** - Messaging integration
 - **[OTEL Integration](integration_guides/otel_integration_guide.md)** - Observability integration
 - **[CODEC Integration](integration_guides/codec_integration_guide.md)** - Serialization integration
+- **[FaaS Integrations](../src/faas/integrations/README.md)** - NATS, OTEL, CODEC for FaaS services
+
+#### ☁️ FaaS Services
+- **[FaaS Overview](../src/faas/README.md)** - FaaS architecture and services
+- **[FaaS Implementation Guide](architecture/FAAS_IMPLEMENTATION_GUIDE.md)** - Complete implementation guide
+- **[FaaS Examples](../../examples/faas/)** - FaaS service usage examples
+- **[FaaS Deployment](../deployment/)** - Docker, Kubernetes, AWS Lambda guides
 
 #### 🐛 Troubleshooting
 - **[Troubleshooting Index](troubleshooting/README.md)** - All troubleshooting guides
@@ -96,6 +104,7 @@ Use the **[Navigation Helper](guide/NAVIGATION_HELPER.md)** for:
 ### Examples
 - [Examples Directory](../examples/)
 - [Basic Usage Examples](../examples/basic_usage/)
+- [FaaS Examples](../examples/faas/) - FaaS service examples
 - [Integration Examples](../examples/integration/)
 - [Use Cases](../examples/use_cases/)
 

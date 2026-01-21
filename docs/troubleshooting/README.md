@@ -146,6 +146,20 @@ This directory contains comprehensive troubleshooting guides for all components 
     - Version migration problems
     - Performance issues
 
+### FaaS Services
+
+16. **FaaS Services Troubleshooting** (General)
+    - Service startup issues
+    - Service-to-service communication failures
+    - HTTP endpoint errors
+    - Configuration problems
+    - Deployment issues
+    - See individual service documentation for component-specific issues:
+      - [Agent Service](../../src/faas/services/agent_service/README.md)
+      - [RAG Service](../../src/faas/services/rag_service/)
+      - [Gateway Service](../../src/faas/services/gateway_service/)
+      - [FaaS Deployment Guides](../deployment/) - Docker, Kubernetes, Lambda troubleshooting
+
 ## How to Use These Guides
 
 ### Step 1: Identify the Component
@@ -167,6 +181,7 @@ Determine which component is experiencing issues:
 - **NATS Integration**: Issues with messaging, connections, performance
 - **OTEL Integration**: Issues with tracing, metrics, observability
 - **CODEC Integration**: Issues with serialization, schema validation, versioning
+- **FaaS Services**: Issues with service deployment, HTTP endpoints, service-to-service communication
 
 ### Step 2: Find the Problem
 

@@ -58,6 +58,10 @@ unit_tests/
     ├── test_api_functions.py            # API backend functions tests
     ├── test_litellm_gateway_functions.py # LiteLLM Gateway functions tests
     └── test_prompt_context_functions.py # Prompt context functions tests
+
+└── FaaS Service Tests
+    └── test_faas/
+        └── test_agent_service.py       # Agent Service unit tests
 ```
 
 ### Function-Driven API Tests
