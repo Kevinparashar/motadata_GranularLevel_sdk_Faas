@@ -6,6 +6,7 @@ Handles LLM generation with retrieved context.
 
 from typing import List, Dict, Any, Optional
 from ..litellm_gateway import LiteLLMGateway
+from .hallucination_detector import HallucinationDetector, create_hallucination_detector, HallucinationResult
 
 
 class RAGGenerator:
@@ -19,7 +20,8 @@ class RAGGenerator:
         self,
         gateway: LiteLLMGateway,
         model: str = "gpt-4",
-        system_prompt: Optional[str] = None
+        system_prompt: Optional[str] = None,
+        enable_hallucination_detection: bool = True
     ):
         """
         Initialize RAG generator.
@@ -28,18 +30,29 @@ class RAGGenerator:
             gateway: LiteLLM gateway instance
             model: LLM model to use
             system_prompt: Optional system prompt
+            enable_hallucination_detection: Whether to enable hallucination detection
         """
         self.gateway = gateway
         self.model = model
         self.system_prompt = system_prompt or self._default_system_prompt()
+        self.enable_hallucination_detection = enable_hallucination_detection
+        
+        # Initialize hallucination detector
+        self.hallucination_detector: Optional[HallucinationDetector] = None
+        if self.enable_hallucination_detection:
+            self.hallucination_detector = create_hallucination_detector(
+                gateway=gateway,
+                enable_llm_verification=True
+            )
     
     def generate(
         self,
         query: str,
         context_documents: List[Dict[str, Any]],
         max_tokens: int = 1000,
-        temperature: float = 0.7
-    ) -> str:
+        temperature: float = 0.7,
+        check_hallucination: Optional[bool] = None
+    ) -> Dict[str, Any]:
         """
         Generate response using retrieved context.
         
@@ -48,9 +61,10 @@ class RAGGenerator:
             context_documents: Retrieved context documents
             max_tokens: Maximum tokens to generate
             temperature: Generation temperature
+            check_hallucination: Whether to check for hallucinations (default: uses instance setting)
         
         Returns:
-            Generated response
+            Dictionary with 'response' and optionally 'hallucination_result'
         """
         # Build context from documents
         context = self._build_context(context_documents)
@@ -66,15 +80,33 @@ class RAGGenerator:
             temperature=temperature
         )
         
-        return response.text
+        result = {
+            "response": response.text,
+            "model": response.model,
+            "usage": response.usage
+        }
+        
+        # Check for hallucinations if enabled
+        should_check = check_hallucination if check_hallucination is not None else self.enable_hallucination_detection
+        if should_check and self.hallucination_detector:
+            hallucination_result = self.hallucination_detector.detect(
+                response=response.text,
+                context_documents=context_documents,
+                query=query
+            )
+            result["hallucination_result"] = hallucination_result.to_dict()
+            result["is_hallucination"] = hallucination_result.is_hallucination
+        
+        return result
     
     async def generate_async(
         self,
         query: str,
         context_documents: List[Dict[str, Any]],
         max_tokens: int = 1000,
-        temperature: float = 0.7
-    ) -> str:
+        temperature: float = 0.7,
+        check_hallucination: Optional[bool] = None
+    ) -> Dict[str, Any]:
         """
         Generate response asynchronously.
         
@@ -83,9 +115,10 @@ class RAGGenerator:
             context_documents: Retrieved context documents
             max_tokens: Maximum tokens to generate
             temperature: Generation temperature
+            check_hallucination: Whether to check for hallucinations (default: uses instance setting)
         
         Returns:
-            Generated response
+            Dictionary with 'response' and optionally 'hallucination_result'
         """
         context = self._build_context(context_documents)
         prompt = self._build_prompt(query, context)
@@ -97,7 +130,24 @@ class RAGGenerator:
             temperature=temperature
         )
         
-        return response.text
+        result = {
+            "response": response.text,
+            "model": response.model,
+            "usage": response.usage
+        }
+        
+        # Check for hallucinations if enabled
+        should_check = check_hallucination if check_hallucination is not None else self.enable_hallucination_detection
+        if should_check and self.hallucination_detector:
+            hallucination_result = await self.hallucination_detector.detect_async(
+                response=response.text,
+                context_documents=context_documents,
+                query=query
+            )
+            result["hallucination_result"] = hallucination_result.to_dict()
+            result["is_hallucination"] = hallucination_result.is_hallucination
+        
+        return result
     
     def _build_context(self, documents: List[Dict[str, Any]]) -> str:
         """

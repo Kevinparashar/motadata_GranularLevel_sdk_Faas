@@ -63,7 +63,9 @@ def create_document_processor(
     max_chunk_size: int = 2000,
     enable_preprocessing: bool = True,
     enable_metadata_extraction: bool = True,
-    metadata_schema: Optional[Any] = None
+    metadata_schema: Optional[Any] = None,
+    enable_multimodal: bool = True,
+    gateway: Optional[LiteLLMGateway] = None
 ) -> DocumentProcessor:
     """
     Create a document processor with specified configuration.
@@ -97,7 +99,9 @@ def create_document_processor(
         max_chunk_size=max_chunk_size,
         enable_preprocessing=enable_preprocessing,
         enable_metadata_extraction=enable_metadata_extraction,
-        metadata_schema=metadata_schema
+        metadata_schema=metadata_schema,
+        enable_multimodal=enable_multimodal,
+        gateway=gateway
     )
 
 

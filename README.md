@@ -51,10 +51,11 @@ The Motadata Python AI SDK is a comprehensive, modular SDK for building AI-power
 ## Features
 
 ### Core AI Capabilities
+- **Data Ingestion Service**: Simple one-line file upload that automatically processes any format (text, PDF, audio, video, images) and integrates with RAG, Agents, and Cache - just upload and everything works
 - **Prompt-Based Creation**: Create agents and tools from natural language prompts - describe what you want in plain English and the system generates fully configured agents and tools automatically
 - **Multi-Provider LLM Support**: Unified interface for OpenAI, Anthropic, Google Gemini, and other providers through LiteLLM Gateway with advanced rate limiting, request queuing, batching, and deduplication
 - **Autonomous AI Agents**: Create and manage intelligent agents with session management, bounded memory systems, tools, plugins, circuit breakers, and health checks
-- **RAG System**: Complete Retrieval-Augmented Generation with document processing, vector search, re-ranking, versioning, relevance scoring, incremental updates, and real-time synchronization
+- **RAG System**: Complete Retrieval-Augmented Generation with multi-modal document processing (text, PDF, audio, video, images), vector search, re-ranking, versioning, relevance scoring, incremental updates, and real-time synchronization
 - **Machine Learning Framework**: Comprehensive ML capabilities for training, inference, and model management with MLOps pipeline, data management, and model serving
 - **Vector Database Integration**: PostgreSQL with pgvector for efficient similarity search and embedding storage
 
@@ -83,6 +84,7 @@ The Motadata Python AI SDK is a comprehensive, modular SDK for building AI-power
 
 **Quick Decision Guide:**
 
+- **Want to upload files and have them work automatically?** → Use [Data Ingestion Service](src/core/data_ingestion/README.md)
 - **Need AI text generation?** → Use [LiteLLM Gateway](src/core/litellm_gateway/README.md)
 - **Building a chatbot or assistant?** → Use [Agent Framework](src/core/agno_agent_framework/README.md)
 - **Want to create agents/tools from natural language?** → Use [Prompt-Based Generator](src/core/prompt_based_generator/README.md)

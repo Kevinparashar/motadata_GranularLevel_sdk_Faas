@@ -37,6 +37,7 @@ from .rate_limiter import (
     RequestBatcher,
     RequestDeduplicator,
 )
+from .kv_cache import KVCacheManager, create_kv_cache_manager
 
 
 class GatewayConfig(BaseModel):
@@ -60,11 +61,15 @@ class GatewayConfig(BaseModel):
     enable_feedback_loop: bool = True
     enable_caching: bool = True
     cache_ttl: int = 3600  # Default cache TTL in seconds (1 hour)
+    enable_kv_cache: bool = True  # Enable KV cache for attention optimization
+    kv_cache_ttl: int = 3600  # KV cache TTL in seconds
     rate_limit_config: Optional[RateLimitConfig] = None
     circuit_breaker_config: Optional[CircuitBreakerConfig] = None
     validation_level: ValidationLevel = ValidationLevel.MODERATE
     cache: Optional[CacheMechanism] = None
     cache_config: Optional[CacheConfig] = None
+    batch_size: Optional[int] = None
+    batch_timeout: Optional[float] = None
 
 
 class GenerateResponse(BaseModel):
@@ -139,7 +144,19 @@ class LiteLLMGateway:
         # Initialize request batcher
         self.batcher: Optional[RequestBatcher] = None
         if self.config.enable_request_batching:
-            self.batcher = RequestBatcher(batch_size=10, batch_timeout=0.5)
+            self.batcher = RequestBatcher(
+                batch_size=self.config.batch_size or 10,
+                batch_timeout=self.config.batch_timeout or 0.5
+            )
+        
+        # Initialize KV cache manager
+        self.kv_cache: Optional[KVCacheManager] = None
+        if self.config.enable_kv_cache:
+            self.kv_cache = create_kv_cache_manager(
+                cache=self.cache,
+                enable_kv_cache=self.config.enable_kv_cache,
+                kv_cache_ttl=self.config.kv_cache_ttl or 3600
+            )
 
         # Initialize health check
         self.health_check: Optional[HealthCheck] = None

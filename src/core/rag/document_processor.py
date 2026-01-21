@@ -21,6 +21,7 @@ from .exceptions import (
     DocumentProcessingError,
     ValidationError,
 )
+from .multimodal_loader import MultiModalLoader, create_multimodal_loader
 
 
 class ChunkingStrategy(str, Enum):
@@ -252,7 +253,10 @@ class DocumentProcessor:
         max_chunk_size: int = 2000,  # Maximum chunk size
         enable_preprocessing: bool = True,
         enable_metadata_extraction: bool = True,
-        metadata_schema: Optional[MetadataSchema] = None
+        metadata_schema: Optional[MetadataSchema] = None,
+        enable_multimodal: bool = True,
+        multimodal_loader: Optional[MultiModalLoader] = None,
+        gateway: Optional[Any] = None  # For image description generation
     ):
         """
         Initialize document processor.
@@ -272,6 +276,13 @@ class DocumentProcessor:
         self.chunking_strategy = chunking_strategy
         self.min_chunk_size = min_chunk_size
         self.max_chunk_size = max_chunk_size
+        self.gateway = gateway
+        
+        # Initialize multimodal loader if enabled
+        if enable_multimodal:
+            self.multimodal_loader = multimodal_loader or create_multimodal_loader()
+        else:
+            self.multimodal_loader = None
         
         # Initialize preprocessing pipeline
         preprocessing_steps = []
@@ -311,6 +322,13 @@ class DocumentProcessor:
         """
         Load document from file with metadata extraction.
         
+        Supports multiple formats:
+        - Text: .txt, .md, .markdown, .html, .json
+        - Documents: .pdf, .doc, .docx, .rtf
+        - Audio: .mp3, .wav, .m4a, .ogg (with transcription)
+        - Video: .mp4, .avi, .mov, .mkv (with transcription and frame extraction)
+        - Images: .jpg, .png, .gif, .bmp (with OCR and description)
+        
         Args:
             file_path: Path to document file
         
@@ -322,38 +340,42 @@ class DocumentProcessor:
         if not path.exists():
             raise FileNotFoundError(f"Document not found: {file_path}")
         
-        # Extract file metadata
-        file_metadata = {
-            "source": str(path),
-            "file_name": path.name,
-            "file_extension": path.suffix.lower(),
-            "file_size": path.stat().st_size,
-            "updated_at": datetime.fromtimestamp(path.stat().st_mtime).isoformat()
-        }
-        
-        # Determine file type and load accordingly
+        # Use multimodal loader if available and file is not basic text
         suffix = path.suffix.lower()
-        content = ""
+        basic_text_formats = [".txt", ".md", ".markdown", ".html", ".json"]
         
-        if suffix in [".txt", ".md", ".markdown"]:
-            with open(path, 'r', encoding='utf-8') as f:
-                content = f.read()
-        elif suffix == ".html":
-            content = self._load_html(path)
-        elif suffix == ".json":
-            content = self._load_json(path)
+        if self.multimodal_loader and suffix not in basic_text_formats:
+            # Use multimodal loader for complex formats
+            content, file_metadata = self.multimodal_loader.load(str(path), gateway=self.gateway)
         else:
-            # Try as text file
-            try:
+            # Use basic text loading for simple formats
+            file_metadata = {
+                "source": str(path),
+                "file_name": path.name,
+                "file_extension": suffix,
+                "file_size": path.stat().st_size,
+                "updated_at": datetime.fromtimestamp(path.stat().st_mtime).isoformat()
+            }
+            
+            if suffix in [".txt", ".md", ".markdown"]:
                 with open(path, 'r', encoding='utf-8') as f:
                     content = f.read()
-            except UnicodeDecodeError as e:
-                raise DocumentProcessingError(
-                    message=f"Unsupported file format: {suffix}",
-                    file_path=str(file_path),
-                    operation="load_document",
-                    original_error=e
-                )
+            elif suffix == ".html":
+                content = self._load_html(path)
+            elif suffix == ".json":
+                content = self._load_json(path)
+            else:
+                # Try as text file
+                try:
+                    with open(path, 'r', encoding='utf-8') as f:
+                        content = f.read()
+                except UnicodeDecodeError as e:
+                    raise DocumentProcessingError(
+                        message=f"Unsupported file format: {suffix}. Enable multimodal loader for advanced formats.",
+                        file_path=str(file_path),
+                        operation="load_document",
+                        original_error=e
+                    )
         
         # Extract metadata from content
         extracted_metadata = self.metadata_handler.extract_metadata(

@@ -61,7 +61,32 @@ The Motadata AI SDK is a comprehensive, modular framework designed for integrati
 
 ### 2.1 Core Components
 
-#### 2.1.1 LiteLLM Gateway
+#### 2.1.1 Data Ingestion Service
+**Purpose**: Unified interface for uploading and processing data files
+
+**Responsibilities**:
+- Validate uploaded files (format, size, content)
+- Process files using multi-modal loader (text, PDF, audio, video, images)
+- Cleanse and normalize data
+- Automatically integrate with RAG, Cache, and Agents
+- Support batch and asynchronous processing
+
+**Integration Points**:
+- Uses: Multi-Modal Loader, RAG System, Cache Mechanism
+- Used by: Application backend for file uploads
+- Integrates with: All AI components automatically
+
+**Key Features**:
+- One-line file upload
+- Automatic format detection and processing
+- Multi-format support (text, PDF, audio, video, images, structured data)
+- Automatic RAG ingestion
+- Automatic caching
+- Data validation and cleansing
+
+---
+
+#### 2.1.2 LiteLLM Gateway
 **Purpose**: Unified interface for multiple LLM providers
 
 **Responsibilities**:
@@ -88,7 +113,7 @@ The Motadata AI SDK is a comprehensive, modular framework designed for integrati
 
 ---
 
-#### 2.1.2 Agno Agent Framework
+#### 2.1.3 Agno Agent Framework
 **Purpose**: Autonomous AI agents for task execution
 
 **Responsibilities**:
@@ -114,7 +139,7 @@ The Motadata AI SDK is a comprehensive, modular framework designed for integrati
 
 ---
 
-#### 2.1.3 RAG System
+#### 2.1.4 RAG System
 **Purpose**: Retrieval-Augmented Generation for knowledge-based queries
 
 **Responsibilities**:
