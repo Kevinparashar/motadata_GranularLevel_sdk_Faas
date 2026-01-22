@@ -594,6 +594,7 @@ Check Cache (by prompt hash + tenant)
 
 ### Deep Dives
 
+- **Development**: [Developer Integration Guide](guide/DEVELOPER_INTEGRATION_GUIDE.md) - Component development and integration
 - **Architecture**: [Architecture Documentation](architecture/)
 - **Integration**: [Integration Guides](integration_guides/)
 - **Components**: [Component Explanations](components/)
@@ -633,6 +634,7 @@ Check Cache (by prompt hash + tenant)
 
 ### Guides & Tools
 - **[Documentation Index](guide/DOCUMENTATION_INDEX.md)** - Complete navigation
+- **[Developer Integration Guide](guide/DEVELOPER_INTEGRATION_GUIDE.md)** - **FOR DEVELOPERS** - Component development and integration patterns
 - **[Quick Reference](guide/QUICK_REFERENCE.md)** - Common tasks
 - **[Navigation Helper](guide/NAVIGATION_HELPER.md)** - Find information fast
 - **[Prompt-Based Creation](prompt_based_creation_guide.md)** - Create agents from prompts
