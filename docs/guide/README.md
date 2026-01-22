@@ -26,6 +26,7 @@
 
 #### 📖 Guides
 - **[Onboarding Guide](ONBOARDING_GUIDE.md)** - Complete guide for new team members
+- **[Developer Integration Guide](DEVELOPER_INTEGRATION_GUIDE.md)** - **FOR DEVELOPERS** - Component development and integration patterns
 - **[Prompt-Based Creation Guide](prompt_based_creation_guide.md)** - Create agents/tools from prompts
 
 #### 🏗️ Architecture
