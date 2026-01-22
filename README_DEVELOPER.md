@@ -1,6 +1,8 @@
 # Developer Guide
 
 > **Note:** This guide is for SDK contributors and maintainers. For using the SDK, see the main [README.md](README.md) and component-specific documentation.
+>
+> **📚 For comprehensive development and integration guidance, see [Developer Integration Guide](docs/guide/DEVELOPER_INTEGRATION_GUIDE.md)** - This guide combines development guidelines, integration patterns, and practical examples.
 
 ## Guidelines for Developers
 

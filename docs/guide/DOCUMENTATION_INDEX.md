@@ -8,6 +8,7 @@
 
 ### Getting Started
 - **[Onboarding Guide](../ONBOARDING_GUIDE.md)** - **START HERE** - Complete guide for new team members
+- **[Developer Integration Guide](DEVELOPER_INTEGRATION_GUIDE.md)** - **FOR DEVELOPERS** - Component development and integration guide
 - **[Quick Start Guide](../README.md#quick-start-5-minutes)** - Get up and running in 5 minutes
 - **[Installation Guide](../README.md#installation)** - Detailed installation instructions
 - **[Hello World Example](../../examples/hello_world.py)** - Simplest possible example
@@ -148,6 +149,7 @@
 
 ### 🏗️ Architecture
 - [Onboarding Guide](../ONBOARDING_GUIDE.md) - Architecture overview and component integration
+- [Developer Integration Guide](DEVELOPER_INTEGRATION_GUIDE.md) - Component development and integration patterns
 - [SDK Architecture](../architecture/SDK_ARCHITECTURE.md) - Overall architecture
 - [AI Architecture Design](../architecture/AI_ARCHITECTURE_DESIGN.md) - AI-specific architecture
 - [REST/FastAPI Architecture](../architecture/REST_FASTAPI_ARCHITECTURE.md) - API layer design
