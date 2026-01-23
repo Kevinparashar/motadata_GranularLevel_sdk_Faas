@@ -28,9 +28,7 @@ python examples/hello_world.py
 ✅ Gateway created successfully
 🤖 Sending request to AI...
 ============================================================
-AI Response:
-============================================================
-Hello! I'm an AI assistant ready to help you.
+AI Response: Hello! I'm an AI assistant ready to help you.
 ============================================================
 ✅ Success! SDK is working correctly.
 📊 Model used: gpt-3.5-turbo
