@@ -1,4 +1,4 @@
-# NATS Integration - Comprehensive Component Explanation
+# Motadata NATS Integration - Comprehensive Component Explanation
 
 ## Overview
 

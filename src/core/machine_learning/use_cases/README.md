@@ -1,4 +1,4 @@
-# ML Use Cases
+# Motadata ML Use Cases
 
 ## Overview
 

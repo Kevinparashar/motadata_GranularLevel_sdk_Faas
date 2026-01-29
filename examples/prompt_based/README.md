@@ -1,4 +1,4 @@
-# Prompt-Based Creation Examples
+# Motadata Prompt-Based Creation Examples
 
 This directory contains examples demonstrating how to use the prompt-based generator to create agents and tools from natural language prompts.
 

@@ -1,4 +1,4 @@
-# NATS Integration Guide
+# Motadata NATS Integration Guide
 
 ## Overview
 

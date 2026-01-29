@@ -1,4 +1,4 @@
-# LiteLLM Gateway Functions Documentation
+# Motadata LiteLLM Gateway Functions Documentation
 
 ## Overview
 

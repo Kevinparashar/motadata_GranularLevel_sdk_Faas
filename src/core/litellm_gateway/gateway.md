@@ -1,4 +1,4 @@
-# LiteLLM Gateway Class Documentation
+# Motadata LiteLLM Gateway Class Documentation
 
 ## Overview
 

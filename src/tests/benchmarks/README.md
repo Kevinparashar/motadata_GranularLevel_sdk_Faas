@@ -1,4 +1,4 @@
-# Performance Benchmarks
+# Motadata Performance Benchmarks
 
 This directory contains performance benchmarking tests for all SDK components.
 

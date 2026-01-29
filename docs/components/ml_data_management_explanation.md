@@ -1,4 +1,4 @@
-# ML Data Management - Comprehensive Component Explanation
+# Motadata ML Data Management - Comprehensive Component Explanation
 
 ## Overview
 

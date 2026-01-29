@@ -1,4 +1,4 @@
-# CODEC Integration Troubleshooting
+# Motadata CODEC Integration Troubleshooting
 
 ## Common Issues and Solutions
 

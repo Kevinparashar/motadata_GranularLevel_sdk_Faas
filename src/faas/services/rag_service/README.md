@@ -1,4 +1,4 @@
-# RAG Service
+# Motadata RAG Service
 
 ## Overview
 

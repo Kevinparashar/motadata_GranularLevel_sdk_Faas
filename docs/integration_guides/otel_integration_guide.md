@@ -1,4 +1,4 @@
-# OTEL Integration Guide
+# Motadata OTEL Integration Guide
 
 ## Overview
 

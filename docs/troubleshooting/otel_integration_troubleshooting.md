@@ -1,4 +1,4 @@
-# OTEL Integration Troubleshooting
+# Motadata OTEL Integration Troubleshooting
 
 ## Common Issues and Solutions
 

@@ -1,4 +1,4 @@
-# FaaS Service Examples
+# Motadata FaaS Service Examples
 
 This directory contains examples demonstrating how to use each FaaS service.
 

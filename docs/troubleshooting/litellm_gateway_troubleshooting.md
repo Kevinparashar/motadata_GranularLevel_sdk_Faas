@@ -1,4 +1,4 @@
-# LiteLLM Gateway Troubleshooting Guide
+# Motadata LiteLLM Gateway Troubleshooting Guide
 
 This guide helps diagnose and resolve common issues encountered when using the LiteLLM Gateway.
 

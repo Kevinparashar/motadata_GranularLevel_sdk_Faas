@@ -1,4 +1,4 @@
-# ML Framework - Comprehensive Component Explanation
+# Motadata ML Framework - Comprehensive Component Explanation
 
 ## Overview
 

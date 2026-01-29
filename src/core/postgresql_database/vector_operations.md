@@ -1,4 +1,4 @@
-# Vector Operations Documentation
+# Motadata Vector Operations Documentation
 
 ## Overview
 

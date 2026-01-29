@@ -1,4 +1,4 @@
-# Document Q&A Use Case with NATS, OTEL, and CODEC Integration
+# Motadata Document Q&A Use Case with NATS, OTEL, and CODEC Integration
 
 ## Overview
 

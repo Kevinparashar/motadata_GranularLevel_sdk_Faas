@@ -1,4 +1,4 @@
-# Prompt-Based Generator - Comprehensive Component Explanation
+# Motadata Prompt-Based Generator - Comprehensive Component Explanation
 
 ## Overview
 

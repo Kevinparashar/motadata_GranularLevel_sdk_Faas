@@ -1,4 +1,4 @@
-# Prompt-Based Creation User Guide
+# Motadata Prompt-Based Creation User Guide
 
 ## Introduction
 

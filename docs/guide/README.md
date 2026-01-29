@@ -1,4 +1,4 @@
-# SDK Documentation
+# Motadata SDK Documentation
 
 **Welcome to the Motadata Python AI SDK Documentation**
 

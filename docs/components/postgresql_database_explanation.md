@@ -1,4 +1,4 @@
-# PostgreSQL Database - Comprehensive Component Explanation
+# Motadata PostgreSQL Database - Comprehensive Component Explanation
 
 ## Overview
 

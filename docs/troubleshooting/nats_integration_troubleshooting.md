@@ -1,4 +1,4 @@
-# NATS Integration Troubleshooting
+# Motadata NATS Integration Troubleshooting
 
 ## Common Issues and Solutions
 

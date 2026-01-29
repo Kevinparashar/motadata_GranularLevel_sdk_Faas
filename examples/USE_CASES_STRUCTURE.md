@@ -1,4 +1,4 @@
-# Use Cases Folder Structure and Management
+# Motadata Use Cases Folder Structure and Management
 
 ## Overview
 
@@ -342,5 +342,5 @@ Before adding a use case:
 
 - [Building New Use Cases Guide](../BUILDING_NEW_USECASE_GUIDE.md)
 - [Examples README](README.md)
-- [Developer Guide](../../README_DEVELOPER.md)
+- [Developer Guide](../../PYTHON_SDK_DEVELOPMENT_ENVIRONMENT_SETUP_GUIDE.md)
 

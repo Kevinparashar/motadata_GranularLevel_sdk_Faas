@@ -1,4 +1,4 @@
-# MLOps Pipeline Troubleshooting Guide
+# Motadata MLOps Pipeline Troubleshooting Guide
 
 This guide helps diagnose and resolve common issues encountered when using the MLOps Pipeline.
 

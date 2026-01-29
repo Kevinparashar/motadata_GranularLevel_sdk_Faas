@@ -1,4 +1,4 @@
-# Prompt Generator Service
+# Motadata Prompt Generator Service
 
 ## Overview
 

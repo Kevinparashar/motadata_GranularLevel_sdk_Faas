@@ -1,4 +1,4 @@
-# OTEL Integration
+# Motadata OTEL Integration
 
 ## Overview
 
