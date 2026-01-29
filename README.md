@@ -74,7 +74,7 @@ The Motadata Python AI SDK is a comprehensive, modular SDK for building AI-power
 
 ### Infrastructure & Operations
 - **Connection Pooling**: Efficient resource management for databases and API connections
-- **Advanced Caching**: Multi-backend caching (Redis, memory, database) with warming strategies, memory monitoring, automatic sharding, validation, and recovery mechanisms
+- **Advanced Caching**: Multi-backend caching (Dragonfly, memory, database) with warming strategies, memory monitoring, automatic sharding, validation, and recovery mechanisms
 - **Observability**: Distributed tracing, structured logging, metrics collection with OpenTelemetry, and comprehensive LLMOps capabilities
 - **Health Monitoring**: Automatic failover, retry logic, circuit breaker patterns, and built-in health checks for all components
 - **LLMOps**: Comprehensive logging, cost tracking, token usage monitoring, and performance metrics for LLM operations
@@ -306,7 +306,7 @@ motadata-python-ai-sdk/
 
 9. **Cache Mechanism** (`src/core/cache_mechanism/`)
    - Response, embedding, and query result caching
-   - In-memory (LRU + TTL) and optional Redis backend
+   - In-memory (LRU + TTL) and optional Dragonfly backend
    - Pattern-based invalidation and max-size enforcement
    - **Cache Warming Strategies** to pre-load frequently accessed data
    - **Memory Usage Monitoring** for better resource management
@@ -439,7 +439,7 @@ Response with Observability
 
 ### External Dependencies
 - **PostgreSQL 12+** with pgvector extension (for vector database functionality)
-- **Redis** (optional, for caching - can use in-memory cache as alternative)
+- **Dragonfly** (optional, for caching - can use in-memory cache as alternative)
 - **LLM API Keys**: OpenAI, Anthropic, or Google API keys (depending on provider)
 
 ### Python Dependencies
@@ -450,7 +450,7 @@ The SDK requires the following key libraries (automatically installed with requi
 - **fastapi/uvicorn**: API framework (for API Backend component)
 - **opentelemetry**: Observability and tracing
 - **httpx/aiohttp**: Async HTTP clients
-- **redis**: Caching backend (optional)
+- **dragonfly**: Caching backend (optional, Redis-compatible)
 
 See `requirements.txt` for complete dependency list.
 
@@ -511,10 +511,10 @@ POSTGRES_DB=motadata_sdk
 POSTGRES_USER=your-username
 POSTGRES_PASSWORD=your-password
 
-# Redis Configuration (optional, for caching)
-REDIS_HOST=localhost
-REDIS_PORT=6379
-REDIS_PASSWORD=your-redis-password
+# Dragonfly Configuration (optional, for caching)
+DRAGONFLY_HOST=localhost
+DRAGONFLY_PORT=6379
+DRAGONFLY_PASSWORD=your-dragonfly-password
 
 # Observability Configuration (optional)
 OTEL_EXPORTER_OTLP_ENDPOINT=http://localhost:4317
@@ -631,10 +631,10 @@ from src.core.prompt_context_management import create_prompt_manager
 prompt_manager = create_prompt_manager(max_tokens=8000)
 
 # Cache Mechanism
-from src.core.cache_mechanism import create_memory_cache, create_redis_cache
+from src.core.cache_mechanism import create_memory_cache, create_dragonfly_cache
 
 cache = create_memory_cache(default_ttl=600, max_size=2048)
-redis_cache = create_redis_cache(redis_url="redis://localhost:6379/0")
+dragonfly_cache = create_dragonfly_cache(dragonfly_url="dragonfly://localhost:6379/0")
 
 # API Backend Services
 from src.core.api_backend_services import create_api_app, create_api_router
@@ -959,7 +959,8 @@ See `src/tests/unit_tests/README.md` and `src/tests/integration_tests/README.md`
 - **Tests**: See `src/tests/` for test suites and validation examples
 - **Workflows**: See `docs/workflows.md` for detailed workflow diagrams
 - **Libraries**: See `docs/libraries.md` for complete library list
-- **Developer Guide**: See `PYTHON_SDK_DEVELOPMENT_ENVIRONMENT_SETUP_GUIDE.md` for development guidelines
+- **Developer Guide**: See `PYTHON_SDK_DEVELOPMENT_ENVIRONMENT_SETUP_GUIDE.md` for development environment setup
+- **Quality Gate Rules**: See `PYTHON_SDK_QUALITY_GATE_RULES_AND_DEVELOPMENT_GUIDELINE_DOCUMENT.md` for quality gates, coding standards, and development guidelines
 - **Developer Integration Guide**: See `docs/guide/DEVELOPER_INTEGRATION_GUIDE.md` for component development and integration patterns
 - **Ground Truth Analysis**: See `GROUND_TRUTH_ANALYSIS.md` for SDK as reference implementation guide
 - **OpenTelemetry Guide**: See `OTEL_IMPLEMENTATION_GUIDE.md` for comprehensive OTEL integration and observability
@@ -978,7 +979,7 @@ The SDK is designed with modularity in mind:
 
 - **Agent Frameworks**: Swap Agno with LangChain or other frameworks
 - **Database Backends**: Swap PostgreSQL with other databases
-- **Cache Backends**: Swap Redis with memory or database caching
+- **Cache Backends**: Swap Dragonfly with memory or database caching
 - **LLM Providers**: Switch between providers via LiteLLM
 
 See component README files for swapping instructions.

@@ -50,7 +50,7 @@ This folder contains comprehensive documentation for each component of the Motad
 
 5. **[Cache Mechanism](cache_mechanism_explanation.md)**
    - Cache operations (set, get, delete)
-   - Cache backends (memory, Redis)
+   - Cache backends (memory, Dragonfly)
    - Advanced features (warming, monitoring, sharding)
    - Exception handling
    - Functions and utilities

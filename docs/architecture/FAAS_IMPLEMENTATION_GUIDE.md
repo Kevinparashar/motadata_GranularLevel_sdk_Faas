@@ -17,7 +17,7 @@ Each AI component (Agent, RAG, Gateway, ML, Cache, Prompt, Data Ingestion, Promp
 Services communicate via:
 - **Direct HTTP calls**: Synchronous service-to-service calls
 - **NATS messaging**: Asynchronous event-driven communication
-- **Shared state**: PostgreSQL for persistent state, Redis for caching
+- **Shared state**: PostgreSQL for persistent state, Dragonfly for caching
 
 ### 3. Observability
 All services integrate with:
@@ -219,7 +219,7 @@ Prompt Service
     └─> Database (template storage)
 
 Cache Service
-    └─> Redis (cache backend)
+    └─> Dragonfly (cache backend)
 ```
 
 ## Integration Order
@@ -228,7 +228,7 @@ Cache Service
 
 1. **Infrastructure Services** (start first):
    - Database (PostgreSQL)
-   - Redis (Cache)
+   - Dragonfly (Cache)
    - NATS (if enabled)
    - OTEL Collector (if enabled)
 
@@ -398,7 +398,7 @@ RAG_SERVICE_URL=http://rag-service:8080
 
 # Database
 DATABASE_URL=postgresql://user:pass@localhost/db
-REDIS_URL=redis://localhost:6379
+DRAGONFLY_URL=dragonfly://localhost:6379
 
 # Integrations
 ENABLE_NATS=true

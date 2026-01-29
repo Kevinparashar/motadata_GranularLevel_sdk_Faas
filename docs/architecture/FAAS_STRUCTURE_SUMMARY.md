@@ -165,7 +165,7 @@ Gateway Service
 
 All Services
     ├─> Database (state persistence)
-    ├─> Redis (caching)
+    ├─> Dragonfly (caching)
     ├─> NATS (messaging, if enabled)
     └─> OTEL (observability, if enabled)
 ```
@@ -183,7 +183,7 @@ All requests include:
 Each service configured via environment variables:
 - Service identity (name, version, port)
 - Dependency URLs (gateway, cache, rag, etc.)
-- Database and Redis URLs
+- Database and Dragonfly URLs
 - Integration flags (NATS, OTEL, CODEC)
 
 ## Next Steps

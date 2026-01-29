@@ -9,7 +9,7 @@ This guide explains how to deploy FaaS services using Docker containers.
 - Docker installed
 - Docker Compose (optional, for multi-service deployment)
 - PostgreSQL database
-- Redis (optional, for caching)
+- Dragonfly (optional, for caching)
 
 ## Service Dockerfile
 
@@ -93,9 +93,9 @@ services:
       timeout: 5s
       retries: 5
 
-  # Redis
-  redis:
-    image: redis:7-alpine
+  # Dragonfly
+  dragonfly:
+    image: docker.dragonflydb.io/dragonflydb/dragonfly:latest
     ports:
       - "6379:6379"
     healthcheck:
@@ -113,7 +113,7 @@ services:
       SERVICE_NAME: gateway-service
       SERVICE_PORT: 8080
       DATABASE_URL: postgresql://motadata:password@postgres:5432/motadata_ai
-      REDIS_URL: redis://redis:6379
+      DRAGONFLY_URL: dragonfly://dragonfly:6379
       ENABLE_NATS: "false"
       ENABLE_OTEL: "false"
     ports:
@@ -121,7 +121,7 @@ services:
     depends_on:
       postgres:
         condition: service_healthy
-      redis:
+      dragonfly:
         condition: service_healthy
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8080/health"]
@@ -137,11 +137,11 @@ services:
     environment:
       SERVICE_NAME: cache-service
       SERVICE_PORT: 8081
-      REDIS_URL: redis://redis:6379
+      DRAGONFLY_URL: dragonfly://dragonfly:6379
     ports:
       - "8081:8081"
     depends_on:
-      redis:
+      dragonfly:
         condition: service_healthy
 
   # RAG Service
@@ -260,7 +260,7 @@ RAG_SERVICE_URL=http://rag-service:8082
 
 # Database
 DATABASE_URL=postgresql://user:pass@postgres:5432/db
-REDIS_URL=redis://redis:6379
+DRAGONFLY_URL=dragonfly://dragonfly:6379
 
 # Integrations
 ENABLE_NATS=true

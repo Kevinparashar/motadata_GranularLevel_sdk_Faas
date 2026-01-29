@@ -356,9 +356,9 @@ async def add_process_time_header(request: Request, call_next):
 1. **Enable Caching:**
    ```python
    from fastapi_cache import FastAPICache
-   from fastapi_cache.backends.redis import RedisBackend
+   from fastapi_cache.backends.dragonfly import DragonflyBackend
 
-   FastAPICache.init(RedisBackend())
+   FastAPICache.init(DragonflyBackend())
 
    @app.get("/endpoint")
    @cache(expire=60)

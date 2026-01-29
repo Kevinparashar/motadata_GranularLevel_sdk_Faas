@@ -189,7 +189,7 @@ metrics.set_gauge("active.connections", connection_count, {
 
 # Update gauge
 metrics.set_gauge("cache.size", cache_size_bytes, {
-    "backend": "redis"
+    "backend": "dragonfly"
 })
 ```
 

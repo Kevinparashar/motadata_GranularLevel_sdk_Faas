@@ -2,7 +2,7 @@
 
 ## Overview
 
-The Cache Mechanism provides high-performance caching with multiple backends (in-memory, Redis) for improving application performance. This guide explains the complete workflow from cache creation to data retrieval.
+The Cache Mechanism provides high-performance caching with multiple backends (in-memory, Dragonfly) for improving application performance. This guide explains the complete workflow from cache creation to data retrieval.
 
 ## Entry Point
 
@@ -11,7 +11,7 @@ The primary entry point for creating caches is through factory functions:
 ```python
 from src.core.cache_mechanism import (
     create_memory_cache,
-    create_redis_cache,
+    create_dragonfly_cache,
     cache_set,
     cache_get,
     cache_delete
@@ -25,26 +25,26 @@ from src.core.cache_mechanism import (
 1. **Cache Configuration** (for memory cache):
    - `default_ttl`: Default time-to-live in seconds (optional)
 
-2. **Redis Configuration** (for Redis cache):
-   - `host`: Redis server host
-   - `port`: Redis server port
+2. **Dragonfly Configuration** (for Dragonfly cache):
+   - `host`: Dragonfly server host
+   - `port`: Dragonfly server port
    - `default_ttl`: Default time-to-live in seconds
 
 ### Optional Inputs
 
 - `max_size`: Maximum cache size (for memory cache)
-- `password`: Redis password (if required)
-- `db`: Redis database number
-- `decode_responses`: Decode Redis responses (default: True)
+- `password`: Dragonfly password (if required)
+- `db`: Dragonfly database number
+- `decode_responses`: Decode Dragonfly responses (default: True)
 
 ## Process Flow
 
 ### Step 1: Cache Creation
 
 **What Happens:**
-1. Cache backend is initialized (memory or Redis)
+1. Cache backend is initialized (memory or Dragonfly)
 2. Configuration is validated
-3. Connection is established (for Redis)
+3. Connection is established (for Dragonfly)
 4. Cache instance is created
 
 **Code:**
@@ -52,8 +52,8 @@ from src.core.cache_mechanism import (
 # Memory cache
 cache = create_memory_cache(default_ttl=600)
 
-# Redis cache
-cache = create_redis_cache(
+# Dragonfly cache
+cache = create_dragonfly_cache(
     host="localhost",
     port=6379,
     default_ttl=600
@@ -68,9 +68,9 @@ create_memory_cache()
   ├─> Initialize eviction policy
   └─> Return cache instance
 
-create_redis_cache()
-  ├─> Validate Redis connection
-  ├─> Connect to Redis server
+create_dragonfly_cache()
+  ├─> Validate Dragonfly connection
+  ├─> Connect to Dragonfly server
   ├─> Set default TTL
   └─> Return cache instance
 ```
@@ -109,7 +109,7 @@ cache_set()
   ├─> Calculate expiration time
   ├─> Store in cache backend
   │   ├─> Memory: Store in LRU dict with expiration
-  │   └─> Redis: SET with EX (expiration)
+  │   └─> Dragonfly: SET with EX (expiration)
   ├─> Update metadata
   └─> Return success
 ```
@@ -144,7 +144,7 @@ cache_get()
   │   ├─> Memory: Check LRU dict
   │   │   ├─> Check expiration
   │   │   └─> Return if valid, delete if expired
-  │   └─> Redis: GET key
+  │   └─> Dragonfly: GET key
   │       ├─> Check expiration
   │       └─> Return if exists
   ├─> Deserialize value (if needed)
@@ -332,11 +332,11 @@ cache_set(cache, "key", "value", ttl=60)  # Expires in 60 seconds
 # After 60 seconds, cache_get() returns None
 ```
 
-### Redis Cache Features
+### Dragonfly Cache Features
 
 ```python
-# Redis backend for distributed caching
-cache = create_redis_cache(
+# Dragonfly backend for distributed caching
+cache = create_dragonfly_cache(
     host="localhost",
     port=6379,
     password="your-password",
@@ -344,7 +344,7 @@ cache = create_redis_cache(
     default_ttl=600
 )
 
-# Supports multiple Redis instances
+# Supports multiple Dragonfly instances
 # Shared cache across multiple application instances
 ```
 
@@ -429,8 +429,8 @@ try:
 except CacheError as e:
     print(f"Cache error: {e.message}")
     print(f"Error type: {e.error_type}")
-except RedisConnectionError as e:
-    print(f"Redis connection error: {e.message}")
+except DragonflyConnectionError as e:
+    print(f"Dragonfly connection error: {e.message}")
     # Fallback to memory cache or direct database access
 ```
 

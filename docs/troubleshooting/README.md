@@ -48,7 +48,7 @@ This directory contains comprehensive troubleshooting guides for all components 
 5. **[Cache Mechanism Troubleshooting](cache_mechanism_troubleshooting.md)**
    - Cache misses
    - Memory backend issues
-   - Redis backend issues
+   - Dragonfly backend issues
    - Cache invalidation problems
    - Performance issues
    - Memory pressure
@@ -169,7 +169,7 @@ Determine which component is experiencing issues:
 - **Agent Framework**: Issues with agent execution, tools, memory
 - **LiteLLM Gateway**: Issues with LLM API calls, rate limiting, providers
 - **RAG System**: Issues with document ingestion, retrieval, generation, multi-modal processing
-- **Cache Mechanism**: Issues with caching, Redis, memory
+- **Cache Mechanism**: Issues with caching, Dragonfly, memory
 - **Prompt Context Management**: Issues with templates, context, tokens
 - **PostgreSQL Database**: Issues with database connections, queries, vectors
 - **Evaluation & Observability**: Issues with tracing, logging, metrics

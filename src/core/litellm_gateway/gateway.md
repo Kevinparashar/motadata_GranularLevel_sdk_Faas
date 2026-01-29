@@ -288,8 +288,8 @@ config = GatewayConfig(
     enable_caching=True,
     cache_ttl=3600,  # Cache for 1 hour
     cache_config=CacheConfig(
-        backend="redis",  # or "memory"
-        redis_url="redis://localhost:6379"
+        backend="dragonfly",  # or "memory"
+        dragonfly_url="dragonfly://localhost:6379"
     )
 )
 
@@ -347,14 +347,14 @@ print(f"Total cost: ${stats['total_cost']:.2f}")
 2. **Dependencies**: Install via `pip install -r requirements.txt`
    - `litellm`: Core LLM library
    - `pydantic`: For data validation
-   - `redis`: Optional, for Redis caching
+   - `dragonfly`: Optional, for Dragonfly caching
 3. **API Keys**: Configure provider API keys:
    - OpenAI: `OPENAI_API_KEY`
    - Anthropic: `ANTHROPIC_API_KEY`
    - Google: `GOOGLE_API_KEY`
    - Or pass via `api_keys` parameter
 4. **Optional Dependencies**:
-   - Redis: For distributed caching
+   - Dragonfly: For distributed caching
    - PostgreSQL: For persistent storage (if needed)
 
 ## Connection to Other Components

@@ -6,7 +6,7 @@ This guide helps diagnose and resolve common issues encountered when using the C
 
 1. [Cache Misses](#cache-misses)
 2. [Memory Backend Issues](#memory-backend-issues)
-3. [Redis Backend Issues](#redis-backend-issues)
+3. [Dragonfly Backend Issues](#dragonfly-backend-issues)
 4. [Cache Invalidation Problems](#cache-invalidation-problems)
 5. [Performance Issues](#performance-issues)
 6. [Memory Pressure](#memory-pressure)
@@ -107,58 +107,58 @@ if cache.backend == "memory":
 3. **Check LRU Eviction:**
    - Monitor eviction frequency
    - Adjust max_size if needed
-   - Consider using Redis for larger caches
+   - Consider using Dragonfly for larger caches
 
 4. **Memory Usage:**
    - Monitor memory usage
    - Use cache monitoring
    - Consider cache sharding
 
-## Redis Backend Issues
+## Dragonfly Backend Issues
 
-### Problem: Redis connection failures
+### Problem: Dragonfly connection failures
 
 **Symptoms:**
-- Redis connection errors
+- Dragonfly connection errors
 - Cache operations failing
 - Timeout errors
 - Connection refused
 
 **Diagnosis:**
 ```python
-# Test Redis connection
-if cache.backend == "redis":
+# Test Dragonfly connection
+if cache.backend == "dragonfly":
     try:
         cache._client.ping()
-        print("Redis connected")
+        print("Dragonfly connected")
     except Exception as e:
-        print(f"Redis error: {e}")
+        print(f"Dragonfly error: {e}")
 ```
 
 **Solutions:**
 
-1. **Check Redis Configuration:**
+1. **Check Dragonfly Configuration:**
    ```python
    config = CacheConfig(
-       backend="redis",
-       redis_url="redis://localhost:6379/0"
+       backend="dragonfly",
+       dragonfly_url="dragonfly://localhost:6379/0"
    )
    ```
 
-2. **Verify Redis is Running:**
-   - Check Redis service status
-   - Verify Redis port is accessible
-   - Test Redis connectivity
+2. **Verify Dragonfly is Running:**
+   - Check Dragonfly service status
+   - Verify Dragonfly port is accessible
+   - Test Dragonfly connectivity
 
-3. **Check Redis URL:**
-   - Verify URL format: `redis://host:port/db`
+3. **Check Dragonfly URL:**
+   - Verify URL format: `dragonfly://host:port/db`
    - Check authentication if required
    - Verify database number
 
 4. **Network Issues:**
    - Check firewall rules
    - Verify network connectivity
-   - Test with different Redis instance
+   - Test with different Dragonfly instance
 
 ## Cache Invalidation Problems
 
@@ -201,9 +201,9 @@ value2 = cache.get("test:2")  # Should be None
    - Verify tenant-specific invalidation
    - Check key namespacing
 
-4. **Redis Pattern Matching:**
-   - For Redis, verify pattern syntax
-   - Check Redis KEYS command usage
+4. **Dragonfly Pattern Matching:**
+   - For Dragonfly, verify pattern syntax
+   - Check Dragonfly KEYS command usage
    - Consider SCAN for large key sets
 
 ## Performance Issues
@@ -235,8 +235,8 @@ print(f"Set time: {set_time}, Get time: {get_time}")
 **Solutions:**
 
 1. **Optimize Cache Backend:**
-   - Use Redis for distributed caching
-   - Optimize Redis configuration
+   - Use Dragonfly for distributed caching
+   - Optimize Dragonfly configuration
    - Use connection pooling
 
 2. **Reduce Cache Size:**
@@ -292,11 +292,11 @@ print(f"Cache size: {usage['cache_size']}")
        monitor.handle_memory_pressure()
    ```
 
-3. **Use Redis Backend:**
+3. **Use Dragonfly Backend:**
    ```python
    config = CacheConfig(
-       backend="redis",
-       redis_url="redis://localhost:6379/0"
+       backend="dragonfly",
+       dragonfly_url="dragonfly://localhost:6379/0"
    )
    ```
 
@@ -454,6 +454,6 @@ If you continue to experience issues:
 2. Review the Cache Mechanism documentation
 3. Verify your configuration matches the examples
 4. Test with minimal configuration to isolate issues
-5. Check Redis connectivity (if using Redis)
+5. Check Dragonfly connectivity (if using Dragonfly)
 6. Review GitHub issues for known problems
 

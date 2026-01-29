@@ -9,6 +9,8 @@
 ### Getting Started
 - **[Onboarding Guide](../ONBOARDING_GUIDE.md)** - **START HERE** - Complete guide for new team members
 - **[Developer Integration Guide](DEVELOPER_INTEGRATION_GUIDE.md)** - **FOR DEVELOPERS** - Component development and integration guide
+- **[Development Environment Setup Guide](../../PYTHON_SDK_DEV_ENVIRONMENT_SETUP_GUIDE.md)** - **FOR CONTRIBUTORS** - Complete setup guide for local development
+- **[Quality Gate Rules & Development Guidelines](../../PYTHON_SDK_QUALITY_GATE_RULES_AND_DEVELOPMENT_GUIDELINE_DOCUMENT.md)** - **FOR CONTRIBUTORS** - Quality gates, coding standards, and development guidelines
 - **[Quick Start Guide](../README.md#quick-start-5-minutes)** - Get up and running in 5 minutes
 - **[Installation Guide](../README.md#installation)** - Detailed installation instructions
 - **[Hello World Example](../../examples/hello_world.py)** - Simplest possible example
@@ -150,6 +152,8 @@
 ### 🏗️ Architecture
 - [Onboarding Guide](../ONBOARDING_GUIDE.md) - Architecture overview and component integration
 - [Developer Integration Guide](DEVELOPER_INTEGRATION_GUIDE.md) - Component development and integration patterns
+- [Development Environment Setup Guide](../../PYTHON_SDK_DEV_ENVIRONMENT_SETUP_GUIDE.md) - Local development setup
+- [Quality Gate Rules & Development Guidelines](../../PYTHON_SDK_QUALITY_GATE_RULES_AND_DEVELOPMENT_GUIDELINE_DOCUMENT.md) - Quality standards and coding guidelines
 - [SDK Architecture](../architecture/SDK_ARCHITECTURE.md) - Overall architecture
 - [AI Architecture Design](../architecture/AI_ARCHITECTURE_DESIGN.md) - AI-specific architecture
 - [REST/FastAPI Architecture](../architecture/REST_FASTAPI_ARCHITECTURE.md) - API layer design

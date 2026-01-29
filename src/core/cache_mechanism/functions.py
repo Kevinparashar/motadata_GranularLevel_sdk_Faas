@@ -16,7 +16,7 @@ def create_cache(
     backend: str = "memory",
     default_ttl: int = 300,
     max_size: int = 1024,
-    redis_url: Optional[str] = None,
+    dragonfly_url: Optional[str] = None,
     namespace: str = "sdk_cache",
     **kwargs: Any
 ) -> CacheMechanism:
@@ -24,10 +24,10 @@ def create_cache(
     Create and configure a cache with default settings.
     
     Args:
-        backend: Cache backend ("memory" or "redis")
+        backend: Cache backend ("memory" or "dragonfly")
         default_ttl: Default TTL in seconds
         max_size: Maximum cache size (only for memory backend)
-        redis_url: Redis connection URL (required for Redis backend)
+        dragonfly_url: Dragonfly connection URL (required for Dragonfly backend)
         namespace: Cache namespace to prevent key collisions
         **kwargs: Additional cache configuration
     
@@ -38,17 +38,17 @@ def create_cache(
         >>> # In-memory cache
         >>> cache = create_cache(backend="memory", default_ttl=600)
         
-        >>> # Redis cache
+        >>> # Dragonfly cache
         >>> cache = create_cache(
-        ...     backend="redis",
-        ...     redis_url="redis://localhost:6379/0"
+        ...     backend="dragonfly",
+        ...     dragonfly_url="dragonfly://localhost:6379/0"
         ... )
     """
     config = CacheConfig(
         backend=backend,
         default_ttl=default_ttl,
         max_size=max_size,
-        redis_url=redis_url,
+        dragonfly_url=dragonfly_url,
         namespace=namespace
     )
     return CacheMechanism(config=config)
@@ -81,31 +81,31 @@ def create_memory_cache(
     )
 
 
-def create_redis_cache(
-    redis_url: str = "redis://localhost:6379/0",
+def create_dragonfly_cache(
+    dragonfly_url: str = "dragonfly://localhost:6379/0",
     default_ttl: int = 300,
     namespace: str = "sdk_cache"
 ) -> CacheMechanism:
     """
-    Create a Redis cache.
+    Create a Dragonfly cache.
     
     Args:
-        redis_url: Redis connection URL
+        dragonfly_url: Dragonfly connection URL
         default_ttl: Default TTL in seconds
         namespace: Cache namespace
     
     Returns:
-        CacheMechanism instance with Redis backend
+        CacheMechanism instance with Dragonfly backend
     
     Example:
-        >>> cache = create_redis_cache(
-        ...     redis_url="redis://localhost:6379/0",
+        >>> cache = create_dragonfly_cache(
+        ...     dragonfly_url="dragonfly://localhost:6379/0",
         ...     default_ttl=600
         ... )
     """
     return create_cache(
-        backend="redis",
-        redis_url=redis_url,
+        backend="dragonfly",
+        dragonfly_url=dragonfly_url,
         default_ttl=default_ttl,
         namespace=namespace
     )
@@ -115,17 +115,17 @@ def configure_cache(
     backend: str = "memory",
     default_ttl: int = 300,
     max_size: int = 1024,
-    redis_url: Optional[str] = None,
+    dragonfly_url: Optional[str] = None,
     namespace: str = "sdk_cache"
 ) -> CacheConfig:
     """
     Create a CacheConfig with specified settings.
     
     Args:
-        backend: Cache backend ("memory" or "redis")
+        backend: Cache backend ("memory" or "dragonfly")
         default_ttl: Default TTL in seconds
         max_size: Maximum cache size (only for memory backend)
-        redis_url: Redis connection URL
+        dragonfly_url: Dragonfly connection URL
         namespace: Cache namespace
     
     Returns:
@@ -143,7 +143,7 @@ def configure_cache(
         backend=backend,
         default_ttl=default_ttl,
         max_size=max_size,
-        redis_url=redis_url,
+        dragonfly_url=dragonfly_url,
         namespace=namespace
     )
 
@@ -310,7 +310,7 @@ __all__ = [
     # Factory functions
     "create_cache",
     "create_memory_cache",
-    "create_redis_cache",
+    "create_dragonfly_cache",
     "configure_cache",
     # High-level convenience functions
     "cache_get",
