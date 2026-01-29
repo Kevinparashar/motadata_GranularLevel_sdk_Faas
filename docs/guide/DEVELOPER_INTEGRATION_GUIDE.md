@@ -78,7 +78,7 @@ This guide helps you:
                         ▼
 ┌─────────────────────────────────────────────────────────────┐
 │              Infrastructure Layer                            │
-│  PostgreSQL | Redis | NATS | OTEL | CODEC                   │
+│  PostgreSQL | Dragonfly | NATS | OTEL | CODEC                   │
 └─────────────────────────────────────────────────────────────┘
 ```
 
@@ -631,7 +631,7 @@ from src.core.postgresql_database import create_database
 
 # 1. Initialize shared components
 gateway = create_gateway(api_keys={"openai": "sk-..."})
-cache = create_cache(backend="redis", redis_url="redis://localhost:6379")
+cache = create_cache(backend="dragonfly", dragonfly_url="dragonfly://localhost:6379")
 db = create_database(connection_string="postgresql://...")
 
 # 2. Create RAG system (uses Gateway, Database, Cache)

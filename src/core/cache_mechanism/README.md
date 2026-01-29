@@ -38,7 +38,7 @@ value = cache_get(cache, "user:123")
 
 ## Overview
 
-The Cache Mechanism component provides caching capabilities to improve performance, reduce costs, and enhance user experience. It offers in-memory (LRU + TTL) and Redis backends with pattern-based invalidation.
+The Cache Mechanism component provides caching capabilities to improve performance, reduce costs, and enhance user experience. It offers in-memory (LRU + TTL) and Dragonfly backends with pattern-based invalidation.
 
 ## Purpose and Functionality
 
@@ -83,7 +83,7 @@ The **API Backend Services** (`src/core/api_backend_services/`) can use caching 
 ## Backends
 
 - **Memory**: OrderedDict-based LRU with TTL and max-size enforcement
-- **Redis**: Optional; enabled when `redis` dependency and URL are provided
+- **Dragonfly**: Optional; enabled when `redis` dependency (Dragonfly is Redis-compatible) and URL are provided
 
 ## Function-Driven API
 
@@ -97,15 +97,15 @@ Create caches with simplified configuration:
 from src.core.cache_mechanism import (
     create_cache,
     create_memory_cache,
-    create_redis_cache
+    create_dragonfly_cache
 )
 
 # Create in-memory cache
 cache = create_memory_cache(default_ttl=600, max_size=2048)
 
-# Create Redis cache
-cache = create_redis_cache(
-    redis_url="redis://localhost:6379/0",
+# Create Dragonfly cache
+cache = create_dragonfly_cache(
+    dragonfly_url="dragonfly://localhost:6379/0",
     default_ttl=600
 )
 
@@ -341,10 +341,10 @@ The component implements robust error handling:
 ## Configuration
 
 `CacheConfig` supports:
-- `backend`: `"memory"` or `"redis"`
+- `backend`: `"memory"` or `"dragonfly"`
 - `default_ttl`: default TTL in seconds
 - `max_size`: max entries for in-memory cache
-- `redis_url`: optional Redis connection URL
+- `dragonfly_url`: optional Dragonfly connection URL
 - `namespace`: namespacing for keys
 
 ## Best Practices
@@ -353,7 +353,7 @@ The component implements robust error handling:
 2. **Cache Key Design**: Use consistent, unique cache keys
 3. **Cache Invalidation**: Implement proper cache invalidation strategies
 4. **Monitor Performance**: Track cache hit rates and adjust configurations
-5. **Distributed Caching**: Use distributed caches (Redis) for multi-instance deployments
+5. **Distributed Caching**: Use distributed caches (Dragonfly) for multi-instance deployments
 6. **Cost-Benefit Analysis**: Balance cache complexity with performance and cost benefits
 7. **Cache Warming**: Use cache warming for frequently accessed data to improve performance
 8. **Memory Monitoring**: Monitor memory usage to prevent memory pressure and optimize cache size

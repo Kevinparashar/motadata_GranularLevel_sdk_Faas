@@ -74,7 +74,7 @@ The FaaS architecture organizes AI components as independent services:
          ┌─────────────────┐
          │  State Storage  │
          │  - PostgreSQL   │
-         │  - Redis        │
+         │  - Dragonfly        │
          └─────────────────┘
 ```
 
@@ -133,7 +133,7 @@ src/faas/
 ### 5. Cache Service
 - **Purpose**: Distributed caching for performance optimization
 - **Endpoints**: Get, set, delete, invalidate operations
-- **Dependencies**: Redis
+- **Dependencies**: Dragonfly
 
 ### 6. Prompt Service
 - **Purpose**: Prompt template management and context building
@@ -347,7 +347,7 @@ LOG_LEVEL=INFO
 GATEWAY_SERVICE_URL=http://gateway-service:8080
 CACHE_SERVICE_URL=http://cache-service:8080
 DATABASE_URL=postgresql://user:pass@localhost/db
-REDIS_URL=redis://localhost:6379
+DRAGONFLY_URL=dragonfly://localhost:6379
 
 # Integrations
 NATS_URL=nats://localhost:4222

@@ -280,8 +280,8 @@ rag = create_rag_system_with_cache(
     db=db,
     gateway=gateway,
     cache_config=CacheConfig(
-        backend="redis",
-        redis_url="redis://localhost:6379",
+        backend="dragonfly",
+        dragonfly_url="dragonfly://localhost:6379",
         ttl=3600
     )
 )

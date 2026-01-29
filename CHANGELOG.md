@@ -1,26 +1,3 @@
-# Motadata CHANGELOG
-## Motadata Python AI SDK
-
-All notable changes to the **Motadata Python AI SDK** are documented in this file.
-
-- Format: **Keep a Changelog** (v1.0.0)
-- Versioning: **Semantic Versioning (SemVer)**
-
----
-
-## How to use this changelog (mandatory)
-- Every PR that changes SDK behavior **must** add an entry under **[Unreleased]**.
-- When releasing, move items from **[Unreleased]** to a new version section:
-  - Use `YYYY-MM-DD` release date (no `XX` placeholders).
-- Keep entries **user-facing** (what changed + impact), not internal chatter.
-
-### Entry writing rules
-- Use **Added / Changed / Deprecated / Removed / Fixed / Security** only.
-- Reference components using real paths (e.g., `src/core/...`, `src/faas/...`).
-- If a feature is not production-ready, label it clearly as **Planned** or **Experimental**.
-
----
-
 # Motadata Changelog
 
 All notable changes to the Motadata Python AI SDK will be documented in this file.
@@ -88,7 +65,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Integration with RAG and Agents
 
 - **Cache Mechanism** (`src/core/cache_mechanism/`)
-  - Redis and in-memory caching
+  - Dragonfly and in-memory caching
   - Tenant-scoped caching
   - TTL-based expiration
   - Cache invalidation strategies
@@ -289,15 +266,3 @@ For detailed information about each component, see:
 - [FaaS Services Documentation](src/faas/README.md)
 - [Architecture Documentation](docs/architecture/SDK_ARCHITECTURE.md)
 
-
-
----
-
-## Release checklist (quick)
-- Update version in packaging metadata (as applicable)
-- Confirm CI + Sonar Quality Gate is green
-- Run: `python -m build` and install wheel in a clean environment
-- Tag release and publish artifacts
-- Post-release smoke test
-
-**End of file**

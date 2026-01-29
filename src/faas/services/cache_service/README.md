@@ -37,13 +37,13 @@ Cache Service is a FaaS implementation of the Cache Mechanism component. It prov
 
 ## Service Dependencies
 
-- **Redis**: For distributed caching backend (optional, falls back to in-memory)
+- **Dragonfly**: For distributed caching backend (optional, falls back to in-memory)
 
 ## Stateless Architecture
 
 The Cache Service is **stateless**:
 - Cache instances are created on-demand per request
-- Cache backend (Redis/memory) handles state persistence
+- Cache backend (Dragonfly/memory) handles state persistence
 - All cache operations are tenant-scoped
 
 ## Usage
@@ -55,7 +55,7 @@ from src.faas.services.cache_service import create_cache_service
 service = create_cache_service(
     service_name="cache-service",
     config_overrides={
-        "redis_url": "redis://localhost:6379/0",
+        "dragonfly_url": "dragonfly://localhost:6379/0",
     }
 )
 
@@ -100,8 +100,8 @@ response = await cache_client.get(
 ```bash
 SERVICE_NAME=cache-service
 SERVICE_PORT=8080
-REDIS_URL=redis://localhost:6379/0
-# If REDIS_URL is not set, uses in-memory cache
+DRAGONFLY_URL=dragonfly://localhost:6379/0
+# If DRAGONFLY_URL is not set, uses in-memory cache
 ENABLE_NATS=true
 ENABLE_OTEL=true
 ```
@@ -134,7 +134,7 @@ curl -X POST http://localhost:8080/api/v1/cache/invalidate \
 
 ## Features
 
-- **Multi-Backend Support**: Redis or in-memory caching
+- **Multi-Backend Support**: Dragonfly or in-memory caching
 - **Tenant Isolation**: All cache keys are tenant-scoped
 - **TTL Support**: Time-to-live for cached values
 - **Pattern Invalidation**: Invalidate multiple keys by pattern

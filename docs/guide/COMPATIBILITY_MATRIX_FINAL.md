@@ -45,7 +45,7 @@ It is intended for **platform teams, DevOps, QA, and engineering leadership**.
 |---|---|---|---|
 | Relational store | PostgreSQL 14+ | ✅ Supported | Required for persistence |
 | Vector store | pgvector | ✅ Supported | Required for vector operations |
-| Cache | Redis 6+ | ✅ Supported | Optional depending on configuration |
+| Cache | Dragonfly 6+ | ✅ Supported | Optional depending on configuration |
 | In-memory cache | Built-in | ✅ Supported | Dev/local use; not distributed |
 
 ---
@@ -97,7 +97,7 @@ It is intended for **platform teams, DevOps, QA, and engineering leadership**.
 For enterprise adoption:
 - Standardize production on **Linux + Python 3.8.x**
 - Run services using **Docker/Kubernetes**
-- Ensure Postgres + Redis are provisioned via platform tooling
+- Ensure Postgres + Dragonfly are provisioned via platform tooling
 - Expand CI matrix to validate 3.9–3.11 if required by org standards
 
 ---

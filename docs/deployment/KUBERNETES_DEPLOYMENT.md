@@ -9,7 +9,7 @@ This guide explains how to deploy FaaS services on Kubernetes.
 - Kubernetes cluster (1.24+)
 - kubectl configured
 - PostgreSQL database (can be deployed separately)
-- Redis (can be deployed separately)
+- Dragonfly (can be deployed separately)
 
 ## Service Deployment
 
@@ -54,10 +54,10 @@ spec:
           value: "http://cache-service:8081"
         - name: RAG_SERVICE_URL
           value: "http://rag-service:8082"
-        - name: REDIS_URL
+        - name: DRAGONFLY_URL
           valueFrom:
             secretKeyRef:
-              name: redis-credentials
+              name: dragonfly-credentials
               key: url
         resources:
           requests:
@@ -188,10 +188,10 @@ spec:
           value: "gateway-service"
         - name: SERVICE_PORT
           value: "8080"
-        - name: REDIS_URL
+        - name: DRAGONFLY_URL
           valueFrom:
             secretKeyRef:
-              name: redis-credentials
+              name: dragonfly-credentials
               key: url
         - name: OPENAI_API_KEY
           valueFrom:
@@ -282,10 +282,10 @@ stringData:
 apiVersion: v1
 kind: Secret
 metadata:
-  name: redis-credentials
+  name: dragonfly-credentials
 type: Opaque
 stringData:
-  url: redis://redis-service:6379
+  url: dragonfly://dragonfly-service:6379
 
 ---
 apiVersion: v1

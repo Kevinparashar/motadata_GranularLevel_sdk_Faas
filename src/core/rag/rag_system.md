@@ -480,7 +480,7 @@ Enable caching for repeated queries:
 rag = RAGSystem(
     db=db,
     gateway=gateway,
-    cache=CacheMechanism(CacheConfig(backend="redis"))
+    cache=CacheMechanism(CacheConfig(backend="dragonfly"))
 )
 
 # Bad: No caching (higher costs, slower)

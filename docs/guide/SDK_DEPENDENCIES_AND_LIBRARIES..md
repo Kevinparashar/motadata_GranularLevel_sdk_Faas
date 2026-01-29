@@ -42,7 +42,7 @@ This document provides a comprehensive list of all libraries used in the SDK, th
 
 | Library | Version | Purpose |
 |---------|---------|---------|
-| `redis` | >=5.0.0 | Redis client for distributed caching |
+| `dragonfly` | >=5.0.0 | Dragonfly client for distributed caching |
 | `cachetools` | >=5.3.0 | In-memory caching utilities |
 | `diskcache` | >=5.6.0 | Disk-based caching |
 
@@ -173,7 +173,7 @@ pip install litellm pydantic httpx
 pip install psycopg2-binary sqlalchemy
 
 # With caching
-pip install redis cachetools
+pip install dragonfly cachetools
 
 # With observability
 pip install opentelemetry-api opentelemetry-sdk structlog
@@ -194,7 +194,7 @@ pip install nats-py msgpack protobuf
 
 ### Data Storage
 - **psycopg2-binary**: PostgreSQL database connectivity
-- **redis**: Distributed caching layer (optional, in-memory fallback)
+- **dragonfly**: Distributed caching layer (optional, in-memory fallback)
 - **cachetools**: In-memory caching utilities
 
 ### Development
@@ -209,7 +209,7 @@ pip install nats-py msgpack protobuf
 - **prometheus-client**: Metrics collection
 
 ### Recent Enhancements
-- **Gateway Cache**: Automatic response caching using cachetools/redis
+- **Gateway Cache**: Automatic response caching using cachetools/dragonfly
 - **Memory Integration**: Agent Memory for conversation context (built-in)
 - **Unified Query**: Single endpoint for Agent/RAG orchestration (FastAPI)
 - **FaaS Architecture**: Services-based architecture with FastAPI, Starlette middleware, and integration placeholders
@@ -222,7 +222,7 @@ The SDK is designed to allow swapping of certain libraries:
 - **agno** ↔ **langchain**: Agent framework swapping
 
 ### Caching Backends
-- **redis** ↔ **memory** ↔ **database**: Cache backend swapping
+- **dragonfly** ↔ **memory** ↔ **database**: Cache backend swapping
 
 ### HTTP Clients
 - **httpx** ↔ **aiohttp** ↔ **requests**: HTTP client swapping

@@ -442,7 +442,7 @@ if rag_system.cache:
    ```
 
 4. **Check Cache Backend:**
-   - Verify Redis connection (if using Redis)
+   - Verify Dragonfly connection (if using Dragonfly)
    - Check memory cache size limits
    - Monitor cache performance
 

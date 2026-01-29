@@ -39,7 +39,7 @@ The Motadata AI SDK is a comprehensive, modular framework designed for integrati
 │                            ▼                                     │
 │  ┌──────────────────────────────────────────────────────────┐  │
 │  │         Infrastructure Layer                              │  │
-│  │  - PostgreSQL (with pgvector)  - Redis (Cache)           │  │
+│  │  - PostgreSQL (with pgvector)  - Dragonfly (Cache)           │  │
 │  │  - NATS (Messaging)            - OTEL (Observability)     │  │
 │  │  - CODEC (Serialization)                                 │  │
 │  └──────────────────────────────────────────────────────────┘  │
@@ -220,14 +220,14 @@ The Motadata AI SDK is a comprehensive, modular framework designed for integrati
 - Cache RAG query results
 - Cache embeddings
 - Manage cache invalidation
-- Support multiple backends (memory, Redis)
+- Support multiple backends (memory, Dragonfly)
 
 **Integration Points**:
 - Used by: Gateway, RAG System, ML Framework
-- Supports: Memory backend, Redis backend
+- Supports: Memory backend, Dragonfly backend
 
 **Key Features**:
-- Multi-backend support (in-memory LRU, Redis)
+- Multi-backend support (in-memory LRU, Dragonfly)
 - Pattern-based invalidation
 - Tenant isolation
 - TTL management
@@ -672,7 +672,7 @@ SaaS Backend (EC2/ECS/EKS/Lambda)
 
 Shared Infrastructure
     ├─> PostgreSQL (with pgvector)
-    ├─> Redis (for caching)
+    ├─> Dragonfly (for caching)
     ├─> NATS (for messaging)
     └─> OTEL Collector (for observability)
 ```
@@ -770,7 +770,7 @@ The SDK supports a **Function as a Service (FaaS)** architecture where each AI c
          ┌─────────────────┐
          │  State Storage  │
          │  - PostgreSQL   │
-         │  - Redis        │
+         │  - Dragonfly        │
          └─────────────────┘
 ```
 
@@ -834,7 +834,7 @@ Each AI component is available as an independent service:
 Services communicate via:
 - **Direct HTTP**: Synchronous service-to-service calls
 - **NATS Messaging**: Asynchronous event-driven communication
-- **Shared State**: PostgreSQL for persistent state, Redis for caching
+- **Shared State**: PostgreSQL for persistent state, Dragonfly for caching
 
 ### 8.5 FaaS vs Library Mode
 
@@ -918,7 +918,7 @@ For complete FaaS documentation, see:
 | **RAG** | Gateway, Database, Cache, Memory | Agents, SaaS Backend | Direct calls |
 | **ML Framework** | Database, Cache, Observability | SaaS Backend | Direct calls |
 | **Database** | Connection Pooling | RAG, ML, Agents | Direct calls |
-| **Cache** | Memory/Redis | Gateway, RAG, ML | Direct calls |
+| **Cache** | Memory/Dragonfly | Gateway, RAG, ML | Direct calls |
 | **Observability** | OTEL | ALL components | OTEL Collector |
 
 ---
@@ -939,7 +939,7 @@ For complete FaaS documentation, see:
 
 **Data**:
 - PostgreSQL + pgvector (vector database)
-- Redis (caching)
+- Dragonfly (caching)
 - SQLAlchemy (ORM)
 
 **Observability**:
@@ -960,7 +960,7 @@ For complete FaaS documentation, see:
 **Infrastructure**:
 - AWS Services (EC2/ECS/EKS/Lambda)
 - PostgreSQL (managed or self-hosted)
-- Redis (ElastiCache or self-hosted)
+- Dragonfly (ElastiCache or self-hosted)
 - NATS (self-hosted or cloud)
 
 ---
@@ -1209,7 +1209,7 @@ SDKError (base)
 
 **Infrastructure**:
 - PostgreSQL (data storage)
-- Redis (caching)
+- Dragonfly (caching)
 - NATS (messaging)
 - OTEL Collector (observability)
 
@@ -1253,7 +1253,7 @@ create_gateway(providers, default_model, api_keys)
 
 # Cache
 create_memory_cache(default_ttl, max_size)
-create_redis_cache(redis_url)
+create_dragonfly_cache(dragonfly_url)
 ```
 
 ---
