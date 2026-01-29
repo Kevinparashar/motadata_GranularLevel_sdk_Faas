@@ -1,4 +1,4 @@
-# SDK Quick Reference Guide
+# Motadata SDK Quick Reference Guide
 
 **Fast lookup for common tasks and APIs**
 

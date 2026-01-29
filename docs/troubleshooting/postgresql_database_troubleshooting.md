@@ -1,4 +1,4 @@
-# PostgreSQL Database Troubleshooting Guide
+# Motadata PostgreSQL Database Troubleshooting Guide
 
 This guide helps diagnose and resolve common issues encountered when using the PostgreSQL Database component.
 

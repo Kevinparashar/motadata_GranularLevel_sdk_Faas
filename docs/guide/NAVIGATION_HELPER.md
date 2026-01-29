@@ -1,4 +1,4 @@
-# Documentation Navigation Helper
+# Motadata Documentation Navigation Helper
 
 **Quick navigation aids for finding information fast**
 

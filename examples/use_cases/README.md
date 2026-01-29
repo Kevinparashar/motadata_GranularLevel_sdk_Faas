@@ -1,4 +1,4 @@
-# Use Cases Index
+# Motadata Use Cases Index
 
 This directory contains real-world use case implementations built using the SDK.
 

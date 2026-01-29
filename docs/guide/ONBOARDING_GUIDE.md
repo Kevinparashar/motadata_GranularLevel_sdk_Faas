@@ -1,4 +1,4 @@
-# SDK Onboarding Guide
+# Motadata SDK Onboarding Guide
 
 **Welcome to the Motadata Python AI SDK!** This guide will help you understand the SDK architecture, components, and how everything works together.
 

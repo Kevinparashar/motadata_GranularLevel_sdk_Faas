@@ -1,4 +1,4 @@
-# Prompt-Based Generator
+# Motadata Prompt-Based Generator
 
 ## Overview
 

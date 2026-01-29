@@ -1,4 +1,4 @@
-# RAG System Functions Documentation
+# Motadata RAG System Functions Documentation
 
 ## Overview
 

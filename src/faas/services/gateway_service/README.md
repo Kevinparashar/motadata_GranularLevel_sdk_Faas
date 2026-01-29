@@ -1,4 +1,4 @@
-# Gateway Service
+# Motadata Gateway Service
 
 ## Overview
 

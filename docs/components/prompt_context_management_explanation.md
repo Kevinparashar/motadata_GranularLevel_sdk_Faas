@@ -1,4 +1,4 @@
-# Prompt Context Management - Comprehensive Component Explanation
+# Motadata Prompt Context Management - Comprehensive Component Explanation
 
 ## Overview
 

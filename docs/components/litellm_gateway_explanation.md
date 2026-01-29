@@ -1,4 +1,4 @@
-# LiteLLM Gateway - Comprehensive Component Explanation
+# Motadata LiteLLM Gateway - Comprehensive Component Explanation
 
 ## Overview
 

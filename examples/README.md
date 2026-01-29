@@ -1,4 +1,4 @@
-# SDK Examples
+# Motadata SDK Examples
 
 This directory contains working code examples for all SDK components, organized by component and complexity level.
 

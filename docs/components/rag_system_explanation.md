@@ -1,4 +1,4 @@
-# RAG System - Comprehensive Component Explanation
+# Motadata RAG System - Comprehensive Component Explanation
 
 ## Overview
 

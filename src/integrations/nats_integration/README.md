@@ -1,4 +1,4 @@
-# NATS Integration
+# Motadata NATS Integration
 
 ## Overview
 

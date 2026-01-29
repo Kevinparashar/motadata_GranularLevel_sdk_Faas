@@ -1,4 +1,4 @@
-# AI Architecture Design Document
+# Motadata AI Architecture Design Document
 ## Motadata AI SDK - Complete Architecture Specification
 
 **Version:** 1.0

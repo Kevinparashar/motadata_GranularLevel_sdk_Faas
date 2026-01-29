@@ -1,4 +1,4 @@
-# CODEC Integration - Comprehensive Component Explanation
+# Motadata CODEC Integration - Comprehensive Component Explanation
 
 ## Overview
 

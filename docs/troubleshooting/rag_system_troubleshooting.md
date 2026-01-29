@@ -1,4 +1,4 @@
-# RAG System Troubleshooting Guide
+# Motadata RAG System Troubleshooting Guide
 
 This guide helps diagnose and resolve common issues encountered when using the RAG System.
 

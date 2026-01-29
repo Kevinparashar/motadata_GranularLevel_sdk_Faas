@@ -1,4 +1,4 @@
-# Prompt Generator Troubleshooting Guide
+# Motadata Prompt Generator Troubleshooting Guide
 
 ## Common Issues and Solutions
 
