@@ -1,4 +1,4 @@
-# Model Serving Troubleshooting Guide
+# Motadata Model Serving Troubleshooting Guide
 
 This guide helps diagnose and resolve common issues encountered when using Model Serving.
 

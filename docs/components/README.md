@@ -1,4 +1,4 @@
-# Component Explanation Documentation
+# Motadata Component Explanation Documentation
 
 This folder contains comprehensive documentation for each component of the Motadata Python AI SDK. Each documentation file provides detailed explanations of component functionality, code examples, workflows, and customization guidelines.
 

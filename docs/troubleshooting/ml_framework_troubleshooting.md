@@ -1,4 +1,4 @@
-# ML Framework Troubleshooting Guide
+# Motadata ML Framework Troubleshooting Guide
 
 This guide helps diagnose and resolve common issues encountered when using the ML Framework.
 

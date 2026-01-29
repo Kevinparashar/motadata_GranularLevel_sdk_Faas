@@ -1,4 +1,4 @@
-# SDK Documentation Index & Search Guide
+# Motadata SDK Documentation Index & Search Guide
 
 **Quick Navigation:** Find what you need fast!
 
@@ -255,7 +255,7 @@ print_config_options('agent')  # See all agent config options
 ### Related Documentation
 - **[Onboarding Guide](../ONBOARDING_GUIDE.md)** - **START HERE** - Complete guide for new team members
 - **[Main README](../README.md)** - Project overview and quick start
-- **[Developer Guide](../../README_DEVELOPER.md)** - Development guidelines
+- **[Developer Guide](../../PYTHON_SDK_DEVELOPMENT_ENVIRONMENT_SETUP_GUIDE.md)** - Development guidelines
 - **[Professional Evaluation](../PROFESSIONAL_SDK_EVALUATION.md)** - SDK quality assessment
 
 ### External Resources

@@ -1,4 +1,4 @@
-# OTEL Integration - Comprehensive Component Explanation
+# Motadata OTEL Integration - Comprehensive Component Explanation
 
 ## Overview
 

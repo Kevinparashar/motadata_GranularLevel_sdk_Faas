@@ -1,4 +1,4 @@
-# Developer Integration Guide
+# Motadata Developer Integration Guide
 
 > **For SDK Contributors and Maintainers**  
 > This guide combines development guidelines, integration patterns, and practical examples to help you understand how to develop new components and how existing components integrate and work together.

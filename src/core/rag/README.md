@@ -1,4 +1,4 @@
-# RAG System
+# Motadata RAG System
 
 ## When to Use This Component
 

@@ -1,4 +1,4 @@
-# RAG System Class Documentation
+# Motadata RAG System Class Documentation
 
 ## Overview
 

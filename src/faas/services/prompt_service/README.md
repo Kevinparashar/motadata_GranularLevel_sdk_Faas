@@ -1,4 +1,4 @@
-# Prompt Service
+# Motadata Prompt Service
 
 ## Overview
 

@@ -1,4 +1,4 @@
-# Getting Started with RAG System
+# Motadata Getting Started with RAG System
 
 ## Overview
 

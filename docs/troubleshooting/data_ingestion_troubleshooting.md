@@ -1,4 +1,4 @@
-# Data Ingestion Service Troubleshooting
+# Motadata Data Ingestion Service Troubleshooting
 
 ## Common Issues and Solutions
 

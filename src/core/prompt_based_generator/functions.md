@@ -1,4 +1,4 @@
-# Prompt-Based Generator Functions Documentation
+# Motadata Prompt-Based Generator Functions Documentation
 
 ## Overview
 

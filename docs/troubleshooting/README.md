@@ -1,4 +1,4 @@
-# Troubleshooting Guides
+# Motadata Troubleshooting Guides
 
 This directory contains comprehensive troubleshooting guides for all components of the Motadata Python AI SDK. Each guide provides detailed solutions for common issues, diagnostic steps, and best practices.
 

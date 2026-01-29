@@ -1,4 +1,4 @@
-# LiteLLM Gateway
+# Motadata LiteLLM Gateway
 
 ## When to Use This Component
 

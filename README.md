@@ -959,7 +959,7 @@ See `src/tests/unit_tests/README.md` and `src/tests/integration_tests/README.md`
 - **Tests**: See `src/tests/` for test suites and validation examples
 - **Workflows**: See `docs/workflows.md` for detailed workflow diagrams
 - **Libraries**: See `docs/libraries.md` for complete library list
-- **Developer Guide**: See `README_DEVELOPER.md` for development guidelines
+- **Developer Guide**: See `PYTHON_SDK_DEVELOPMENT_ENVIRONMENT_SETUP_GUIDE.md` for development guidelines
 - **Developer Integration Guide**: See `docs/guide/DEVELOPER_INTEGRATION_GUIDE.md` for component development and integration patterns
 - **Ground Truth Analysis**: See `GROUND_TRUTH_ANALYSIS.md` for SDK as reference implementation guide
 - **OpenTelemetry Guide**: See `OTEL_IMPLEMENTATION_GUIDE.md` for comprehensive OTEL integration and observability

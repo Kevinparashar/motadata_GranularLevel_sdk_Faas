@@ -1,4 +1,4 @@
-# MLOps Pipeline - Comprehensive Component Explanation
+# Motadata MLOps Pipeline - Comprehensive Component Explanation
 
 ## Overview
 

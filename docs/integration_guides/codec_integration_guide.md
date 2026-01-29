@@ -1,4 +1,4 @@
-# CODEC Integration Guide
+# Motadata CODEC Integration Guide
 
 ## Overview
 
