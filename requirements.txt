@@ -68,7 +68,8 @@ python-docx==1.2.0
 python-dotenv==1.2.1
 pytokens==0.3.0
 PyYAML==6.0.3
-redis==7.1.0
+dragonflydb==1.0.0
+redis==7.1.0  # Required for Dragonfly (Dragonfly is Redis-compatible)
 referencing==0.37.0
 regex==2025.11.3
 requests==2.32.5

@@ -2,10 +2,10 @@
 
 ## Overview
 
-The `cache.py` file contains the core `CacheMechanism` class implementation, which provides a flexible caching system for improving performance and reducing costs in AI operations. The cache supports multiple backends (in-memory, Redis), tenant-scoped caching, TTL-based expiration, and pattern-based invalidation.
+The `cache.py` file contains the core `CacheMechanism` class implementation, which provides a flexible caching system for improving performance and reducing costs in AI operations. The cache supports multiple backends (in-memory, Dragonfly), tenant-scoped caching, TTL-based expiration, and pattern-based invalidation.
 
 **Primary Functionality:**
-- Multi-backend caching (in-memory LRU, Redis)
+- Multi-backend caching (in-memory LRU, Dragonfly)
 - Tenant-scoped cache isolation
 - TTL-based expiration
 - Pattern-based cache invalidation
@@ -22,8 +22,8 @@ The `cache.py` file contains the core `CacheMechanism` class implementation, whi
 Configuration model for the cache mechanism:
 
 **Backend Configuration:**
-- `backend`: Cache backend ("memory" or "redis")
-- `redis_url`: Redis connection URL (if using Redis)
+- `backend`: Cache backend ("memory" or "dragonfly")
+- `dragonfly_url`: Dragonfly connection URL (if using Dragonfly)
 - `max_size`: Maximum cache size (for in-memory)
 - `ttl`: Default time-to-live in seconds
 
@@ -143,10 +143,10 @@ config = CacheConfig(
 )
 cache = CacheMechanism(config)
 
-# Redis cache
+# Dragonfly cache
 config = CacheConfig(
-    backend="redis",
-    redis_url="redis://localhost:6379",
+    backend="dragonfly",
+    dragonfly_url="dragonfly://localhost:6379",
     ttl=3600
 )
 cache = CacheMechanism(config)
@@ -205,9 +205,9 @@ print(f"Hit Rate: {stats['hits'] / (stats['hits'] + stats['misses']) * 100:.2f}%
 
 1. **Python 3.10+**: Required for type hints
 2. **Dependencies**: Install via `pip install -r requirements.txt`
-   - `redis`: For Redis backend (optional)
+   - `dragonfly`: For Dragonfly backend (optional)
    - `pydantic`: For data validation
-3. **Redis** (optional): For distributed caching
+3. **Dragonfly** (optional): For distributed caching
 
 ## Connection to Other Components
 
@@ -264,11 +264,11 @@ cache.set("key", "value", ttl=86400)  # Too long (may serve stale data)
 cache.set("key", "value", ttl=1)      # Too short (ineffective)
 ```
 
-### 3. Use Redis for Distributed Systems
-Use Redis backend for multi-instance deployments:
+### 3. Use Dragonfly for Distributed Systems
+Use Dragonfly backend for multi-instance deployments:
 ```python
-# Good: Redis for distributed
-config = CacheConfig(backend="redis", redis_url="redis://...")
+# Good: Dragonfly for distributed
+config = CacheConfig(backend="dragonfly", dragonfly_url="dragonfly://...")
 
 # Bad: In-memory for distributed (not shared)
 config = CacheConfig(backend="memory")
@@ -314,13 +314,13 @@ cache.warm_cache(frequent_data, tenant_id="tenant_123")
 
 ### Related Components
 - **[Cache Enhancements](cache_enhancements.py)** - Advanced features
-- **[Redis Integration](https://redis.io/docs/)** - Redis documentation
+- **[Dragonfly Integration](https://dragonfly.io/docs/)** - Dragonfly documentation
 
 ### External Resources
 - **[Caching Strategies](https://aws.amazon.com/caching/)** - Caching best practices
-- **[Redis Documentation](https://redis.io/docs/)** - Redis reference
+- **[Dragonfly Documentation](https://dragonfly.io/docs/)** - Dragonfly reference
 
 ### Examples
 - **[Basic Cache Example](../../../../examples/basic_usage/04_cache_basic.py)** - Simple usage
-- **[Cache with Redis Example](../../../../examples/)** - Redis backend
+- **[Cache with Dragonfly Example](../../../../examples/)** - Dragonfly backend
 

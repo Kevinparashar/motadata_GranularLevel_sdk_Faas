@@ -12,59 +12,77 @@ It is intended for:
 - Core maintainers
 - CI/debugging engineers
 
-This guide is **strictly about environment setup and local execution**.  
+This guide focuses on **getting a developer productive from scratch**:
+environment setup, local execution, and validation.
+
 Architecture, component design, and quality gates are covered in separate documents.
 
 ---
 
-## 1. Supported & Mandatory Python Version
+## 1. Prerequisites (Mandatory)
 
-### 1.1 Python Version (Pinned)
+### 1.1 Operating System
+- Linux (Ubuntu 20.04+ recommended)
+- macOS (development only)
+- Windows (development only, WSL2 recommended)
+
+### 1.2 Python Version (Pinned)
 
 The Motadata Python AI SDK **must** be developed using:
 
 ```
-Python 3.8.x
+Python 3.11.x
 ```
 
-**Why**
-- Matches current `mypy` and tooling configuration
-- Ensures compatibility with production environments
+**Why 3.11?** While the SDK supports Python 3.8+, development uses 3.11 for:
+- Better type checking support
+- Improved async performance
+- Modern language features
 
-### 1.2 Verify Python Version
-
+**Verify Python version:**
 ```bash
 python3 --version
-```
-Expected output:
-```
-Python 3.8.x
+# Expected output: Python 3.11.x
 ```
 
-If multiple Python versions are installed, explicitly use:
+**If Python 3.11 is not installed:**
 ```bash
-python3.8 --version
+# Ubuntu/Debian
+sudo apt update
+sudo apt install python3.11 python3.11-venv python3.11-dev
+
+# macOS (using Homebrew)
+brew install python@3.11
+
+# Verify installation
+python3.11 --version
 ```
+
+---
+
+### 1.3 Required Tools
+
+| Tool | Purpose |
+|---|---|
+git | Source control |
+python3.8 | Runtime |
+pip | Dependency management |
+make | Standardized commands |
+java 11+ | Sonar (optional, local) |
 
 ---
 
 ## 2. Virtual Environment Strategy (Standardized)
 
-### 2.1 Chosen Tool: `venv` (Standard)
+### Chosen Tool: `venv`
 
 The SDK **standardizes on Python built‑in `venv`**.
 
-Reasons:
-- Zero external dependency
-- CI‑friendly
-- Matches current SDK tooling
-- Simplest for contributors
-
-> ❌ Poetry and pip‑tools are intentionally **not used** for this SDK.
+> ❌ Poetry and pip‑tools are intentionally **not used**.
 
 ---
 
-## 3. Repository Clone & Initial Setup
+## 3. Repository Clone & Branch Strategy
 
 ### 3.1 Clone the Repository
 
@@ -73,222 +91,301 @@ git clone <REPO_URL>
 cd motadata-python-ai-sdk
 ```
 
----
+### 3.2 Branching Strategy (Mandatory)
 
-### 3.2 Create Virtual Environment
+- ❌ No direct commits to `main`
+- ✅ All work via feature branches
 
+**Branch naming**
+
+| Purpose | Pattern |
+|---|---|
+Feature | `feature/<desc>` |
+Bug fix | `fix/<desc>` |
+Docs | `docs/<desc>` |
+Chore | `chore/<desc>` |
+
+Example:
 ```bash
-python3.8 -m venv .venv
+git checkout -b feature/add-tenant-cache
 ```
 
-### 3.3 Activate Virtual Environment
+All branches are merged via Pull Requests only.
 
-**Linux / macOS**
+---
+
+## 4. Create & Activate Virtual Environment
+
+**Create virtual environment:**
 ```bash
+python3.11 -m venv .venv
+```
+
+**Activate virtual environment:**
+```bash
+# Linux/macOS
 source .venv/bin/activate
-```
 
-**Windows (PowerShell)**
-```powershell
+# Windows (PowerShell)
 .venv\Scripts\Activate.ps1
+
+# Windows (CMD)
+.venv\Scripts\activate.bat
 ```
 
-Verify:
+**Verify activation:**
 ```bash
-which python
-python --version
+which python  # Should show: /path/to/.venv/bin/python
+python --version  # Should show: Python 3.11.x
 ```
 
 ---
 
-## 4. Dependency Installation
+## 5. Dependency Installation
 
-### 4.1 Upgrade pip
-
+**Upgrade pip:**
 ```bash
-pip install --upgrade pip
+pip install --upgrade pip setuptools wheel
 ```
 
-### 4.2 Install SDK in Editable Mode
-
+**Install SDK in development mode:**
 ```bash
 pip install -e ".[dev]"
 ```
 
-This installs:
-- SDK source in editable mode
-- All development dependencies:
-  - pytest
-  - pytest-cov
-  - black
-  - isort
-  - mypy
+**Verify installation:**
+```bash
+# Check installed packages
+pip list | grep motadata
 
----
-
-## 5. Repository Structure (What You’ll Work With)
-
+# Verify imports work
+python -c "from src.core.litellm_gateway import create_gateway; print('✓ Gateway import successful')"
+python -c "from src.core.rag import create_rag_system; print('✓ RAG import successful')"
+python -c "from src.core.agno_agent_framework import create_agent; print('✓ Agent import successful')"
 ```
-motadata-python-ai-sdk/
-├── src/
-│   ├── core/
-│   ├── faas/
-│   ├── integrations/
-│   └── tests/
-│       ├── unit_tests/
-│       ├── integration_tests/
-│       └── benchmarks/
-├── pyproject.toml
-├── Makefile
-└── README.md
+
+**Expected output:**
+```
+✓ Gateway import successful
+✓ RAG import successful
+✓ Agent import successful
 ```
 
 ---
 
-## 6. Local Development Commands (Mandatory)
+## 6. Repository Structure (Orientation)
 
-All developers **must use Makefile targets** for consistency.
+```
+src/
+├── core/
+├── faas/
+├── integrations/
+└── tests/
+```
 
-### 6.1 Code Formatting
+---
 
+## 7. Running the SDK Locally
+
+**Format code:**
 ```bash
 make format
 ```
 
-Checks formatting only:
+**Check code formatting (without changes):**
 ```bash
 make format-check
 ```
 
----
-
-### 6.2 Linting (Current SDK State)
-
-> ⚠️ Note: Linting is not yet enforced in the SDK.
-> This is expected to be added as part of Quality Gate enforcement.
-
----
-
-### 6.3 Type Checking
-
+**Type checking:**
 ```bash
 make type-check
 ```
 
-Runs:
-- `mypy` against `src/`
+**Run all tests:**
+```bash
+make test
+```
 
----
+**Run tests with coverage:**
+```bash
+make test-cov
+# Coverage report available at: htmlcov/index.html
+```
 
-### 6.4 Running Tests
-
-#### Unit Tests
+**Run unit tests only:**
 ```bash
 make test-unit
 ```
 
-#### Integration Tests
+**Run integration tests only:**
 ```bash
 make test-integration
 ```
 
-#### All Tests
+**Run all checks (format, type, lint):**
 ```bash
-make test
+make check
+```
+
+**Run full CI pipeline locally:**
+```bash
+make ci
 ```
 
 ---
 
-### 6.5 Coverage Report
+## 8. Running Sonar Locally (Optional)
 
+**Prerequisites:**
+- Java 11+ installed
+- SonarQube server running (or SonarCloud account)
+- SonarScanner installed
+
+**Install SonarScanner:**
 ```bash
-make test-cov
-```
+# Linux/macOS
+wget https://binaries.sonarsource.com/Distribution/sonar-scanner-cli/sonar-scanner-cli-5.0.1.3006-linux.zip
+unzip sonar-scanner-cli-5.0.1.3006-linux.zip
+export PATH=$PATH:$(pwd)/sonar-scanner-5.0.1.3006-linux/bin
 
-Generates:
-- Terminal coverage output
-- HTML report
-
-> Coverage threshold enforcement is handled via CI (see Quality Gate document).
-
----
-
-## 7. Running Sonar Locally (Optional)
-
-> Sonar analysis is **primarily enforced in CI**.
-> Local execution is optional and intended for maintainers.
-
-### 7.1 Prerequisites
-
-- Java 11+
-- SonarQube server access OR SonarCloud account
-- `sonar-scanner` installed
-
-### 7.2 Install Sonar Scanner
-
-**Linux/macOS**
-```bash
+# macOS (using Homebrew)
 brew install sonar-scanner
-# OR
-sudo apt install sonar-scanner
 ```
 
-### 7.3 Generate Coverage XML
-
+**Generate coverage report:**
 ```bash
-pytest --cov=src --cov-report=xml
+pytest --cov=src --cov-report=xml --cov-report=term
 ```
 
-### 7.4 Run Sonar Scanner
-
+**Run SonarScanner:**
 ```bash
-sonar-scanner   -Dsonar.projectKey=motadata_python_ai_sdk   -Dsonar.sources=src   -Dsonar.tests=src/tests   -Dsonar.python.coverage.reportPaths=coverage.xml
+sonar-scanner \
+  -Dsonar.projectKey=motadata_python_ai_sdk \
+  -Dsonar.sources=src \
+  -Dsonar.tests=src/tests \
+  -Dsonar.python.coverage.reportPaths=coverage.xml \
+  -Dsonar.python.version=3.11 \
+  -Dsonar.host.url=http://localhost:9000 \
+  -Dsonar.login=YOUR_SONAR_TOKEN
 ```
 
-> CI will fail the build if the Sonar Quality Gate fails.
+**For SonarCloud:**
+```bash
+sonar-scanner \
+  -Dsonar.projectKey=motadata_python_ai_sdk \
+  -Dsonar.organization=YOUR_ORG \
+  -Dsonar.sources=src \
+  -Dsonar.tests=src/tests \
+  -Dsonar.python.coverage.reportPaths=coverage.xml \
+  -Dsonar.python.version=3.11 \
+  -Dsonar.login=YOUR_SONAR_TOKEN
+```
+
+**Note:** Replace `YOUR_SONAR_TOKEN` with your actual SonarQube/SonarCloud token.
 
 ---
 
-## 8. Common Setup Validation Checklist
+## 9. Validation Checklist
 
-Run these commands after setup:
+**Run this complete validation checklist:**
 
 ```bash
+# 1. Verify Python version
 python --version
+# Expected: Python 3.11.x
+
+# 2. Verify virtual environment is active
+which python
+# Should show path to .venv/bin/python
+
+# 3. Check code formatting
 make format-check
+
+# 4. Type checking
 make type-check
-make test-unit
+
+# 5. Run all tests
 make test
+
+# 6. Run tests with coverage
 make test-cov
+
+# 7. Verify imports work
+python -c "from src.core import *; print('✓ All core imports successful')"
+
+# 8. Verify FaaS services can be imported
+python -c "from src.faas.services import *; print('✓ All FaaS imports successful')"
 ```
 
-If all pass, your environment is correctly set up.
+**Expected result:** All commands should complete without errors.
 
 ---
 
-## 9. Troubleshooting
+## 10. Quick Start Example
 
-### Virtual Environment Not Activating
-- Ensure you are in repo root
-- Delete `.venv` and recreate
+**Test the SDK with a simple example:**
 
-### Dependency Issues
 ```bash
-pip install --upgrade pip setuptools wheel
-pip install -e ".[dev]"
+# Set your API key (if needed)
+export OPENAI_API_KEY='your-api-key-here'
+
+# Run hello world example
+python examples/hello_world.py
 ```
 
-### Test Failures
-- Run unit tests first
-- Verify environment variables for integration tests
+**Expected output:**
+```
+🚀 Motadata AI SDK - Hello World Example
+✅ API key found
+📡 Creating gateway connection...
+✅ Gateway created successfully
+🤖 Sending request to AI...
+============================================================
+AI Response: Hello! I'm an AI assistant ready to help you.
+============================================================
+✅ Success! SDK is working correctly.
+```
 
 ---
 
-## 10. Final Notes
+## 11. Troubleshooting
 
-- This document is **mandatory reading** for contributors.
-- Do not bypass Makefile commands.
-- CI mirrors these exact steps.
+### Issue: `python3.11: command not found`
+**Solution:** Install Python 3.11 (see section 1.2)
+
+### Issue: `pip: command not found`
+**Solution:** 
+```bash
+python3.11 -m ensurepip --upgrade
+```
+
+### Issue: Import errors after installation
+**Solution:**
+```bash
+# Reinstall in development mode
+pip install -e ".[dev]" --force-reinstall
+```
+
+### Issue: Tests failing
+**Solution:**
+```bash
+# Check test dependencies
+pip install -e ".[dev]"
+
+# Run tests with verbose output
+pytest -v src/tests
+```
+
+### Issue: Type checking errors
+**Solution:**
+```bash
+# Update mypy
+pip install --upgrade mypy
+
+# Run type check with more details
+mypy src --show-error-codes
+```
 
 ---
 

@@ -1,7 +1,7 @@
 """
 Cache Mechanism
 
-Provides a simple pluggable cache layer with in-memory and Redis backends,
+Provides a simple pluggable cache layer with in-memory and Dragonfly backends,
 supporting TTL, basic LRU eviction, and pattern-based invalidation.
 """
 
@@ -13,33 +13,33 @@ from dataclasses import dataclass, field
 from typing import Any, Optional
 
 try:
-    import redis  # type: ignore
+    import redis  # type: ignore - Dragonfly is Redis-compatible
 except Exception:  # pragma: no cover - optional dependency
     redis = None
 
 
 @dataclass
 class CacheConfig:
-    backend: str = "memory"  # "memory" or "redis"
+    backend: str = "memory"  # "memory" or "dragonfly"
     default_ttl: int = 300
     max_size: int = 1024  # only applies to memory backend
-    redis_url: Optional[str] = None
+    dragonfly_url: Optional[str] = None
     namespace: str = "sdk_cache"
 
 
 class CacheMechanism:
     """
-    Cache wrapper that supports in-memory and Redis backends with TTL support.
+    Cache wrapper that supports in-memory and Dragonfly backends with TTL support.
     """
 
     def __init__(self, config: Optional[CacheConfig] = None) -> None:
         self.config = config or CacheConfig()
         self.backend = self.config.backend
 
-        if self.backend == "redis":
+        if self.backend == "dragonfly":
             if redis is None:
-                raise ImportError("redis package is required for Redis backend")
-            self._client = redis.Redis.from_url(self.config.redis_url or "redis://localhost:6379/0")
+                raise ImportError("redis package is required for Dragonfly backend (Dragonfly is Redis-compatible)")
+            self._client = redis.Redis.from_url(self.config.dragonfly_url or "dragonfly://localhost:6379/0")
         else:
             # Simple in-memory LRU with TTL
             self._store: OrderedDict[str, tuple[Any, float]] = OrderedDict()
@@ -63,8 +63,8 @@ class CacheMechanism:
         expires_at = time.time() + ttl
         namespaced = self._namespaced_key(key, tenant_id=tenant_id)
 
-        if self.backend == "redis":
-            # Redis backend: Distributed cache, survives process restarts
+        if self.backend == "dragonfly":
+            # Dragonfly backend: Distributed cache, survives process restarts
             self._client.set(namespaced, value, ex=ttl)
             return
 
@@ -84,7 +84,7 @@ class CacheMechanism:
         """
         namespaced = self._namespaced_key(key, tenant_id=tenant_id)
 
-        if self.backend == "redis":
+        if self.backend == "dragonfly":
             value = self._client.get(namespaced)
             return value
 
@@ -104,7 +104,7 @@ class CacheMechanism:
 
     def delete(self, key: str, tenant_id: Optional[str] = None) -> None:
         namespaced = self._namespaced_key(key, tenant_id=tenant_id)
-        if self.backend == "redis":
+        if self.backend == "dragonfly":
             self._client.delete(namespaced)
         else:
             self._store.pop(namespaced, None)
@@ -119,7 +119,7 @@ class CacheMechanism:
         """
         if tenant_id:
             pattern = f"{tenant_id}:{pattern}"
-        if self.backend == "redis":
+        if self.backend == "dragonfly":
             keys = self._client.keys(f"{self.config.namespace}:{pattern}*")
             if keys:
                 self._client.delete(*keys)

@@ -2,7 +2,7 @@
 
 ## Overview
 
-The Cache Mechanism provides a pluggable cache layer with in-memory and Redis backends, supporting TTL, LRU eviction, pattern-based invalidation, and advanced features like warming, monitoring, sharding, validation, and recovery.
+The Cache Mechanism provides a pluggable cache layer with in-memory and Dragonfly backends, supporting TTL, LRU eviction, pattern-based invalidation, and advanced features like warming, monitoring, sharding, validation, and recovery.
 
 ## Table of Contents
 
@@ -83,13 +83,13 @@ In-memory cache with LRU eviction:
 - **TTL Support**: Automatic expiration
 - **Size Limits**: Configurable max_size
 
-### Redis Backend
+### Dragonfly Backend
 
-Distributed cache using Redis:
+Distributed cache using Dragonfly:
 - **Distributed**: Shared across multiple instances
 - **Persistence**: Optional persistence to disk
 - **Scalability**: Handles large datasets
-- **TTL Support**: Native Redis TTL
+- **TTL Support**: Native Dragonfly TTL
 
 ### Code Examples
 
@@ -105,13 +105,13 @@ cache = create_memory_cache(
 )
 ```
 
-#### Redis Cache
+#### Dragonfly Cache
 
 ```python
-from src.core.cache_mechanism import create_redis_cache
+from src.core.cache_mechanism import create_dragonfly_cache
 
-cache = create_redis_cache(
-    redis_url="redis://localhost:6379/0",
+cache = create_dragonfly_cache(
+    dragonfly_url="dragonfly://localhost:6379/0",
     default_ttl=600,
     namespace="my_cache"
 )
@@ -197,7 +197,7 @@ The cache mechanism handles errors gracefully:
 from src.core.cache_mechanism import (
     create_cache,
     create_memory_cache,
-    create_redis_cache
+    create_dragonfly_cache
 )
 
 # Create cache
@@ -210,8 +210,8 @@ cache = create_cache(
 # Create memory cache
 cache = create_memory_cache(default_ttl=600)
 
-# Create Redis cache
-cache = create_redis_cache(redis_url="redis://localhost:6379/0")
+# Create Dragonfly cache
+cache = create_dragonfly_cache(dragonfly_url="dragonfly://localhost:6379/0")
 ```
 
 ### Convenience Functions
@@ -280,7 +280,7 @@ The Cache Mechanism is positioned in the **Infrastructure Layer** and serves all
 ┌─────────┼──────────────────┼─────────────────────────────────────┐
 │         │                  │                                      │
 │  ┌──────▼──────┐  ┌────────▼────────┐  ┌──────────────┐         │
-│  │   Memory    │  │      Redis      │  │  Monitoring  │         │
+│  │   Memory    │  │      Dragonfly      │  │  Monitoring  │         │
 │  │   Backend   │  │     Backend     │  │   Tools      │         │
 │  │             │  │                 │  │              │         │
 │  │ - LRU       │  │ - Distributed   │  │ - Metrics     │         │
@@ -335,7 +335,7 @@ The following diagram shows the complete flow of setting a value in cache:
            │                 │
            ▼                 ▼
     ┌──────────┐    ┌──────────┐
-    │  Memory  │    │  Redis   │
+    │  Memory  │    │  Dragonfly   │
     │  Backend │    │  Backend  │
     └────┬─────┘    └────┬─────┘
          │              │
@@ -360,18 +360,18 @@ The following diagram shows the complete flow of setting a value in cache:
            │
            ▼
     ┌─────────────────────────────────────────┐
-    │  Redis Backend Processing               │
+    │  Dragonfly Backend Processing               │
     │  ┌───────────────────────────────────┐  │
     │  │ 1. Serialize value (if needed):    │  │
     │  │    serialized = json.dumps(value)  │  │
-    │  │ 2. Set in Redis with TTL:         │  │
-    │  │    redis_client.set(               │  │
+    │  │ 2. Set in Dragonfly with TTL:         │  │
+    │  │    dragonfly_client.set(               │  │
     │  │        namespaced,                 │  │
     │  │        serialized,                 │  │
     │  │        ex=ttl  # TTL in seconds   │  │
     │  │    )                               │  │
     │  │                                   │  │
-    │  │ Redis Operations:                  │  │
+    │  │ Dragonfly Operations:                  │  │
     │  │ - SET key value EX ttl            │  │
     │  │ - Automatic expiration             │  │
     │  │ - Distributed storage              │  │
@@ -413,7 +413,7 @@ The following diagram shows the complete flow of getting a value from cache:
            │                 │
            ▼                 ▼
     ┌──────────┐    ┌──────────┐
-    │  Memory  │    │  Redis   │
+    │  Memory  │    │  Dragonfly   │
     │  Backend │    │  Backend  │
     └────┬─────┘    └────┬─────┘
          │              │
@@ -443,10 +443,10 @@ The following diagram shows the complete flow of getting a value from cache:
            │
            ▼
     ┌─────────────────────────────────────────┐
-    │  Redis Backend Processing               │
+    │  Dragonfly Backend Processing               │
     │  ┌───────────────────────────────────┐  │
-    │  │ 1. Get from Redis:                │  │
-    │  │    value = redis_client.get(namespaced)│
+    │  │ 1. Get from Dragonfly:                │  │
+    │  │    value = dragonfly_client.get(namespaced)│
     │  │                                   │  │
     │  │ 2. Check if exists:               │  │
     │  │    if value is None:              │  │
@@ -457,7 +457,7 @@ The following diagram shows the complete flow of getting a value from cache:
     │  │                                   │  │
     │  │ 4. Return value                   │  │
     │  │                                   │  │
-    │  │ Note: Redis handles TTL automatically│
+    │  │ Note: Dragonfly handles TTL automatically│
     │  └───────────────────────────────────┘  │
     └─────────────────────────────────────────┘
            │
@@ -533,7 +533,7 @@ The following diagram shows the complete flow of getting a value from cache:
         │                  │                  │
         ▼                  ▼                  ▼
 ┌───────────────┐  ┌───────────────┐  ┌───────────────┐
-│   Memory      │  │     Redis     │  │  Enhancements │
+│   Memory      │  │     Dragonfly     │  │  Enhancements │
 │   Backend     │  │    Backend    │  │               │
 │               │  │               │  │ - Warmer      │
 │ Functions:    │  │ Functions:     │  │ - Monitor     │
@@ -553,7 +553,7 @@ class CacheConfig:
     backend: str = "memory"  # Cache backend type
                           # Values:
                           #   - "memory": In-memory cache
-                          #   - "redis": Redis cache
+                          #   - "dragonfly": Dragonfly cache
                           # Default: "memory"
 
     default_ttl: int = 300  # Default TTL in seconds
@@ -567,10 +567,10 @@ class CacheConfig:
                          # Default: 1024
                          # LRU eviction when exceeded
 
-    redis_url: Optional[str] = None  # Redis connection URL
-                                   # Required for Redis backend
-                                   # Format: "redis://host:port/db"
-                                   # Example: "redis://localhost:6379/0"
+    dragonfly_url: Optional[str] = None  # Dragonfly connection URL
+                                   # Required for Dragonfly backend
+                                   # Format: "dragonfly://host:port/db"
+                                   # Example: "dragonfly://localhost:6379/0"
 
     namespace: str = "sdk_cache"  # Cache namespace
                                  # Prevents key collisions
@@ -589,7 +589,7 @@ def set(
 
     value: Any,                  # Value to cache
                                # Can be any serializable type
-                               # For Redis: must be JSON serializable
+                               # For Dragonfly: must be JSON serializable
 
     tenant_id: Optional[str] = None,  # Tenant identifier
                                # Used for key namespacing
@@ -649,10 +649,10 @@ def invalidate_pattern(
 ```python
 # Custom cache configuration
 config = CacheConfig(
-    backend="redis",
+    backend="dragonfly",
     default_ttl=600,  # 10 minutes
     max_size=10000,   # Larger cache
-    redis_url="redis://localhost:6379/0",
+    dragonfly_url="dragonfly://localhost:6379/0",
     namespace="custom_cache"
 )
 
@@ -705,7 +705,7 @@ sharder.enable_sharding()
 3. **Tenant Isolation**: Always use tenant_id for multi-tenant deployments
 4. **Pattern Invalidation**: Use pattern invalidation for related keys
 5. **Memory Management**: Monitor memory usage for memory backend
-6. **Redis for Scale**: Use Redis backend for distributed deployments
+6. **Dragonfly for Scale**: Use Dragonfly backend for distributed deployments
 7. **Cache Warming**: Warm frequently accessed data on startup
 8. **Error Handling**: Handle cache failures gracefully
 9. **Monitoring**: Monitor cache hit/miss rates

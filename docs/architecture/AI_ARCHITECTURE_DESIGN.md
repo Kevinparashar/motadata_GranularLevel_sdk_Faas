@@ -82,7 +82,7 @@ The Motadata AI SDK is designed as a **library-based, modular framework** that i
 │                              ▼                                        │
 │  ┌──────────────────────────────────────────────────────────────┐   │
 │  │              Infrastructure Layer                             │   │
-│  │  - PostgreSQL (with pgvector)  - Redis (Cache)               │   │
+│  │  - PostgreSQL (with pgvector)  - Dragonfly (Cache)               │   │
 │  │  - NATS (Internal Messaging)   - OTEL (Observability)       │   │
 │  │  - CODEC (Message Serialization)                             │   │
 │  └──────────────────────────────────────────────────────────────┘   │
@@ -125,7 +125,7 @@ The Motadata AI SDK is designed as a **library-based, modular framework** that i
 | **RAG** | Custom + pgvector | Retrieval-Augmented Generation |
 | **ML** | scikit-learn, PyTorch (flexible) | Machine learning models |
 | **Database** | PostgreSQL + pgvector | Vector storage and metadata |
-| **Cache** | Redis (optional) | Response caching |
+| **Cache** | Dragonfly (optional) | Response caching |
 | **Messaging** | NATS | Internal component communication |
 | **Observability** | OpenTelemetry | Distributed tracing and metrics |
 | **Serialization** | CODEC | Message encoding/decoding |
@@ -331,7 +331,7 @@ Training Request
 | **Vector Embeddings** | PostgreSQL (pgvector) | Document embeddings for RAG |
 | **Agent Memory** | PostgreSQL (episodic, semantic) | Agent conversation history |
 | **Model Artifacts** | File System / S3 | Trained ML models |
-| **Cache Data** | Redis / In-Memory | LLM response caching |
+| **Cache Data** | Dragonfly / In-Memory | LLM response caching |
 | **Metadata** | PostgreSQL | Model versions, experiment tracking |
 | **Traces/Logs** | OTEL Backend | Observability data |
 
@@ -614,7 +614,7 @@ ml_system = create_ml_system(
 
 #### 3.5.2 Cache Mechanism
 - **Purpose**: Cache LLM responses to reduce costs
-- **Backends**: In-memory (LRU) or Redis
+- **Backends**: In-memory (LRU) or Dragonfly
 - **Features**: Pattern-based invalidation, TTL, tenant isolation
 
 #### 3.5.3 Prompt Context Management
@@ -894,7 +894,7 @@ db = create_database_connection(
 
 # 2. Cache (Optional)
 from src.core.cache_mechanism import create_cache_mechanism
-cache = create_cache_mechanism(backend="redis", config=redis_config)
+cache = create_cache_mechanism(backend="dragonfly", config=dragonfly_config)
 
 # 3. AI Gateway
 from src.core.litellm_gateway import create_gateway
@@ -1391,7 +1391,7 @@ results = db.similarity_search(
 
 ---
 
-#### 6.3.2 Redis Integration (Optional)
+#### 6.3.2 Dragonfly Integration (Optional)
 
 **Purpose**: Response caching
 
@@ -1402,10 +1402,10 @@ results = db.similarity_search(
 
 **Integration Pattern**:
 ```python
-# Cache mechanism with Redis
+# Cache mechanism with Dragonfly
 cache = create_cache_mechanism(
-    backend="redis",
-    config=redis_config
+    backend="dragonfly",
+    config=dragonfly_config
 )
 
 # Gateway uses cache
@@ -1599,7 +1599,7 @@ Load Balancer → Routes requests to instances
 
 **Stateful Components** (Require coordination):
 - **Database**: Connection pooling, read replicas
-- **Cache**: Redis cluster for distributed caching
+- **Cache**: Dragonfly cluster for distributed caching
 - **NATS**: NATS cluster for messaging
 
 ---
@@ -1627,7 +1627,7 @@ Load Balancer → Routes requests to instances
    - LRU eviction policy
    - TTL-based expiration
 
-2. **L2: Redis Cache** (Shared cache)
+2. **L2: Dragonfly Cache** (Shared cache)
    - Distributed across instances
    - Larger capacity
    - Pattern-based invalidation
@@ -1767,7 +1767,7 @@ Load Balancer → Routes requests to instances
 - Connection timeout and retry
 
 **Cache Connections**:
-- Redis connection pooling
+- Dragonfly connection pooling
 - Connection health checks
 - Automatic reconnection
 
@@ -1845,7 +1845,7 @@ memory.store(content, tenant_id=tenant_id)
 **Encryption at Rest**:
 - Database encryption (PostgreSQL)
 - Model storage encryption (S3/File System)
-- Cache encryption (Redis with encryption)
+- Cache encryption (Dragonfly with encryption)
 
 **Encryption in Transit**:
 - TLS/SSL for all network communication
@@ -1970,7 +1970,7 @@ user_data = memory.export_user_data(user_id, tenant_id)
 - Rotate passwords regularly
 
 **Cache Credentials**:
-- Secure Redis connections
+- Secure Dragonfly connections
 - Use authentication
 - Encrypt sensitive cache data
 
@@ -2085,7 +2085,7 @@ src/core/{component}/
 **External Service Dependencies**:
 - **LLM Providers**: Monitor API changes
 - **PostgreSQL**: Track version compatibility
-- **Redis**: Track version compatibility
+- **Dragonfly**: Track version compatibility
 - **OTEL**: Track SDK updates
 
 ---

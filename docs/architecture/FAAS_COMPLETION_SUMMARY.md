@@ -203,7 +203,7 @@ service_name/
 Services communicate via:
 - **Direct HTTP calls** (synchronous)
 - **NATS messaging** (asynchronous, placeholder ready)
-- **Shared state** (PostgreSQL, Redis)
+- **Shared state** (PostgreSQL, Dragonfly)
 
 ### Standard Headers
 
