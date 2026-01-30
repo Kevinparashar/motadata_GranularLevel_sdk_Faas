@@ -1,4 +1,6 @@
-# Motadata Gateway Service
+# MOTADATA - GATEWAY SERVICE
+
+**FaaS implementation of the LiteLLM Gateway providing REST API endpoints for unified LLM access with rate limiting and caching.**
 
 ## Overview
 

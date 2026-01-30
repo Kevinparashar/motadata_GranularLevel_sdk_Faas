@@ -1,4 +1,6 @@
-# Motadata RAG Service
+# MOTADATA - RAG SERVICE
+
+**FaaS implementation of the RAG System providing REST API endpoints for document ingestion, query processing, and vector search.**
 
 ## Overview
 

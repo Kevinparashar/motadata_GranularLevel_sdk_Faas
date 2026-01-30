@@ -1,6 +1,8 @@
-# Motadata SDK Documentation
+# MOTADATA - SDK DOCUMENTATION
 
-**Welcome to the Motadata Python AI SDK Documentation**
+**Documentation hub for the Motadata Python AI SDK with navigation and quick access to all guides.**
+
+---
 
 ---
 

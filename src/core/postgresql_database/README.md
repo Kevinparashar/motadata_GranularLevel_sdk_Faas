@@ -1,4 +1,6 @@
-# Motadata PostgreSQL Database
+# MOTADATA - POSTGRESQL DATABASE
+
+**Database connectivity and management with pgvector support for efficient vector similarity search operations.**
 
 ## Overview
 

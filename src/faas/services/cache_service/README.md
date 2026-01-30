@@ -1,4 +1,6 @@
-# Motadata Cache Service
+# MOTADATA - CACHE SERVICE
+
+**FaaS implementation of the Cache Mechanism providing REST API endpoints for distributed caching operations with tenant-scoped isolation.**
 
 ## Overview
 

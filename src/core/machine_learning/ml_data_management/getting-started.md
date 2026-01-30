@@ -1,4 +1,6 @@
-# Motadata Getting Started with ML Data Management
+# MOTADATA - GETTING STARTED WITH ML DATA MANAGEMENT
+
+**Complete guide for getting started with ML Data Management, from data ingestion to feature retrieval.**
 
 ## Overview
 

@@ -1,4 +1,6 @@
-# Motadata CODEC Integration Troubleshooting
+# MOTADATA - CODEC INTEGRATION TROUBLESHOOTING
+
+**Troubleshooting guide for diagnosing and resolving common issues with the CODEC Integration component.**
 
 ## Common Issues and Solutions
 

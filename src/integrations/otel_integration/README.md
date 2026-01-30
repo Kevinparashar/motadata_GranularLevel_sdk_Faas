@@ -1,4 +1,6 @@
-# Motadata OTEL Integration
+# MOTADATA - OTEL INTEGRATION
+
+**Integration module providing observability capabilities between AI SDK components and the OpenTelemetry system.**
 
 ## Overview
 

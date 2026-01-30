@@ -1,4 +1,6 @@
-# Motadata OTEL Integration - Comprehensive Component Explanation
+# MOTADATA - OTEL INTEGRATION
+
+**Comprehensive explanation of the OTEL Integration component providing observability through OpenTelemetry for distributed tracing, metrics, and logging.**
 
 ## Overview
 

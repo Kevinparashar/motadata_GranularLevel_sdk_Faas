@@ -1,4 +1,6 @@
-# Motadata API Backend Services
+# MOTADATA - API BACKEND SERVICES
+
+**RESTful API endpoints and backend integration for exposing SDK functionality through HTTP APIs.**
 
 ## When to Use This Component
 

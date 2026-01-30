@@ -1,4 +1,6 @@
-# Motadata AWS Lambda Deployment Guide for FaaS Services
+# MOTADATA - AWS LAMBDA DEPLOYMENT GUIDE
+
+**Complete guide for deploying SDK components as AWS Lambda functions with serverless configuration and best practices. for FaaS Services**
 
 ## Overview
 

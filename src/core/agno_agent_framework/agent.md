@@ -1,4 +1,6 @@
-# Motadata Agent Class Documentation
+# MOTADATA - AGENT CLASS DOCUMENTATION
+
+**Complete class documentation for the Agent class providing autonomous AI agent capabilities.**
 
 ## Overview
 

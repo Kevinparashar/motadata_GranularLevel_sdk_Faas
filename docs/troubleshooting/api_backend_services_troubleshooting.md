@@ -1,6 +1,6 @@
-# Motadata API Backend Services Troubleshooting Guide
+# MOTADATA - API BACKEND SERVICES TROUBLESHOOTING
 
-This guide helps diagnose and resolve common issues encountered when using the API Backend Services component.
+**Troubleshooting guide for diagnosing and resolving common issues with the API Backend Services component.**
 
 ## Table of Contents
 

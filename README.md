@@ -1,4 +1,29 @@
-# Motadata Python AI SDK
+# MOTADATA - PYTHON AI SDK
+
+**Comprehensive, modular SDK for building AI-powered applications with unified LLM operations, agent frameworks, RAG systems, and machine learning capabilities.**
+
+---
+
+## Table of Contents
+
+- [Quick Start](#-quick-start-5-minutes)
+- [Overview](#overview)
+- [Features](#features)
+- [When to Use What](#when-to-use-what)
+- [Architecture Overview](#architecture-overview)
+- [Project Structure](#project-structure)
+- [Project Components](#project-components)
+- [Flow and Interconnections](#flow-and-interconnections)
+- [Requirements and Prerequisites](#requirements-and-prerequisites)
+- [Getting Started](#getting-started)
+- [Function-Driven API](#function-driven-api)
+- [Documentation](#-documentation)
+- [Examples and Tutorials](#examples-and-tutorials)
+- [Testing](#testing)
+- [Modularity and Swappability](#modularity-and-swappability)
+- [Error Handling](#error-handling)
+- [Related](#related)
+- [Feedback](#feedback)
 
 ## 🚀 Quick Start (5 Minutes)
 
@@ -1062,4 +1087,17 @@ All exceptions include structured attributes (agent_id, tool_name, operation, et
 ## License
 
 MIT License - see LICENSE file for details.
+
+## Related
+
+- [Onboarding Guide](ONBOARDING_GUIDE.md) - Complete guide for new team members
+- [Documentation Index](docs/guide/DOCUMENTATION_INDEX.md) - Complete navigation
+- [Developer Integration Guide](docs/guide/DEVELOPER_INTEGRATION_GUIDE.md) - Component development and integration
+- [Development Environment Setup Guide](PYTHON_SDK_DEV_ENVIRONMENT_SETUP_GUIDE.md) - Local development setup
+- [Quality Gate Rules](PYTHON_SDK_QUALITY_GATE_RULES_AND_DEVELOPMENT_GUIDELINE_DOCUMENT.md) - Quality standards
+- [Changelog](CHANGELOG.md) - Version history
+
+## Feedback
+
+If you find gaps in this documentation or have suggestions for improvement, raise an issue or PR with your edits.
 

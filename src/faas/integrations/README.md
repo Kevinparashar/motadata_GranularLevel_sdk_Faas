@@ -1,4 +1,6 @@
-# Motadata Integration Layer
+# MOTADATA - INTEGRATION LAYER
+
+**Standardized integrations for NATS, OpenTelemetry (OTEL), and CODEC across all FaaS services.**
 
 ## Overview
 

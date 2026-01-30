@@ -1,4 +1,6 @@
-# Motadata Prompt Context Management
+# MOTADATA - PROMPT CONTEXT MANAGEMENT
+
+**Unified system for managing prompts, templates, context building, and optimization throughout the SDK.**
 
 ## When to Use This Component
 

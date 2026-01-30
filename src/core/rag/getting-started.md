@@ -1,4 +1,6 @@
-# Motadata Getting Started with RAG System
+# MOTADATA - GETTING STARTED WITH RAG SYSTEM
+
+**Complete guide for getting started with the RAG System, from document ingestion to query processing.**
 
 ## Overview
 

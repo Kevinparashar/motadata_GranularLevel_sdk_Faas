@@ -1,4 +1,6 @@
-# Motadata Getting Started with MLOps Pipeline
+# MOTADATA - GETTING STARTED WITH MLOPS PIPELINE
+
+**Complete guide for getting started with the MLOps Pipeline, from experiment tracking to model deployment.**
 
 ## Overview
 

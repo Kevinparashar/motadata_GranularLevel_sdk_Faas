@@ -1,4 +1,6 @@
-# Motadata ML Data Management
+# MOTADATA - ML DATA MANAGEMENT
+
+**Data lifecycle management, feature store, and ETL pipelines for ML operations with data quality and versioning.**
 
 ## Overview
 

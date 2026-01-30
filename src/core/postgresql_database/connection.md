@@ -1,4 +1,6 @@
-# Motadata PostgreSQL Database Connection Documentation
+# MOTADATA - POSTGRESQL DATABASE CONNECTION DOCUMENTATION
+
+**Complete class documentation for the DatabaseConnection class providing robust PostgreSQL connectivity with connection pooling and health monitoring.**
 
 ## Overview
 

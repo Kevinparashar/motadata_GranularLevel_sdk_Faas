@@ -1,4 +1,6 @@
-# Motadata ML Data Management Troubleshooting Guide
+# MOTADATA - ML DATA MANAGEMENT TROUBLESHOOTING
+
+**Troubleshooting guide for diagnosing and resolving common issues with the ML Data Management component.**
 
 This guide helps diagnose and resolve common issues encountered when using ML Data Management.
 

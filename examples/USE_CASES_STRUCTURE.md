@@ -1,4 +1,6 @@
-# Motadata Use Cases Folder Structure and Management
+# MOTADATA - USE CASES STRUCTURE
+
+**Folder structure, naming conventions, and management guidelines for use case examples in the SDK.**
 
 ## Overview
 

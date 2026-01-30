@@ -1,4 +1,6 @@
-# Motadata Getting Started with Prompt Context Management
+# MOTADATA - GETTING STARTED WITH PROMPT CONTEXT MANAGEMENT
+
+**Complete guide for getting started with Prompt Context Management, from template creation to prompt rendering.**
 
 ## Overview
 
