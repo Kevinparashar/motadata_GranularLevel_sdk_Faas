@@ -7,27 +7,26 @@ Handles prompt template management and context building.
 import logging
 from typing import Any, Dict, Optional
 
-from fastapi import FastAPI, HTTPException, Header, status
+from fastapi import FastAPI, Header, HTTPException, status
 
 from ....core.prompt_context_management import create_prompt_manager
 from ....core.prompt_context_management.prompt_manager import PromptContextManager
+from ...integrations.codec import create_codec_manager
+from ...integrations.nats import create_nats_client
+from ...integrations.otel import create_otel_tracer
 from ...shared.config import ServiceConfig, load_config
 from ...shared.contracts import ServiceResponse, extract_headers
 from ...shared.database import get_database_connection
-from ...shared.exceptions import NotFoundError
 from ...shared.middleware import setup_middleware
 from .models import (
-    CreateTemplateRequest,
-    UpdateTemplateRequest,
-    RenderPromptRequest,
     BuildContextRequest,
-    TemplateResponse,
-    RenderedPromptResponse,
     ContextResponse,
+    CreateTemplateRequest,
+    RenderedPromptResponse,
+    RenderPromptRequest,
+    TemplateResponse,
+    UpdateTemplateRequest,
 )
-from ...integrations.nats import create_nats_client
-from ...integrations.otel import create_otel_tracer
-from ...integrations.codec import create_codec_manager
 
 logger = logging.getLogger(__name__)
 
@@ -102,7 +101,11 @@ class PromptService:
     def _register_routes(self):
         """Register FastAPI routes."""
 
-        @self.app.post("/api/v1/prompts/templates", response_model=ServiceResponse, status_code=status.HTTP_201_CREATED)
+        @self.app.post(
+            "/api/v1/prompts/templates",
+            response_model=ServiceResponse,
+            status_code=status.HTTP_201_CREATED,
+        )
         async def create_template(
             request: CreateTemplateRequest,
             headers: dict = Header(...),
@@ -124,7 +127,8 @@ class PromptService:
                 template_id = request.template_id or f"template_{standard_headers.request_id[:8]}"
 
                 # Create template
-                # TODO: Store template in database
+                # TODO: SDK-SVC-005 - Store template in database
+                # Placeholder - replace with actual database storage implementation
                 # For now, add to prompt manager
                 prompt_manager.add_template(
                     name=request.name,
@@ -175,7 +179,8 @@ class PromptService:
             """Get template by ID."""
             standard_headers = extract_headers(**headers)
 
-            # TODO: Implement template retrieval from database
+            # TODO: SDK-SVC-005 - Implement template retrieval from database
+            # Placeholder - replace with actual database query implementation
             raise HTTPException(
                 status_code=status.HTTP_501_NOT_IMPLEMENTED,
                 detail="Template retrieval not yet implemented",
@@ -262,7 +267,8 @@ class PromptService:
             """List templates."""
             standard_headers = extract_headers(**headers)
 
-            # TODO: Implement template listing from database
+            # TODO: SDK-SVC-005 - Implement template listing from database
+            # Placeholder - replace with actual database query implementation
             return ServiceResponse(
                 success=True,
                 data={"templates": [], "total": 0},
@@ -311,4 +317,3 @@ def create_prompt_service(
 
     logger.info(f"Prompt Service created: {service_name}")
     return service
-

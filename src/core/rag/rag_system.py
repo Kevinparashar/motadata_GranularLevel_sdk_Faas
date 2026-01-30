@@ -13,14 +13,13 @@ from ..agno_agent_framework.memory import AgentMemory, MemoryType
 from ..cache_mechanism import CacheConfig, CacheMechanism
 from ..litellm_gateway import LiteLLMGateway
 from ..postgresql_database.connection import DatabaseConnection
-from ..postgresql_database.vector_operations import VectorOperations
 from ..postgresql_database.vector_index_manager import (
-    VectorIndexManager,
-    create_vector_index_manager,
+    IndexDistance,
     IndexType,
-    IndexDistance
+    create_vector_index_manager,
 )
-from .document_processor import DocumentChunk, DocumentProcessor
+from ..postgresql_database.vector_operations import VectorOperations
+from .document_processor import DocumentProcessor
 from .generator import RAGGenerator
 from .retriever import Retriever
 
@@ -45,7 +44,7 @@ class RAGSystem:
         cache_config: Optional[CacheConfig] = None,
         enable_memory: bool = True,
         memory_config: Optional[Dict[str, Any]] = None,
-        **kwargs: Any
+        **kwargs: Any,
     ):
         """
         Initialize RAG system.
@@ -84,15 +83,15 @@ class RAGSystem:
                 max_episodic=memory_config.get("max_episodic", 100),
                 max_semantic=memory_config.get("max_semantic", 200),
                 max_age_days=memory_config.get("max_age_days", 30),
-                persistence_path=memory_config.get("persistence_path")
+                persistence_path=memory_config.get("persistence_path"),
             )
 
         # Initialize components
         self.vector_ops = VectorOperations(db)
-        
+
         # Initialize vector index manager
         self.index_manager = create_vector_index_manager(db)
-        
+
         # Initialize document processor with multimodal support
         processor_kwargs = {
             "chunk_size": kwargs.get("chunk_size", 1000),
@@ -103,19 +102,102 @@ class RAGSystem:
             "enable_preprocessing": kwargs.get("enable_preprocessing", True),
             "enable_metadata_extraction": kwargs.get("enable_metadata_extraction", True),
             "enable_multimodal": kwargs.get("enable_multimodal", True),
-            "gateway": gateway  # Pass gateway for image description generation
+            "gateway": gateway,  # Pass gateway for image description generation
         }
         self.document_processor = DocumentProcessor(**processor_kwargs)
-        
+
         self.retriever = Retriever(
-            vector_ops=self.vector_ops,
-            gateway=gateway,
-            embedding_model=embedding_model
+            vector_ops=self.vector_ops, gateway=gateway, embedding_model=embedding_model
         )
-        self.generator = RAGGenerator(
-            gateway=gateway,
-            model=generation_model
+        self.generator = RAGGenerator(gateway=gateway, model=generation_model)
+
+    def _load_document_from_file(
+        self, file_path: str, metadata: Optional[Dict[str, Any]]
+    ) -> tuple[str, Dict[str, Any], str]:
+        """Load document from file path."""
+        content, loaded_metadata = self.document_processor.load_document(file_path)
+        if metadata:
+            metadata.update(loaded_metadata)
+        else:
+            metadata = loaded_metadata
+        return content, metadata, file_path
+
+    def _insert_document_to_db(
+        self, title: str, content: str, metadata: Optional[Dict[str, Any]], source: Optional[str], tenant_id: Optional[str]
+    ) -> str:
+        """Insert document into database and return document ID."""
+        import json
+
+        query = """
+        INSERT INTO documents (title, content, metadata, source, tenant_id)
+        VALUES (%s, %s, %s::jsonb, %s, %s)
+        RETURNING id;
+        """
+        metadata_json = json.dumps(metadata or {})
+        result = self.db.execute_query(
+            query, (title, content, metadata_json, source, tenant_id), fetch_one=True
         )
+        return str(result["id"])
+
+    def _generate_embeddings_batch(
+        self, chunk_texts: List[str], document_id: str
+    ) -> List[tuple]:
+        """Generate embeddings in batch."""
+        try:
+            embedding_response = self.gateway.embed(texts=chunk_texts, model=self.embedding_model)
+            embeddings_data = []
+            if embedding_response.embeddings:
+                for i, embedding in enumerate(embedding_response.embeddings):
+                    if i < len(chunk_texts):
+                        embeddings_data.append((int(document_id), embedding, self.embedding_model))
+            return embeddings_data
+        except (ConnectionError, TimeoutError, ValueError) as e:
+            logger.warning(f"Batch embedding failed, falling back to individual processing: {e}")
+            return []
+
+    def _generate_embeddings_individual(
+        self, chunks: List[Any], document_id: str
+    ) -> List[tuple]:
+        """Generate embeddings individually as fallback."""
+        embeddings_data = []
+        for chunk in chunks:
+            try:
+                embedding_response = self.gateway.embed(
+                    texts=[chunk.content], model=self.embedding_model
+                )
+                if embedding_response.embeddings and len(embedding_response.embeddings) > 0:
+                    embedding = embedding_response.embeddings[0]
+                    embeddings_data.append((int(document_id), embedding, self.embedding_model))
+            except (ConnectionError, TimeoutError, ValueError) as chunk_error:
+                logger.warning(f"Failed to embed chunk, skipping: {chunk_error}")
+                continue
+            except Exception as chunk_error:
+                logger.error(f"Unexpected error embedding chunk: {chunk_error}", exc_info=True)
+                continue
+        return embeddings_data
+
+    def _process_embeddings(
+        self, chunks: List[Any], document_id: str
+    ) -> List[tuple]:
+        """Process embeddings with batch fallback to individual."""
+        chunk_texts = [chunk.content for chunk in chunks]
+        embeddings_data = self._generate_embeddings_batch(chunk_texts, document_id)
+        if not embeddings_data:
+            embeddings_data = self._generate_embeddings_individual(chunks, document_id)
+        return embeddings_data
+
+    def _store_embeddings(self, embeddings_data: List[tuple]) -> None:
+        """Store embeddings and trigger reindexing."""
+        if not embeddings_data:
+            return
+
+        self.vector_ops.batch_insert_embeddings(embeddings_data)
+        try:
+            self.index_manager.auto_reindex_on_embedding_change(
+                table_name="embeddings", column_name="embedding"
+            )
+        except Exception as e:
+            logger.warning(f"Auto-reindexing failed (non-critical): {str(e)}")
 
     def ingest_document(
         self,
@@ -124,7 +206,7 @@ class RAGSystem:
         file_path: Optional[str] = None,
         tenant_id: Optional[str] = None,
         source: Optional[str] = None,
-        metadata: Optional[Dict[str, Any]] = None
+        metadata: Optional[Dict[str, Any]] = None,
     ) -> str:
         """
         Ingest a document into the RAG system.
@@ -147,106 +229,23 @@ class RAGSystem:
         Returns:
             Document ID
         """
-        # Load from file if file_path provided
         if file_path:
-            content, loaded_metadata = self.document_processor.load_document(file_path)
-            if metadata:
-                metadata.update(loaded_metadata)
-            else:
-                metadata = loaded_metadata
-            if not source:
-                source = file_path
-        
-        # Ensure content is provided
+            content, metadata, source = self._load_document_from_file(file_path, metadata)
+
         if not content:
             raise ValueError("Either 'content' or 'file_path' must be provided")
-        
-        # Insert document with tenant_id
-        query = """
-        INSERT INTO documents (title, content, metadata, source, tenant_id)
-        VALUES (%s, %s, %s::jsonb, %s, %s)
-        RETURNING id;
-        """
 
-        import json
-        metadata_json = json.dumps(metadata or {})
+        document_id = self._insert_document_to_db(title, content, metadata, source, tenant_id)
 
-        result = self.db.execute_query(
-            query,
-            (title, content, metadata_json, source, tenant_id),
-            fetch_one=True
-        )
-
-        document_id = str(result['id'])
-
-        # Process and chunk document
         chunks = self.document_processor.chunk_document(
-            content=content,
-            document_id=document_id,
-            metadata=metadata
+            content=content, document_id=document_id, metadata=metadata
         )
 
         if not chunks:
             return document_id
 
-        # Batch processing: Collect all chunk texts
-        chunk_texts = [chunk.content for chunk in chunks]
-
-        # Generate embeddings in batch (single API call)
-        try:
-            embedding_response = self.gateway.embed(
-                texts=chunk_texts,
-                model=self.embedding_model
-            )
-
-            # Map embeddings back to chunks
-            embeddings_data = []
-            if embedding_response.embeddings:
-                for i, embedding in enumerate(embedding_response.embeddings):
-                    if i < len(chunks):  # Ensure we have a matching chunk
-                        embeddings_data.append((
-                            int(document_id),
-                            embedding,
-                            self.embedding_model
-                        ))
-        except (ConnectionError, TimeoutError, ValueError) as e:
-            # If batch fails due to network/timeout/validation errors, fall back to individual processing
-            logger.warning(f"Batch embedding failed, falling back to individual processing: {e}")
-            embeddings_data = []
-            for chunk in chunks:
-                try:
-                    embedding_response = self.gateway.embed(
-                        texts=[chunk.content],
-                        model=self.embedding_model
-                    )
-                    if embedding_response.embeddings and len(embedding_response.embeddings) > 0:
-                        embedding = embedding_response.embeddings[0]
-                        embeddings_data.append((
-                            int(document_id),
-                            embedding,
-                            self.embedding_model
-                        ))
-                except (ConnectionError, TimeoutError, ValueError) as chunk_error:
-                    # Skip failed chunk embedding to keep ingestion resilient
-                    logger.warning(f"Failed to embed chunk, skipping: {chunk_error}")
-                    continue
-                except Exception as chunk_error:
-                    # Log unexpected errors but continue processing
-                    logger.error(f"Unexpected error embedding chunk: {chunk_error}", exc_info=True)
-                    continue
-
-        # Batch insert embeddings
-        if embeddings_data:
-            self.vector_ops.batch_insert_embeddings(embeddings_data)
-            
-            # Auto-reindex after batch insert (non-blocking)
-            try:
-                self.index_manager.auto_reindex_on_embedding_change(
-                    table_name="embeddings",
-                    column_name="embedding"
-                )
-            except Exception as e:
-                logger.warning(f"Auto-reindexing failed (non-critical): {str(e)}")
+        embeddings_data = self._process_embeddings(chunks, document_id)
+        self._store_embeddings(embeddings_data)
 
         return document_id
 
@@ -293,7 +292,7 @@ class RAGSystem:
         use_query_rewriting: bool = True,
         retrieval_strategy: str = "vector",  # "vector", "hybrid", "keyword"
         user_id: Optional[str] = None,
-        conversation_id: Optional[str] = None
+        conversation_id: Optional[str] = None,
     ) -> Dict[str, Any]:
         """
         Query the RAG system with query optimization.
@@ -317,14 +316,10 @@ class RAGSystem:
         memory_context = ""
         if self.memory:
             memories = self.memory.retrieve(
-                query=query,
-                limit=5,
-                memory_types=[MemoryType.EPISODIC, MemoryType.SEMANTIC]
+                query=query, limit=5
             )
             if memories:
-                memory_context = "\n".join([
-                    f"- {mem.content}" for mem in memories[:3]
-                ])
+                memory_context = "\n".join([f"- {mem.content}" for mem in memories[:3]])
 
         # Query rewriting for optimization
         original_query = query
@@ -341,17 +336,11 @@ class RAGSystem:
             # Use hybrid retrieval if specified
             if retrieval_strategy == "hybrid":
                 retrieved_docs = self.retriever.retrieve_hybrid(
-                    query=query,
-                    top_k=top_k,
-                    threshold=threshold,
-                    tenant_id=tenant_id
+                    query=query, top_k=top_k, threshold=threshold, tenant_id=tenant_id
                 )
             else:
                 retrieved_docs = self.retriever.retrieve(
-                    query=query,
-                    top_k=top_k,
-                    threshold=threshold,
-                    tenant_id=tenant_id
+                    query=query, top_k=top_k, threshold=threshold, tenant_id=tenant_id
                 )
 
             # Enhance context with memory if available
@@ -364,7 +353,7 @@ class RAGSystem:
             answer = self.generator.generate(
                 query=original_query,  # Use original query for generation
                 context_documents=enhanced_context,
-                max_tokens=max_tokens
+                max_tokens=max_tokens,
             )
 
             result = {
@@ -373,7 +362,7 @@ class RAGSystem:
                 "num_documents": len(retrieved_docs),
                 "query_used": query if use_query_rewriting else original_query,
                 "original_query": original_query,
-                "memory_used": len(memories) if memories else 0
+                "memory_used": len(memories) if memories else 0,
             }
 
             # Store in cache
@@ -389,8 +378,8 @@ class RAGSystem:
                         "user_id": user_id,
                         "conversation_id": conversation_id,
                         "tenant_id": tenant_id,
-                        "num_documents": len(retrieved_docs)
-                    }
+                        "num_documents": len(retrieved_docs),
+                    },
                 )
 
             return result
@@ -432,7 +421,7 @@ class RAGSystem:
         use_query_rewriting: bool = True,
         retrieval_strategy: str = "vector",
         user_id: Optional[str] = None,
-        conversation_id: Optional[str] = None
+        conversation_id: Optional[str] = None,
     ) -> Dict[str, Any]:
         """
         Query the RAG system asynchronously.
@@ -460,14 +449,10 @@ class RAGSystem:
         memory_context = ""
         if self.memory:
             memories = self.memory.retrieve(
-                query=query,
-                limit=5,
-                memory_types=[MemoryType.EPISODIC, MemoryType.SEMANTIC]
+                query=query, limit=5
             )
             if memories:
-                memory_context = "\n".join([
-                    f"- {mem.content}" for mem in memories[:3]
-                ])
+                memory_context = "\n".join([f"- {mem.content}" for mem in memories[:3]])
 
         # STEP 2: Query rewriting for optimization
         # Rewrites user query to be more effective for vector search
@@ -491,18 +476,12 @@ class RAGSystem:
             if retrieval_strategy == "hybrid":
                 # Hybrid: Combines vector search + keyword search for better results
                 retrieved_docs = self.retriever.retrieve_hybrid(
-                    query=query,
-                    top_k=top_k,
-                    threshold=threshold,
-                    tenant_id=tenant_id
+                    query=query, top_k=top_k, threshold=threshold, tenant_id=tenant_id
                 )
             else:
                 # Vector-only: Fast, semantic similarity search
                 retrieved_docs = self.retriever.retrieve(
-                    query=query,
-                    top_k=top_k,
-                    threshold=threshold,
-                    tenant_id=tenant_id
+                    query=query, top_k=top_k, threshold=threshold, tenant_id=tenant_id
                 )
 
             # STEP 5: Enhance context with memory if available
@@ -521,7 +500,7 @@ class RAGSystem:
             answer = await self.generator.generate_async(
                 query=original_query,  # Use original query for generation (not rewritten)
                 context_documents=enhanced_context,
-                max_tokens=max_tokens  # Limit response length to control cost
+                max_tokens=max_tokens,  # Limit response length to control cost
             )
 
             result = {
@@ -530,7 +509,7 @@ class RAGSystem:
                 "num_documents": len(retrieved_docs),
                 "query_used": query if use_query_rewriting else original_query,
                 "original_query": original_query,
-                "memory_used": len(memories) if memories else 0
+                "memory_used": len(memories) if memories else 0,
             }
 
             # Store in cache
@@ -546,8 +525,8 @@ class RAGSystem:
                         "user_id": user_id,
                         "conversation_id": conversation_id,
                         "tenant_id": tenant_id,
-                        "num_documents": len(retrieved_docs)
-                    }
+                        "num_documents": len(retrieved_docs),
+                    },
                 )
 
             return result
@@ -579,12 +558,63 @@ class RAGSystem:
                 "error": f"An error occurred: {str(e)}",
             }
 
+    async def _try_batch_embeddings(
+        self, chunk_texts: List[str], document_id: str
+    ) -> Optional[List[tuple]]:
+        """Try to generate embeddings in batch, return None if it fails."""
+        try:
+            embedding_response = await self.gateway.embed_async(
+                texts=chunk_texts, model=self.embedding_model
+            )
+            
+            embeddings_data = []
+            if embedding_response.embeddings:
+                for i, embedding in enumerate(embedding_response.embeddings):
+                    if i < len(chunk_texts):
+                        embeddings_data.append((int(document_id), embedding, self.embedding_model))
+            return embeddings_data
+        except (ConnectionError, TimeoutError, ValueError) as e:
+            logger.warning(f"Batch embedding failed, falling back to individual processing: {e}")
+            return None
+
+    async def _fallback_individual_embeddings(
+        self, chunks: List[Any], document_id: str
+    ) -> List[tuple]:
+        """Generate embeddings individually as fallback."""
+        embeddings_data = []
+        for chunk in chunks:
+            try:
+                embedding_response = await self.gateway.embed_async(
+                    texts=[chunk.content], model=self.embedding_model
+                )
+                if embedding_response.embeddings and len(embedding_response.embeddings) > 0:
+                    embedding = embedding_response.embeddings[0]
+                    embeddings_data.append((int(document_id), embedding, self.embedding_model))
+            except (ConnectionError, TimeoutError, ValueError) as chunk_error:
+                logger.warning(f"Failed to embed chunk, skipping: {chunk_error}")
+                continue
+            except Exception as chunk_error:
+                logger.error(f"Unexpected error embedding chunk: {chunk_error}", exc_info=True)
+                continue
+        return embeddings_data
+
+    def _store_embeddings_and_reindex(self, embeddings_data: List[tuple]) -> None:
+        """Store embeddings and trigger reindexing."""
+        if embeddings_data:
+            self.vector_ops.batch_insert_embeddings(embeddings_data)
+            try:
+                self.index_manager.auto_reindex_on_embedding_change(
+                    table_name="embeddings", column_name="embedding"
+                )
+            except Exception as e:
+                logger.warning(f"Auto-reindexing failed (non-critical): {str(e)}")
+
     async def ingest_document_async(
         self,
         title: str,
         content: str,
         source: Optional[str] = None,
-        metadata: Optional[Dict[str, Any]] = None
+        metadata: Optional[Dict[str, Any]] = None,
     ) -> str:
         """
         Ingest a document into the RAG system asynchronously with batch processing.
@@ -606,21 +636,18 @@ class RAGSystem:
         """
 
         import json
+
         metadata_json = json.dumps(metadata or {})
 
         result = self.db.execute_query(
-            query,
-            (title, content, metadata_json, source),
-            fetch_one=True
+            query, (title, content, metadata_json, source), fetch_one=True
         )
 
-        document_id = str(result['id'])
+        document_id = str(result["id"])
 
         # Process and chunk document
         chunks = self.document_processor.chunk_document(
-            content=content,
-            document_id=document_id,
-            metadata=metadata
+            content=content, document_id=document_id, metadata=metadata
         )
 
         if not chunks:
@@ -629,68 +656,18 @@ class RAGSystem:
         # Batch processing: Collect all chunk texts
         chunk_texts = [chunk.content for chunk in chunks]
 
-        # Generate embeddings in batch (single async API call)
-        try:
-            embedding_response = await self.gateway.embed_async(
-                texts=chunk_texts,
-                model=self.embedding_model
-            )
+        # Try batch embeddings first, fall back to individual if needed
+        embeddings_data = await self._try_batch_embeddings(chunk_texts, document_id)
+        if embeddings_data is None:
+            embeddings_data = await self._fallback_individual_embeddings(chunks, document_id)
 
-            # Map embeddings back to chunks
-            embeddings_data = []
-            if embedding_response.embeddings:
-                for i, embedding in enumerate(embedding_response.embeddings):
-                    if i < len(chunks):  # Ensure we have a matching chunk
-                        embeddings_data.append((
-                            int(document_id),
-                            embedding,
-                            self.embedding_model
-                        ))
-        except (ConnectionError, TimeoutError, ValueError) as e:
-            # If batch fails due to network/timeout/validation errors, fall back to individual processing
-            logger.warning(f"Batch embedding failed in async ingestion, falling back to individual processing: {e}")
-            embeddings_data = []
-            for chunk in chunks:
-                try:
-                    embedding_response = await self.gateway.embed_async(
-                        texts=[chunk.content],
-                        model=self.embedding_model
-                    )
-                    if embedding_response.embeddings and len(embedding_response.embeddings) > 0:
-                        embedding = embedding_response.embeddings[0]
-                        embeddings_data.append((
-                            int(document_id),
-                            embedding,
-                            self.embedding_model
-                        ))
-                except (ConnectionError, TimeoutError, ValueError) as chunk_error:
-                    # Skip failed chunk embedding to keep ingestion resilient
-                    logger.warning(f"Failed to embed chunk in async ingestion, skipping: {chunk_error}")
-                    continue
-                except Exception as chunk_error:
-                    # Log unexpected errors but continue processing
-                    logger.error(f"Unexpected error embedding chunk in async ingestion: {chunk_error}", exc_info=True)
-                    continue
-
-        # Batch insert embeddings
-        if embeddings_data:
-            self.vector_ops.batch_insert_embeddings(embeddings_data)
-            
-            # Auto-reindex after batch insert (non-blocking)
-            try:
-                self.index_manager.auto_reindex_on_embedding_change(
-                    table_name="embeddings",
-                    column_name="embedding"
-                )
-            except Exception as e:
-                logger.warning(f"Auto-reindexing failed (non-critical): {str(e)}")
+        # Store embeddings and reindex
+        self._store_embeddings_and_reindex(embeddings_data)
 
         return document_id
 
     def ingest_documents_batch(
-        self,
-        documents: List[Dict[str, Any]],
-        batch_size: int = 10
+        self, documents: List[Dict[str, Any]], batch_size: int = 10
     ) -> List[str]:
         """
         Ingest multiple documents in batch with optimized processing.
@@ -706,7 +683,7 @@ class RAGSystem:
 
         # Process documents in batches
         for i in range(0, len(documents), batch_size):
-            batch = documents[i:i + batch_size]
+            batch = documents[i : i + batch_size]
 
             # Process each document in the batch
             for doc in batch:
@@ -715,7 +692,7 @@ class RAGSystem:
                         title=doc.get("title", ""),
                         content=doc.get("content", ""),
                         source=doc.get("source"),
-                        metadata=doc.get("metadata")
+                        metadata=doc.get("metadata"),
                     )
                     document_ids.append(doc_id)
                 except (ValueError, ConnectionError) as e:
@@ -724,15 +701,15 @@ class RAGSystem:
                     continue
                 except Exception as e:
                     # Log unexpected errors but continue processing
-                    logger.error(f"Unexpected error ingesting document in batch: {e}", exc_info=True)
+                    logger.error(
+                        f"Unexpected error ingesting document in batch: {e}", exc_info=True
+                    )
                     continue
 
         return document_ids
 
     async def ingest_documents_batch_async(
-        self,
-        documents: List[Dict[str, Any]],
-        batch_size: int = 10
+        self, documents: List[Dict[str, Any]], batch_size: int = 10
     ) -> List[str]:
         """
         Ingest multiple documents in batch asynchronously with optimized processing.
@@ -750,7 +727,7 @@ class RAGSystem:
 
         # Process documents in batches
         for i in range(0, len(documents), batch_size):
-            batch = documents[i:i + batch_size]
+            batch = documents[i : i + batch_size]
 
             # Process batch concurrently
             tasks = []
@@ -759,7 +736,7 @@ class RAGSystem:
                     title=doc.get("title", ""),
                     content=doc.get("content", ""),
                     source=doc.get("source"),
-                    metadata=doc.get("metadata")
+                    metadata=doc.get("metadata"),
                 )
                 tasks.append(task)
 
@@ -787,16 +764,16 @@ class RAGSystem:
         self,
         index_type: IndexType = IndexType.IVFFLAT,
         distance: IndexDistance = IndexDistance.COSINE,
-        **kwargs: Any
+        **kwargs: Any,
     ) -> bool:
         """
         Create a vector index for optimal search performance.
-        
+
         Args:
             index_type: Type of index (IVFFlat or HNSW)
             distance: Distance metric (cosine, l2, inner_product)
             **kwargs: Additional index parameters
-        
+
         Returns:
             True if index created successfully
         """
@@ -805,42 +782,101 @@ class RAGSystem:
             column_name="embedding",
             index_type=index_type,
             distance=distance,
-            **kwargs
+            **kwargs,
         )
-    
-    def reindex(
-        self,
-        concurrently: bool = True
-    ) -> List[str]:
+
+    def reindex(self, concurrently: bool = True) -> List[str]:
         """
         Reindex all vector indexes (useful after embedding model changes or bulk updates).
-        
+
         Args:
             concurrently: Whether to rebuild concurrently (non-blocking)
-        
+
         Returns:
             List of reindexed index names
         """
-        return self.index_manager.reindex_table(
-            table_name="embeddings",
-            concurrently=concurrently
-        )
-    
+        return self.index_manager.reindex_table(table_name="embeddings", concurrently=concurrently)
+
     def get_index_info(self) -> List[Dict[str, Any]]:
         """
         Get information about all vector indexes.
-        
+
         Returns:
             List of index information dictionaries
         """
         return self.index_manager.list_indexes(table_name="embeddings")
+
+    def _build_document_update_query(
+        self, title: Optional[str], metadata: Optional[Dict[str, Any]]
+    ) -> tuple:
+        """Build SQL query and params for document metadata updates."""
+        updates = []
+        params = []
+        
+        if title is not None:
+            updates.append("title = %s")
+            params.append(title)
+        
+        if metadata is not None:
+            import json
+            updates.append("metadata = %s::jsonb")
+            params.append(json.dumps(metadata))
+        
+        return updates, params
+
+    def _generate_and_store_embeddings(
+        self, chunks: List[Any], document_id: str
+    ) -> None:
+        """Generate embeddings for chunks and store them."""
+        if not chunks:
+            return
+        
+        chunk_texts = [chunk.content for chunk in chunks]
+        embedding_response = self.gateway.embed(
+            texts=chunk_texts, model=self.embedding_model
+        )
+        
+        if embedding_response.embeddings:
+            embeddings_data = []
+            for i, embedding in enumerate(embedding_response.embeddings):
+                if i < len(chunks):
+                    embeddings_data.append((int(document_id), embedding, self.embedding_model))
+            
+            if embeddings_data:
+                self.vector_ops.batch_insert_embeddings(embeddings_data)
+
+    def _update_document_content(
+        self, document_id: str, content: str, metadata: Optional[Dict[str, Any]]
+    ) -> None:
+        """Re-process and update document content."""
+        # Delete old chunks and embeddings
+        self._delete_document_chunks(document_id)
+        
+        # Re-process and re-embed
+        chunks = self.document_processor.chunk_document(
+            content=content, document_id=document_id, metadata=metadata
+        )
+        
+        self._generate_and_store_embeddings(chunks, document_id)
+        
+        # Auto-reindex
+        try:
+            self.index_manager.auto_reindex_on_embedding_change(
+                table_name="embeddings", column_name="embedding"
+            )
+        except Exception as e:
+            logger.warning(f"Auto-reindexing failed (non-critical): {str(e)}")
+        
+        # Update content in database
+        query = "UPDATE documents SET content = %s WHERE id = %s;"
+        self.db.execute_query(query, (content, document_id))
 
     def update_document(
         self,
         document_id: str,
         title: Optional[str] = None,
         content: Optional[str] = None,
-        metadata: Optional[Dict[str, Any]] = None
+        metadata: Optional[Dict[str, Any]] = None,
     ) -> bool:
         """
         Update an existing document in the RAG system.
@@ -856,18 +892,8 @@ class RAGSystem:
         """
         try:
             # Update document metadata
-            updates = []
-            params = []
-
-            if title is not None:
-                updates.append("title = %s")
-                params.append(title)
-
-            if metadata is not None:
-                import json
-                updates.append("metadata = %s::jsonb")
-                params.append(json.dumps(metadata))
-
+            updates, params = self._build_document_update_query(title, metadata)
+            
             if updates:
                 query = f"""
                 UPDATE documents
@@ -879,50 +905,7 @@ class RAGSystem:
 
             # If content changed, re-process document
             if content is not None:
-                # Delete old chunks and embeddings
-                self._delete_document_chunks(document_id)
-
-                # Re-process and re-embed
-                chunks = self.document_processor.chunk_document(
-                    content=content,
-                    document_id=document_id,
-                    metadata=metadata
-                )
-
-                if chunks:
-                    chunk_texts = [chunk.content for chunk in chunks]
-
-                    # Generate embeddings in batch
-                    embedding_response = self.gateway.embed(
-                        texts=chunk_texts,
-                        model=self.embedding_model
-                    )
-
-                    if embedding_response.embeddings:
-                        embeddings_data = []
-                        for i, embedding in enumerate(embedding_response.embeddings):
-                            if i < len(chunks):
-                                embeddings_data.append((
-                                    int(document_id),
-                                    embedding,
-                                    self.embedding_model
-                                ))
-
-                        if embeddings_data:
-                            self.vector_ops.batch_insert_embeddings(embeddings_data)
-            
-            # Auto-reindex after batch insert (non-blocking)
-            try:
-                self.index_manager.auto_reindex_on_embedding_change(
-                    table_name="embeddings",
-                    column_name="embedding"
-                )
-            except Exception as e:
-                logger.warning(f"Auto-reindexing failed (non-critical): {str(e)}")
-
-                # Update content in database
-                query = "UPDATE documents SET content = %s WHERE id = %s;"
-                self.db.execute_query(query, (content, document_id))
+                self._update_document_content(document_id, content, metadata)
 
             # Invalidate cache for this document
             self.cache.invalidate_pattern(f"rag:doc:{document_id}")
@@ -957,7 +940,7 @@ class RAGSystem:
 
             # Invalidate cache
             self.cache.invalidate_pattern(f"rag:doc:{document_id}")
-            self.cache.invalidate_pattern(f"rag:query:*")
+            self.cache.invalidate_pattern("rag:query:*")
 
             return True
         except (ConnectionError, ValueError) as e:
@@ -983,4 +966,3 @@ class RAGSystem:
         # Note: If you have a chunks table, delete from there too
         # query = "DELETE FROM chunks WHERE document_id = %s;"
         # self.db.execute_query(query, (document_id,))
-

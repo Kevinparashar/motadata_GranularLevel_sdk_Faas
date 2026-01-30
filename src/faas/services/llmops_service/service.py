@@ -5,29 +5,28 @@ Handles LLM operations logging, monitoring, metrics, and cost tracking.
 """
 
 import logging
-from typing import Any, Dict, Optional
 from datetime import datetime
+from typing import Any, Dict, Optional
 
-from fastapi import FastAPI, HTTPException, Header, status, Query
+from fastapi import FastAPI, Header, HTTPException, Query, status
 
-from ....core.llmops import LLMOps, LLMOperation, LLMOperationType, LLMOperationStatus
+from ....core.llmops import LLMOperation, LLMOperationStatus, LLMOperationType, LLMOps
+from ...integrations.codec import create_codec_manager
+from ...integrations.nats import create_nats_client
+from ...integrations.otel import create_otel_tracer
 from ...shared.config import ServiceConfig, load_config
 from ...shared.contracts import ServiceResponse, extract_headers
 from ...shared.database import get_database_connection
-from ...shared.exceptions import ValidationError
 from ...shared.middleware import setup_middleware
 from .models import (
-    LogOperationRequest,
-    QueryOperationsRequest,
-    OperationResponse,
-    MetricsResponse,
     CostAnalysisResponse,
-    OperationType,
+    LogOperationRequest,
+    MetricsResponse,
+    OperationResponse,
     OperationStatus,
+    OperationType,
+    QueryOperationsRequest,
 )
-from ...integrations.nats import create_nats_client
-from ...integrations.otel import create_otel_tracer
-from ...integrations.codec import create_codec_manager
 
 logger = logging.getLogger(__name__)
 
@@ -83,39 +82,210 @@ class LLMOpsService:
         # Register routes
         self._register_routes()
 
+    def _handle_log_operation(
+        self, request: LogOperationRequest, standard_headers: Any
+    ) -> ServiceResponse:
+        """Handle log operation business logic."""
+        operation_id = self.llmops.log_operation(
+            operation_type=LLMOperationType(request.operation_type.value),
+            model=request.model,
+            prompt_tokens=request.prompt_tokens,
+            completion_tokens=request.completion_tokens,
+            latency_ms=request.latency_ms,
+            status=LLMOperationStatus(request.status.value),
+            error_message=request.error_message,
+            tenant_id=standard_headers.tenant_id,
+            agent_id=request.agent_id,
+            metadata=request.metadata,
+        )
+        return ServiceResponse(
+            success=True,
+            data={"operation_id": operation_id},
+            message="Operation logged successfully",
+            correlation_id=standard_headers.correlation_id,
+            request_id=standard_headers.request_id,
+        )
+
+    def _calculate_cutoff_date(
+        self, start_date: Optional[datetime], end_date: Optional[datetime]
+    ) -> datetime:
+        """Calculate cutoff date for filtering operations."""
+        from datetime import timedelta
+
+        if start_date:
+            return start_date
+        elif end_date:
+            return end_date - timedelta(hours=24)
+        else:
+            return datetime.now() - timedelta(hours=24)
+
+    def _filter_operations(
+        self,
+        all_operations: List[Any],
+        cutoff: datetime,
+        filter_tenant_id: Optional[str],
+        agent_id: Optional[str],
+        model: Optional[str],
+        operation_type: Optional[str],
+        status_filter: Optional[str],
+        end_date: Optional[datetime],
+    ) -> List[Any]:
+        """Filter operations based on criteria."""
+        return [
+            op
+            for op in all_operations
+            if op.timestamp >= cutoff
+            and (not filter_tenant_id or op.tenant_id == filter_tenant_id)
+            and (not agent_id or op.agent_id == agent_id)
+            and (not model or op.model == model)
+            and (not operation_type or op.operation_type.value == operation_type)
+            and (not status_filter or op.status.value == status_filter)
+            and (not end_date or op.timestamp <= end_date)
+        ]
+
+    def _format_operation_list(self, operations: List[Any]) -> List[Dict[str, Any]]:
+        """Format operations list for response."""
+        return [
+            {
+                "operation_id": op.operation_id,
+                "operation_type": op.operation_type.value,
+                "model": op.model,
+                "tenant_id": op.tenant_id,
+                "agent_id": op.agent_id,
+                "prompt_tokens": op.prompt_tokens,
+                "completion_tokens": op.completion_tokens,
+                "total_tokens": op.total_tokens,
+                "latency_ms": op.latency_ms,
+                "cost_usd": op.cost_usd,
+                "status": op.status.value,
+                "error_message": op.error_message,
+                "timestamp": op.timestamp.isoformat(),
+            }
+            for op in operations
+        ]
+
+    def _handle_query_operations(
+        self,
+        tenant_id: Optional[str],
+        agent_id: Optional[str],
+        model: Optional[str],
+        operation_type: Optional[str],
+        status_filter: Optional[str],
+        start_date: Optional[datetime],
+        end_date: Optional[datetime],
+        limit: int,
+        offset: int,
+        standard_headers: Any,
+    ) -> ServiceResponse:
+        """Handle query operations business logic."""
+        filter_tenant_id = tenant_id or standard_headers.tenant_id
+        cutoff = self._calculate_cutoff_date(start_date, end_date)
+
+        all_operations = self.llmops.operations
+        filtered = self._filter_operations(
+            all_operations=all_operations,
+            cutoff=cutoff,
+            filter_tenant_id=filter_tenant_id,
+            agent_id=agent_id,
+            model=model,
+            operation_type=operation_type,
+            status_filter=status_filter,
+            end_date=end_date,
+        )
+
+        paginated = filtered[offset : offset + limit]
+        operation_list = self._format_operation_list(paginated)
+
+        return ServiceResponse(
+            success=True,
+            data={"operations": operation_list, "count": len(operation_list)},
+            correlation_id=standard_headers.correlation_id,
+            request_id=standard_headers.request_id,
+        )
+
+    def _calculate_time_range(
+        self, start_date: Optional[datetime], end_date: Optional[datetime]
+    ) -> int:
+        """Calculate time range in hours."""
+        from datetime import timedelta
+
+        if start_date and end_date:
+            return int((end_date - start_date).total_seconds() / 3600)
+        elif start_date:
+            return int((datetime.now() - start_date).total_seconds() / 3600)
+        else:
+            return 24
+
+    def _format_metrics_response(self, metrics: Dict[str, Any]) -> Dict[str, Any]:
+        """Format metrics for response."""
+        return {
+            "total_operations": metrics.get("total_operations", 0),
+            "total_tokens": metrics.get("total_tokens", 0),
+            "total_cost_usd": metrics.get("total_cost_usd", 0.0),
+            "average_latency_ms": metrics.get("average_latency_ms", 0.0),
+            "success_rate": metrics.get("success_rate", 0.0),
+            "operations_by_type": {
+                k: v.get("count", 0) for k, v in metrics.get("by_type", {}).items()
+            },
+            "operations_by_model": {
+                k: v.get("count", 0) for k, v in metrics.get("by_model", {}).items()
+            },
+            "cost_by_model": {
+                k: v.get("cost_usd", 0.0) for k, v in metrics.get("by_model", {}).items()
+            },
+            "tokens_by_model": {
+                k: v.get("tokens", 0) for k, v in metrics.get("by_model", {}).items()
+            },
+        }
+
+    def _format_cost_analysis(
+        self,
+        cost_summary: Dict[str, Any],
+        metrics: Dict[str, Any],
+        filter_tenant_id: Optional[str],
+        start_date: Optional[datetime],
+        end_date: Optional[datetime],
+        time_range_hours: int,
+    ) -> Dict[str, Any]:
+        """Format cost analysis for response."""
+        from datetime import timedelta
+
+        return {
+            "total_cost_usd": cost_summary.get("total_cost_usd", 0.0),
+            "cost_by_model": {
+                k: v.get("cost_usd", 0.0) for k, v in cost_summary.get("by_model", {}).items()
+            },
+            "cost_by_operation_type": {k: 0.0 for k in metrics.get("by_type", {}).keys()},
+            "cost_by_tenant": (
+                {filter_tenant_id: cost_summary.get("total_cost_usd", 0.0)}
+                if filter_tenant_id
+                else {}
+            ),
+            "cost_trend": [],  # Would need historical data
+            "period_start": (
+                start_date.isoformat()
+                if start_date
+                else (datetime.now() - timedelta(hours=time_range_hours)).isoformat()
+            ),
+            "period_end": end_date.isoformat() if end_date else datetime.now().isoformat(),
+        }
+
     def _register_routes(self):
         """Register FastAPI routes."""
 
-        @self.app.post("/api/v1/llmops/operations", response_model=ServiceResponse, status_code=status.HTTP_201_CREATED)
+        @self.app.post(
+            "/api/v1/llmops/operations",
+            response_model=ServiceResponse,
+            status_code=status.HTTP_201_CREATED,
+        )
         async def log_operation(
             request: LogOperationRequest,
             headers: dict = Header(...),
         ):
             """Log an LLM operation."""
             standard_headers = extract_headers(**headers)
-
             try:
-                # Log operation using LLMOps API
-                operation_id = self.llmops.log_operation(
-                    operation_type=LLMOperationType(request.operation_type.value),
-                    model=request.model,
-                    prompt_tokens=request.prompt_tokens,
-                    completion_tokens=request.completion_tokens,
-                    latency_ms=request.latency_ms,
-                    status=LLMOperationStatus(request.status.value),
-                    error_message=request.error_message,
-                    tenant_id=standard_headers.tenant_id,
-                    agent_id=request.agent_id,
-                    metadata=request.metadata,
-                )
-
-                return ServiceResponse(
-                    success=True,
-                    data={"operation_id": operation.operation_id},
-                    message="Operation logged successfully",
-                    correlation_id=standard_headers.correlation_id,
-                    request_id=standard_headers.request_id,
-                )
+                return self._handle_log_operation(request, standard_headers)
             except Exception as e:
                 logger.error(f"Error logging operation: {e}", exc_info=True)
                 raise HTTPException(
@@ -138,61 +308,18 @@ class LLMOpsService:
         ):
             """Query LLM operations."""
             standard_headers = extract_headers(**headers)
-
             try:
-                # Use tenant_id from headers if not provided in query
-                filter_tenant_id = tenant_id or standard_headers.tenant_id
-
-                # Filter operations from LLMOps
-                from datetime import timedelta
-                if start_date:
-                    cutoff = start_date
-                elif end_date:
-                    cutoff = end_date - timedelta(hours=24)
-                else:
-                    cutoff = datetime.now() - timedelta(hours=24)
-
-                # Get all operations and filter
-                all_operations = self.llmops.operations
-                filtered = [
-                    op for op in all_operations
-                    if op.timestamp >= cutoff and
-                    (not filter_tenant_id or op.tenant_id == filter_tenant_id) and
-                    (not agent_id or op.agent_id == agent_id) and
-                    (not model or op.model == model) and
-                    (not operation_type or op.operation_type.value == operation_type) and
-                    (not status_filter or op.status.value == status_filter) and
-                    (not end_date or op.timestamp <= end_date)
-                ]
-
-                # Apply pagination
-                paginated = filtered[offset:offset + limit]
-
-                # Convert to response format
-                operation_list = [
-                    {
-                        "operation_id": op.operation_id,
-                        "operation_type": op.operation_type.value,
-                        "model": op.model,
-                        "tenant_id": op.tenant_id,
-                        "agent_id": op.agent_id,
-                        "prompt_tokens": op.prompt_tokens,
-                        "completion_tokens": op.completion_tokens,
-                        "total_tokens": op.total_tokens,
-                        "latency_ms": op.latency_ms,
-                        "cost_usd": op.cost_usd,
-                        "status": op.status.value,
-                        "error_message": op.error_message,
-                        "timestamp": op.timestamp.isoformat(),
-                    }
-                    for op in paginated
-                ]
-
-                return ServiceResponse(
-                    success=True,
-                    data={"operations": operation_list, "count": len(operation_list)},
-                    correlation_id=standard_headers.correlation_id,
-                    request_id=standard_headers.request_id,
+                return self._handle_query_operations(
+                    tenant_id=tenant_id,
+                    agent_id=agent_id,
+                    model=model,
+                    operation_type=operation_type,
+                    status_filter=status_filter,
+                    start_date=start_date,
+                    end_date=end_date,
+                    limit=limit,
+                    offset=offset,
+                    standard_headers=standard_headers,
                 )
             except Exception as e:
                 logger.error(f"Error querying operations: {e}", exc_info=True)
@@ -210,46 +337,14 @@ class LLMOpsService:
         ):
             """Get LLM operations metrics."""
             standard_headers = extract_headers(**headers)
-
             try:
                 filter_tenant_id = tenant_id or standard_headers.tenant_id
-
-                # Calculate time range
-                from datetime import timedelta
-                if start_date and end_date:
-                    time_range_hours = int((end_date - start_date).total_seconds() / 3600)
-                elif start_date:
-                    time_range_hours = int((datetime.now() - start_date).total_seconds() / 3600)
-                else:
-                    time_range_hours = 24
-
-                # Get metrics
+                time_range_hours = self._calculate_time_range(start_date, end_date)
                 metrics = self.llmops.get_metrics(
                     tenant_id=filter_tenant_id,
                     time_range_hours=time_range_hours,
                 )
-
-                # Format response
-                formatted_metrics = {
-                    "total_operations": metrics.get("total_operations", 0),
-                    "total_tokens": metrics.get("total_tokens", 0),
-                    "total_cost_usd": metrics.get("total_cost_usd", 0.0),
-                    "average_latency_ms": metrics.get("average_latency_ms", 0.0),
-                    "success_rate": metrics.get("success_rate", 0.0),
-                    "operations_by_type": {
-                        k: v.get("count", 0) for k, v in metrics.get("by_type", {}).items()
-                    },
-                    "operations_by_model": {
-                        k: v.get("count", 0) for k, v in metrics.get("by_model", {}).items()
-                    },
-                    "cost_by_model": {
-                        k: v.get("cost_usd", 0.0) for k, v in metrics.get("by_model", {}).items()
-                    },
-                    "tokens_by_model": {
-                        k: v.get("tokens", 0) for k, v in metrics.get("by_model", {}).items()
-                    },
-                }
-
+                formatted_metrics = self._format_metrics_response(metrics)
                 return ServiceResponse(
                     success=True,
                     data=formatted_metrics,
@@ -272,48 +367,25 @@ class LLMOpsService:
         ):
             """Get cost analysis."""
             standard_headers = extract_headers(**headers)
-
             try:
                 filter_tenant_id = tenant_id or standard_headers.tenant_id
-
-                # Calculate time range
-                from datetime import timedelta
-                if start_date and end_date:
-                    time_range_hours = int((end_date - start_date).total_seconds() / 3600)
-                elif start_date:
-                    time_range_hours = int((datetime.now() - start_date).total_seconds() / 3600)
-                else:
-                    time_range_hours = 24
-
-                # Get cost summary
+                time_range_hours = self._calculate_time_range(start_date, end_date)
                 cost_summary = self.llmops.get_cost_summary(
                     tenant_id=filter_tenant_id,
                     time_range_hours=time_range_hours,
                 )
-
-                # Get metrics for additional breakdown
                 metrics = self.llmops.get_metrics(
                     tenant_id=filter_tenant_id,
                     time_range_hours=time_range_hours,
                 )
-
-                # Format cost analysis response
-                cost_analysis = {
-                    "total_cost_usd": cost_summary.get("total_cost_usd", 0.0),
-                    "cost_by_model": {
-                        k: v.get("cost_usd", 0.0) for k, v in cost_summary.get("by_model", {}).items()
-                    },
-                    "cost_by_operation_type": {
-                        k: 0.0 for k in metrics.get("by_type", {}).keys()
-                    },
-                    "cost_by_tenant": {
-                        filter_tenant_id: cost_summary.get("total_cost_usd", 0.0)
-                    } if filter_tenant_id else {},
-                    "cost_trend": [],  # Would need historical data
-                    "period_start": start_date.isoformat() if start_date else (datetime.now() - timedelta(hours=time_range_hours)).isoformat(),
-                    "period_end": end_date.isoformat() if end_date else datetime.now().isoformat(),
-                }
-
+                cost_analysis = self._format_cost_analysis(
+                    cost_summary=cost_summary,
+                    metrics=metrics,
+                    filter_tenant_id=filter_tenant_id,
+                    start_date=start_date,
+                    end_date=end_date,
+                    time_range_hours=time_range_hours,
+                )
                 return ServiceResponse(
                     success=True,
                     data=cost_analysis,
@@ -352,7 +424,11 @@ def create_llmops_service(
 
     # Initialize integrations
     nats_client = create_nats_client(config.nats_url) if config.enable_nats else None
-    otel_tracer = create_otel_tracer(service_name, config.otel_exporter_otlp_endpoint) if config.enable_otel else None
+    otel_tracer = (
+        create_otel_tracer(service_name, config.otel_exporter_otlp_endpoint)
+        if config.enable_otel
+        else None
+    )
 
     # Create service
     service = LLMOpsService(
@@ -363,4 +439,3 @@ def create_llmops_service(
     )
 
     return service.app
-

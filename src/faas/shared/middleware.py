@@ -200,4 +200,3 @@ def logging_middleware(func: Callable) -> Callable:
             raise
 
     return wrapper
-

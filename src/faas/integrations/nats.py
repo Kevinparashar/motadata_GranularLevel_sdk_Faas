@@ -31,7 +31,8 @@ class NATSClient:
 
     async def connect(self):
         """Connect to NATS server."""
-        # TODO: Implement actual NATS connection
+        # TODO: SDK-INT-001 - Implement actual NATS connection
+        # Placeholder implementation - replace with actual NATS client when integration is ready
         # from nats.aio.client import Client as NATS
         # self._client = NATS()
         # await self._client.connect(self.nats_url)
@@ -40,7 +41,8 @@ class NATSClient:
 
     async def disconnect(self):
         """Disconnect from NATS server."""
-        # TODO: Implement actual NATS disconnection
+        # TODO: SDK-INT-001 - Implement actual NATS disconnection
+        # Placeholder implementation - replace with actual NATS client when integration is ready
         # if self._client:
         #     await self._client.close()
         self._connected = False
@@ -58,7 +60,8 @@ class NATSClient:
         if not self._connected:
             await self.connect()
 
-        # TODO: Implement actual NATS publish
+        # TODO: SDK-INT-001 - Implement actual NATS publish
+        # Placeholder implementation - replace with actual NATS client when integration is ready
         # await self._client.publish(subject, payload, reply=reply)
         logger.info(f"NATS publish (placeholder): subject={subject}, payload_size={len(payload)}")
 
@@ -74,7 +77,8 @@ class NATSClient:
         if not self._connected:
             await self.connect()
 
-        # TODO: Implement actual NATS subscribe
+        # TODO: SDK-INT-001 - Implement actual NATS subscribe
+        # Placeholder implementation - replace with actual NATS client when integration is ready
         # await self._client.subscribe(subject, cb=callback, queue=queue)
         logger.info(f"NATS subscribe (placeholder): subject={subject}, queue={queue}")
 
@@ -93,7 +97,8 @@ class NATSClient:
         if not self._connected:
             await self.connect()
 
-        # TODO: Implement actual NATS request
+        # TODO: SDK-INT-001 - Implement actual NATS request
+        # Placeholder implementation - replace with actual NATS client when integration is ready
         # response = await self._client.request(subject, payload, timeout=timeout)
         # return response.data
         logger.info(f"NATS request (placeholder): subject={subject}, timeout={timeout}")
@@ -132,4 +137,3 @@ def create_nats_client(nats_url: Optional[str] = None) -> Optional[NATSClient]:
         if nats_url:
             return NATSClient(nats_url)
         return None
-

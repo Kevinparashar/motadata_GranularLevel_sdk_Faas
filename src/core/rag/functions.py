@@ -4,16 +4,17 @@ RAG System - High-Level Functions
 Factory functions, convenience functions, and utilities for RAG system.
 """
 
-from typing import Any, Dict, List, Optional
-from .rag_system import RAGSystem
-from .document_processor import DocumentProcessor
-from ..postgresql_database.connection import DatabaseConnection
-from ..litellm_gateway import LiteLLMGateway
+from typing import Any, Awaitable, Callable, Dict, List, Optional
 
+from ..litellm_gateway import LiteLLMGateway
+from ..postgresql_database.connection import DatabaseConnection
+from .document_processor import DocumentProcessor
+from .rag_system import RAGSystem
 
 # ============================================================================
 # Factory Functions
 # ============================================================================
+
 
 def create_rag_system(
     db: DatabaseConnection,
@@ -22,7 +23,7 @@ def create_rag_system(
     generation_model: str = "gpt-4",
     enable_memory: bool = True,
     memory_config: Optional[Dict[str, Any]] = None,
-    **kwargs: Any
+    **kwargs: Any,
 ) -> RAGSystem:
     """
     Create and configure a RAG system with default settings.
@@ -51,7 +52,7 @@ def create_rag_system(
         generation_model=generation_model,
         enable_memory=enable_memory,
         memory_config=memory_config,
-        **kwargs
+        **kwargs,
     )
 
 
@@ -65,7 +66,7 @@ def create_document_processor(
     enable_metadata_extraction: bool = True,
     metadata_schema: Optional[Any] = None,
     enable_multimodal: bool = True,
-    gateway: Optional[LiteLLMGateway] = None
+    gateway: Optional[LiteLLMGateway] = None,
 ) -> DocumentProcessor:
     """
     Create a document processor with specified configuration.
@@ -101,13 +102,14 @@ def create_document_processor(
         enable_metadata_extraction=enable_metadata_extraction,
         metadata_schema=metadata_schema,
         enable_multimodal=enable_multimodal,
-        gateway=gateway
+        gateway=gateway,
     )
 
 
 # ============================================================================
 # High-Level Convenience Functions
 # ============================================================================
+
 
 def quick_rag_query(
     rag_system: RAGSystem,
@@ -119,7 +121,7 @@ def quick_rag_query(
     use_query_rewriting: bool = True,
     retrieval_strategy: str = "vector",
     user_id: Optional[str] = None,
-    conversation_id: Optional[str] = None
+    conversation_id: Optional[str] = None,
 ) -> Dict[str, Any]:
     """
     Quick RAG query without manual setup (high-level convenience).
@@ -152,7 +154,7 @@ def quick_rag_query(
         use_query_rewriting=use_query_rewriting,
         retrieval_strategy=retrieval_strategy,
         user_id=user_id,
-        conversation_id=conversation_id
+        conversation_id=conversation_id,
     )
 
 
@@ -166,7 +168,7 @@ async def quick_rag_query_async(
     use_query_rewriting: bool = True,
     retrieval_strategy: str = "vector",
     user_id: Optional[str] = None,
-    conversation_id: Optional[str] = None
+    conversation_id: Optional[str] = None,
 ) -> Dict[str, Any]:
     """
     Quick async RAG query (high-level convenience).
@@ -199,7 +201,7 @@ async def quick_rag_query_async(
         use_query_rewriting=use_query_rewriting,
         retrieval_strategy=retrieval_strategy,
         user_id=user_id,
-        conversation_id=conversation_id
+        conversation_id=conversation_id,
     )
 
 
@@ -209,7 +211,7 @@ def ingest_document_simple(
     content: str,
     tenant_id: Optional[str] = None,
     source: Optional[str] = None,
-    metadata: Optional[Dict[str, Any]] = None
+    metadata: Optional[Dict[str, Any]] = None,
 ) -> str:
     """
     Ingest a document with simplified interface (high-level convenience).
@@ -232,10 +234,7 @@ def ingest_document_simple(
         ... )
     """
     return rag_system.ingest_document(
-        title=title,
-        content=content,
-        source=source,
-        metadata=metadata
+        title=title, content=content, tenant_id=tenant_id, source=source, metadata=metadata
     )
 
 
@@ -244,7 +243,7 @@ async def ingest_document_simple_async(
     title: str,
     content: str,
     source: Optional[str] = None,
-    metadata: Optional[Dict[str, Any]] = None
+    metadata: Optional[Dict[str, Any]] = None,
 ) -> str:
     """
     Ingest a document asynchronously with simplified interface.
@@ -267,17 +266,12 @@ async def ingest_document_simple_async(
         ... )
     """
     return await rag_system.ingest_document_async(
-        title=title,
-        content=content,
-        source=source,
-        metadata=metadata
+        title=title, content=content, source=source, metadata=metadata
     )
 
 
 def batch_ingest_documents(
-    rag_system: RAGSystem,
-    documents: List[Dict[str, Any]],
-    batch_size: int = 10
+    rag_system: RAGSystem, documents: List[Dict[str, Any]], batch_size: int = 10
 ) -> List[str]:
     """
     Batch ingest multiple documents (high-level convenience).
@@ -297,16 +291,11 @@ def batch_ingest_documents(
         ... ]
         >>> doc_ids = batch_ingest_documents(rag, docs)
     """
-    return rag_system.ingest_documents_batch(
-        documents=documents,
-        batch_size=batch_size
-    )
+    return rag_system.ingest_documents_batch(documents=documents, batch_size=batch_size)
 
 
 async def batch_ingest_documents_async(
-    rag_system: RAGSystem,
-    documents: List[Dict[str, Any]],
-    batch_size: int = 10
+    rag_system: RAGSystem, documents: List[Dict[str, Any]], batch_size: int = 10
 ) -> List[str]:
     """
     Batch ingest multiple documents asynchronously (high-level convenience).
@@ -322,28 +311,26 @@ async def batch_ingest_documents_async(
     Example:
         >>> doc_ids = await batch_ingest_documents_async(rag, docs)
     """
-    return await rag_system.ingest_documents_batch_async(
-        documents=documents,
-        batch_size=batch_size
-    )
+    return await rag_system.ingest_documents_batch_async(documents=documents, batch_size=batch_size)
 
 
 # ============================================================================
 # Utility Functions
 # ============================================================================
 
+
 def batch_process_documents(
     documents: List[Dict[str, Any]],
-    processor: Any,
+    processor: Callable[[Dict[str, Any]], Awaitable[Any]],
     batch_size: int = 10,
-    max_concurrent: int = 5
+    max_concurrent: int = 5,
 ) -> List[Any]:
     """
     Process documents in batches with concurrency control.
 
     Args:
         documents: List of documents to process
-        processor: Function to process each document
+        processor: Async function to process each document
         batch_size: Size of each batch
         max_concurrent: Maximum concurrent batches
 
@@ -358,15 +345,19 @@ def batch_process_documents(
         ... )
     """
     import asyncio
+    from asyncio import Semaphore
 
-    async def _process_batch(batch):
-        tasks = [processor(doc) for doc in batch]
-        return await asyncio.gather(*tasks, return_exceptions=True)
+    semaphore = Semaphore(max_concurrent)
 
-    async def _process_all():
-        results = []
+    async def _process_batch(batch: List[Dict[str, Any]]) -> List[Any]:
+        async with semaphore:
+            tasks = [processor(doc) for doc in batch]
+            return await asyncio.gather(*tasks, return_exceptions=True)
+
+    async def _process_all() -> List[Any]:
+        results: List[Any] = []
         for i in range(0, len(documents), batch_size):
-            batch = documents[i:i + batch_size]
+            batch = documents[i : i + batch_size]
             batch_results = await _process_batch(batch)
             results.extend(batch_results)
         return results
@@ -379,7 +370,7 @@ def update_document_simple(
     document_id: str,
     title: Optional[str] = None,
     content: Optional[str] = None,
-    metadata: Optional[Dict[str, Any]] = None
+    metadata: Optional[Dict[str, Any]] = None,
 ) -> bool:
     """
     Update a document in the RAG system (high-level convenience).
@@ -404,10 +395,7 @@ def update_document_simple(
     return rag_system.update_document(document_id, title, content, metadata)
 
 
-def delete_document_simple(
-    rag_system: RAGSystem,
-    document_id: str
-) -> bool:
+def delete_document_simple(rag_system: RAGSystem, document_id: str) -> bool:
     """
     Delete a document from the RAG system (high-level convenience).
 
@@ -440,4 +428,3 @@ __all__ = [
     # Utility functions
     "batch_process_documents",
 ]
-

@@ -7,39 +7,38 @@ Handles prompt-based agent and tool creation, feedback collection, and permissio
 import logging
 from typing import Any, Dict, Optional
 
-import httpx
-from fastapi import FastAPI, HTTPException, Header, status
+from fastapi import FastAPI, Header, HTTPException, status
 
+from ....core.litellm_gateway import create_gateway
 from ....core.prompt_based_generator import (
+    check_permission,
     create_agent_from_prompt,
     create_tool_from_prompt,
-    rate_agent,
-    rate_tool,
-    grant_permission,
-    check_permission,
     get_agent_feedback_stats,
     get_tool_feedback_stats,
+    grant_permission,
+    rate_agent,
+    rate_tool,
 )
-from ....core.litellm_gateway import create_gateway
+from ...integrations.codec import create_codec_manager
+from ...integrations.nats import create_nats_client
+from ...integrations.otel import create_otel_tracer
 from ...shared.config import ServiceConfig, load_config
 from ...shared.contracts import ServiceResponse, extract_headers
 from ...shared.database import get_database_connection
-from ...shared.exceptions import NotFoundError, DependencyError, ValidationError
+from ...shared.exceptions import DependencyError, NotFoundError, ValidationError
 from ...shared.middleware import setup_middleware
 from .models import (
+    AgentGenerationResponse,
     CreateAgentFromPromptRequest,
     CreateToolFromPromptRequest,
-    RateAgentRequest,
-    RateToolRequest,
-    GrantPermissionRequest,
-    AgentGenerationResponse,
-    ToolGenerationResponse,
     FeedbackResponse,
     FeedbackStatsResponse,
+    GrantPermissionRequest,
+    RateAgentRequest,
+    RateToolRequest,
+    ToolGenerationResponse,
 )
-from ...integrations.nats import create_nats_client
-from ...integrations.otel import create_otel_tracer
-from ...integrations.codec import create_codec_manager
 
 logger = logging.getLogger(__name__)
 
@@ -82,6 +81,7 @@ class PromptGeneratorService:
         # Create gateway for LLM calls
         # Note: In production, API keys should come from environment or config
         import os
+
         api_key = os.getenv("OPENAI_API_KEY", "")
         if api_key:
             self.gateway = create_gateway(api_keys={"openai": api_key})
@@ -105,7 +105,11 @@ class PromptGeneratorService:
     def _register_routes(self):
         """Register FastAPI routes."""
 
-        @self.app.post("/api/v1/prompt/agents", response_model=ServiceResponse, status_code=status.HTTP_201_CREATED)
+        @self.app.post(
+            "/api/v1/prompt/agents",
+            response_model=ServiceResponse,
+            status_code=status.HTTP_201_CREATED,
+        )
         async def create_agent_from_prompt_endpoint(
             request: CreateAgentFromPromptRequest,
             headers: dict = Header(...),
@@ -137,7 +141,11 @@ class PromptGeneratorService:
                     detail=f"Failed to create agent from prompt: {str(e)}",
                 )
 
-        @self.app.post("/api/v1/prompt/tools", response_model=ServiceResponse, status_code=status.HTTP_201_CREATED)
+        @self.app.post(
+            "/api/v1/prompt/tools",
+            response_model=ServiceResponse,
+            status_code=status.HTTP_201_CREATED,
+        )
         async def create_tool_from_prompt_endpoint(
             request: CreateToolFromPromptRequest,
             headers: dict = Header(...),
@@ -325,11 +333,12 @@ class PromptGeneratorService:
         # Create gateway if not already created
         if not self.gateway:
             import os
+
             api_key = os.getenv("OPENAI_API_KEY", "")
             gateway = create_gateway(api_keys={"openai": api_key}) if api_key else create_gateway()
         else:
             gateway = self.gateway
-            
+
         agent = await create_agent_from_prompt(
             prompt=request.prompt,
             gateway=gateway,
@@ -356,11 +365,12 @@ class PromptGeneratorService:
         # Create gateway if not already created
         if not self.gateway:
             import os
+
             api_key = os.getenv("OPENAI_API_KEY", "")
             gateway = create_gateway(api_keys={"openai": api_key}) if api_key else create_gateway()
         else:
             gateway = self.gateway
-            
+
         tool = await create_tool_from_prompt(
             prompt=request.prompt,
             gateway=gateway,
@@ -400,7 +410,11 @@ def create_prompt_generator_service(
 
     # Initialize integrations
     nats_client = create_nats_client(config.nats_url) if config.enable_nats else None
-    otel_tracer = create_otel_tracer(service_name, config.otel_exporter_otlp_endpoint) if config.enable_otel else None
+    otel_tracer = (
+        create_otel_tracer(service_name, config.otel_exporter_otlp_endpoint)
+        if config.enable_otel
+        else None
+    )
 
     # Create service
     service = PromptGeneratorService(
@@ -411,4 +425,3 @@ def create_prompt_generator_service(
     )
 
     return service.app
-

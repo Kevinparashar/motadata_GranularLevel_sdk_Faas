@@ -4,14 +4,13 @@ Agno Agent Framework - High-Level Functions
 Factory functions, convenience functions, and utilities for agent framework.
 """
 
-from typing import Any, Dict, List, Optional, TypeVar, Callable, cast
-from .agent import Agent, AgentManager, AgentTask, AgentStatus
-from .memory import AgentMemory, MemoryType
-from .session import AgentSession, SessionManager
-from .tools import Tool, ToolRegistry, ToolExecutor
-from .plugins import PluginManager
-from .orchestration import AgentOrchestrator, WorkflowPipeline
-from ..utils.type_helpers import GatewayProtocol, ConfigDict, MetadataDict
+from typing import Any, Dict, List, Optional
+
+from ..utils.type_helpers import ConfigDict, GatewayProtocol
+from .agent import Agent, AgentManager
+from .orchestration import AgentOrchestrator
+from .session import SessionManager
+from .tools import Tool, ToolRegistry
 
 # Import Prompt Context Management
 try:
@@ -19,17 +18,10 @@ try:
 except ImportError:
     create_prompt_manager = None
 
-# Import Prompt-Based Generator (optional)
-try:
-    from ..prompt_based_generator import create_agent_from_prompt, create_tool_from_prompt
-except ImportError:
-    create_agent_from_prompt = None
-    create_tool_from_prompt = None
-
-
 # ============================================================================
 # Factory Functions
 # ============================================================================
+
 
 def create_agent(
     agent_id: str,
@@ -39,7 +31,7 @@ def create_agent(
     description: str = "",
     llm_model: Optional[str] = None,
     llm_provider: Optional[str] = None,
-    **kwargs: Any
+    **kwargs: Any,
 ) -> Agent:
     """
     Create and configure an agent with default settings.
@@ -69,7 +61,7 @@ def create_agent(
         gateway=gateway,
         llm_model=llm_model,
         llm_provider=llm_provider,
-        **kwargs
+        **kwargs,
     )
 
 
@@ -77,9 +69,8 @@ def create_agent_with_memory(
     agent_id: str,
     name: str,
     gateway: GatewayProtocol,
-    tenant_id: Optional[str] = None,
     memory_config: Optional[ConfigDict] = None,
-    **kwargs: Any
+    **kwargs: Any,
 ) -> Agent:
     """
     Create an agent with memory pre-configured.
@@ -130,7 +121,7 @@ def create_agent_with_prompt_management(
     role_template: Optional[str] = None,
     max_context_tokens: int = 4000,
     prompt_config: Optional[Dict[str, Any]] = None,
-    **kwargs: Any
+    **kwargs: Any,
 ) -> Agent:
     """
     Create an agent with prompt context management pre-configured.
@@ -163,16 +154,13 @@ def create_agent_with_prompt_management(
 
     if create_prompt_manager:
         prompt_max_tokens = max_context_tokens
-        safety_margin = 200
 
         if prompt_config:
             prompt_max_tokens = prompt_config.get("max_tokens", max_context_tokens)
-            safety_margin = prompt_config.get("safety_margin", 200)
+            # Note: safety_margin is available in prompt_config but not used by attach_prompt_manager
 
         agent.attach_prompt_manager(
-            max_tokens=prompt_max_tokens,
-            system_prompt=system_prompt,
-            role_template=role_template
+            max_tokens=prompt_max_tokens, system_prompt=system_prompt, role_template=role_template
         )
 
         # Add templates if provided
@@ -182,7 +170,7 @@ def create_agent_with_prompt_management(
                     name=template["name"],
                     version=template.get("version", "1.0"),
                     content=template["content"],
-                    metadata=template.get("metadata")
+                    metadata=template.get("metadata"),
                 )
     else:
         # If prompt manager not available, set basic config
@@ -203,7 +191,7 @@ def create_agent_with_tools(
     tool_registry: Optional[ToolRegistry] = None,
     enable_tool_calling: bool = True,
     max_tool_iterations: int = 10,
-    **kwargs: Any
+    **kwargs: Any,
 ) -> Agent:
     """
     Create an agent with tools pre-configured.
@@ -289,12 +277,13 @@ def create_orchestrator(agent_manager: AgentManager) -> AgentOrchestrator:
 # High-Level Convenience Functions
 # ============================================================================
 
+
 async def execute_task(
     agent: Agent,
     task_type: str,
     parameters: Dict[str, Any],
     tenant_id: Optional[str] = None,
-    priority: int = 0
+    priority: int = 0,
 ) -> Dict[str, Any]:  # Task result is typically a dict
     """
     Execute a task on an agent (high-level convenience function).
@@ -325,7 +314,7 @@ async def chat_with_agent(
     message: str,
     tenant_id: Optional[str] = None,
     session_id: Optional[str] = None,
-    context: Optional[Dict[str, Any]] = None
+    context: Optional[Dict[str, Any]] = None,
 ) -> Dict[str, Any]:
     """
     Chat with an agent using session management (high-level convenience).
@@ -349,7 +338,7 @@ async def chat_with_agent(
     """
     # Create or get session manager
     # Use a module-level session manager or create one per agent
-    if not hasattr(chat_with_agent, '_session_managers'):
+    if not hasattr(chat_with_agent, "_session_managers"):
         chat_with_agent._session_managers = {}
 
     if agent.agent_id not in chat_with_agent._session_managers:
@@ -376,8 +365,8 @@ async def chat_with_agent(
             "messages": [
                 {"role": msg.role, "content": msg.content}
                 for msg in session.messages[-10:]  # Last 10 messages
-            ]
-        }
+            ],
+        },
     )
 
     # Extract answer
@@ -386,11 +375,7 @@ async def chat_with_agent(
     # Add assistant response to session
     session.add_message("assistant", answer)
 
-    return {
-        "answer": answer,
-        "session_id": session.session_id,
-        "result": result
-    }
+    return {"answer": answer, "session_id": session.session_id, "result": result}
 
 
 async def delegate_task(
@@ -399,7 +384,7 @@ async def delegate_task(
     to_agent_id: str,
     task_type: str,
     parameters: Dict[str, Any],
-    priority: int = 5
+    priority: int = 5,
 ) -> Dict[str, Any]:  # Task result is typically a dict
     """
     Delegate a task from one agent to another (high-level convenience).
@@ -425,18 +410,11 @@ async def delegate_task(
         ... )
     """
     return await orchestrator.delegate_task(
-        from_agent_id,
-        to_agent_id,
-        task_type,
-        parameters,
-        priority
+        from_agent_id, to_agent_id, task_type, parameters, priority
     )
 
 
-def find_agents_by_capability(
-    manager: AgentManager,
-    capability_name: str
-) -> List[Agent]:
+def find_agents_by_capability(manager: AgentManager, capability_name: str) -> List[Agent]:
     """
     Find agents with a specific capability (high-level convenience).
 
@@ -459,14 +437,12 @@ def find_agents_by_capability(
 # Utility Functions
 # ============================================================================
 
+
 def batch_process_agents(
-    agents: List[Agent],
-    task_type: str,
-    parameters: Dict[str, Any],
-    max_concurrent: int = 5
+    agents: List[Agent], task_type: str, parameters: Dict[str, Any], max_concurrent: int = 5
 ) -> List[Any]:
     """
-    Process tasks on multiple agents concurrently.
+    Process tasks on multiple agents concurrently with controlled concurrency.
 
     Args:
         agents: List of agent instances
@@ -481,25 +457,69 @@ def batch_process_agents(
         >>> results = batch_process_agents(
         ...     [agent1, agent2, agent3],
         ...     "analyze",
-        ...     {"text": "..."}
+        ...     {"text": "..."},
+        ...     max_concurrent=2
         ... )
     """
     import asyncio
 
     async def _process():
-        tasks = [
-            execute_task(agent, task_type, parameters)
-            for agent in agents
-        ]
+        semaphore = asyncio.Semaphore(max_concurrent)
+
+        async def _bounded_execute(agent):
+            async with semaphore:
+                return await execute_task(agent, task_type, parameters)
+
+        tasks = [_bounded_execute(agent) for agent in agents]
         return await asyncio.gather(*tasks, return_exceptions=True)
 
     return asyncio.run(_process())
 
 
+def _create_async_retry_wrapper(func, max_retries, retry_delay, exceptions):
+    """Create async wrapper with retry logic."""
+    import asyncio
+    from functools import wraps
+
+    @wraps(func)
+    async def async_wrapper(*args, **kwargs):
+        last_error = None
+        for attempt in range(max_retries):
+            try:
+                return await func(*args, **kwargs)
+            except exceptions as e:
+                last_error = e
+                if attempt < max_retries - 1:
+                    await asyncio.sleep(retry_delay * (attempt + 1))
+                else:
+                    raise last_error
+
+    return async_wrapper
+
+
+def _create_sync_retry_wrapper(func, max_retries, retry_delay, exceptions):
+    """Create sync wrapper with retry logic."""
+    import time
+    from functools import wraps
+
+    @wraps(func)
+    def sync_wrapper(*args, **kwargs):
+        last_error = None
+        for attempt in range(max_retries):
+            try:
+                return func(*args, **kwargs)
+            except exceptions as e:
+                last_error = e
+                if attempt < max_retries - 1:
+                    time.sleep(retry_delay * (attempt + 1))
+                else:
+                    raise last_error
+
+    return sync_wrapper
+
+
 def retry_on_failure(
-    max_retries: int = 3,
-    retry_delay: float = 1.0,
-    exceptions: tuple = (Exception,)
+    max_retries: int = 3, retry_delay: float = 1.0, exceptions: tuple = (Exception,)
 ):
     """
     Decorator to retry function on failure.
@@ -519,50 +539,19 @@ def retry_on_failure(
         ...     pass
     """
     import asyncio
-    from functools import wraps
+    from typing import Callable, TypeVar, cast
 
-    from typing import TypeVar, Callable, cast
-    F = TypeVar('F', bound=Callable[..., Any])
-    
+    F = TypeVar("F", bound=Callable[..., Any])
+
     def decorator(func: F) -> F:
-        @wraps(func)
-        async def async_wrapper(*args, **kwargs):
-            last_error = None
-            for attempt in range(max_retries):
-                try:
-                    return await func(*args, **kwargs)
-                except exceptions as e:
-                    last_error = e
-                    if attempt < max_retries - 1:
-                        await asyncio.sleep(retry_delay * (attempt + 1))
-                    else:
-                        raise last_error
-
-        @wraps(func)
-        def sync_wrapper(*args, **kwargs):
-            import time
-            last_error = None
-            for attempt in range(max_retries):
-                try:
-                    return func(*args, **kwargs)
-                except exceptions as e:
-                    last_error = e
-                    if attempt < max_retries - 1:
-                        time.sleep(retry_delay * (attempt + 1))
-                    else:
-                        raise last_error
-
         if asyncio.iscoroutinefunction(func):
-            return cast(F, async_wrapper)
-        return cast(F, sync_wrapper)
+            return cast(F, _create_async_retry_wrapper(func, max_retries, retry_delay, exceptions))
+        return cast(F, _create_sync_retry_wrapper(func, max_retries, retry_delay, exceptions))
 
     return decorator
 
 
-def save_agent_state(
-    agent: Agent,
-    file_path: Optional[str] = None
-) -> None:
+def save_agent_state(agent: Agent, file_path: Optional[str] = None) -> None:
     """
     Save agent state to disk for persistence (utility function).
 
@@ -576,10 +565,7 @@ def save_agent_state(
     agent.save_state(file_path)
 
 
-def load_agent_state(
-    file_path: str,
-    gateway: GatewayProtocol
-) -> Agent:
+def load_agent_state(file_path: str, gateway: GatewayProtocol) -> Agent:
     """
     Load agent state from disk (utility function).
 
@@ -614,4 +600,3 @@ __all__ = [
     "save_agent_state",
     "load_agent_state",
 ]
-

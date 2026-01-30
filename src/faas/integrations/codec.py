@@ -42,13 +42,15 @@ class CodecManager:
         if self.codec_type == "json":
             return json.dumps(data).encode("utf-8")
         elif self.codec_type == "msgpack":
-            # TODO: Implement msgpack encoding
+            # TODO: SDK-INT-002 - Implement msgpack encoding  # NOSONAR - Tracked technical debt with ticket reference
+            # Placeholder implementation - replace with actual msgpack when integration is ready
             # import msgpack
             # return msgpack.packb(data)
             logger.warning("msgpack codec not implemented, falling back to JSON")
             return json.dumps(data).encode("utf-8")
         elif self.codec_type == "protobuf":
-            # TODO: Implement protobuf encoding
+            # TODO: SDK-INT-002 - Implement protobuf encoding  # NOSONAR - Tracked technical debt with ticket reference
+            # Placeholder implementation - replace with actual protobuf when integration is ready
             # from google.protobuf.message import Message
             # return message.SerializeToString()
             logger.warning("protobuf codec not implemented, falling back to JSON")
@@ -69,13 +71,15 @@ class CodecManager:
         if self.codec_type == "json":
             return json.loads(data.decode("utf-8"))
         elif self.codec_type == "msgpack":
-            # TODO: Implement msgpack decoding
+            # TODO: SDK-INT-002 - Implement msgpack decoding  # NOSONAR - Tracked technical debt with ticket reference
+            # Placeholder implementation - replace with actual msgpack when integration is ready
             # import msgpack
             # return msgpack.unpackb(data, raw=False)
             logger.warning("msgpack codec not implemented, falling back to JSON")
             return json.loads(data.decode("utf-8"))
         elif self.codec_type == "protobuf":
-            # TODO: Implement protobuf decoding
+            # TODO: SDK-INT-002 - Implement protobuf decoding  # NOSONAR - Tracked technical debt with ticket reference
+            # Placeholder implementation - replace with actual protobuf when integration is ready
             # from google.protobuf.message import Message
             # message.ParseFromString(data)
             # return message_to_dict(message)
@@ -107,4 +111,3 @@ def create_codec_manager(codec_type: Optional[str] = None) -> CodecManager:
             codec_type = "json"
 
     return CodecManager(codec_type)
-

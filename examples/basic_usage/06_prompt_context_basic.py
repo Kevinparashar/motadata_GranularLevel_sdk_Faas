@@ -7,9 +7,9 @@ for template-based prompts with versioning.
 Dependencies: Agent Framework, Evaluation & Observability
 """
 
-import os
 import sys
 from pathlib import Path
+
 from dotenv import load_dotenv
 
 # Add project root to path
@@ -19,150 +19,137 @@ sys.path.insert(0, str(project_root))
 load_dotenv(project_root / ".env")
 
 from src.core.prompt_context_management import (
+    ContextWindowManager,
+    PromptContextManager,
     PromptTemplate,
-    PromptManager,
-    ContextBuilder
 )
 
 
 def main():
     """Demonstrate basic prompt context management."""
-    
+
     # 1. Create Prompt Templates
     print("=== Prompt Templates ===")
-    
+
     template = PromptTemplate(
         name="qa_template",
         version="1.0.0",
-        template="""
-You are a helpful assistant. Answer the following question based on the context provided.
+        content="""You are a helpful assistant. Answer the following question based on the context provided.
 
 Context: {context}
 
 Question: {question}
 
-Answer:
-        """.strip(),
-        variables=["context", "question"]
+Answer:""",
     )
-    
+
     print(f"Created template: {template.name} v{template.version}")
-    print(f"Variables: {template.variables}")
-    
-    # 2. Render Template
-    print("\n=== Template Rendering ===")
-    
-    rendered = template.render(
-        context="Python is a programming language.",
-        question="What is Python?"
-    )
-    
-    print("Rendered prompt:")
-    print(rendered)
-    
-    # 3. Prompt Manager
+
+    # 2. Prompt Manager with Templates
     print("\n=== Prompt Manager ===")
-    
-    manager = PromptManager()
-    
-    # Register templates
-    manager.register_template(template)
-    
-    # Create another version
-    template_v2 = PromptTemplate(
+
+    manager = PromptContextManager(max_tokens=4000)
+
+    # Add templates
+    manager.add_template(
+        name="qa_template",
+        version="1.0.0",
+        content="""You are a helpful assistant. Answer the following question based on the context provided.
+
+Context: {context}
+
+Question: {question}
+
+Answer:""",
+    )
+
+    manager.add_template(
         name="qa_template",
         version="2.0.0",
-        template="""
-Based on the context below, provide a clear and concise answer to the question.
+        content="""Based on the context below, provide a clear and concise answer to the question.
 
 Context: {context}
 
 Question: {question}
 
-Please provide your answer:
-        """.strip(),
-        variables=["context", "question"]
+Please provide your answer:""",
     )
-    
-    manager.register_template(template_v2)
-    
-    # Get template by name and version
-    template_1 = manager.get_template("qa_template", version="1.0.0")
-    template_2 = manager.get_template("qa_template", version="2.0.0")
-    
-    print(f"Template v1.0.0: {template_1.name}")
-    print(f"Template v2.0.0: {template_2.name}")
-    
-    # List all versions
-    versions = manager.list_versions("qa_template")
-    print(f"Available versions: {versions}")
-    
-    # 4. Context Building
+
+    print("Registered 2 template versions")
+
+    # 3. Template Rendering
+    print("\n=== Template Rendering ===")
+
+    rendered = manager.render(
+        template_name="qa_template",
+        version="1.0.0",
+        variables={"context": "Python is a programming language.", "question": "What is Python?"},
+    )
+
+    print("Rendered prompt:")
+    print(rendered)
+
+    # 4. Context Window Management
+    print("\n=== Context Window Management ===")
+
+    window_manager = ContextWindowManager(max_tokens=1000, safety_margin=100)
+
+    # Estimate tokens
+    sample_text = "This is a sample text for token estimation."
+    tokens = window_manager.estimate_tokens(sample_text)
+    print(f"Estimated tokens: {tokens}")
+
+    # Truncate long text
+    long_text = " ".join(["word"] * 2000)
+    truncated = window_manager.truncate(long_text, max_tokens=500)
+    print(f"Truncated from {len(long_text.split())} to {len(truncated.split())} words")
+
+    # 5. Context Building from Messages
     print("\n=== Context Building ===")
-    
-    context_builder = ContextBuilder()
-    
-    # Add context items
-    context_builder.add_item("user_name", "John Doe")
-    context_builder.add_item("user_role", "developer")
-    context_builder.add_item("conversation_history", [
-        {"role": "user", "content": "Hello"},
-        {"role": "assistant", "content": "Hi! How can I help?"}
-    ])
-    
-    # Build context
-    context = context_builder.build()
-    print(f"Built context with {len(context)} items")
-    
-    # 5. Template with Context
-    print("\n=== Template with Context ===")
-    
-    personalized_template = PromptTemplate(
+
+    messages = [
+        "User: Hello",
+        "Assistant: Hi! How can I help?",
+        "User: Tell me about Python",
+        "Assistant: Python is a high-level programming language...",
+    ]
+
+    context = window_manager.build_context(messages, max_tokens=100)
+    print("Built context from messages:")
+    print(context)
+
+    # 6. Template with Context Variables
+    print("\n=== Template with Variables ===")
+
+    manager.add_template(
         name="personalized_template",
         version="1.0.0",
-        template="""
-Hello {user_name}! You are a {user_role}.
+        content="""Hello {user_name}! You are a {user_role}.
 
-Previous conversation:
-{conversation_history}
+How can I assist you today?""",
+    )
 
-How can I assist you today?
-        """.strip(),
-        variables=["user_name", "user_role", "conversation_history"]
+    personalized_prompt = manager.render(
+        template_name="personalized_template",
+        version="1.0.0",
+        variables={"user_name": "John Doe", "user_role": "developer"},
     )
-    
-    # Format conversation history
-    history_str = "\n".join([
-        f"{msg['role']}: {msg['content']}"
-        for msg in context["conversation_history"]
-    ])
-    
-    personalized_prompt = personalized_template.render(
-        user_name=context["user_name"],
-        user_role=context["user_role"],
-        conversation_history=history_str
-    )
-    
+
     print("Personalized prompt:")
     print(personalized_prompt)
-    
-    # 6. A/B Testing Support
-    print("\n=== A/B Testing ===")
-    
-    # Get template for A/B test
-    test_template = manager.get_template("qa_template", version="2.0.0")
-    
-    # Track usage
-    manager.track_usage("qa_template", "2.0.0", success=True)
-    manager.track_usage("qa_template", "1.0.0", success=True)
-    
-    # Get usage statistics
-    stats = manager.get_usage_stats("qa_template")
-    print(f"Usage stats: {stats}")
-    
+
+    # 7. Prompt History
+    print("\n=== Prompt History ===")
+
+    manager.record_history("First prompt")
+    manager.record_history("Second prompt")
+    manager.record_history("Third prompt")
+
+    print(f"Prompt history count: {len(manager.history)}")
+    print(f"Latest prompts: {manager.history[-2:]}")
+
     print("\n✅ Prompt context management example completed successfully!")
 
 
 if __name__ == "__main__":
     main()
-

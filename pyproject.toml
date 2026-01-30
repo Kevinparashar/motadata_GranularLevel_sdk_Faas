@@ -83,11 +83,29 @@ line_length = 100
 known_first_party = ["src"]
 
 [tool.mypy]
-python_version = "3.8"
+python_version = "3.9"
 warn_return_any = true
 warn_unused_configs = true
 disallow_untyped_defs = false
 ignore_missing_imports = false
+
+# Ignore missing stubs for optional dependencies
+[[tool.mypy.overrides]]
+module = [
+    "sklearn.*",
+    "joblib.*",
+    "mlflow.*",
+    "PyPDF2.*",
+    "speech_recognition.*",
+    "pydub.*",
+    "PIL.*",
+    "pytesseract.*",
+    "cv2.*",
+    "bs4.*",
+    "sentence_transformers.*",
+    "src.faas.core.*",
+]
+ignore_missing_imports = true
 
 [tool.pytest.ini_options]
 testpaths = ["src/tests"]

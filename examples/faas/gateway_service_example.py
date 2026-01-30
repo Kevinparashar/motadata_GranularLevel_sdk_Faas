@@ -5,6 +5,7 @@ Demonstrates how to interact with Gateway Service for LLM access.
 """
 
 import asyncio
+
 import httpx
 
 
@@ -71,4 +72,3 @@ async def main():
 
 if __name__ == "__main__":
     asyncio.run(main())
-

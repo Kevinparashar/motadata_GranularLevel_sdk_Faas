@@ -5,13 +5,13 @@ Unified interface for uploading and processing data files with automatic
 integration into RAG, Agents, Cache, and other AI components.
 """
 
-from .ingestion_service import DataIngestionService
 from .functions import (
+    batch_upload_and_process,
     create_ingestion_service,
     upload_and_process,
     upload_and_process_async,
-    batch_upload_and_process,
 )
+from .ingestion_service import DataIngestionService
 
 __all__ = [
     # Core classes
@@ -23,4 +23,3 @@ __all__ = [
     "upload_and_process_async",
     "batch_upload_and_process",
 ]
-

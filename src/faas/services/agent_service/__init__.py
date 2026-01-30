@@ -5,16 +5,16 @@ Provides REST API for agent management, task execution, chat interactions,
 memory management, and tool management.
 """
 
-from .service import AgentService, create_agent_service
 from .models import (
-    CreateAgentRequest,
-    UpdateAgentRequest,
-    ExecuteTaskRequest,
-    ChatRequest,
     AgentResponse,
-    TaskResponse,
+    ChatRequest,
     ChatResponse,
+    CreateAgentRequest,
+    ExecuteTaskRequest,
+    TaskResponse,
+    UpdateAgentRequest,
 )
+from .service import AgentService, create_agent_service
 
 __all__ = [
     "AgentService",
@@ -27,4 +27,3 @@ __all__ = [
     "TaskResponse",
     "ChatResponse",
 ]
-

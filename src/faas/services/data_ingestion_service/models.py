@@ -43,4 +43,3 @@ class ProcessingResponse(BaseModel):
     result: Optional[Dict[str, Any]] = None
     error: Optional[str] = None
     processing_time: Optional[float] = None
-

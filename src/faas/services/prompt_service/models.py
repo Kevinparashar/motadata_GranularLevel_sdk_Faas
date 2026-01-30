@@ -69,4 +69,3 @@ class ContextResponse(BaseModel):
     token_count: int
     messages_included: int
     truncated: bool = Field(False, description="Whether context was truncated")
-

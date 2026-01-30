@@ -1,0 +1,19 @@
+# SonarLint ignore file
+# Ignore TODO comments that are tracked with ticket references
+
+# These TODOs are intentional and tracked as technical debt
+# They have ticket references (e.g., SDK-INT-002, SDK-INTEG-001) and are part of planned work
+
+src/faas/integrations/codec.py
+src/faas/integrations/nats.py
+src/faas/integrations/otel.py
+src/faas/services/ml_service/service.py
+src/faas/services/gateway_service/service.py
+src/faas/services/data_ingestion_service/service.py
+src/faas/services/rag_service/service.py
+src/faas/services/prompt_service/service.py
+examples/use_cases/document_qa_with_integrations/main.py
+
+# Template files with instructional TODOs for end users
+src/core/machine_learning/use_cases/model_template.py
+

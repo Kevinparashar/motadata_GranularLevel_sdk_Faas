@@ -6,13 +6,11 @@ These are framework-level components that support use case models.
 """
 
 from .base_model_wrapper import BaseModelWrapper
-from .model_factory import ModelFactory
 from .model_config import ModelConfig
+from .model_factory import ModelFactory
 
 __all__ = [
     "BaseModelWrapper",
     "ModelFactory",
     "ModelConfig",
 ]
-
-

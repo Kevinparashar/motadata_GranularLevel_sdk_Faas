@@ -7,16 +7,35 @@ into structured configurations for agents and tools.
 
 import hashlib
 import json
-from typing import Dict, Optional, List
+from typing import Any, Dict, List, Optional, Protocol
+
 from pydantic import BaseModel, Field
 
-from ..utils.type_helpers import GatewayProtocol, ConfigDict, MetadataDict
-from .exceptions import PromptInterpretationError
 from ..utils.error_handler import create_error_with_suggestion
+from ..utils.type_helpers import GatewayProtocol, MetadataDict
+from .exceptions import PromptInterpretationError
+
+# Constants
+JSON_CODE_BLOCK_MARKER = "```json"
+
+
+class CacheProtocol(Protocol):
+    """Protocol for cache interface."""
+
+    async def get(self, key: str, tenant_id: Optional[str] = None) -> Optional[str]:
+        """Get value from cache."""
+        ...
+
+    async def set(
+        self, key: str, value: str, ttl: Optional[int] = None, tenant_id: Optional[str] = None
+    ) -> None:
+        """Set value in cache."""
+        ...
 
 
 class AgentRequirements(BaseModel):
     """Extracted agent requirements from prompt."""
+
     name: str
     description: str
     capabilities: List[str] = Field(default_factory=list)
@@ -30,6 +49,7 @@ class AgentRequirements(BaseModel):
 
 class ToolRequirements(BaseModel):
     """Extracted tool requirements from prompt."""
+
     name: str
     description: str
     function_name: str
@@ -42,15 +62,15 @@ class ToolRequirements(BaseModel):
 class PromptInterpreter:
     """
     Interprets natural language prompts to extract requirements.
-    
+
     Uses LLM to analyze prompts and extract structured requirements
     for agent and tool creation.
     """
-    
+
     def __init__(self, gateway: GatewayProtocol):
         """
         Initialize prompt interpreter.
-        
+
         Args:
             gateway: LiteLLM Gateway instance for LLM calls
         """
@@ -115,72 +135,69 @@ Only return valid JSON, no additional text."""
         return hashlib.sha256(prompt.encode()).hexdigest()
 
     async def interpret_agent_prompt(
-        self,
-        prompt: str,
-        cache: Optional[CacheProtocol] = None,
-        tenant_id: Optional[str] = None
+        self, prompt: str, cache: Optional[CacheProtocol] = None, tenant_id: Optional[str] = None
     ) -> AgentRequirements:
         """
         Interpret a prompt for agent creation.
-        
+
         Args:
             prompt: Natural language description of desired agent
             cache: Optional cache mechanism for storing interpretations
             tenant_id: Optional tenant ID for cache isolation
-            
+
         Returns:
             AgentRequirements object with extracted requirements
-            
+
         Raises:
             PromptInterpretationError: If interpretation fails
         """
         # Check cache first
         if cache:
             prompt_hash = self._hash_prompt(prompt)
-            cached = cache.get(f"agent_interpretation:{prompt_hash}", tenant_id=tenant_id)
+            cached = await cache.get(f"agent_interpretation:{prompt_hash}", tenant_id=tenant_id)
             if cached:
                 try:
                     return AgentRequirements(**json.loads(cached))
-                except Exception:
-                    pass  # Cache invalid, continue with interpretation
-        
+                except (json.JSONDecodeError, KeyError, TypeError) as e:
+                    # Cache invalid, continue with interpretation
+                    import logging
+                    logger = logging.getLogger(__name__)
+                    logger.debug(f"Invalid cached agent interpretation, re-interpreting: {e}")
+
         try:
             # Use LLM to interpret prompt
             formatted_prompt = self._agent_prompt_template.format(prompt=prompt)
-            
+
             response = await self.gateway.generate_async(
-                prompt=formatted_prompt,
-                model="gpt-4",
-                temperature=0.3,
-                max_tokens=2000
+                prompt=formatted_prompt, model="gpt-4", temperature=0.3, max_tokens=2000
             )
-            
+
             # Parse JSON response
             response_text = response.text.strip()
-            
+
             # Extract JSON from response (handle markdown code blocks)
-            if "```json" in response_text:
-                response_text = response_text.split("```json")[1].split("```")[0].strip()
+            if JSON_CODE_BLOCK_MARKER in response_text:
+                response_text = response_text.split(JSON_CODE_BLOCK_MARKER)[1].split("```")[0].strip()
             elif "```" in response_text:
                 response_text = response_text.split("```")[1].split("```")[0].strip()
-            
+
             config = json.loads(response_text)
-            
+
             # Create AgentRequirements object
             requirements = AgentRequirements(**config)
-            
+
             # Cache the interpretation
             if cache:
                 prompt_hash = self._hash_prompt(prompt)
-                cache.set(
+                await cache.set(
                     f"agent_interpretation:{prompt_hash}",
                     json.dumps(config),
                     tenant_id=tenant_id,
-                    ttl=86400  # 24 hours
+                    ttl=86400,  # 24 hours
                 )
-            
+
             return requirements
-            
+
         except json.JSONDecodeError as e:
             raise create_error_with_suggestion(
                 PromptInterpretationError,
@@ -188,7 +205,7 @@ Only return valid JSON, no additional text."""
                 suggestion="The LLM response was not valid JSON. Try rephrasing your prompt to be more specific about the agent requirements. The system expects structured JSON output.",
                 prompt=prompt,
                 reason="json_parse_error",
-                original_error=e
+                original_error=e,
             )
         except Exception as e:
             raise create_error_with_suggestion(
@@ -197,76 +214,73 @@ Only return valid JSON, no additional text."""
                 suggestion="Ensure your prompt clearly describes the agent's purpose, capabilities, and requirements. Check that the gateway is properly configured and the LLM provider is accessible.",
                 prompt=prompt,
                 reason="interpretation_error",
-                original_error=e
+                original_error=e,
             )
 
     async def interpret_tool_prompt(
-        self,
-        prompt: str,
-        cache: Optional[CacheProtocol] = None,
-        tenant_id: Optional[str] = None
+        self, prompt: str, cache: Optional[CacheProtocol] = None, tenant_id: Optional[str] = None
     ) -> ToolRequirements:
         """
         Interpret a prompt for tool creation.
-        
+
         Args:
             prompt: Natural language description of desired tool
             cache: Optional cache mechanism for storing interpretations
             tenant_id: Optional tenant ID for cache isolation
-            
+
         Returns:
             ToolRequirements object with extracted requirements
-            
+
         Raises:
             PromptInterpretationError: If interpretation fails
         """
         # Check cache first
         if cache:
             prompt_hash = self._hash_prompt(prompt)
-            cached = cache.get(f"tool_interpretation:{prompt_hash}", tenant_id=tenant_id)
+            cached = await cache.get(f"tool_interpretation:{prompt_hash}", tenant_id=tenant_id)
             if cached:
                 try:
                     return ToolRequirements(**json.loads(cached))
-                except Exception:
-                    pass  # Cache invalid, continue with interpretation
-        
+                except (json.JSONDecodeError, KeyError, TypeError) as e:
+                    # Cache invalid, continue with interpretation
+                    import logging
+                    logger = logging.getLogger(__name__)
+                    logger.debug(f"Invalid cached tool interpretation, re-interpreting: {e}")
+
         try:
             # Use LLM to interpret prompt
             formatted_prompt = self._tool_prompt_template.format(prompt=prompt)
-            
+
             response = await self.gateway.generate_async(
-                prompt=formatted_prompt,
-                model="gpt-4",
-                temperature=0.3,
-                max_tokens=2000
+                prompt=formatted_prompt, model="gpt-4", temperature=0.3, max_tokens=2000
             )
-            
+
             # Parse JSON response
             response_text = response.text.strip()
-            
+
             # Extract JSON from response (handle markdown code blocks)
-            if "```json" in response_text:
-                response_text = response_text.split("```json")[1].split("```")[0].strip()
+            if JSON_CODE_BLOCK_MARKER in response_text:
+                response_text = response_text.split(JSON_CODE_BLOCK_MARKER)[1].split("```")[0].strip()
             elif "```" in response_text:
                 response_text = response_text.split("```")[1].split("```")[0].strip()
-            
+
             config = json.loads(response_text)
-            
+
             # Create ToolRequirements object
             requirements = ToolRequirements(**config)
-            
+
             # Cache the interpretation
             if cache:
                 prompt_hash = self._hash_prompt(prompt)
-                cache.set(
+                await cache.set(
                     f"tool_interpretation:{prompt_hash}",
                     json.dumps(config),
                     tenant_id=tenant_id,
-                    ttl=86400  # 24 hours
+                    ttl=86400,  # 24 hours
                 )
-            
+
             return requirements
-            
+
         except json.JSONDecodeError as e:
             raise create_error_with_suggestion(
                 PromptInterpretationError,
@@ -274,7 +288,7 @@ Only return valid JSON, no additional text."""
                 suggestion="The LLM response was not valid JSON. Try rephrasing your prompt to clearly specify inputs, outputs, and the tool's behavior. The system expects structured JSON output.",
                 prompt=prompt,
                 reason="json_parse_error",
-                original_error=e
+                original_error=e,
             )
         except Exception as e:
             raise create_error_with_suggestion(
@@ -283,6 +297,5 @@ Only return valid JSON, no additional text."""
                 suggestion="Ensure your prompt clearly describes the tool's inputs, outputs, and behavior. Include parameter types and return types. Check that the gateway is properly configured.",
                 prompt=prompt,
                 reason="interpretation_error",
-                original_error=e
+                original_error=e,
             )
-

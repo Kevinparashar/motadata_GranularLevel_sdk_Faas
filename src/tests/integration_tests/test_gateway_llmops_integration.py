@@ -4,10 +4,12 @@ Integration Tests for Gateway-LLMOps Integration
 Tests the integration between LiteLLM Gateway and LLMOps.
 """
 
+from unittest.mock import AsyncMock, MagicMock, patch
+
 import pytest
-from unittest.mock import Mock, MagicMock, patch, AsyncMock
-from src.core.litellm_gateway import LiteLLMGateway, GatewayConfig
-from src.core.llmops import LLMOps, LLMOperationType, LLMOperationStatus
+
+from src.core.litellm_gateway import GatewayConfig, LiteLLMGateway
+from src.core.llmops import LLMOps
 
 
 @pytest.mark.integration
@@ -18,18 +20,18 @@ class TestGatewayLLMOpsIntegration:
     def gateway_with_llmops(self):
         """Create gateway with LLMOps enabled."""
         config = GatewayConfig(enable_llmops=True)
-        with patch('src.core.litellm_gateway.gateway.litellm') as mock_litellm:
+        with patch("src.core.litellm_gateway.gateway.litellm") as mock_litellm:
             gateway = LiteLLMGateway(config=config)
-            gateway._litellm = mock_litellm
+            gateway._litellm = mock_litellm  # type: ignore[attr-defined]
             return gateway, mock_litellm
 
     @pytest.fixture
     def gateway_without_llmops(self):
         """Create gateway without LLMOps."""
         config = GatewayConfig(enable_llmops=False)
-        with patch('src.core.litellm_gateway.gateway.litellm') as mock_litellm:
+        with patch("src.core.litellm_gateway.gateway.litellm") as mock_litellm:
             gateway = LiteLLMGateway(config=config)
-            gateway._litellm = mock_litellm
+            gateway._litellm = mock_litellm  # type: ignore[attr-defined]
             return gateway, mock_litellm
 
     def test_llmops_initialization(self, gateway_with_llmops):
@@ -56,11 +58,9 @@ class TestGatewayLLMOpsIntegration:
         mock_litellm.acompletion = AsyncMock(return_value=mock_response)
 
         # Mock LLMOps log_operation
-        with patch.object(gateway.llmops, 'log_operation') as mock_log:
+        with patch.object(gateway.llmops, "log_operation") as mock_log:
             await gateway.generate_async(
-                prompt="Test prompt",
-                model="gpt-4",
-                tenant_id="test_tenant"
+                prompt="Test prompt", model="gpt-4", tenant_id="test_tenant"
             )
 
             # LLMOps should have logged the operation
@@ -75,18 +75,10 @@ class TestGatewayLLMOpsIntegration:
         mock_response.choices = [MagicMock()]
         mock_response.choices[0].message.content = "Response"
         mock_response.model = "gpt-4"
-        mock_response.usage = {
-            "prompt_tokens": 100,
-            "completion_tokens": 50,
-            "total_tokens": 150
-        }
+        mock_response.usage = {"prompt_tokens": 100, "completion_tokens": 50, "total_tokens": 150}
         mock_litellm.acompletion = AsyncMock(return_value=mock_response)
 
-        await gateway.generate_async(
-            prompt="Test prompt",
-            model="gpt-4",
-            tenant_id="test_tenant"
-        )
+        await gateway.generate_async(prompt="Test prompt", model="gpt-4", tenant_id="test_tenant")
 
         # Check that token usage was tracked
         # This would require checking LLMOps storage
@@ -104,15 +96,11 @@ class TestGatewayLLMOpsIntegration:
         mock_response.usage = {
             "prompt_tokens": 1000,
             "completion_tokens": 500,
-            "total_tokens": 1500
+            "total_tokens": 1500,
         }
         mock_litellm.acompletion = AsyncMock(return_value=mock_response)
 
-        await gateway.generate_async(
-            prompt="Test prompt",
-            model="gpt-4",
-            tenant_id="test_tenant"
-        )
+        await gateway.generate_async(prompt="Test prompt", model="gpt-4", tenant_id="test_tenant")
 
         # Cost should be calculated based on token usage
         # Check LLMOps for cost tracking
@@ -122,6 +110,7 @@ class TestGatewayLLMOpsIntegration:
     async def test_latency_monitoring(self, gateway_with_llmops):
         """Test that latency is monitored."""
         import time
+
         gateway, mock_litellm = gateway_with_llmops
 
         mock_response = MagicMock()
@@ -131,11 +120,7 @@ class TestGatewayLLMOpsIntegration:
         mock_litellm.acompletion = AsyncMock(return_value=mock_response)
 
         start = time.time()
-        await gateway.generate_async(
-            prompt="Test prompt",
-            model="gpt-4",
-            tenant_id="test_tenant"
-        )
+        await gateway.generate_async(prompt="Test prompt", model="gpt-4", tenant_id="test_tenant")
         elapsed = time.time() - start
 
         # Latency should be tracked in LLMOps
@@ -154,20 +139,14 @@ class TestGatewayLLMOpsIntegration:
         mock_response.model = "gpt-4"
         mock_litellm.acompletion = AsyncMock(return_value=mock_response)
 
-        await gateway.generate_async(
-            prompt="Test prompt",
-            model="gpt-4",
-            tenant_id="test_tenant"
-        )
+        await gateway.generate_async(prompt="Test prompt", model="gpt-4", tenant_id="test_tenant")
 
         # Error operation
         mock_litellm.acompletion.side_effect = Exception("API Error")
 
         try:
             await gateway.generate_async(
-                prompt="Test prompt",
-                model="gpt-4",
-                tenant_id="test_tenant"
+                prompt="Test prompt", model="gpt-4", tenant_id="test_tenant"
             )
         except Exception:
             pass
@@ -202,11 +181,7 @@ class TestGatewayLLMOpsIntegration:
         mock_response.model = "gpt-4"
         mock_litellm.acompletion = AsyncMock(return_value=mock_response)
 
-        await gateway.generate_async(
-            prompt="Test",
-            model="gpt-4",
-            tenant_id="test_tenant"
-        )
+        await gateway.generate_async(prompt="Test", model="gpt-4", tenant_id="test_tenant")
 
         # Embedding operation
         mock_embedding = MagicMock()
@@ -214,9 +189,7 @@ class TestGatewayLLMOpsIntegration:
         mock_litellm.aembedding = AsyncMock(return_value=mock_embedding)
 
         await gateway.embed_async(
-            texts=["Test"],
-            model="text-embedding-3-small",
-            tenant_id="test_tenant"
+            texts=["Test"], model="text-embedding-3-small", tenant_id="test_tenant"
         )
 
         # Both operation types should be tracked
@@ -225,4 +198,3 @@ class TestGatewayLLMOpsIntegration:
 
 if __name__ == "__main__":
     pytest.main([__file__, "-v", "-m", "integration"])
-

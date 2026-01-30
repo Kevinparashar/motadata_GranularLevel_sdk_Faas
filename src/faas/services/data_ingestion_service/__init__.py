@@ -4,13 +4,13 @@ Data Ingestion Service - FaaS implementation of Data Ingestion.
 Provides REST API for file upload and multi-modal data processing.
 """
 
-from .service import DataIngestionService, create_data_ingestion_service
 from .models import (
-    UploadFileRequest,
-    ProcessFileRequest,
     FileResponse,
+    ProcessFileRequest,
     ProcessingResponse,
+    UploadFileRequest,
 )
+from .service import DataIngestionService, create_data_ingestion_service
 
 __all__ = [
     "DataIngestionService",
@@ -20,4 +20,3 @@ __all__ = [
     "FileResponse",
     "ProcessingResponse",
 ]
-

@@ -4,15 +4,14 @@ Trainer
 Model training orchestration with hyperparameter management, validation, and checkpointing.
 """
 
-from typing import Dict, Any, Optional, List
 import logging
-from datetime import datetime
 import os
 from pathlib import Path
+from typing import Any, Dict, Optional
 
+from ...postgresql_database.connection import DatabaseConnection
 from .exceptions import TrainingError
 from .model_manager import ModelManager
-from ...postgresql_database.connection import DatabaseConnection
 
 logger = logging.getLogger(__name__)
 
@@ -25,11 +24,7 @@ class Trainer:
     cross-validation, metrics tracking, and checkpoint management.
     """
 
-    def __init__(
-        self,
-        db: DatabaseConnection,
-        tenant_id: Optional[str] = None
-    ):
+    def __init__(self, db: DatabaseConnection, tenant_id: Optional[str] = None):
         """
         Initialize trainer.
 
@@ -50,7 +45,7 @@ class Trainer:
         training_data: Any,
         validation_data: Optional[Any] = None,
         hyperparameters: Optional[Dict[str, Any]] = None,
-        **kwargs
+        **kwargs,
     ) -> Dict[str, Any]:
         """
         Execute model training.
@@ -87,7 +82,7 @@ class Trainer:
             train_metrics = self._evaluate(model, training_data)
 
             # Save model
-            version = kwargs.get('version', '1.0.0')
+            version = kwargs.get("version", "1.0.0")
             model_path = self.model_manager.save_model(model, model_id, version)
 
             # Register model
@@ -96,22 +91,19 @@ class Trainer:
                 model_type=model_type,
                 model_path=model_path,
                 metadata={
-                    'hyperparameters': hyperparameters or {},
-                    'train_metrics': train_metrics,
-                    'val_metrics': val_metrics
+                    "hyperparameters": hyperparameters or {},
+                    "train_metrics": train_metrics,
+                    "val_metrics": val_metrics,
                 },
-                version=version
+                version=version,
             )
 
             result = {
-                'model_id': model_id,
-                'version': version,
-                'model_path': model_path,
-                'metrics': {
-                    'train': train_metrics,
-                    'validation': val_metrics
-                },
-                'hyperparameters': hyperparameters or {}
+                "model_id": model_id,
+                "version": version,
+                "model_path": model_path,
+                "metrics": {"train": train_metrics, "validation": val_metrics},
+                "hyperparameters": hyperparameters or {},
             }
 
             logger.info(f"Training completed for {model_id}")
@@ -125,14 +117,10 @@ class Trainer:
                 model_id=model_id,
                 stage="training",
                 hyperparameters=hyperparameters,
-                original_error=e
+                original_error=e,
             )
 
-    def validate(
-        self,
-        model: Any,
-        validation_data: Any
-    ) -> Dict[str, Any]:
+    def validate(self, model: Any, validation_data: Any) -> Dict[str, Any]:
         """
         Validate a model.
 
@@ -146,11 +134,7 @@ class Trainer:
         return self._evaluate(model, validation_data)
 
     def save_checkpoint(
-        self,
-        model: Any,
-        model_id: str,
-        epoch: int,
-        checkpoint_dir: Optional[str] = None
+        self, model: Any, model_id: str, epoch: int, checkpoint_dir: Optional[str] = None
     ) -> str:
         """
         Save training checkpoint.
@@ -176,10 +160,7 @@ class Trainer:
         logger.info(f"Checkpoint saved: {checkpoint_path}")
         return checkpoint_path
 
-    def load_checkpoint(
-        self,
-        checkpoint_path: str
-    ) -> Any:
+    def load_checkpoint(self, checkpoint_path: str) -> Any:
         """
         Load training checkpoint.
 
@@ -190,13 +171,10 @@ class Trainer:
             Loaded model
         """
         import joblib
+
         return joblib.load(checkpoint_path)
 
-    def _create_model(
-        self,
-        model_type: str,
-        hyperparameters: Dict[str, Any]
-    ) -> Any:
+    def _create_model(self, model_type: str, hyperparameters: Dict[str, Any]) -> Any:
         """
         Create model instance based on type.
 
@@ -208,16 +186,41 @@ class Trainer:
             Model instance
         """
         from sklearn.ensemble import RandomForestClassifier, RandomForestRegressor
-        from sklearn.linear_model import LogisticRegression, LinearRegression
+        from sklearn.linear_model import LinearRegression, LogisticRegression
         from sklearn.svm import SVC, SVR
 
+        # Provide sensible defaults for scikit-learn estimators
+        # Users can override these via the hyperparameters argument
+        rf_clf_defaults = {
+            "random_state": 42,
+            "n_estimators": 100,
+            "min_samples_leaf": 1,
+            "max_features": "sqrt",
+        }
+        rf_reg_defaults = {
+            "random_state": 42,
+            "n_estimators": 100,
+            "min_samples_leaf": 1,
+            "max_features": 1.0,
+        }
+        svc_defaults = {"C": 1.0, "kernel": "rbf", "gamma": "scale"}
+        svr_defaults = {"C": 1.0, "kernel": "rbf", "gamma": "scale"}
+
         model_map = {
-            'classification': RandomForestClassifier(**hyperparameters),
-            'regression': RandomForestRegressor(**hyperparameters),
-            'logistic_regression': LogisticRegression(**hyperparameters),
-            'linear_regression': LinearRegression(**hyperparameters),
-            'svm_classification': SVC(**hyperparameters),
-            'svm_regression': SVR(**hyperparameters),
+            "classification": RandomForestClassifier(  # noqa: S6709, S6973
+                **{**rf_clf_defaults, **hyperparameters}
+            ),
+            "regression": RandomForestRegressor(  # noqa: S6709, S6973
+                **{**rf_reg_defaults, **hyperparameters}
+            ),
+            "logistic_regression": LogisticRegression(**hyperparameters),
+            "linear_regression": LinearRegression(**hyperparameters),
+            "svm_classification": SVC(  # noqa: S6973
+                **{**svc_defaults, **hyperparameters}
+            ),
+            "svm_regression": SVR(  # noqa: S6973
+                **{**svr_defaults, **hyperparameters}
+            ),
         }
 
         if model_type not in model_map:
@@ -225,11 +228,7 @@ class Trainer:
 
         return model_map[model_type]
 
-    def _evaluate(
-        self,
-        model: Any,
-        data: Any
-    ) -> Dict[str, Any]:
+    def _evaluate(self, model: Any, data: Any) -> Dict[str, Any]:
         """
         Evaluate model on data.
 
@@ -241,28 +240,31 @@ class Trainer:
             Evaluation metrics
         """
         from sklearn.metrics import (
-            accuracy_score, precision_score, recall_score, f1_score,
-            mean_squared_error, mean_absolute_error, r2_score
+            accuracy_score,
+            f1_score,
+            mean_absolute_error,
+            mean_squared_error,
+            precision_score,
+            r2_score,
+            recall_score,
         )
 
         X, y = data
         y_pred = model.predict(X)
 
         # Determine if classification or regression
-        if hasattr(model, 'predict_proba'):
+        if hasattr(model, "predict_proba"):
             # Classification
             return {
-                'accuracy': float(accuracy_score(y, y_pred)),
-                'precision': float(precision_score(y, y_pred, average='weighted', zero_division=0)),
-                'recall': float(recall_score(y, y_pred, average='weighted', zero_division=0)),
-                'f1': float(f1_score(y, y_pred, average='weighted', zero_division=0))
+                "accuracy": float(accuracy_score(y, y_pred)),
+                "precision": float(precision_score(y, y_pred, average="weighted", zero_division=0)),  # type: ignore[arg-type]
+                "recall": float(recall_score(y, y_pred, average="weighted", zero_division=0)),  # type: ignore[arg-type]
+                "f1": float(f1_score(y, y_pred, average="weighted", zero_division=0)),  # type: ignore[arg-type]
             }
         else:
             # Regression
             return {
-                'mse': float(mean_squared_error(y, y_pred)),
-                'mae': float(mean_absolute_error(y, y_pred)),
-                'r2': float(r2_score(y, y_pred))
+                "mse": float(mean_squared_error(y, y_pred)),
+                "mae": float(mean_absolute_error(y, y_pred)),
+                "r2": float(r2_score(y, y_pred)),
             }
-
-

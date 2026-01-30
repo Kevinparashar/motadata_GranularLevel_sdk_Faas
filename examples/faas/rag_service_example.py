@@ -5,6 +5,7 @@ Demonstrates how to interact with RAG Service for document ingestion and queryin
 """
 
 import asyncio
+
 import httpx
 
 
@@ -77,4 +78,3 @@ async def main():
 
 if __name__ == "__main__":
     asyncio.run(main())
-

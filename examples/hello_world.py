@@ -15,12 +15,13 @@ Expected Output:
 - Token usage information
 """
 
-import os
 import asyncio
+import os
 
 # Load environment variables from .env file (optional)
 try:
-    from dotenv import load_dotenv  # type: ignore
+    from dotenv import load_dotenv
+
     load_dotenv()
 except ImportError:
     # python-dotenv not installed, will use environment variables directly
@@ -28,6 +29,9 @@ except ImportError:
 
 # Import the gateway factory function
 from src.core.litellm_gateway import create_gateway
+
+# Constants
+TROUBLESHOOTING_HEADER = "\nTroubleshooting:"
 
 
 async def main():
@@ -43,7 +47,9 @@ async def main():
     print("🚀 Motadata AI SDK - Hello World Example\n")
 
     # Step 1: Get your API key from environment
-    api_key = os.getenv("OPENAI_API_KEY") or os.getenv("ANTHROPIC_API_KEY") or os.getenv("GOOGLE_API_KEY")
+    api_key = (
+        os.getenv("OPENAI_API_KEY") or os.getenv("ANTHROPIC_API_KEY") or os.getenv("GOOGLE_API_KEY")
+    )
 
     if not api_key:
         print("❌ Error: No API key found in environment variables")
@@ -58,17 +64,25 @@ async def main():
 
     # Step 2: Create a gateway (this is your connection to AI services)
     # Using GPT-3.5-turbo for cost efficiency in Hello World example
-    provider = "openai" if os.getenv("OPENAI_API_KEY") else ("anthropic" if os.getenv("ANTHROPIC_API_KEY") else "google")
+    if os.getenv("OPENAI_API_KEY"):
+        provider = "openai"
+    elif os.getenv("ANTHROPIC_API_KEY"):
+        provider = "anthropic"
+    else:
+        provider = "google"
 
     # Determine the default model based on provider
-    default_model = "gpt-3.5-turbo" if provider == "openai" else ("claude-3-haiku-20240307" if provider == "anthropic" else "gemini-pro")
+    if provider == "openai":
+        default_model = "gpt-3.5-turbo"
+    elif provider == "anthropic":
+        default_model = "claude-3-haiku-20240307"
+    else:
+        default_model = "gemini-pro"
 
     # Create gateway with provider and API key
     # Note: create_gateway expects providers (list) and api_keys (dict)
     gateway = create_gateway(
-        providers=[provider],
-        default_model=default_model,
-        api_keys={provider: api_key}
+        providers=[provider], default_model=default_model, api_keys={provider: api_key}
     )
 
     print("✅ Gateway created successfully")
@@ -77,8 +91,7 @@ async def main():
     # Step 3: Make your first AI call
     try:
         response = await gateway.generate_async(
-            prompt="Say hello and introduce yourself in one sentence.",
-            model=default_model
+            prompt="Say hello and introduce yourself in one sentence.", model=default_model
         )
 
         # Step 4: Display the response
@@ -88,7 +101,7 @@ async def main():
         print(response.text)
         print("=" * 60)
 
-        print(f"\n✅ Success! SDK is working correctly.")
+        print("\n✅ Success! SDK is working correctly.")
         print(f"📊 Model used: {response.model}")
 
         if response.usage:
@@ -102,17 +115,17 @@ async def main():
 
     except (ConnectionError, TimeoutError) as e:
         print(f"❌ Network error: {str(e)}")
-        print("\nTroubleshooting:")
+        print(TROUBLESHOOTING_HEADER)
         print("1. Check your internet connection")
         print("2. Verify the API endpoint is accessible")
     except ValueError as e:
         print(f"❌ Validation error: {str(e)}")
-        print("\nTroubleshooting:")
+        print(TROUBLESHOOTING_HEADER)
         print("1. Check your API key format is correct")
         print("2. Verify all required parameters are provided")
     except Exception as e:
         print(f"❌ Error: {str(e)}")
-        print("\nTroubleshooting:")
+        print(TROUBLESHOOTING_HEADER)
         print("1. Check your API key is correct")
         print("2. Ensure you have internet connection")
         print("3. Verify your API key has credits/quota")
@@ -122,4 +135,3 @@ async def main():
 if __name__ == "__main__":
     # Run the async function
     asyncio.run(main())
-

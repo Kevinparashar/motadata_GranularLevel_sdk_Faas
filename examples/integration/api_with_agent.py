@@ -14,7 +14,7 @@ from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel
 
 try:
-    from dotenv import load_dotenv  # type: ignore
+    from dotenv import load_dotenv
 except ImportError:
     load_dotenv = None
 
@@ -27,12 +27,12 @@ if load_dotenv:
 
 # Local application/library specific imports
 from src.core.agno_agent_framework import Agent, AgentManager
-from src.core.litellm_gateway import LiteLLMGateway
 
 
 # Request/Response Models
 class AgentTaskRequest(BaseModel):
     """Request model for agent task execution."""
+
     task_type: str
     parameters: dict
     priority: int = 0
@@ -40,6 +40,7 @@ class AgentTaskRequest(BaseModel):
 
 class AgentTaskResponse(BaseModel):
     """Response model for agent task execution."""
+
     task_id: str
     status: str
     result: dict
@@ -52,21 +53,19 @@ default_model = "gpt-3.5-turbo" if provider == "openai" else "claude-3-haiku-202
 
 if api_key:
     from src.core.litellm_gateway import create_gateway
-    
+
     gateway = create_gateway(
-        providers=[provider],
-        default_model=default_model,
-        api_keys={provider: api_key}
+        providers=[provider], default_model=default_model, api_keys={provider: api_key}
     )
     agent_manager = AgentManager()
-    
+
     # Create default agent
     default_agent = Agent(
         agent_id="api-agent-001",
         name="API Agent",
         description="Agent exposed via API",
         gateway=gateway,
-        llm_model=default_model
+        llm_model=default_model,
     )
     agent_manager.register_agent(default_agent)
 
@@ -85,27 +84,22 @@ async def execute_agent_task(request: AgentTaskRequest):
     """Execute an agent task."""
     if not api_key:
         raise HTTPException(status_code=500, detail="API key not configured")
-    
+
     agent = agent_manager.get_agent("api-agent-001")
     if not agent:
         raise HTTPException(status_code=404, detail="Agent not found")
-    
+
     # Add task
     task_id = agent.add_task(
-        task_type=request.task_type,
-        parameters=request.parameters,
-        priority=request.priority
+        task_type=request.task_type, parameters=request.parameters, priority=request.priority
     )
-    
+
     # Execute task
-    import asyncio
     task = agent.task_queue[-1]  # Get the task we just added
     result = await agent.execute_task(task)
-    
+
     return AgentTaskResponse(
-        task_id=task_id,
-        status=result.get("status", "completed"),
-        result=result
+        task_id=task_id, status=result.get("status", "completed"), result=result
     )
 
 
@@ -114,17 +108,17 @@ async def get_agent_status():
     """Get agent status."""
     if not api_key:
         raise HTTPException(status_code=500, detail="API key not configured")
-    
+
     agent = agent_manager.get_agent("api-agent-001")
     if not agent:
         raise HTTPException(status_code=404, detail="Agent not found")
-    
+
     return agent.get_status()
 
 
 if __name__ == "__main__":
     import uvicorn
+
     print("🚀 Starting Agent API server...")
     print("📖 API Docs: http://localhost:8001/docs")
     uvicorn.run(app, host="0.0.0.0", port=8001)
-
