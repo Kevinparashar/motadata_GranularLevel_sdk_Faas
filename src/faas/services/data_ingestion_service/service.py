@@ -8,24 +8,26 @@ import logging
 from typing import Any, Dict, Optional
 
 import httpx
-from fastapi import FastAPI, HTTPException, Header, UploadFile, File, status
+from fastapi import FastAPI, File, Header, HTTPException, UploadFile, status
 
 from ....core.data_ingestion import create_ingestion_service
-from ....core.data_ingestion.ingestion_service import DataIngestionService as CoreDataIngestionService
+from ....core.data_ingestion.ingestion_service import (
+    DataIngestionService as CoreDataIngestionService,
+)
+from ...integrations.codec import create_codec_manager
+from ...integrations.nats import create_nats_client
+from ...integrations.otel import create_otel_tracer
 from ...shared.config import ServiceConfig, load_config
 from ...shared.contracts import ServiceResponse, extract_headers
 from ...shared.database import get_database_connection
-from ...shared.exceptions import NotFoundError, DependencyError
+from ...shared.exceptions import DependencyError, NotFoundError
 from ...shared.middleware import setup_middleware
 from .models import (
-    UploadFileRequest,
-    ProcessFileRequest,
     FileResponse,
+    ProcessFileRequest,
     ProcessingResponse,
+    UploadFileRequest,
 )
-from ...integrations.nats import create_nats_client
-from ...integrations.otel import create_otel_tracer
-from ...integrations.codec import create_codec_manager
 
 logger = logging.getLogger(__name__)
 
@@ -95,7 +97,8 @@ class DataIngestionService:
             rag_service_url = self.config.rag_service_url
 
             # Create ingestion service
-            # TODO: Get RAG system from RAG Service or create directly
+            # TODO: SDK-SVC-003 - Get RAG system from RAG Service or create directly
+            # Placeholder - replace with actual RAG system retrieval/creation
             ingestion_service = create_ingestion_service(
                 db=self.db,
                 tenant_id=tenant_id,
@@ -108,7 +111,11 @@ class DataIngestionService:
     def _register_routes(self):
         """Register FastAPI routes."""
 
-        @self.app.post("/api/v1/ingestion/upload", response_model=ServiceResponse, status_code=status.HTTP_201_CREATED)
+        @self.app.post(
+            "/api/v1/ingestion/upload",
+            response_model=ServiceResponse,
+            status_code=status.HTTP_201_CREATED,
+        )
         async def upload_file(
             file: UploadFile = File(...),
             title: Optional[str] = None,
@@ -127,8 +134,8 @@ class DataIngestionService:
 
             try:
                 # Save uploaded file temporarily
-                import tempfile
                 import os
+                import tempfile
 
                 file_id = f"file_{standard_headers.request_id[:8]}"
                 temp_dir = tempfile.gettempdir()
@@ -205,7 +212,8 @@ class DataIngestionService:
             """Get file status."""
             standard_headers = extract_headers(**headers)
 
-            # TODO: Implement file status retrieval from database
+            # TODO: SDK-SVC-003 - Implement file status retrieval from database
+            # Placeholder - replace with actual database query implementation
             return ServiceResponse(
                 success=True,
                 data={"file_id": file_id, "status": "unknown"},
@@ -227,7 +235,8 @@ class DataIngestionService:
                 ingestion_service = self._get_ingestion_service(standard_headers.tenant_id)
 
                 # Process file
-                # TODO: Implement actual processing
+                # TODO: SDK-SVC-003 - Implement actual processing
+                # Placeholder - replace with actual file processing implementation
                 result = {"status": "processed", "file_id": file_id}
 
                 return ServiceResponse(
@@ -285,4 +294,3 @@ def create_data_ingestion_service(
 
     logger.info(f"Data Ingestion Service created: {service_name}")
     return service
-

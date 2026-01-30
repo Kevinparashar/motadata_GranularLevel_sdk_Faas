@@ -7,9 +7,9 @@ Provides integrations for:
 - CODEC: Message serialization/deserialization
 """
 
+from .codec import CodecManager, create_codec_manager
 from .nats import NATSClient, create_nats_client
 from .otel import OTELTracer, create_otel_tracer
-from .codec import CodecManager, create_codec_manager
 
 __all__ = [
     # NATS
@@ -22,4 +22,3 @@ __all__ = [
     "CodecManager",
     "create_codec_manager",
 ]
-

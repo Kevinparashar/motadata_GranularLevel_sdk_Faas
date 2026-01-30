@@ -5,7 +5,6 @@ Provides prompt templates, history tracking, and context window handling with
 simple token estimation and truncation.
 """
 
-from __future__ import annotations
 
 import re
 from dataclasses import dataclass, field
@@ -30,9 +29,13 @@ class PromptStore:
 
     def add(self, template: PromptTemplate) -> None:
         tenant_id = template.tenant_id
-        self._templates.setdefault(tenant_id, {}).setdefault(template.name, {})[template.version] = template
+        self._templates.setdefault(tenant_id, {}).setdefault(template.name, {})[
+            template.version
+        ] = template
 
-    def get(self, name: str, tenant_id: Optional[str] = None, version: Optional[str] = None) -> Optional[PromptTemplate]:
+    def get(
+        self, name: str, tenant_id: Optional[str] = None, version: Optional[str] = None
+    ) -> Optional[PromptTemplate]:
         tenant_templates = self._templates.get(tenant_id, {})
         versions = tenant_templates.get(name)
         if not versions:
@@ -89,15 +92,36 @@ class PromptContextManager:
         self.history: List[str] = []
         self.window = ContextWindowManager(max_tokens=max_tokens, safety_margin=safety_margin)
 
-    def render(self, template_name: str, variables: Dict[str, Any], tenant_id: Optional[str] = None, version: Optional[str] = None) -> str:
+    def render(
+        self,
+        template_name: str,
+        variables: Dict[str, Any],
+        tenant_id: Optional[str] = None,
+        version: Optional[str] = None,
+    ) -> str:
         template = self.store.get(template_name, tenant_id=tenant_id, version=version)
         if not template:
-            raise ValueError(f"Template '{template_name}' not found for tenant '{tenant_id or 'global'}'")
+            raise ValueError(
+                f"Template '{template_name}' not found for tenant '{tenant_id or 'global'}'"
+            )
         # Basic Python format-style rendering
         return template.content.format(**variables)
 
-    def add_template(self, name: str, version: str, content: str, tenant_id: Optional[str] = None, metadata: Optional[Dict[str, Any]] = None) -> None:
-        tmpl = PromptTemplate(name=name, version=version, content=content, tenant_id=tenant_id, metadata=metadata or {})
+    def add_template(
+        self,
+        name: str,
+        version: str,
+        content: str,
+        tenant_id: Optional[str] = None,
+        metadata: Optional[Dict[str, Any]] = None,
+    ) -> None:
+        tmpl = PromptTemplate(
+            name=name,
+            version=version,
+            content=content,
+            tenant_id=tenant_id,
+            metadata=metadata or {},
+        )
         self.store.add(tmpl)
 
     def record_history(self, prompt: str) -> None:
@@ -122,5 +146,3 @@ class PromptContextManager:
         for pat in patterns:
             redacted = re.sub(pat, "[REDACTED]", redacted)
         return redacted
-
-

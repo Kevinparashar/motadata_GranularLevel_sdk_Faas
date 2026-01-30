@@ -7,27 +7,26 @@ Handles model training, inference, and model management.
 import logging
 from typing import Any, Dict, Optional
 
-from fastapi import FastAPI, HTTPException, Header, status
+from fastapi import FastAPI, Header, HTTPException, status
 
 from ....core.machine_learning.ml_framework import create_ml_system
 from ....core.machine_learning.ml_framework.ml_system import MLSystem
+from ...integrations.codec import create_codec_manager
+from ...integrations.nats import create_nats_client
+from ...integrations.otel import create_otel_tracer
 from ...shared.config import ServiceConfig, load_config
 from ...shared.contracts import ServiceResponse, extract_headers
 from ...shared.database import get_database_connection
-from ...shared.exceptions import NotFoundError
 from ...shared.middleware import setup_middleware
 from .models import (
-    TrainModelRequest,
-    PredictRequest,
     BatchPredictRequest,
     DeployModelRequest,
     ModelResponse,
-    TrainingResponse,
     PredictionResponse,
+    PredictRequest,
+    TrainingResponse,
+    TrainModelRequest,
 )
-from ...integrations.nats import create_nats_client
-from ...integrations.otel import create_otel_tracer
-from ...integrations.codec import create_codec_manager
 
 logger = logging.getLogger(__name__)
 
@@ -103,7 +102,11 @@ class MLService:
     def _register_routes(self):
         """Register FastAPI routes."""
 
-        @self.app.post("/api/v1/ml/models/train", response_model=ServiceResponse, status_code=status.HTTP_202_ACCEPTED)
+        @self.app.post(
+            "/api/v1/ml/models/train",
+            response_model=ServiceResponse,
+            status_code=status.HTTP_202_ACCEPTED,
+        )
         async def train_model(
             request: TrainModelRequest,
             headers: dict = Header(...),
@@ -125,7 +128,8 @@ class MLService:
                 training_id = f"training_{standard_headers.request_id[:8]}"
                 model_id = f"model_{standard_headers.request_id[:8]}"
 
-                # TODO: Implement actual training
+                # TODO: SDK-SVC-001 - Implement actual training
+                # Placeholder - replace with actual ML training implementation
                 # result = await ml_system.train_model_async(
                 #     model_type=request.model_type,
                 #     training_data=request.training_data,
@@ -187,7 +191,8 @@ class MLService:
                 ml_system = self._get_ml_system(standard_headers.tenant_id)
 
                 # Make prediction
-                # TODO: Implement actual prediction
+                # TODO: SDK-SVC-001 - Implement actual prediction
+                # Placeholder - replace with actual ML prediction implementation
                 # result = await ml_system.predict_async(
                 #     model_id=model_id,
                 #     features=request.features,
@@ -230,7 +235,8 @@ class MLService:
                 ml_system = self._get_ml_system(standard_headers.tenant_id)
 
                 # Make batch predictions
-                # TODO: Implement actual batch prediction
+                # TODO: SDK-SVC-001 - Implement actual batch prediction
+                # Placeholder - replace with actual ML batch prediction implementation
                 # results = await ml_system.predict_batch_async(
                 #     model_id=model_id,
                 #     features_list=request.features_list,
@@ -265,7 +271,8 @@ class MLService:
             """List models."""
             standard_headers = extract_headers(**headers)
 
-            # TODO: Implement model listing from database
+            # TODO: SDK-SVC-001 - Implement model listing from database
+            # Placeholder - replace with actual database query implementation
             return ServiceResponse(
                 success=True,
                 data={"models": [], "total": 0},
@@ -281,7 +288,8 @@ class MLService:
             """Get model by ID."""
             standard_headers = extract_headers(**headers)
 
-            # TODO: Implement model retrieval from database
+            # TODO: SDK-SVC-001 - Implement model retrieval from database
+            # Placeholder - replace with actual database query implementation
             raise HTTPException(
                 status_code=status.HTTP_501_NOT_IMPLEMENTED,
                 detail="Model retrieval not yet implemented",
@@ -301,7 +309,8 @@ class MLService:
                 ml_system = self._get_ml_system(standard_headers.tenant_id)
 
                 # Deploy model
-                # TODO: Implement actual deployment
+                # TODO: SDK-SVC-001 - Implement actual deployment
+                # Placeholder - replace with actual ML model deployment implementation
                 # await ml_system.deploy_model_async(model_id, request.version)
 
                 return ServiceResponse(
@@ -359,4 +368,3 @@ def create_ml_service(
 
     logger.info(f"ML Service created: {service_name}")
     return service
-

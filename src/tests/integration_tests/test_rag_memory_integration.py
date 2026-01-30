@@ -4,12 +4,14 @@ Integration Tests for RAG-Memory Integration
 Tests the integration between RAG System and Agent Memory.
 """
 
+from unittest.mock import AsyncMock, MagicMock, patch
+
 import pytest
-from unittest.mock import Mock, MagicMock, patch, AsyncMock
-from src.core.rag import RAGSystem
+
 from src.core.agno_agent_framework.memory import AgentMemory, MemoryType
-from src.core.postgresql_database.connection import DatabaseConnection, DatabaseConfig
-from src.core.litellm_gateway import LiteLLMGateway, GatewayConfig
+from src.core.litellm_gateway import GatewayConfig, LiteLLMGateway
+from src.core.postgresql_database.connection import DatabaseConfig, DatabaseConnection
+from src.core.rag import RAGSystem
 
 
 @pytest.mark.integration
@@ -19,25 +21,23 @@ class TestRAGMemoryIntegration:
     @pytest.fixture
     def mock_db(self):
         """Create mock database connection."""
-        with patch('src.core.postgresql_database.connection.psycopg2') as mock_psycopg2:
+        with patch("src.core.postgresql_database.connection.psycopg2") as mock_psycopg2:
             mock_conn = MagicMock()
             mock_psycopg2.connect.return_value = mock_conn
-            db = DatabaseConnection(DatabaseConfig(
-                host="localhost",
-                port=5432,
-                database="test",
-                user="test",
-                password="test"
-            ))
+            db = DatabaseConnection(
+                DatabaseConfig(
+                    host="localhost", port=5432, database="test", user="test", password="test"
+                )
+            )
             return db
 
     @pytest.fixture
     def mock_gateway(self):
         """Create mock gateway."""
-        with patch('src.core.litellm_gateway.gateway.litellm') as mock_litellm:
+        with patch("src.core.litellm_gateway.gateway.litellm") as mock_litellm:
             config = GatewayConfig()
             gateway = LiteLLMGateway(config=config)
-            gateway._litellm = mock_litellm
+            gateway._litellm = mock_litellm  # type: ignore[attr-defined]
 
             mock_embedding_response = MagicMock()
             mock_embedding_response.embeddings = [[0.1] * 1536]
@@ -57,10 +57,7 @@ class TestRAGMemoryIntegration:
             db=mock_db,
             gateway=mock_gateway,
             enable_memory=True,
-            memory_config={
-                "max_episodic": 100,
-                "max_semantic": 200
-            }
+            memory_config={"max_episodic": 100, "max_semantic": 200},
         )
 
     def test_memory_initialization(self, rag_with_memory):
@@ -75,24 +72,24 @@ class TestRAGMemoryIntegration:
         rag_with_memory.memory.store(
             content="Previous query about AI",
             memory_type=MemoryType.EPISODIC,
-            metadata={"query": "What is AI?", "answer": "AI is..."}
+            metadata={"query": "What is AI?", "answer": "AI is..."},
         )
 
         # Mock vector search
-        with patch.object(rag_with_memory.vector_ops, 'similarity_search') as mock_search:
+        with patch.object(rag_with_memory.vector_ops, "similarity_search") as mock_search:
             mock_search.return_value = []
 
             # Mock memory retrieval
-            with patch.object(rag_with_memory.memory, 'retrieve') as mock_retrieve:
+            with patch.object(rag_with_memory.memory, "retrieve") as mock_retrieve:
                 mock_retrieve.return_value = [
                     {"content": "Previous query about AI", "relevance": 0.9}
                 ]
 
-                result = await rag_with_memory.query_async(
+                _ = await rag_with_memory.query_async(
                     query="Tell me more",
                     user_id="test_user",
                     conversation_id="test_conv",
-                    tenant_id="test_tenant"
+                    tenant_id="test_tenant",
                 )
 
                 # Memory should have been retrieved
@@ -104,14 +101,14 @@ class TestRAGMemoryIntegration:
         initial_size = len(rag_with_memory.memory.episodic_memory)
 
         # Mock vector search
-        with patch.object(rag_with_memory.vector_ops, 'similarity_search') as mock_search:
+        with patch.object(rag_with_memory.vector_ops, "similarity_search") as mock_search:
             mock_search.return_value = []
 
             await rag_with_memory.query_async(
                 query="Test query",
                 user_id="test_user",
                 conversation_id="test_conv",
-                tenant_id="test_tenant"
+                tenant_id="test_tenant",
             )
 
             # Memory should have stored the query-answer pair
@@ -125,22 +122,22 @@ class TestRAGMemoryIntegration:
         rag_with_memory.memory.store(
             content="User prefers technical explanations",
             memory_type=MemoryType.SEMANTIC,
-            metadata={"preference": "technical"}
+            metadata={"preference": "technical"},
         )
 
         # Mock vector search
-        with patch.object(rag_with_memory.vector_ops, 'similarity_search') as mock_search:
+        with patch.object(rag_with_memory.vector_ops, "similarity_search") as mock_search:
             mock_search.return_value = []
 
             # Mock generator to check if memory context is included
-            with patch.object(rag_with_memory.generator, 'generate_async') as mock_generate:
+            with patch.object(rag_with_memory.generator, "generate_async") as mock_generate:
                 mock_generate.return_value = "Enhanced answer"
 
                 await rag_with_memory.query_async(
                     query="Explain AI",
                     user_id="test_user",
                     conversation_id="test_conv",
-                    tenant_id="test_tenant"
+                    tenant_id="test_tenant",
                 )
 
                 # Generator should have been called (with memory context)
@@ -148,11 +145,7 @@ class TestRAGMemoryIntegration:
 
     def test_memory_disabled_behavior(self, mock_db, mock_gateway):
         """Test RAG behavior when memory is disabled."""
-        rag = RAGSystem(
-            db=mock_db,
-            gateway=mock_gateway,
-            enable_memory=False
-        )
+        rag = RAGSystem(db=mock_db, gateway=mock_gateway, enable_memory=False)
 
         assert rag.memory is None
 
@@ -163,29 +156,29 @@ class TestRAGMemoryIntegration:
         conversation_id = "test_conv"
 
         # First query
-        with patch.object(rag_with_memory.vector_ops, 'similarity_search') as mock_search:
+        with patch.object(rag_with_memory.vector_ops, "similarity_search") as mock_search:
             mock_search.return_value = []
 
             await rag_with_memory.query_async(
                 query="What is Python?",
                 user_id=user_id,
                 conversation_id=conversation_id,
-                tenant_id="test_tenant"
+                tenant_id="test_tenant",
             )
 
         # Second query in same conversation
-        with patch.object(rag_with_memory.vector_ops, 'similarity_search') as mock_search:
+        with patch.object(rag_with_memory.vector_ops, "similarity_search") as mock_search:
             mock_search.return_value = []
 
             # Mock memory retrieval to verify it's called with conversation context
-            with patch.object(rag_with_memory.memory, 'retrieve') as mock_retrieve:
+            with patch.object(rag_with_memory.memory, "retrieve") as mock_retrieve:
                 mock_retrieve.return_value = []
 
                 await rag_with_memory.query_async(
                     query="How do I use it?",
                     user_id=user_id,
                     conversation_id=conversation_id,
-                    tenant_id="test_tenant"
+                    tenant_id="test_tenant",
                 )
 
                 # Memory should retrieve context from same conversation
@@ -194,4 +187,3 @@ class TestRAGMemoryIntegration:
 
 if __name__ == "__main__":
     pytest.main([__file__, "-v", "-m", "integration"])
-

@@ -7,22 +7,21 @@ Provides distributed caching operations.
 import logging
 from typing import Any, Dict, Optional
 
-from fastapi import FastAPI, HTTPException, Header, status
+from fastapi import FastAPI, Header, HTTPException, status
 
-from ....core.cache_mechanism import create_cache, CacheMechanism
-from ...shared.config import ServiceConfig, load_config
-from ...shared.contracts import ServiceResponse, extract_headers
-from ...shared.exceptions import NotFoundError
-from ...shared.middleware import setup_middleware
-from .models import (
-    GetCacheRequest,
-    SetCacheRequest,
-    InvalidateCacheRequest,
-    CacheResponse,
-)
+from ....core.cache_mechanism import CacheMechanism, create_cache
+from ...integrations.codec import create_codec_manager
 from ...integrations.nats import create_nats_client
 from ...integrations.otel import create_otel_tracer
-from ...integrations.codec import create_codec_manager
+from ...shared.config import ServiceConfig, load_config
+from ...shared.contracts import ServiceResponse, extract_headers
+from ...shared.middleware import setup_middleware
+from .models import (
+    CacheResponse,
+    GetCacheRequest,
+    InvalidateCacheRequest,
+    SetCacheRequest,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -143,7 +142,9 @@ class CacheService:
                 if span:
                     span.end()
 
-        @self.app.post("/api/v1/cache", response_model=ServiceResponse, status_code=status.HTTP_201_CREATED)
+        @self.app.post(
+            "/api/v1/cache", response_model=ServiceResponse, status_code=status.HTTP_201_CREATED
+        )
         async def set_cache(
             request: SetCacheRequest,
             headers: dict = Header(...),
@@ -312,4 +313,3 @@ def create_cache_service(
 
     logger.info(f"Cache Service created: {service_name}")
     return service
-

@@ -4,9 +4,11 @@ Retriever
 Handles document retrieval using vector similarity search.
 """
 
-from typing import List, Dict, Any, Optional
-from ..postgresql_database.vector_operations import VectorOperations
+from typing import Any, Dict, List, Optional
+
 from ..litellm_gateway import LiteLLMGateway
+from ..postgresql_database.vector_operations import VectorOperations
+from .exceptions import EmbeddingError
 
 
 class Retriever:
@@ -20,7 +22,7 @@ class Retriever:
         self,
         vector_ops: VectorOperations,
         gateway: Optional[LiteLLMGateway] = None,
-        embedding_model: str = "text-embedding-3-small"
+        embedding_model: str = "text-embedding-3-small",
     ):
         """
         Initialize retriever.
@@ -34,7 +36,7 @@ class Retriever:
         self.gateway = gateway
         self.embedding_model = embedding_model
         # Access database connection from vector_ops for keyword search
-        self.db = vector_ops.db if hasattr(vector_ops, 'db') else None
+        self.db = vector_ops.db if hasattr(vector_ops, "db") else None
 
     def retrieve(
         self,
@@ -42,7 +44,7 @@ class Retriever:
         tenant_id: Optional[str] = None,
         top_k: int = 5,
         threshold: float = 0.7,
-        filters: Optional[Dict[str, Any]] = None
+        filters: Optional[Dict[str, Any]] = None,
     ) -> List[Dict[str, Any]]:
         """
         Retrieve relevant documents for a query.
@@ -64,7 +66,7 @@ class Retriever:
         if tenant_id:
             if filters is None:
                 filters = {}
-            filters['tenant_id'] = tenant_id
+            filters["tenant_id"] = tenant_id
 
         # Perform similarity search
         results = self.vector_ops.similarity_search(
@@ -72,7 +74,6 @@ class Retriever:
             limit=top_k,
             threshold=threshold,
             model=self.embedding_model,
-            filters=filters
         )
 
         # Apply additional filters if provided
@@ -93,14 +94,10 @@ class Retriever:
         """
         if not self.gateway:
             raise EmbeddingError(
-                message="Gateway not available for embedding generation",
-                model=self.embedding_model
+                message="Gateway not available for embedding generation", model=self.embedding_model
             )
 
-        response = self.gateway.embed(
-            texts=[text],
-            model=self.embedding_model
-        )
+        response = self.gateway.embed(texts=[text], model=self.embedding_model)
 
         if response.embeddings and len(response.embeddings) > 0:
             return response.embeddings[0]
@@ -108,7 +105,7 @@ class Retriever:
         raise EmbeddingError(
             message="Failed to generate embedding: No embeddings returned",
             text=text,
-            model=self.embedding_model
+            model=self.embedding_model,
         )
 
     def retrieve_hybrid(
@@ -119,7 +116,7 @@ class Retriever:
         threshold: float = 0.7,
         filters: Optional[Dict[str, Any]] = None,
         vector_weight: float = 0.7,
-        keyword_weight: float = 0.3
+        keyword_weight: float = 0.3,
     ) -> List[Dict[str, Any]]:
         """
         Hybrid retrieval combining vector similarity and keyword search.
@@ -140,7 +137,7 @@ class Retriever:
         if tenant_id:
             if filters is None:
                 filters = {}
-            filters['tenant_id'] = tenant_id
+            filters["tenant_id"] = tenant_id
 
         # Vector-based retrieval
         query_embedding = self._get_embedding(query)
@@ -149,7 +146,6 @@ class Retriever:
             limit=top_k * 2,  # Get more for re-ranking
             threshold=threshold * 0.8,  # Lower threshold for hybrid
             model=self.embedding_model,
-            filters=filters
         )
 
         # Keyword-based retrieval (simple text search)
@@ -157,10 +153,7 @@ class Retriever:
 
         # Combine and re-rank results
         combined = self._combine_results(
-            vector_results,
-            keyword_results,
-            vector_weight,
-            keyword_weight
+            vector_results, keyword_results, vector_weight, keyword_weight
         )
 
         # Apply filters if provided
@@ -171,10 +164,7 @@ class Retriever:
         return combined[:top_k]
 
     def _keyword_search(
-        self,
-        query: str,
-        tenant_id: Optional[str] = None,
-        top_k: int = 10
+        self, query: str, tenant_id: Optional[str] = None, top_k: int = 10
     ) -> List[Dict[str, Any]]:
         """
         Perform keyword-based search on document content.
@@ -220,33 +210,39 @@ class Retriever:
         like_patterns = [f"%{keyword}%" for keyword in keywords]
 
         # Get database connection from vector_ops
-        db = getattr(self.vector_ops, 'db', None)
+        db = getattr(self.vector_ops, "db", None)
         if not db:
             # Fallback: try to get from vector_ops connection attribute
-            db = getattr(self.vector_ops, 'connection', None)
+            db = getattr(self.vector_ops, "connection", None)
 
         if not db:
             return []  # Cannot perform keyword search without database
 
         try:
-            results = db.execute_query(
-                query_sql,
-                (like_patterns, like_patterns, limit),
-                fetch_all=True
-            )
+            if tenant_id:
+                results = db.execute_query(
+                    query_sql, (like_patterns, like_patterns, tenant_id, top_k), fetch_all=True
+                )
+            else:
+                results = db.execute_query(
+                    query_sql, (like_patterns, like_patterns, top_k), fetch_all=True
+                )
 
             # Format results similar to vector search
             formatted_results = []
             for row in results:
-                formatted_results.append({
-                    "id": str(row["id"]),
-                    "title": row.get("title", ""),
-                    "content": row.get("content", ""),
-                    "metadata": row.get("metadata", {}),
-                    "source": row.get("source"),
-                    "similarity": row.get("keyword_matches", 0) / len(keywords),  # Normalize score
-                    "score_type": "keyword"
-                })
+                formatted_results.append(
+                    {
+                        "id": str(row["id"]),
+                        "title": row.get("title", ""),
+                        "content": row.get("content", ""),
+                        "metadata": row.get("metadata", {}),
+                        "source": row.get("source"),
+                        "similarity": row.get("keyword_matches", 0)
+                        / len(keywords),  # Normalize score
+                        "score_type": "keyword",
+                    }
+                )
 
             return formatted_results
         except Exception:
@@ -258,7 +254,7 @@ class Retriever:
         vector_results: List[Dict[str, Any]],
         keyword_results: List[Dict[str, Any]],
         vector_weight: float,
-        keyword_weight: float
+        keyword_weight: float,
     ) -> List[Dict[str, Any]]:
         """
         Combine and re-rank vector and keyword results.
@@ -284,8 +280,7 @@ class Retriever:
                 combined_map[doc_id]["keyword_score"] = 0.0
             else:
                 combined_map[doc_id]["vector_score"] = max(
-                    combined_map[doc_id].get("vector_score", 0.0),
-                    result.get("similarity", 0.0)
+                    combined_map[doc_id].get("vector_score", 0.0), result.get("similarity", 0.0)
                 )
 
         # Add keyword results
@@ -297,16 +292,15 @@ class Retriever:
                 combined_map[doc_id]["keyword_score"] = result.get("similarity", 0.0)
             else:
                 combined_map[doc_id]["keyword_score"] = max(
-                    combined_map[doc_id].get("keyword_score", 0.0),
-                    result.get("similarity", 0.0)
+                    combined_map[doc_id].get("keyword_score", 0.0), result.get("similarity", 0.0)
                 )
 
         # Calculate combined scores
         combined_results = []
         for doc_id, result in combined_map.items():
             combined_score = (
-                result.get("vector_score", 0.0) * vector_weight +
-                result.get("keyword_score", 0.0) * keyword_weight
+                result.get("vector_score", 0.0) * vector_weight
+                + result.get("keyword_score", 0.0) * keyword_weight
             )
             result["similarity"] = combined_score
             result["score_type"] = "hybrid"
@@ -318,9 +312,7 @@ class Retriever:
         return combined_results
 
     def _apply_filters(
-        self,
-        results: List[Dict[str, Any]],
-        filters: Dict[str, Any]
+        self, results: List[Dict[str, Any]], filters: Dict[str, Any]
     ) -> List[Dict[str, Any]]:
         """
         Apply metadata filters to results.
@@ -335,12 +327,13 @@ class Retriever:
         filtered = []
 
         for result in results:
-            metadata = result.get('metadata', {})
+            metadata = result.get("metadata", {})
             if isinstance(metadata, str):
                 import json
+
                 try:
                     metadata = json.loads(metadata)
-                except:
+                except json.JSONDecodeError:
                     metadata = {}
 
             match = True
@@ -354,4 +347,3 @@ class Retriever:
                 filtered.append(result)
 
         return filtered
-

@@ -5,42 +5,42 @@ This module contains common utilities, contracts, and middleware
 used across all AI component services.
 """
 
-from .contracts import (
-    ServiceRequest,
-    ServiceResponse,
-    ErrorResponse,
-    StandardHeaders,
-)
-from .middleware import (
-    setup_middleware,
-    auth_middleware,
-    logging_middleware,
-    error_handler,
-)
-from .database import (
-    get_database_connection,
-    DatabaseConnection,
-)
+from .agent_storage import AgentStorage
 from .config import (
     ServiceConfig,
-    load_config,
     get_config,
+    load_config,
+)
+from .contracts import (
+    ErrorResponse,
+    ServiceRequest,
+    ServiceResponse,
+    StandardHeaders,
+)
+from .database import (
+    DatabaseConnection,
+    get_database_connection,
 )
 from .exceptions import (
+    InternalServerError,
+    NotFoundError,
     ServiceException,
     ValidationError,
-    NotFoundError,
-    InternalServerError,
 )
 from .http_client import (
-    ServiceHTTPClient,
-    ServiceClientManager,
-    create_service_client,
     ServiceClientError,
-    ServiceUnavailableError,
+    ServiceClientManager,
+    ServiceHTTPClient,
     ServiceTimeoutError,
+    ServiceUnavailableError,
+    create_service_client,
 )
-from .agent_storage import AgentStorage
+from .middleware import (
+    auth_middleware,
+    error_handler,
+    logging_middleware,
+    setup_middleware,
+)
 
 __all__ = [
     # Contracts

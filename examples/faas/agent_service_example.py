@@ -5,6 +5,7 @@ Demonstrates how to interact with Agent Service via HTTP API.
 """
 
 import asyncio
+
 import httpx
 
 
@@ -84,4 +85,3 @@ async def main():
 
 if __name__ == "__main__":
     asyncio.run(main())
-

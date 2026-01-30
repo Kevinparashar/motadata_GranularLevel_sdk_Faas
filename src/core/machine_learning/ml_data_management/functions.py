@@ -16,10 +16,7 @@ from .data_validator import DataValidator
 from .feature_store import FeatureStore
 
 
-def create_data_manager(
-    db: DatabaseConnection,
-    tenant_id: Optional[str] = None
-) -> DataManager:
+def create_data_manager(db: DatabaseConnection, tenant_id: Optional[str] = None) -> DataManager:
     """Create data manager."""
     return DataManager(db=db, tenant_id=tenant_id)
 
@@ -34,19 +31,11 @@ def create_data_validator() -> DataValidator:
     return DataValidator()
 
 
-def create_feature_store(
-    db: DatabaseConnection,
-    tenant_id: Optional[str] = None
-) -> FeatureStore:
+def create_feature_store(db: DatabaseConnection, tenant_id: Optional[str] = None) -> FeatureStore:
     """Create feature store."""
     return FeatureStore(db=db, tenant_id=tenant_id)
 
 
-def create_data_pipeline(
-    pipeline_id: str,
-    tenant_id: Optional[str] = None
-) -> DataPipeline:
+def create_data_pipeline(pipeline_id: str, tenant_id: Optional[str] = None) -> DataPipeline:
     """Create data pipeline."""
     return DataPipeline(pipeline_id=pipeline_id, tenant_id=tenant_id)
-
-

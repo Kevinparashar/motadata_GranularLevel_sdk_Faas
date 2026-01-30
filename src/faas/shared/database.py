@@ -63,4 +63,3 @@ def get_database_connection(database_url: Optional[str] = None) -> DatabaseManag
         _db_manager = DatabaseManager(database_url)
 
     return _db_manager
-

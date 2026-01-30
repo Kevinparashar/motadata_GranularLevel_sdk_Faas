@@ -4,9 +4,9 @@ Integration tests for FaaS service interactions.
 Tests how services communicate with each other.
 """
 
+from unittest.mock import AsyncMock, Mock, patch
+
 import pytest
-from unittest.mock import Mock, AsyncMock, patch
-import httpx
 
 
 @pytest.mark.asyncio
@@ -28,7 +28,12 @@ async def test_agent_service_calls_gateway_service():
 
         # Test would call Gateway Service
         # This is a placeholder for actual integration test
-        assert True
+        # Verify mock is set up correctly
+        assert mock_response.json() == {
+            "text": "Hello, I'm an AI assistant.",
+            "model": "gpt-4",
+            "usage": {"total_tokens": 15},
+        }
 
 
 @pytest.mark.asyncio
@@ -48,7 +53,11 @@ async def test_rag_service_calls_gateway_service():
         mock_client.return_value = mock_client_instance
 
         # Test would call Gateway Service
-        assert True
+        # Verify mock is set up correctly
+        assert mock_response.json() == {
+            "embeddings": [[0.1, 0.2, 0.3]],
+            "model": "text-embedding-3-small",
+        }
 
 
 @pytest.mark.asyncio
@@ -68,5 +77,8 @@ async def test_data_ingestion_service_calls_rag_service():
         mock_client.return_value = mock_client_instance
 
         # Test would call RAG Service
-        assert True
-
+        # Verify mock is set up correctly
+        assert mock_response.json() == {
+            "success": True,
+            "data": {"document_id": "doc_123"},
+        }

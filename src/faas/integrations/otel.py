@@ -41,7 +41,8 @@ class OTELTracer:
         Returns:
             OTELSpan instance
         """
-        # TODO: Implement actual OTEL span creation
+        # TODO: SDK-INT-003 - Implement actual OTEL span creation
+        # Placeholder implementation - replace with actual OpenTelemetry SDK when integration is ready
         # from opentelemetry import trace
         # tracer = trace.get_tracer(self.service_name)
         # span = tracer.start_span(name, **kwargs)
@@ -55,7 +56,8 @@ class OTELTracer:
         Returns:
             Current span or None
         """
-        # TODO: Implement actual OTEL current span retrieval
+        # TODO: SDK-INT-003 - Implement actual OTEL current span retrieval
+        # Placeholder implementation - replace with actual OpenTelemetry SDK when integration is ready
         # from opentelemetry import trace
         # span = trace.get_current_span()
         return None
@@ -93,7 +95,9 @@ class OTELSpan:
         self.end()
 
 
-def create_otel_tracer(service_name: Optional[str] = None, otlp_endpoint: Optional[str] = None) -> Optional[OTELTracer]:
+def create_otel_tracer(
+    service_name: Optional[str] = None, otlp_endpoint: Optional[str] = None
+) -> Optional[OTELTracer]:
     """
     Create OTEL tracer instance.
 
@@ -125,4 +129,3 @@ def create_otel_tracer(service_name: Optional[str] = None, otlp_endpoint: Option
         if service_name:
             return OTELTracer(service_name, otlp_endpoint)
         return None
-

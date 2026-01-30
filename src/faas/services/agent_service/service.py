@@ -7,31 +7,28 @@ Handles agent management, task execution, chat interactions, and memory manageme
 import logging
 from typing import Any, Dict, Optional
 
-import httpx
-from fastapi import FastAPI, HTTPException, Header, status
-from fastapi.responses import StreamingResponse
+from fastapi import FastAPI, Header, HTTPException, status
 
 from ....core.agno_agent_framework import Agent, AgentTask, create_agent
 from ....core.litellm_gateway import create_gateway
-from ...shared.config import ServiceConfig, load_config
-from ...shared.contracts import ServiceResponse, extract_headers
-from ...shared.database import get_database_connection
-from ...shared.exceptions import NotFoundError, DependencyError, ValidationError
-from ...shared.middleware import setup_middleware
-from ...shared.http_client import ServiceClientManager, ServiceHTTPClient
-from ...shared.agent_storage import AgentStorage
-from .models import (
-    CreateAgentRequest,
-    UpdateAgentRequest,
-    ExecuteTaskRequest,
-    ChatRequest,
-    AgentResponse,
-    TaskResponse,
-    ChatResponse,
-)
+from ...integrations.codec import create_codec_manager
 from ...integrations.nats import create_nats_client
 from ...integrations.otel import create_otel_tracer
-from ...integrations.codec import create_codec_manager
+from ...shared.agent_storage import AgentStorage
+from ...shared.config import ServiceConfig, load_config
+from ...shared.contracts import ServiceResponse, extract_headers
+from ...shared.exceptions import DependencyError, NotFoundError, ValidationError
+from ...shared.http_client import ServiceClientManager, ServiceHTTPClient
+from ...shared.middleware import setup_middleware
+from .models import (
+    AgentResponse,
+    ChatRequest,
+    ChatResponse,
+    CreateAgentRequest,
+    ExecuteTaskRequest,
+    TaskResponse,
+    UpdateAgentRequest,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -84,7 +81,7 @@ class AgentService:
 
         # Initialize agent storage (database-backed, stateless)
         self.agent_storage = AgentStorage(self.db)
-        
+
         # Initialize service client manager for service-to-service calls
         self.service_clients = ServiceClientManager(self.config)
 
@@ -94,7 +91,9 @@ class AgentService:
     def _register_routes(self):
         """Register FastAPI routes."""
 
-        @self.app.post("/api/v1/agents", response_model=ServiceResponse, status_code=status.HTTP_201_CREATED)
+        @self.app.post(
+            "/api/v1/agents", response_model=ServiceResponse, status_code=status.HTTP_201_CREATED
+        )
         async def create_agent(
             request: CreateAgentRequest,
             headers: dict = Header(...),
@@ -287,7 +286,9 @@ class AgentService:
             standard_headers = extract_headers(**headers)
 
             # Load agents from database (stateless)
-            agents = self.agent_storage.list_agents(standard_headers.tenant_id, limit=limit, offset=offset)
+            agents = self.agent_storage.list_agents(
+                standard_headers.tenant_id, limit=limit, offset=offset
+            )
 
             return ServiceResponse(
                 success=True,
@@ -307,7 +308,7 @@ class AgentService:
     async def _get_gateway_client(self, tenant_id: str):
         """
         Get gateway client for LLM calls.
-        
+
         Uses Gateway Service via HTTP if configured, otherwise falls back to direct SDK.
 
         Args:
@@ -323,12 +324,11 @@ class AgentService:
             # For now, fall back to direct SDK for simplicity
             # In production, you could create a GatewayServiceClient wrapper
             pass
-        
+
         # Fallback to direct SDK (for development or when Gateway Service not available)
         # In production, this should use Gateway Service via HTTP
         gateway = create_gateway(
-            api_keys={"openai": self.config.get("OPENAI_API_KEY", "")},
-            default_model="gpt-4"
+            api_keys={"openai": self.config.get("OPENAI_API_KEY", "")}, default_model="gpt-4"
         )
         return gateway
 
@@ -352,6 +352,7 @@ def create_agent_service(
 
     # Get database connection (direct connection for stateless services)
     from ...core.postgresql_database import create_database_connection
+
     db_connection = create_database_connection(config.database_url)
     db_connection.connect()
 
@@ -369,4 +370,3 @@ def create_agent_service(
 
     logger.info(f"Agent Service created: {service_name}")
     return service
-

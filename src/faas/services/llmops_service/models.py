@@ -2,9 +2,9 @@
 Request/Response models for LLMOps Service.
 """
 
-from typing import Any, Dict, List, Optional
 from datetime import datetime
 from enum import Enum
+from typing import Any, Dict, List, Optional
 
 from pydantic import BaseModel, Field
 
@@ -102,4 +102,3 @@ class CostAnalysisResponse(BaseModel):
     cost_trend: List[Dict[str, Any]] = Field(default_factory=list)
     period_start: str
     period_end: str
-

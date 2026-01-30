@@ -4,16 +4,16 @@ ML Service - FaaS implementation of ML Framework.
 Provides REST API for model training, inference, and model management.
 """
 
-from .service import MLService, create_ml_service
 from .models import (
-    TrainModelRequest,
-    PredictRequest,
     BatchPredictRequest,
     DeployModelRequest,
     ModelResponse,
-    TrainingResponse,
     PredictionResponse,
+    PredictRequest,
+    TrainingResponse,
+    TrainModelRequest,
 )
+from .service import MLService, create_ml_service
 
 __all__ = [
     "MLService",
@@ -26,4 +26,3 @@ __all__ = [
     "TrainingResponse",
     "PredictionResponse",
 ]
-

@@ -4,21 +4,20 @@ Agent Memory Management
 Manages agent memory, including short-term and long-term memory storage.
 """
 
-from typing import Dict, List, Optional, Any
-from pydantic import BaseModel, Field
+import json
 from datetime import datetime
 from enum import Enum
-import json
 from pathlib import Path
-from .exceptions import (
-    MemoryReadError,
-    MemoryWriteError,
-    MemoryPersistenceError
-)
+from typing import Any, Dict, List, Optional
+
+from pydantic import BaseModel, Field
+
+from .exceptions import MemoryPersistenceError, MemoryWriteError
 
 
 class MemoryType(str, Enum):
     """Memory type enumeration."""
+
     SHORT_TERM = "short_term"
     LONG_TERM = "long_term"
     EPISODIC = "episodic"
@@ -27,6 +26,7 @@ class MemoryType(str, Enum):
 
 class MemoryItem(BaseModel):
     """Individual memory item."""
+
     memory_id: str
     agent_id: str
     memory_type: MemoryType
@@ -55,7 +55,7 @@ class AgentMemory:
         max_episodic: int = 500,  # Limit for episodic memory (ITSM ticket history)
         max_semantic: int = 2000,  # Limit for semantic memory (knowledge patterns)
         max_age_days: Optional[int] = 30,  # Optional max age for automatic cleanup
-        persistence_path: Optional[str] = None
+        persistence_path: Optional[str] = None,
     ):
         """
         Initialize agent memory.
@@ -85,9 +85,50 @@ class AgentMemory:
         if self._persistence_path and self._persistence_path.exists():
             try:
                 self._load()
-            except Exception:
+            except (OSError, IOError, ValueError, KeyError) as e:
                 # If load fails, continue with empty memory
-                pass
+                # Log the error for debugging but don't fail initialization
+                import logging
+                logger = logging.getLogger(__name__)
+                logger.warning(
+                    f"Failed to load memory from {self._persistence_path}: {e}. "
+                    "Continuing with empty memory.",
+                    exc_info=True
+                )
+
+    def _trim_short_term(self, memory: MemoryItem) -> None:
+        """Trim short-term memory if exceeds max limit."""
+        self._short_term.append(memory)
+        if len(self._short_term) > self.max_short_term:
+            # Remove least important items (LRU-like eviction based on importance)
+            self._short_term.sort(key=lambda m: m.importance)
+            self._short_term = self._short_term[-self.max_short_term :]
+
+    def _trim_long_term(self, memory: MemoryItem) -> None:
+        """Trim long-term memory if exceeds max limit."""
+        self._long_term[memory.memory_id] = memory
+        if len(self._long_term) > self.max_long_term:
+            # Remove least important items
+            sorted_items = sorted(self._long_term.values(), key=lambda m: m.importance)
+            to_remove = sorted_items[: len(sorted_items) - self.max_long_term]
+            for item in to_remove:
+                self._long_term.pop(item.memory_id, None)
+
+    def _trim_episodic(self, memory: MemoryItem) -> None:
+        """Trim episodic memory if exceeds max limit."""
+        self._episodic.append(memory)
+        if len(self._episodic) > self.max_episodic:
+            # FIFO - remove oldest
+            self._episodic = self._episodic[-self.max_episodic :]
+
+    def _trim_semantic(self, memory: MemoryItem) -> None:
+        """Trim semantic memory if exceeds max limit."""
+        self._semantic[memory.memory_id] = memory
+        if len(self._semantic) > self.max_semantic:
+            sorted_items = sorted(self._semantic.values(), key=lambda m: m.importance)
+            to_remove = sorted_items[: len(sorted_items) - self.max_semantic]
+            for item in to_remove:
+                self._semantic.pop(item.memory_id, None)
 
     def store(
         self,
@@ -95,7 +136,7 @@ class AgentMemory:
         memory_type: MemoryType = MemoryType.SHORT_TERM,
         importance: float = 0.5,
         metadata: Optional[Dict[str, Any]] = None,
-        tags: Optional[List[str]] = None
+        tags: Optional[List[str]] = None,
     ) -> MemoryItem:
         """
         Store a memory item.
@@ -119,55 +160,23 @@ class AgentMemory:
             content=content,
             importance=importance,
             metadata=metadata or {},
-            tags=tags or []
+            tags=tags or [],
         )
 
         # BOUNDED MEMORY: Enforce memory limits to prevent unbounded growth
         # This ensures memory usage stays within configured limits, preventing memory leaks
         # and controlling token usage in prompts (more memory = more tokens = higher cost)
         if memory_type == MemoryType.SHORT_TERM:
-            self._short_term.append(memory)
-            # Trim if exceeds max (evict least important items first)
-            # This keeps the most important recent memories for agent context
-            if len(self._short_term) > self.max_short_term:
-                # Remove least important items (LRU-like eviction based on importance)
-                self._short_term.sort(key=lambda m: m.importance)
-                self._short_term = self._short_term[-self.max_short_term:]
-
+            self._trim_short_term(memory)
         elif memory_type == MemoryType.LONG_TERM:
-            self._long_term[memory.memory_id] = memory
-            # Trim if exceeds max
-            if len(self._long_term) > self.max_long_term:
-                # Remove least important items
-                sorted_items = sorted(
-                    self._long_term.values(),
-                    key=lambda m: m.importance
-                )
-                to_remove = sorted_items[:len(sorted_items) - self.max_long_term]
-                for item in to_remove:
-                    self._long_term.pop(item.memory_id, None)
-
+            self._trim_long_term(memory)
         elif memory_type == MemoryType.EPISODIC:
             # EPISODIC MEMORY: Stores conversation episodes (query-answer pairs)
             # Used by RAG system to provide conversation context
             # FIFO eviction: oldest episodes removed first (maintains recent conversation history)
-            self._episodic.append(memory)
-            # Trim if exceeds max (FIFO - remove oldest)
-            # This ensures we keep recent conversation context while limiting memory size
-            if len(self._episodic) > self.max_episodic:
-                self._episodic = self._episodic[-self.max_episodic:]
-
+            self._trim_episodic(memory)
         elif memory_type == MemoryType.SEMANTIC:
-            self._semantic[memory.memory_id] = memory
-            # Trim if exceeds max (remove least important)
-            if len(self._semantic) > self.max_semantic:
-                sorted_items = sorted(
-                    self._semantic.values(),
-                    key=lambda m: m.importance
-                )
-                to_remove = sorted_items[:len(sorted_items) - self.max_semantic]
-                for item in to_remove:
-                    self._semantic.pop(item.memory_id, None)
+            self._trim_semantic(memory)
 
         try:
             self._persist()
@@ -176,9 +185,11 @@ class AgentMemory:
                 message=f"Failed to persist memory: {str(e)}",
                 agent_id=self.agent_id,
                 memory_id=memory.memory_id,
-                memory_type=memory_type.value if hasattr(memory_type, 'value') else str(memory_type),
+                memory_type=(
+                    memory_type.value if hasattr(memory_type, "value") else str(memory_type)
+                ),
                 operation="store",
-                original_error=e
+                original_error=e,
             )
         return memory
 
@@ -187,7 +198,7 @@ class AgentMemory:
         query: Optional[str] = None,
         memory_type: Optional[MemoryType] = None,
         tags: Optional[List[str]] = None,
-        limit: int = 10
+        limit: int = 10,
     ) -> List[MemoryItem]:
         """
         Retrieve memory items.
@@ -201,8 +212,6 @@ class AgentMemory:
         Returns:
             List of memory items
         """
-        results = []
-
         # Determine which memories to search
         memories_to_search = []
 
@@ -221,23 +230,16 @@ class AgentMemory:
         # Filter by tags if provided
         if tags:
             memories_to_search = [
-                m for m in memories_to_search
-                if any(tag in m.tags for tag in tags)
+                m for m in memories_to_search if any(tag in m.tags for tag in tags)
             ]
 
         # Simple text search if query provided
         if query:
             query_lower = query.lower()
-            memories_to_search = [
-                m for m in memories_to_search
-                if query_lower in m.content.lower()
-            ]
+            memories_to_search = [m for m in memories_to_search if query_lower in m.content.lower()]
 
         # Sort by importance and recency
-        memories_to_search.sort(
-            key=lambda m: (m.importance, m.last_accessed),
-            reverse=True
-        )
+        memories_to_search.sort(key=lambda m: (m.importance, m.last_accessed), reverse=True)
 
         # Update access counts
         for memory in memories_to_search[:limit]:
@@ -293,10 +295,7 @@ class AgentMemory:
             Number of memories consolidated
         """
         # Find important short-term memories
-        important = [
-            m for m in self._short_term
-            if m.importance >= 0.7
-        ]
+        important = [m for m in self._short_term if m.importance >= 0.7]
 
         consolidated = 0
         for memory in important:
@@ -309,7 +308,7 @@ class AgentMemory:
                 importance=memory.importance,
                 metadata=memory.metadata,
                 tags=memory.tags,
-                timestamp=memory.timestamp
+                timestamp=memory.timestamp,
             )
 
             self._long_term[long_term_memory.memory_id] = long_term_memory
@@ -344,10 +343,7 @@ class AgentMemory:
         removed += before - len(self._short_term)
 
         # Clean long-term
-        to_remove = [
-            mid for mid, m in self._long_term.items()
-            if m.timestamp <= cutoff
-        ]
+        to_remove = [mid for mid, m in self._long_term.items() if m.timestamp <= cutoff]
         for mid in to_remove:
             self._long_term.pop(mid, None)
             removed += 1
@@ -358,10 +354,7 @@ class AgentMemory:
         removed += before - len(self._episodic)
 
         # Clean semantic
-        to_remove = [
-            mid for mid, m in self._semantic.items()
-            if m.timestamp <= cutoff
-        ]
+        to_remove = [mid for mid, m in self._semantic.items() if m.timestamp <= cutoff]
         for mid in to_remove:
             self._semantic.pop(mid, None)
             removed += 1
@@ -379,18 +372,10 @@ class AgentMemory:
             Dictionary with memory pressure information
         """
         total = (
-            len(self._short_term) +
-            len(self._long_term) +
-            len(self._episodic) +
-            len(self._semantic)
+            len(self._short_term) + len(self._long_term) + len(self._episodic) + len(self._semantic)
         )
 
-        max_total = (
-            self.max_short_term +
-            self.max_long_term +
-            self.max_episodic +
-            self.max_semantic
-        )
+        max_total = self.max_short_term + self.max_long_term + self.max_episodic + self.max_semantic
 
         usage_ratio = total / max_total if max_total > 0 else 0
 
@@ -403,24 +388,34 @@ class AgentMemory:
                 "short_term": {
                     "count": len(self._short_term),
                     "max": self.max_short_term,
-                    "usage": len(self._short_term) / self.max_short_term if self.max_short_term > 0 else 0
+                    "usage": (
+                        len(self._short_term) / self.max_short_term
+                        if self.max_short_term > 0
+                        else 0
+                    ),
                 },
                 "long_term": {
                     "count": len(self._long_term),
                     "max": self.max_long_term,
-                    "usage": len(self._long_term) / self.max_long_term if self.max_long_term > 0 else 0
+                    "usage": (
+                        len(self._long_term) / self.max_long_term if self.max_long_term > 0 else 0
+                    ),
                 },
                 "episodic": {
                     "count": len(self._episodic),
                     "max": self.max_episodic,
-                    "usage": len(self._episodic) / self.max_episodic if self.max_episodic > 0 else 0
+                    "usage": (
+                        len(self._episodic) / self.max_episodic if self.max_episodic > 0 else 0
+                    ),
                 },
                 "semantic": {
                     "count": len(self._semantic),
                     "max": self.max_semantic,
-                    "usage": len(self._semantic) / self.max_semantic if self.max_semantic > 0 else 0
-                }
-            }
+                    "usage": (
+                        len(self._semantic) / self.max_semantic if self.max_semantic > 0 else 0
+                    ),
+                },
+            },
         }
 
     def handle_memory_pressure(self) -> int:
@@ -450,16 +445,16 @@ class AgentMemory:
         if self.check_memory_pressure()["under_pressure"]:
             # Collect all memories from all types
             all_memories = (
-                list(self._short_term) +
-                list(self._long_term.values()) +
-                list(self._episodic) +
-                list(self._semantic.values())
+                list(self._short_term)
+                + list(self._long_term.values())
+                + list(self._episodic)
+                + list(self._semantic.values())
             )
             # Sort by importance (lowest first) and access count (least accessed first)
             all_memories.sort(key=lambda m: (m.importance, m.access_count))
 
             # Remove bottom 10% (least important and least accessed)
-            to_remove = all_memories[:max(1, len(all_memories) // 10)]
+            to_remove = all_memories[: max(1, len(all_memories) // 10)]
             for memory in to_remove:
                 self.forget(memory.memory_id)
                 removed += 1
@@ -480,18 +475,18 @@ class AgentMemory:
             "episodic_count": len(self._episodic),
             "semantic_count": len(self._semantic),
             "total_count": (
-                len(self._short_term) +
-                len(self._long_term) +
-                len(self._episodic) +
-                len(self._semantic)
+                len(self._short_term)
+                + len(self._long_term)
+                + len(self._episodic)
+                + len(self._semantic)
             ),
             "limits": {
                 "max_short_term": self.max_short_term,
                 "max_long_term": self.max_long_term,
                 "max_episodic": self.max_episodic,
-                "max_semantic": self.max_semantic
+                "max_semantic": self.max_semantic,
             },
-            "pressure": self.check_memory_pressure()
+            "pressure": self.check_memory_pressure(),
         }
 
     def _persist(self) -> None:
@@ -514,7 +509,7 @@ class AgentMemory:
                 agent_id=self.agent_id,
                 file_path=str(self._persistence_path) if self._persistence_path else None,
                 operation="save",
-                original_error=e
+                original_error=e,
             )
 
     def _load(self) -> None:
@@ -540,6 +535,5 @@ class AgentMemory:
                 agent_id=self.agent_id,
                 file_path=str(self._persistence_path) if self._persistence_path else None,
                 operation="load",
-                original_error=e
+                original_error=e,
             )
-

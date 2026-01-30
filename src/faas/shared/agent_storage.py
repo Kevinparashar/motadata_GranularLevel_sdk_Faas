@@ -7,7 +7,6 @@ Provides database-backed agent storage to replace in-memory state.
 import json
 import logging
 from typing import Any, Dict, Optional
-from datetime import datetime
 
 from ...core.agno_agent_framework import Agent, create_agent
 from ...core.litellm_gateway import LiteLLMGateway
@@ -19,25 +18,26 @@ logger = logging.getLogger(__name__)
 class AgentStorage:
     """
     Database-backed agent storage for stateless services.
-    
+
     Stores agent definitions in database and recreates Agent instances on demand.
     """
-    
+
     def __init__(self, db_connection: Any):
         """
         Initialize agent storage.
-        
+
         Args:
             db_connection: Database connection (DatabaseConnection instance)
         """
         self.db = db_connection
         self._ensure_table()
-    
+
     def _ensure_table(self):
         """Ensure agents table exists."""
         try:
             with self.db.get_cursor() as cursor:
-                cursor.execute("""
+                cursor.execute(
+                    """
                     CREATE TABLE IF NOT EXISTS agents (
                         agent_id VARCHAR(255) PRIMARY KEY,
                         tenant_id VARCHAR(255) NOT NULL,
@@ -51,7 +51,8 @@ class AgentStorage:
                         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                         updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
                     )
-                """)
+                """
+                )
                 # Create index separately (MySQL syntax)
                 try:
                     cursor.execute("CREATE INDEX IF NOT EXISTS idx_tenant_id ON agents(tenant_id)")
@@ -60,7 +61,7 @@ class AgentStorage:
                     pass
         except Exception as e:
             logger.warning(f"Could not create agents table (may already exist): {e}")
-    
+
     def save_agent(
         self,
         agent: Agent,
@@ -68,13 +69,14 @@ class AgentStorage:
     ) -> None:
         """
         Save agent to database.
-        
+
         Args:
             agent: Agent instance
             tenant_id: Tenant ID
         """
         with self.db.get_cursor() as cursor:
-            cursor.execute("""
+            cursor.execute(
+                """
                 INSERT INTO agents (
                     agent_id, tenant_id, name, description,
                     llm_model, llm_provider, system_prompt,
@@ -89,18 +91,22 @@ class AgentStorage:
                     capabilities = EXCLUDED.capabilities,
                     config = EXCLUDED.config,
                     updated_at = CURRENT_TIMESTAMP
-            """, (
-                agent.agent_id,
-                tenant_id,
-                agent.name,
-                agent.description,
-                agent.llm_model,
-                agent.llm_provider,
-                agent.system_prompt,
-                json.dumps(list(agent.capabilities.keys()) if hasattr(agent, 'capabilities') else []),
-                json.dumps(agent.config if hasattr(agent, 'config') else {}),
-            ))
-    
+            """,
+                (
+                    agent.agent_id,
+                    tenant_id,
+                    agent.name,
+                    agent.description,
+                    agent.llm_model,
+                    agent.llm_provider,
+                    agent.system_prompt,
+                    json.dumps(
+                        list(agent.capabilities.keys()) if hasattr(agent, "capabilities") else []
+                    ),
+                    json.dumps(agent.config if hasattr(agent, "config") else {}),
+                ),
+            )
+
     def load_agent(
         self,
         agent_id: str,
@@ -109,49 +115,56 @@ class AgentStorage:
     ) -> Optional[Agent]:
         """
         Load agent from database and recreate Agent instance.
-        
+
         Args:
             agent_id: Agent ID
             tenant_id: Tenant ID
             gateway: LiteLLM Gateway instance
-            
+
         Returns:
             Agent instance or None if not found
         """
         with self.db.get_cursor() as cursor:
-            cursor.execute("""
+            cursor.execute(
+                """
                 SELECT 
                     agent_id, name, description,
                     llm_model, llm_provider, system_prompt,
                     capabilities, config
                 FROM agents
                 WHERE agent_id = %s AND tenant_id = %s
-            """, (agent_id, tenant_id))
-            
+            """,
+                (agent_id, tenant_id),
+            )
+
             row = cursor.fetchone()
             if not row:
                 return None
-            
+
             # Recreate agent
             agent = create_agent(
-                agent_id=row['agent_id'],
-                name=row['name'],
-                description=row['description'],
+                agent_id=row["agent_id"],
+                name=row["name"],
+                description=row["description"],
                 gateway=gateway,
-                llm_model=row['llm_model'],
-                llm_provider=row['llm_provider'],
-                system_prompt=row['system_prompt'],
+                llm_model=row["llm_model"],
+                llm_provider=row["llm_provider"],
+                system_prompt=row["system_prompt"],
                 tenant_id=tenant_id,
             )
-            
+
             # Restore capabilities
-            if row['capabilities']:
-                capabilities = json.loads(row['capabilities']) if isinstance(row['capabilities'], str) else row['capabilities']
+            if row["capabilities"]:
+                capabilities = (
+                    json.loads(row["capabilities"])
+                    if isinstance(row["capabilities"], str)
+                    else row["capabilities"]
+                )
                 for capability in capabilities:
                     agent.add_capability(capability, f"Capability: {capability}")
-            
+
             return agent
-    
+
     def list_agents(
         self,
         tenant_id: str,
@@ -160,17 +173,18 @@ class AgentStorage:
     ) -> list[Dict[str, Any]]:
         """
         List agents for a tenant.
-        
+
         Args:
             tenant_id: Tenant ID
             limit: Maximum number of agents
             offset: Offset for pagination
-            
+
         Returns:
             List of agent dictionaries
         """
         with self.db.get_cursor() as cursor:
-            cursor.execute("""
+            cursor.execute(
+                """
                 SELECT 
                     agent_id, name, description,
                     llm_model, llm_provider,
@@ -179,10 +193,12 @@ class AgentStorage:
                 WHERE tenant_id = %s
                 ORDER BY created_at DESC
                 LIMIT %s OFFSET %s
-            """, (tenant_id, limit, offset))
-            
+            """,
+                (tenant_id, limit, offset),
+            )
+
             return [dict(row) for row in cursor.fetchall()]
-    
+
     def delete_agent(
         self,
         agent_id: str,
@@ -190,22 +206,25 @@ class AgentStorage:
     ) -> bool:
         """
         Delete agent from database.
-        
+
         Args:
             agent_id: Agent ID
             tenant_id: Tenant ID
-            
+
         Returns:
             True if deleted, False if not found
         """
         with self.db.get_cursor() as cursor:
-            cursor.execute("""
+            cursor.execute(
+                """
                 DELETE FROM agents
                 WHERE agent_id = %s AND tenant_id = %s
-            """, (agent_id, tenant_id))
-            
+            """,
+                (agent_id, tenant_id),
+            )
+
             return cursor.rowcount > 0
-    
+
     def agent_exists(
         self,
         agent_id: str,
@@ -213,20 +232,22 @@ class AgentStorage:
     ) -> bool:
         """
         Check if agent exists.
-        
+
         Args:
             agent_id: Agent ID
             tenant_id: Tenant ID
-            
+
         Returns:
             True if exists, False otherwise
         """
         with self.db.get_cursor() as cursor:
-            cursor.execute("""
+            cursor.execute(
+                """
                 SELECT 1 FROM agents
                 WHERE agent_id = %s AND tenant_id = %s
                 LIMIT 1
-            """, (agent_id, tenant_id))
-            
-            return cursor.fetchone() is not None
+            """,
+                (agent_id, tenant_id),
+            )
 
+            return cursor.fetchone() is not None

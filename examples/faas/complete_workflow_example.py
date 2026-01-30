@@ -5,7 +5,26 @@ Demonstrates a complete workflow where an Agent uses RAG to answer questions.
 """
 
 import asyncio
+from pathlib import Path
+
 import httpx
+
+# Constants
+EXAMPLE_DOC_FILENAME = "example_document.txt"
+EXAMPLE_DOC_CONTENT = """
+Motadata AI SDK provides comprehensive AI capabilities including:
+- Agent Framework for autonomous AI agents
+- RAG System for document-based Q&A
+- LiteLLM Gateway for unified LLM access
+- ML Framework for machine learning operations
+"""
+
+
+def _prepare_example_document() -> Path:
+    """Prepare example document for upload (synchronous helper)."""
+    doc_path = Path(EXAMPLE_DOC_FILENAME)
+    doc_path.write_text(EXAMPLE_DOC_CONTENT)
+    return doc_path
 
 
 async def complete_workflow():
@@ -23,21 +42,18 @@ async def complete_workflow():
         "Content-Type": "application/json",
     }
 
+    # Prepare document before async operations
+    doc_path = _prepare_example_document()
+    
     async with httpx.AsyncClient(timeout=30.0) as client:
         # Step 1: Upload document via Data Ingestion Service
         print("Step 1: Uploading document...")
-        with open("example_document.txt", "w") as f:
-            f.write("""
-            Motadata AI SDK provides comprehensive AI capabilities including:
-            - Agent Framework for autonomous AI agents
-            - RAG System for document-based Q&A
-            - LiteLLM Gateway for unified LLM access
-            - ML Framework for machine learning operations
-            """)
-
+        
+        # Upload the document (read file content before async context)
+        file_content = doc_path.read_bytes()
         upload_response = await client.post(
             "http://localhost:8086/api/v1/ingestion/upload",
-            files={"file": ("example_document.txt", open("example_document.txt", "rb"))},
+            files={"file": (EXAMPLE_DOC_FILENAME, file_content)},
             data={"title": "SDK Documentation", "auto_ingest": "true"},
             headers={"X-Tenant-ID": tenant_id},
         )
@@ -94,4 +110,3 @@ async def complete_workflow():
 
 if __name__ == "__main__":
     asyncio.run(complete_workflow())
-

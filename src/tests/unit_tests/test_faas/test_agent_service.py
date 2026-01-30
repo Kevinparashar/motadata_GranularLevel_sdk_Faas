@@ -2,8 +2,9 @@
 Unit tests for Agent Service.
 """
 
+from unittest.mock import AsyncMock, Mock, patch
+
 import pytest
-from unittest.mock import Mock, AsyncMock, patch
 from fastapi.testclient import TestClient
 
 from src.faas.services.agent_service import create_agent_service
@@ -113,4 +114,3 @@ def test_health_check(agent_service):
     data = response.json()
     assert data["status"] == "healthy"
     assert data["service"] == "agent-service"
-
