@@ -1,4 +1,6 @@
-# Motadata API Backend Services - Comprehensive Component Explanation
+# MOTADATA - API BACKEND SERVICES
+
+**Comprehensive explanation of the API Backend Services component providing RESTful API endpoints and backend integration for the SDK.**
 
 ## Overview
 

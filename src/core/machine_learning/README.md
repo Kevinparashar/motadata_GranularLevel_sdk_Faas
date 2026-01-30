@@ -1,4 +1,6 @@
-# Motadata Machine Learning Components
+# MOTADATA - MACHINE LEARNING COMPONENTS
+
+**Comprehensive ML capabilities including training, inference, MLOps, data management, and model serving for ITSM SaaS platforms.**
 
 ## Overview
 

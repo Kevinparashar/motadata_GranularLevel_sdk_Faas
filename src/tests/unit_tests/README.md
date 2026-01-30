@@ -1,4 +1,6 @@
-# Motadata Unit Tests
+# MOTADATA - UNIT TESTS
+
+**Unit test suite for SDK components with instructions for running and writing tests.**
 
 ## Instructions for Running Unit Tests
 

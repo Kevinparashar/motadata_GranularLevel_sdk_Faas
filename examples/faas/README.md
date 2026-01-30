@@ -1,4 +1,6 @@
-# Motadata FaaS Service Examples
+# MOTADATA - FAAS SERVICE EXAMPLES
+
+**Examples demonstrating how to use each FaaS service for microservices deployment.**
 
 This directory contains examples demonstrating how to use each FaaS service.
 

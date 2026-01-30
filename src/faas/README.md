@@ -1,4 +1,6 @@
-# Motadata AI SDK - Function as a Service (FaaS) Architecture
+# MOTADATA - FAAS ARCHITECTURE
+
+**FaaS implementation of the Motadata AI SDK, transforming each AI component into an independent, scalable service for serverless or containerized deployment.**
 
 ## Overview
 

@@ -1,4 +1,6 @@
-# Motadata Agents
+# MOTADATA - AGENTS
+
+**Agent implementations and agent type definitions within the Agno Agent Framework with session management, memory, tools, and plugins.**
 
 ## Overview
 

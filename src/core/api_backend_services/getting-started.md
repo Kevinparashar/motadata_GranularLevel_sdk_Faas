@@ -1,4 +1,6 @@
-# Motadata Getting Started with API Backend Services
+# MOTADATA - GETTING STARTED WITH API BACKEND SERVICES
+
+**Complete guide for getting started with API Backend Services, from API creation to endpoint registration.**
 
 ## Overview
 

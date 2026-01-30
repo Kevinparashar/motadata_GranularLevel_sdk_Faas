@@ -1,4 +1,6 @@
-# Motadata Data Ingestion Service Documentation
+# MOTADATA - DATA INGESTION SERVICE DOCUMENTATION
+
+**Complete class documentation for the DataIngestionService class providing unified interface for ingesting and processing multi-modal data.**
 
 ## Overview
 

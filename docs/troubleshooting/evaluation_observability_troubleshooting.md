@@ -1,4 +1,6 @@
-# Motadata Evaluation & Observability Troubleshooting Guide
+# MOTADATA - EVALUATION & OBSERVABILITY TROUBLESHOOTING
+
+**Troubleshooting guide for diagnosing and resolving common issues with the Evaluation & Observability component.**
 
 This guide helps diagnose and resolve common issues encountered when using the Evaluation & Observability component.
 

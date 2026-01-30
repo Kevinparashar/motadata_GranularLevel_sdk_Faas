@@ -1,4 +1,6 @@
-# Motadata MLOps Pipeline
+# MOTADATA - MLOPS PIPELINE
+
+**End-to-end MLOps capabilities including experiment tracking, model versioning, deployment, monitoring, and drift detection.**
 
 ## Overview
 

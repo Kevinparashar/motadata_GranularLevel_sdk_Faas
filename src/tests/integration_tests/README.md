@@ -1,4 +1,6 @@
-# Motadata Integration Tests
+# MOTADATA - INTEGRATION TESTS
+
+**Integration test suite verifying that multiple components work together correctly.**
 
 ## Overview
 

@@ -1,4 +1,6 @@
-# Motadata ML Framework
+# MOTADATA - ML FRAMEWORK
+
+**Comprehensive machine learning system for training, inference, and model management with multi-tenancy and memory management support.**
 
 ## Overview
 

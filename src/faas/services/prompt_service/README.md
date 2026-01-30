@@ -1,4 +1,6 @@
-# Motadata Prompt Service
+# MOTADATA - PROMPT SERVICE
+
+**FaaS implementation of the Prompt Context Management providing REST API endpoints for template management, rendering, and context building.**
 
 ## Overview
 

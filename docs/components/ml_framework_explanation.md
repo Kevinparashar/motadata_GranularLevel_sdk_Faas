@@ -1,4 +1,6 @@
-# Motadata ML Framework - Comprehensive Component Explanation
+# MOTADATA - ML FRAMEWORK
+
+**Comprehensive explanation of the ML Framework providing unified interface for training, inference, and model management with multi-tenancy support.**
 
 ## Overview
 

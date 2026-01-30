@@ -1,4 +1,6 @@
-# Motadata RAG System Functions Documentation
+# MOTADATA - RAG SYSTEM FUNCTIONS
+
+**Documentation of high-level factory functions, convenience functions, and utilities for the RAG System.**
 
 ## Overview
 

@@ -1,4 +1,6 @@
-# Motadata CODEC Integration Guide
+# MOTADATA - CODEC INTEGRATION GUIDE
+
+**Complete guide for integrating CODEC message encoding/decoding with AI SDK components for serialization.**
 
 ## Overview
 

@@ -1,4 +1,6 @@
-# Motadata Data Ingestion Service
+# MOTADATA - DATA INGESTION SERVICE
+
+**FaaS implementation of the Data Ingestion component providing REST API endpoints for file upload and multi-modal data processing.**
 
 ## Overview
 

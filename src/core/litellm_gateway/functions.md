@@ -1,4 +1,6 @@
-# Motadata LiteLLM Gateway Functions Documentation
+# MOTADATA - LITELLM GATEWAY FUNCTIONS
+
+**Documentation of high-level factory functions, convenience functions, and utilities for the LiteLLM Gateway.**
 
 ## Overview
 

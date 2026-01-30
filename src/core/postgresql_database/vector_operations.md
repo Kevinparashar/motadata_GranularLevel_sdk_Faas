@@ -1,4 +1,6 @@
-# Motadata Vector Operations Documentation
+# MOTADATA - VECTOR OPERATIONS DOCUMENTATION
+
+**Complete class documentation for the VectorOperations class providing vector database operations for storing, retrieving, and searching embeddings.**
 
 ## Overview
 

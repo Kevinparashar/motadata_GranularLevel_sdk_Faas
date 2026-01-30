@@ -1,5 +1,6 @@
-# Motadata CONTRIBUTING.md
-## Motadata Python AI SDK
+# MOTADATA - CONTRIBUTING GUIDE
+
+**Official contribution process for the Motadata Python AI SDK defining merge-blocking rules, quality gates, and development guidelines.**
 
 This document defines the **official contribution process** for the Motadata Python AI SDK.
 It is written for **organizational use**: onboarding, training, and consistent engineering execution.

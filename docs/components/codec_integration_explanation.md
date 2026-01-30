@@ -1,4 +1,6 @@
-# Motadata CODEC Integration - Comprehensive Component Explanation
+# MOTADATA - CODEC INTEGRATION
+
+**Comprehensive explanation of the CODEC Integration component providing message encoding/decoding with schema versioning and validation.**
 
 ## Overview
 

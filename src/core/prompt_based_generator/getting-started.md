@@ -1,4 +1,6 @@
-# Motadata Getting Started with Prompt-Based Generator
+# MOTADATA - GETTING STARTED WITH PROMPT-BASED GENERATOR
+
+**Complete guide for getting started with creating AI agents and tools using natural language descriptions.**
 
 ## Introduction
 

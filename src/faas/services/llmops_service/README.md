@@ -1,4 +1,6 @@
-# Motadata LLMOps Service
+# MOTADATA - LLMOPS SERVICE
+
+**FaaS implementation of the LLMOps component providing REST API endpoints for logging, metrics, analytics, and cost tracking.**
 
 ## Overview
 

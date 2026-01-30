@@ -1,4 +1,6 @@
-# Motadata Cache Mechanism Class Documentation
+# MOTADATA - CACHE MECHANISM CLASS DOCUMENTATION
+
+**Complete class documentation for the CacheMechanism class providing flexible caching with multiple backends.**
 
 ## Overview
 
