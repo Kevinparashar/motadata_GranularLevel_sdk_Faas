@@ -1,4 +1,6 @@
-# Motadata Agno Agent Framework
+# MOTADATA - AGNO AGENT FRAMEWORK
+
+**Complete framework for creating, managing, and orchestrating autonomous AI agents with memory, tools, and session management.**
 
 ## When to Use This Component
 

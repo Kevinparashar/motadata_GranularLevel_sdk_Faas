@@ -1,4 +1,6 @@
-# Motadata Data Ingestion Service
+# MOTADATA - DATA INGESTION SERVICE
+
+**Unified interface for uploading and processing data files with automatic integration into all AI components.**
 
 ## When to Use This Component
 

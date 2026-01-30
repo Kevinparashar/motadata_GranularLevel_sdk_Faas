@@ -1,6 +1,6 @@
-# Motadata RAG System Troubleshooting Guide
+# MOTADATA - RAG SYSTEM TROUBLESHOOTING
 
-This guide helps diagnose and resolve common issues encountered when using the RAG System.
+**Troubleshooting guide for diagnosing and resolving common issues with the RAG System including document ingestion failures, retrieval issues, generation errors, and embedding problems.**
 
 ## Table of Contents
 

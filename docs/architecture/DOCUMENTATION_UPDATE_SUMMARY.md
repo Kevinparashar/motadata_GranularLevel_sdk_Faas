@@ -1,4 +1,6 @@
-# Motadata Documentation Update Summary
+# MOTADATA - DOCUMENTATION UPDATE SUMMARY
+
+**Summary of documentation updates reflecting the transition to FaaS Services-based architecture.**
 
 ## Overview
 

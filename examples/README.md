@@ -1,4 +1,6 @@
-# Motadata SDK Examples
+# MOTADATA - SDK EXAMPLES
+
+**Working code examples for all SDK components, organized by component and complexity level.**
 
 This directory contains working code examples for all SDK components, organized by component and complexity level.
 

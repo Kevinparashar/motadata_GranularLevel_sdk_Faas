@@ -1,4 +1,6 @@
-# Motadata ML Use Cases
+# MOTADATA - ML USE CASES
+
+**Template structure and base classes for creating ITSM-specific ML use case models following the BaseMLModel interface.**
 
 ## Overview
 

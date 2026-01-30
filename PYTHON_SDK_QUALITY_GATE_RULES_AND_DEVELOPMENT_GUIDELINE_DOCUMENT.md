@@ -1,11 +1,8 @@
-# PYTHON SDK QUALITY GATE RULES AND DEVELOPMENT GUIDELINE DOCUMENT
+# MOTADATA - PYTHON SDK QUALITY GATE RULES AND DEVELOPMENT GUIDELINE DOCUMENT
 
-> **Audience:** Python SDK contributors, reviewers, maintainers  
-> **Enforcement model:** **CI blocks merge** + **Sonar Quality Gate blocks merge**  
-> **Repo alignment note:** This document is **cross-checked** against the current SDK repo structure (Makefile + pyproject + tests). Where the repo is missing enforcement/config, this doc provides **exact drop-in templates** to close the gaps.
+**Official quality gate rules, development guidelines, and contribution standards for the Motadata Python AI SDK with CI enforcement and Sonar Quality Gate integration.**
 
 ---
-
 
 ### 0.1 Verified in your SDK repo (already present)
 **Tooling**

@@ -1,4 +1,6 @@
-# Motadata Getting Started with Model Serving
+# MOTADATA - GETTING STARTED WITH MODEL SERVING
+
+**Complete guide for getting started with Model Serving, from server creation to prediction serving.**
 
 ## Overview
 

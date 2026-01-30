@@ -1,4 +1,6 @@
-# Motadata Use Cases Index
+# MOTADATA - USE CASES INDEX
+
+**Index of real-world use case implementations built using the SDK with complete examples and documentation.**
 
 This directory contains real-world use case implementations built using the SDK.
 

@@ -1,4 +1,6 @@
-# Motadata Prompt-Based Generator Functions Documentation
+# MOTADATA - PROMPT-BASED GENERATOR FUNCTIONS
+
+**Documentation of high-level factory functions and convenience functions for creating agents and tools from natural language prompts.**
 
 ## Overview
 

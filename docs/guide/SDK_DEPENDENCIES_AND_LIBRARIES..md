@@ -1,8 +1,8 @@
-# Motadata Libraries
+# MOTADATA - SDK DEPENDENCIES AND LIBRARIES
 
-## Comprehensive Library List
+**Comprehensive list of all libraries used in the SDK, their versions, and purposes.**
 
-This document provides a comprehensive list of all libraries used in the SDK, their versions, and purposes.
+---
 
 ## Core Libraries
 

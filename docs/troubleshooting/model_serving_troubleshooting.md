@@ -1,4 +1,6 @@
-# Motadata Model Serving Troubleshooting Guide
+# MOTADATA - MODEL SERVING TROUBLESHOOTING
+
+**Troubleshooting guide for diagnosing and resolving common issues with the Model Serving component.**
 
 This guide helps diagnose and resolve common issues encountered when using Model Serving.
 

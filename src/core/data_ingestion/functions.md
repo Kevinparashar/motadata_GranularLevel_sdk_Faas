@@ -1,4 +1,6 @@
-# Motadata Data Ingestion Functions Documentation
+# MOTADATA - DATA INGESTION FUNCTIONS
+
+**Documentation of high-level factory functions, convenience functions, and utilities for the Data Ingestion Service.**
 
 ## Overview
 

@@ -1,4 +1,6 @@
-# Motadata Cache Mechanism
+# MOTADATA - CACHE MECHANISM
+
+**Complete cache mechanism with in-memory and Dragonfly backends, TTL, LRU eviction, and advanced features for reducing API costs.**
 
 ## When to Use This Component
 

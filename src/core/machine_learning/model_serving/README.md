@@ -1,4 +1,6 @@
-# Motadata Model Serving
+# MOTADATA - MODEL SERVING
+
+**Infrastructure for serving ML models in production with REST APIs, batch processing, and real-time inference capabilities.**
 
 ## Overview
 

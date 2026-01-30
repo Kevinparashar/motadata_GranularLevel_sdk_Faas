@@ -1,4 +1,6 @@
-# Motadata RAG System
+# MOTADATA - RAG SYSTEM
+
+**Complete RAG (Retrieval-Augmented Generation) System for building context-aware AI applications with document retrieval and LLM generation.**
 
 ## When to Use This Component
 

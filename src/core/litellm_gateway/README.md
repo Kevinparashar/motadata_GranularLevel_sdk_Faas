@@ -1,4 +1,6 @@
-# Motadata LiteLLM Gateway
+# MOTADATA - LITELLM GATEWAY
+
+**Unified interface for multiple LLM providers with rate limiting, caching, circuit breakers, and observability.**
 
 ## When to Use This Component
 

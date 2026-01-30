@@ -1,4 +1,6 @@
-# Motadata ML Service
+# MOTADATA - ML SERVICE
+
+**FaaS implementation of the Machine Learning Framework providing REST API endpoints for model training, inference, and batch prediction.**
 
 ## Overview
 

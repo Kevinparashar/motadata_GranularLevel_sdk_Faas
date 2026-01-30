@@ -1,4 +1,6 @@
-# Motadata Prompt-Based Creation User Guide
+# MOTADATA - PROMPT-BASED CREATION USER GUIDE
+
+**User guide for effectively using the prompt-based system to create agents and tools with best practices for writing prompts.**
 
 ## Introduction
 

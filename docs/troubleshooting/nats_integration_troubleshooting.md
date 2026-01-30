@@ -1,4 +1,6 @@
-# Motadata NATS Integration Troubleshooting
+# MOTADATA - NATS INTEGRATION TROUBLESHOOTING
+
+**Troubleshooting guide for diagnosing and resolving common issues with the NATS Integration component.**
 
 ## Common Issues and Solutions
 

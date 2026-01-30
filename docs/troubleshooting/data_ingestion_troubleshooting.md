@@ -1,4 +1,6 @@
-# Motadata Data Ingestion Service Troubleshooting
+# MOTADATA - DATA INGESTION SERVICE TROUBLESHOOTING
+
+**Troubleshooting guide for diagnosing and resolving common issues with the Data Ingestion Service.**
 
 ## Common Issues and Solutions
 

@@ -1,4 +1,6 @@
-# Motadata Evaluation & Observability
+# MOTADATA - EVALUATION & OBSERVABILITY
+
+**Comprehensive traceability, logging, and monitoring capabilities using OpenTelemetry standards.**
 
 ## When to Use This Component
 

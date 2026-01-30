@@ -1,4 +1,6 @@
-# Motadata Prompt Context Management Functions Documentation
+# MOTADATA - PROMPT CONTEXT MANAGEMENT FUNCTIONS
+
+**Documentation of high-level factory functions, convenience functions, and utilities for the Prompt Context Management system.**
 
 ## Overview
 

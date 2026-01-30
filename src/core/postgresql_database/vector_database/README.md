@@ -1,4 +1,6 @@
-# Motadata Vector Database
+# MOTADATA - VECTOR DATABASE
+
+**Specialized vector operations using PostgreSQL's pgvector extension for efficient storage, indexing, and similarity search.**
 
 ## Overview
 

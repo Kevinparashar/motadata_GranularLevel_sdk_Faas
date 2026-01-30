@@ -1,4 +1,6 @@
-# Motadata Kubernetes Deployment Guide for FaaS Services
+# MOTADATA - KUBERNETES DEPLOYMENT GUIDE
+
+**Complete guide for deploying SDK components on Kubernetes with manifests, service configuration, and scaling strategies. for FaaS Services**
 
 ## Overview
 

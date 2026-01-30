@@ -1,4 +1,6 @@
-# Motadata MLOps Pipeline - Comprehensive Component Explanation
+# MOTADATA - MLOPS PIPELINE
+
+**Comprehensive explanation of the MLOps Pipeline providing end-to-end capabilities including experiment tracking, model versioning, deployment, and drift detection.**
 
 ## Overview
 

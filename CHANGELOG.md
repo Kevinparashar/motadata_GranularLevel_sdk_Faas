@@ -1,4 +1,8 @@
-# Motadata Changelog
+# MOTADATA - CHANGELOG
+
+**Complete version history and release notes for the Motadata Python AI SDK, following Semantic Versioning.**
+
+---
 
 All notable changes to the Motadata Python AI SDK will be documented in this file.
 
@@ -265,4 +269,12 @@ For detailed information about each component, see:
 - [Component Documentation](docs/components/README.md)
 - [FaaS Services Documentation](src/faas/README.md)
 - [Architecture Documentation](docs/architecture/SDK_ARCHITECTURE.md)
+
+## Related
+
+- [Main README](README.md) - Project overview
+- [Onboarding Guide](ONBOARDING_GUIDE.md) - Complete guide for new team members
+- [Component Documentation](docs/components/README.md) - Component details
+- [FaaS Services](src/faas/README.md) - FaaS architecture
+- [Architecture Documentation](docs/architecture/SDK_ARCHITECTURE.md) - System architecture
 

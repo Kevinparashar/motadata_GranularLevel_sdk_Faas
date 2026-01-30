@@ -1,4 +1,6 @@
-# Motadata LiteLLM Gateway Class Documentation
+# MOTADATA - LITELLM GATEWAY CLASS DOCUMENTATION
+
+**Complete class documentation for the LiteLLMGateway class providing unified interface for multiple LLM providers.**
 
 ## Overview
 

@@ -1,4 +1,6 @@
-# Motadata Prompt-Based Generator - Comprehensive Component Explanation
+# MOTADATA - PROMPT-BASED GENERATOR
+
+**Comprehensive explanation of the Prompt-Based Generator enabling creation of custom AI agents and tools through natural language prompts.**
 
 ## Overview
 
