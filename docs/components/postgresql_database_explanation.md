@@ -1,4 +1,6 @@
-# Motadata PostgreSQL Database - Comprehensive Component Explanation
+# MOTADATA - POSTGRESQL DATABASE
+
+**Comprehensive explanation of the PostgreSQL Database component providing database connectivity, pgvector support, and vector similarity search operations.**
 
 ## Overview
 

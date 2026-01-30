@@ -1,6 +1,6 @@
-# Motadata LiteLLM Gateway Troubleshooting Guide
+# MOTADATA - LITELLM GATEWAY TROUBLESHOOTING
 
-This guide helps diagnose and resolve common issues encountered when using the LiteLLM Gateway.
+**Troubleshooting guide for diagnosing and resolving common issues with the LiteLLM Gateway.**
 
 ## Table of Contents
 

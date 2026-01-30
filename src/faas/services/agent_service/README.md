@@ -1,4 +1,6 @@
-# Motadata Agent Service
+# MOTADATA - AGENT SERVICE
+
+**FaaS implementation of the Agent Framework providing REST API endpoints for managing AI agents, executing tasks, and handling chat interactions.**
 
 ## Overview
 

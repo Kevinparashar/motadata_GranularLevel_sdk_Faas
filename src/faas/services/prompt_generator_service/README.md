@@ -1,4 +1,6 @@
-# Motadata Prompt Generator Service
+# MOTADATA - PROMPT GENERATOR SERVICE
+
+**FaaS implementation of the Prompt-Based Generator providing REST API endpoints for creating agents and tools from natural language prompts.**
 
 ## Overview
 

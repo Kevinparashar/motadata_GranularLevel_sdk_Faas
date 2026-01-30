@@ -1,4 +1,6 @@
-# Motadata ML Framework Models
+# MOTADATA - ML FRAMEWORK MODELS
+
+**Framework-level model components including base classes, wrappers, factories, and utilities for ML operations.**
 
 ## Overview
 

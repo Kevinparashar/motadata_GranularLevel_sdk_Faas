@@ -1,8 +1,8 @@
-# COMPATIBILITY_MATRIX.md
-## Motadata Python AI SDK
+# MOTADATA - COMPATIBILITY MATRIX
 
-This matrix defines **what is supported, validated, and recommended** for running and developing the SDK across environments.
-It is intended for **platform teams, DevOps, QA, and engineering leadership**.
+**Compatibility matrix defining what is supported, validated, and recommended for running and developing the SDK across environments.**
+
+---
 
 ---
 

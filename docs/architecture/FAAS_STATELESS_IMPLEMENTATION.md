@@ -1,4 +1,6 @@
-# Motadata FaaS Stateless Implementation Summary
+# MOTADATA - FAAS STATELESS IMPLEMENTATION SUMMARY
+
+**Summary of stateless FaaS services implementation with HTTP client utilities, retry logic, and circuit breakers.**
 
 ## Overview
 

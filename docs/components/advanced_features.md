@@ -1,4 +1,6 @@
-# Motadata Advanced Features
+# MOTADATA - ADVANCED FEATURES
+
+**Documentation of advanced production-grade features including vector index management, KV cache for LLM generation, and hallucination detection.**
 
 This document describes the advanced features implemented in the SDK for production-grade AI applications.
 

@@ -1,4 +1,6 @@
-# Motadata Multi-Modal Data Processing
+# MOTADATA - MULTI-MODAL DATA PROCESSING
+
+**Documentation of multi-modal data processing capabilities supporting text, documents, audio, video, and images with automatic conversion for AI models.**
 
 ## Overview
 

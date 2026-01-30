@@ -1,4 +1,6 @@
-# Motadata NATS Integration Guide
+# MOTADATA - NATS INTEGRATION GUIDE
+
+**Complete guide for integrating NATS messaging with AI SDK components for asynchronous communication.**
 
 ## Overview
 

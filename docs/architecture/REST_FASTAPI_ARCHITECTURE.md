@@ -1,4 +1,6 @@
-# Motadata REST/FastAPI Architecture: Where and What It Does
+# MOTADATA - REST/FASTAPI ARCHITECTURE
+
+**Architecture guide explaining where REST/FastAPI is needed in the SDK architecture and what responsibilities it handles.**
 
 ## Overview
 

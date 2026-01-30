@@ -1,4 +1,6 @@
-# Motadata FaaS Structure Summary
+# MOTADATA - FAAS STRUCTURE SUMMARY
+
+**Summary of FaaS implementation structure, folder organization, and AI components as services.**
 
 ## Overview
 

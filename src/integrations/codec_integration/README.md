@@ -1,4 +1,6 @@
-# Motadata CODEC Integration
+# MOTADATA - CODEC INTEGRATION
+
+**Integration module providing message serialization capabilities between AI SDK components and the CODEC system.**
 
 ## Overview
 

@@ -1,4 +1,6 @@
-# Motadata Getting Started with PostgreSQL Database
+# MOTADATA - GETTING STARTED WITH POSTGRESQL DATABASE
+
+**Complete guide for getting started with PostgreSQL Database, from connection setup to vector operations.**
 
 ## Overview
 

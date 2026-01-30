@@ -1,4 +1,6 @@
-# Motadata Integration Guides
+# MOTADATA - INTEGRATION GUIDES
+
+**Integration guides for core platform components (NATS, OTEL, CODEC) with the AI SDK.**
 
 This directory contains integration guides for core platform components (NATS, OTEL, CODEC) with the AI SDK.
 

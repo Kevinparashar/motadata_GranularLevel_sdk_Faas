@@ -1,4 +1,6 @@
-# Motadata Prompt Context Manager Documentation
+# MOTADATA - PROMPT CONTEXT MANAGER DOCUMENTATION
+
+**Complete class documentation for the PromptContextManager class providing prompt template management, versioning, and context building.**
 
 ## Overview
 

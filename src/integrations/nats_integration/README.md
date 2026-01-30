@@ -1,4 +1,6 @@
-# Motadata NATS Integration
+# MOTADATA - NATS INTEGRATION
+
+**Integration module providing asynchronous messaging capabilities between AI SDK components and the NATS messaging system.**
 
 ## Overview
 

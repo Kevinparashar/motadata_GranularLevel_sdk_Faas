@@ -1,4 +1,6 @@
-# Motadata RAG System Class Documentation
+# MOTADATA - RAG SYSTEM CLASS DOCUMENTATION
+
+**Complete class documentation for the RAGSystem class providing Retrieval-Augmented Generation capabilities.**
 
 ## Overview
 

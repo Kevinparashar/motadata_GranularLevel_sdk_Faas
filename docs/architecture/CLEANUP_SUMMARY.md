@@ -1,4 +1,6 @@
-# Motadata FaaS Cleanup Summary
+# MOTADATA - FAAS CLEANUP SUMMARY
+
+**Summary of files removed during the transition from Control Plane/Data Plane architecture to Services-based architecture.**
 
 ## Overview
 

@@ -1,6 +1,6 @@
-# Motadata Cache Mechanism Troubleshooting Guide
+# MOTADATA - CACHE MECHANISM TROUBLESHOOTING
 
-This guide helps diagnose and resolve common issues encountered when using the Cache Mechanism.
+**Troubleshooting guide for diagnosing and resolving common issues with the Cache Mechanism including cache misses, backend issues, invalidation problems, and performance issues.**
 
 ## Table of Contents
 

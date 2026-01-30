@@ -1,4 +1,6 @@
-# Motadata Getting Started with ML Framework
+# MOTADATA - GETTING STARTED WITH ML FRAMEWORK
+
+**Complete guide for getting started with the ML Framework, from system creation to model deployment.**
 
 ## Overview
 

@@ -1,4 +1,6 @@
-# Motadata Getting Started with LiteLLM Gateway
+# MOTADATA - GETTING STARTED WITH LITELLM GATEWAY
+
+**Complete guide for getting started with the LiteLLM Gateway, from gateway creation to receiving responses.**
 
 ## Overview
 

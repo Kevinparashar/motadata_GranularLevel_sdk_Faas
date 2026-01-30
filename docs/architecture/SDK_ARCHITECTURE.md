@@ -1,4 +1,8 @@
-# Motadata AI SDK - Architecture Document
+# MOTADATA - SDK ARCHITECTURE
+
+**Comprehensive architecture document explaining the SDK's design, component structure, integration patterns, and system principles.**
+
+---
 
 ## Executive Summary
 

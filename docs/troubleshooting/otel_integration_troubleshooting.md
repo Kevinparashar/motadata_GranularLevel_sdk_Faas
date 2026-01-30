@@ -1,4 +1,6 @@
-# Motadata OTEL Integration Troubleshooting
+# MOTADATA - OTEL INTEGRATION TROUBLESHOOTING
+
+**Troubleshooting guide for diagnosing and resolving common issues with the OTEL Integration component.**
 
 ## Common Issues and Solutions
 

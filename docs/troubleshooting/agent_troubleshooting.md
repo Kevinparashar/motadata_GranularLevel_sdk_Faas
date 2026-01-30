@@ -1,6 +1,6 @@
-# Motadata Agent Framework Troubleshooting Guide
+# MOTADATA - AGENT FRAMEWORK TROUBLESHOOTING
 
-This guide helps diagnose and resolve common issues encountered when using the Agent Framework.
+**Troubleshooting guide for diagnosing and resolving common issues with the Agent Framework including execution failures, circuit breakers, health checks, and tool execution errors.**
 
 ## Table of Contents
 

@@ -1,4 +1,6 @@
-# Motadata Data Ingestion Service - Comprehensive Component Explanation
+# MOTADATA - DATA INGESTION SERVICE
+
+**Comprehensive explanation of the Data Ingestion Service providing unified interface for uploading and processing data files with automatic integration into all AI components.**
 
 ## Overview
 

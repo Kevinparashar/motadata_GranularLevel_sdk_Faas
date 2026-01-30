@@ -1,6 +1,6 @@
-# Motadata Documentation Navigation Helper
+# MOTADATA - DOCUMENTATION NAVIGATION HELPER
 
-**Quick navigation aids for finding information fast**
+**Quick navigation aids and search strategies for finding information fast in the SDK documentation.**
 
 ---
 

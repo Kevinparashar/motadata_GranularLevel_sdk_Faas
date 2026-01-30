@@ -1,4 +1,6 @@
-# Motadata LiteLLM Gateway - Comprehensive Component Explanation
+# MOTADATA - LITELLM GATEWAY
+
+**Comprehensive explanation of the LiteLLM Gateway, the central AI operations hub providing unified interface for multiple LLM providers with rate limiting, caching, and observability.**
 
 ## Overview
 

@@ -1,4 +1,6 @@
-# Motadata Document Q&A Use Case with NATS, OTEL, and CODEC Integration
+# MOTADATA - DOCUMENT Q&A USE CASE WITH INTEGRATIONS
+
+**Complete Document Q&A system using RAG, Agent Framework, and LiteLLM Gateway with NATS, OTEL, and CODEC integration.**
 
 ## Overview
 

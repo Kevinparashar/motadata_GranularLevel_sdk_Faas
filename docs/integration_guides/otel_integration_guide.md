@@ -1,4 +1,6 @@
-# Motadata OTEL Integration Guide
+# MOTADATA - OTEL INTEGRATION GUIDE
+
+**Complete guide for integrating OpenTelemetry observability with AI SDK components for distributed tracing and metrics.**
 
 ## Overview
 

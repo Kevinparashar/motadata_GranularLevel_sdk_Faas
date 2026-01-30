@@ -1,6 +1,6 @@
-# Motadata SDK Quick Reference Guide
+# MOTADATA - QUICK REFERENCE GUIDE
 
-**Fast lookup for common tasks and APIs**
+**Fast lookup for common tasks, APIs, imports, and code snippets.**
 
 ---
 

@@ -1,4 +1,6 @@
-# Motadata Cache Mechanism - Comprehensive Component Explanation
+# MOTADATA - CACHE MECHANISM
+
+**Comprehensive explanation of the Cache Mechanism with pluggable backends, TTL, LRU eviction, pattern-based invalidation, and advanced features.**
 
 ## Overview
 

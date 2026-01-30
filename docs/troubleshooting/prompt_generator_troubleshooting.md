@@ -1,4 +1,6 @@
-# Motadata Prompt Generator Troubleshooting Guide
+# MOTADATA - PROMPT GENERATOR TROUBLESHOOTING
+
+**Troubleshooting guide for diagnosing and resolving common issues with the Prompt Generator.**
 
 ## Common Issues and Solutions
 

@@ -1,4 +1,6 @@
-# Motadata Prompt-Based Generator
+# MOTADATA - PROMPT-BASED GENERATOR
+
+**System for creating AI agents and tools from natural language prompts with automatic configuration generation.**
 
 ## Overview
 
