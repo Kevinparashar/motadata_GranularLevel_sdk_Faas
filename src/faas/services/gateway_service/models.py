@@ -15,7 +15,9 @@ class GenerateRequest(BaseModel):
     max_tokens: Optional[int] = Field(None, description="Maximum tokens to generate")
     temperature: Optional[float] = Field(None, ge=0.0, le=2.0, description="Generation temperature")
     top_p: Optional[float] = Field(None, ge=0.0, le=1.0, description="Top-p sampling")
-    frequency_penalty: Optional[float] = Field(None, ge=-2.0, le=2.0, description="Frequency penalty")
+    frequency_penalty: Optional[float] = Field(
+        None, ge=-2.0, le=2.0, description="Frequency penalty"
+    )
     presence_penalty: Optional[float] = Field(None, ge=-2.0, le=2.0, description="Presence penalty")
     stop: Optional[List[str]] = Field(None, description="Stop sequences")
     stream: bool = Field(default=False, description="Enable streaming response")
@@ -53,4 +55,3 @@ class EmbedResponse(BaseModel):
     embeddings: List[List[float]] = Field(..., description="Embedding vectors")
     model: str = Field(..., description="Model used")
     usage: Optional[Dict[str, Any]] = Field(None, description="Token usage information")
-

@@ -4,22 +4,26 @@ API Backend Services - High-Level Functions
 Factory functions, convenience functions, and utilities for API backend services.
 """
 
-from typing import Any, Dict, List, Optional, Callable
-from fastapi import FastAPI, APIRouter
+from typing import Any, Callable, Dict, List, Optional
+
+from fastapi import APIRouter, FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
+# Constants
+AGENT_NOT_FOUND_ERROR = "Agent not found"
 
 # ============================================================================
 # Factory Functions
 # ============================================================================
+
 
 def create_api_app(
     title: str = "Motadata AI SDK API",
     version: str = "0.1.0",
     description: str = "RESTful API for Motadata Python AI SDK",
     enable_cors: bool = True,
-    cors_origins: List[str] = None,
-    **kwargs: Any
+    cors_origins: Optional[List[str]] = None,
+    **kwargs: Any,
 ) -> FastAPI:
     """
     Create and configure a FastAPI application with default settings.
@@ -42,15 +46,10 @@ def create_api_app(
         ...     cors_origins=["http://localhost:3000"]
         ... )
     """
-    app = FastAPI(
-        title=title,
-        version=version,
-        description=description,
-        **kwargs
-    )
+    app = FastAPI(title=title, version=version, description=description, **kwargs)
 
     if enable_cors:
-        origins = cors_origins or ["*"]
+        origins: List[str] = cors_origins if cors_origins is not None else ["*"]
         app.add_middleware(
             CORSMiddleware,
             allow_origins=origins,
@@ -63,9 +62,7 @@ def create_api_app(
 
 
 def create_api_router(
-    prefix: str = "",
-    tags: Optional[List[str]] = None,
-    **kwargs: Any
+    prefix: str = "", tags: Optional[List[str]] = None, **kwargs: Any
 ) -> APIRouter:
     """
     Create an API router with default settings.
@@ -81,18 +78,14 @@ def create_api_router(
     Example:
         >>> router = create_api_router(prefix="/api/v1", tags=["agents"])
     """
-    return APIRouter(
-        prefix=prefix,
-        tags=tags or [],
-        **kwargs
-    )
+    # FastAPI accepts list[str | Enum] | None, but we only use str
+    # Type ignore needed due to FastAPI's type system
+    tags_list: List[str] = tags if tags is not None else []
+    return APIRouter(prefix=prefix, tags=tags_list if tags_list else None, **kwargs)  # type: ignore[arg-type]
 
 
 def configure_api_app(
-    app: FastAPI,
-    enable_cors: bool = True,
-    cors_origins: List[str] = None,
-    **kwargs: Any
+    app: FastAPI, enable_cors: bool = True, cors_origins: Optional[List[str]] = None, **kwargs: Any
 ) -> FastAPI:
     """
     Configure an existing FastAPI application.
@@ -127,11 +120,8 @@ def configure_api_app(
 # High-Level Convenience Functions
 # ============================================================================
 
-def register_router(
-    app: FastAPI,
-    router: APIRouter,
-    prefix: Optional[str] = None
-) -> None:
+
+def register_router(app: FastAPI, router: APIRouter, prefix: Optional[str] = None) -> None:
     """
     Register a router with the FastAPI app (high-level convenience).
 
@@ -144,7 +134,10 @@ def register_router(
         >>> router = create_api_router(prefix="/api/v1")
         >>> register_router(app, router)
     """
-    app.include_router(router, prefix=prefix)
+    if prefix:
+        app.include_router(router, prefix=prefix)
+    else:
+        app.include_router(router)
 
 
 def add_endpoint(
@@ -152,7 +145,7 @@ def add_endpoint(
     path: str,
     method: str = "GET",
     handler: Optional[Callable] = None,
-    **kwargs: Any
+    **kwargs: Any,
 ) -> None:
     """
     Add an endpoint to a router (high-level convenience).
@@ -187,11 +180,7 @@ def add_endpoint(
         router.add_api_route(path, handler, methods=[method], **kwargs)
 
 
-def create_rag_endpoints(
-    router: APIRouter,
-    rag_system: Any,
-    prefix: str = "/rag"
-) -> None:
+def create_rag_endpoints(router: APIRouter, rag_system: Any, prefix: str = "/rag") -> None:
     """
     Create RAG system endpoints (high-level convenience).
 
@@ -204,7 +193,7 @@ def create_rag_endpoints(
         >>> router = create_api_router()
         >>> create_rag_endpoints(router, rag_system, prefix="/api/rag")
     """
-    from ..rag import quick_rag_query, ingest_document_simple
+    from ..rag import ingest_document_simple, quick_rag_query
 
     @router.post(f"{prefix}/query")
     async def query_rag(request: Dict[str, Any]) -> Dict[str, Any]:
@@ -222,16 +211,12 @@ def create_rag_endpoints(
             title=request.get("title", ""),
             content=request.get("content", ""),
             source=request.get("source"),
-            metadata=request.get("metadata")
+            metadata=request.get("metadata"),
         )
         return {"document_id": doc_id, "status": "success"}
 
 
-def create_agent_endpoints(
-    router: APIRouter,
-    agent_manager: Any,
-    prefix: str = "/agents"
-) -> None:
+def create_agent_endpoints(router: APIRouter, agent_manager: Any, prefix: str = "/agents") -> None:
     """
     Create agent framework endpoints (high-level convenience).
 
@@ -244,14 +229,14 @@ def create_agent_endpoints(
         >>> router = create_api_router()
         >>> create_agent_endpoints(router, agent_manager, prefix="/api/agents")
     """
-    from ..agno_agent_framework import execute_task, chat_with_agent
+    from ..agno_agent_framework import chat_with_agent, execute_task
 
     @router.get(f"{prefix}")
     async def list_agents() -> Dict[str, Any]:
         """List all agents."""
         return {
             "agents": agent_manager.list_agents(),
-            "statuses": agent_manager.get_agent_statuses()
+            "statuses": agent_manager.get_agent_statuses(),
         }
 
     @router.get(f"{prefix}/{{agent_id}}")
@@ -259,7 +244,7 @@ def create_agent_endpoints(
         """Get agent by ID."""
         agent = agent_manager.get_agent(agent_id)
         if not agent:
-            return {"error": "Agent not found"}
+            return {"error": AGENT_NOT_FOUND_ERROR}
         return agent.get_status()
 
     @router.post(f"{prefix}/{{agent_id}}/chat")
@@ -267,7 +252,7 @@ def create_agent_endpoints(
         """Chat with an agent."""
         agent = agent_manager.get_agent(agent_id)
         if not agent:
-            return {"error": "Agent not found"}
+            return {"error": AGENT_NOT_FOUND_ERROR}
 
         message = request.get("message", "")
         context = request.get("context")
@@ -280,7 +265,7 @@ def create_agent_endpoints(
         """Submit a task to an agent."""
         agent = agent_manager.get_agent(agent_id)
         if not agent:
-            return {"error": "Agent not found"}
+            return {"error": AGENT_NOT_FOUND_ERROR}
 
         task_type = request.get("task_type", "")
         parameters = request.get("parameters", {})
@@ -290,12 +275,105 @@ def create_agent_endpoints(
         return {"result": result, "status": "completed"}
 
 
-def create_unified_query_endpoint(
-    router: APIRouter,
+def _determine_processing_mode(mode: str, query: str) -> tuple[bool, bool]:
+    """Determine whether to use RAG and/or Agent based on mode and query."""
+    use_rag = mode in ["rag", "both", "auto"]
+    use_agent = mode in ["agent", "both", "auto"]
+
+    if mode == "auto":
+        knowledge_indicators = [
+            "what",
+            "how",
+            "explain",
+            "tell me",
+            "describe",
+            "who",
+            "when",
+            "where",
+        ]
+        if any(query.lower().startswith(indicator) for indicator in knowledge_indicators):
+            use_rag = True
+            use_agent = False
+        else:
+            use_agent = True
+            use_rag = False
+
+    return use_rag, use_agent
+
+
+def _process_rag_query(
+    rag_system: Any, query: str, request: Dict[str, Any], tenant_id: Optional[str]
+) -> Dict[str, Any]:
+    """Process query with RAG system."""
+    from ..rag import quick_rag_query
+
+    try:
+        rag_result = quick_rag_query(
+            rag_system,
+            query=query,
+            top_k=request.get("top_k", 5),
+            threshold=request.get("threshold", 0.7),
+            tenant_id=tenant_id,
+        )
+        return {
+            "rag_response": {
+                "answer": rag_result.get("answer"),
+                "sources": rag_result.get("sources", []),
+                "num_documents": rag_result.get("num_documents", 0),
+                "memory_used": rag_result.get("memory_used", 0),
+            }
+        }
+    except Exception as e:
+        return {"rag_error": str(e)}
+
+
+async def _process_agent_query(
     agent_manager: Any,
-    rag_system: Any,
-    gateway: Any,
-    prefix: str = "/query"
+    query: str,
+    request: Dict[str, Any],
+    tenant_id: Optional[str],
+    rag_context: Optional[str],
+) -> Dict[str, Any]:
+    """Process query with Agent system."""
+    from ..agno_agent_framework import chat_with_agent
+
+    try:
+        agent_id = request.get("agent_id")
+        if not agent_id:
+            agents = agent_manager.list_agents() if agent_manager else []
+            agent_id = agents[0] if agents else None
+
+        if not agent_id:
+            return {"agent_error": "No agent available"}
+
+        agent = agent_manager.get_agent(agent_id)
+        if not agent:
+            return {"agent_error": f"Agent {agent_id} not found"}
+
+        # Convert string context to dict format expected by chat_with_agent
+        context_dict = {"rag_context": rag_context} if rag_context else None
+        agent_response = await chat_with_agent(
+            agent, message=query, context=context_dict, tenant_id=tenant_id
+        )
+        return {"agent_response": agent_response}
+    except Exception as e:
+        return {"agent_error": str(e)}
+
+
+def _determine_final_answer(result: Dict[str, Any], use_rag: bool, use_agent: bool) -> str:
+    """Determine final answer from RAG and/or Agent responses."""
+    if use_rag and "rag_response" in result:
+        return result["rag_response"]["answer"]
+    elif use_agent and "agent_response" in result:
+        return result["agent_response"].get("answer", "")
+    elif "combined_answer" in result:
+        return result["combined_answer"]
+    else:
+        return "Unable to process query"
+
+
+def create_unified_query_endpoint(
+    router: APIRouter, agent_manager: Any, rag_system: Any, prefix: str = "/query"
 ) -> None:
     """
     Create unified query endpoint that orchestrates Agent and RAG.
@@ -307,17 +385,14 @@ def create_unified_query_endpoint(
         router: APIRouter instance
         agent_manager: AgentManager instance
         rag_system: RAGSystem instance
-        gateway: LiteLLMGateway instance
         prefix: URL prefix for unified endpoint
 
     Example:
         >>> router = create_api_router()
         >>> create_unified_query_endpoint(
-        ...     router, agent_manager, rag_system, gateway, prefix="/api/query"
+        ...     router, agent_manager, rag_system, prefix="/api/query"
         ... )
     """
-    from ..agno_agent_framework import chat_with_agent
-    from ..rag import quick_rag_query
 
     @router.post(f"{prefix}")
     async def unified_query(request: Dict[str, Any]) -> Dict[str, Any]:
@@ -333,100 +408,37 @@ def create_unified_query_endpoint(
         tenant_id = request.get("tenant_id")
         user_id = request.get("user_id")
         conversation_id = request.get("conversation_id")
-        mode = request.get("mode", "auto")  # "auto", "agent", "rag", "both"
+        mode = request.get("mode", "auto")
 
-        # Determine processing mode
-        use_rag = mode in ["rag", "both", "auto"]
-        use_agent = mode in ["agent", "both", "auto"]
-
-        # Auto mode: Use RAG for knowledge queries, Agent for complex tasks
-        if mode == "auto":
-            # Simple heuristic: if query looks like a knowledge question, use RAG
-            knowledge_indicators = ["what", "how", "explain", "tell me", "describe", "who", "when", "where"]
-            if any(query.lower().startswith(indicator) for indicator in knowledge_indicators):
-                use_rag = True
-                use_agent = False
-            else:
-                use_agent = True
-                use_rag = False
+        use_rag, use_agent = _determine_processing_mode(mode, query)
 
         result = {
             "query": query,
             "mode": mode,
             "tenant_id": tenant_id,
             "user_id": user_id,
-            "conversation_id": conversation_id
+            "conversation_id": conversation_id,
         }
 
-        # Process with RAG
         if use_rag:
-            try:
-                rag_result = quick_rag_query(
-                    rag_system,
-                    query=query,
-                    top_k=request.get("top_k", 5),
-                    threshold=request.get("threshold", 0.7),
-                    tenant_id=tenant_id
-                )
-                result["rag_response"] = {
-                    "answer": rag_result.get("answer"),
-                    "sources": rag_result.get("sources", []),
-                    "num_documents": rag_result.get("num_documents", 0),
-                    "memory_used": rag_result.get("memory_used", 0)
-                }
-            except Exception as e:
-                result["rag_error"] = str(e)
+            result.update(_process_rag_query(rag_system, query, request, tenant_id))
 
-        # Process with Agent
         if use_agent:
-            try:
-                # Get default agent or first available agent
-                agent_id = request.get("agent_id")
-                if not agent_id:
-                    agents = agent_manager.list_agents() if agent_manager else []
-                    agent_id = agents[0] if agents else None
+            rag_context = result.get("rag_response", {}).get("answer") if use_rag else None
+            result.update(
+                await _process_agent_query(agent_manager, query, request, tenant_id, rag_context)
+            )
 
-                if agent_id:
-                    agent = agent_manager.get_agent(agent_id)
-                    if agent:
-                        agent_response = await chat_with_agent(
-                            agent,
-                            message=query,
-                            context=result.get("rag_response", {}).get("answer") if use_rag else None,
-                            tenant_id=tenant_id
-                        )
-                        result["agent_response"] = agent_response
-                    else:
-                        result["agent_error"] = f"Agent {agent_id} not found"
-                else:
-                    result["agent_error"] = "No agent available"
-            except Exception as e:
-                result["agent_error"] = str(e)
-
-        # Combine responses if both were used
         if use_rag and use_agent:
             rag_answer = result.get("rag_response", {}).get("answer", "")
             agent_answer = result.get("agent_response", {}).get("answer", "")
             result["combined_answer"] = f"{rag_answer}\n\n{agent_answer}"
 
-        # Determine final answer
-        if use_rag and "rag_response" in result:
-            result["answer"] = result["rag_response"]["answer"]
-        elif use_agent and "agent_response" in result:
-            result["answer"] = result["agent_response"].get("answer", "")
-        elif "combined_answer" in result:
-            result["answer"] = result["combined_answer"]
-        else:
-            result["answer"] = "Unable to process query"
-
+        result["answer"] = _determine_final_answer(result, use_rag, use_agent)
         return result
 
 
-def create_gateway_endpoints(
-    router: APIRouter,
-    gateway: Any,
-    prefix: str = "/gateway"
-) -> None:
+def create_gateway_endpoints(router: APIRouter, gateway: Any, prefix: str = "/gateway") -> None:
     """
     Create LiteLLM Gateway endpoints (high-level convenience).
 
@@ -439,7 +451,7 @@ def create_gateway_endpoints(
         >>> router = create_api_router()
         >>> create_gateway_endpoints(router, gateway, prefix="/api/gateway")
     """
-    from ..litellm_gateway import generate_text, generate_embeddings
+    from ..litellm_gateway import generate_embeddings, generate_text
 
     @router.post(f"{prefix}/generate")
     async def generate(request: Dict[str, Any]) -> Dict[str, Any]:
@@ -464,10 +476,8 @@ def create_gateway_endpoints(
 # Utility Functions
 # ============================================================================
 
-def add_health_check(
-    app: FastAPI,
-    path: str = "/health"
-) -> None:
+
+def add_health_check(app: FastAPI, path: str = "/health") -> None:  # noqa: ARG001
     """
     Add a health check endpoint (utility function).
 
@@ -478,22 +488,18 @@ def add_health_check(
     Example:
         >>> add_health_check(app, path="/health")
     """
+
     @app.get(path)
     async def health_check() -> Dict[str, str]:
         """Health check endpoint."""
         return {"status": "healthy"}
 
 
-def add_api_versioning(
-    app: FastAPI,
-    version: str = "v1",
-    prefix: str = "/api"
-) -> str:
+def add_api_versioning(version: str = "v1", prefix: str = "/api") -> str:
     """
     Set up API versioning (utility function).
 
     Args:
-        app: FastAPI application instance
         version: API version
         prefix: API prefix
 
@@ -501,7 +507,7 @@ def add_api_versioning(
         Versioned API prefix
 
     Example:
-        >>> api_prefix = add_api_versioning(app, version="v1")
+        >>> api_prefix = add_api_versioning(version="v1")
         >>> # Use api_prefix for all routes
     """
     return f"{prefix}/{version}"
@@ -522,4 +528,3 @@ __all__ = [
     "add_health_check",
     "add_api_versioning",
 ]
-

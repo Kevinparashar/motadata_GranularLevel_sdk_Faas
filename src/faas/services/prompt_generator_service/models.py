@@ -3,7 +3,6 @@ Request/Response models for Prompt Generator Service.
 """
 
 from typing import Any, Dict, List, Optional
-from uuid import uuid4
 
 from pydantic import BaseModel, Field
 
@@ -16,7 +15,9 @@ class CreateAgentFromPromptRequest(BaseModel):
     llm_model: Optional[str] = Field(None, description="LLM model to use for generation")
     llm_provider: Optional[str] = Field(None, description="LLM provider")
     cache_enabled: bool = Field(default=True, description="Enable caching of interpretations")
-    additional_config: Optional[Dict[str, Any]] = Field(None, description="Additional agent configuration")
+    additional_config: Optional[Dict[str, Any]] = Field(
+        None, description="Additional agent configuration"
+    )
 
 
 class CreateToolFromPromptRequest(BaseModel):
@@ -27,7 +28,9 @@ class CreateToolFromPromptRequest(BaseModel):
     llm_model: Optional[str] = Field(None, description="LLM model to use for generation")
     llm_provider: Optional[str] = Field(None, description="LLM provider")
     cache_enabled: bool = Field(default=True, description="Enable caching of interpretations")
-    additional_config: Optional[Dict[str, Any]] = Field(None, description="Additional tool configuration")
+    additional_config: Optional[Dict[str, Any]] = Field(
+        None, description="Additional tool configuration"
+    )
 
 
 class RateAgentRequest(BaseModel):
@@ -101,4 +104,3 @@ class FeedbackStatsResponse(BaseModel):
     average_rating: float
     rating_distribution: Dict[int, int] = Field(default_factory=dict)
     total_feedback: int
-

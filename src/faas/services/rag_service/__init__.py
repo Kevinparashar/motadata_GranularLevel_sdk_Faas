@@ -5,16 +5,16 @@ Provides REST API for document ingestion, query processing, document management,
 and vector search operations.
 """
 
-from .service import RAGService, create_rag_service
 from .models import (
+    DocumentResponse,
     IngestDocumentRequest,
     QueryRequest,
-    SearchRequest,
-    UpdateDocumentRequest,
-    DocumentResponse,
     QueryResponse,
+    SearchRequest,
     SearchResponse,
+    UpdateDocumentRequest,
 )
+from .service import RAGService, create_rag_service
 
 __all__ = [
     "RAGService",
@@ -27,4 +27,3 @@ __all__ = [
     "QueryResponse",
     "SearchResponse",
 ]
-

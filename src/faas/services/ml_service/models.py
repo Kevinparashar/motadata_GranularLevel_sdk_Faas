@@ -13,7 +13,9 @@ class TrainModelRequest(BaseModel):
     model_type: str = Field(..., description="Model type (e.g., 'classification', 'regression')")
     training_data: Dict[str, Any] = Field(..., description="Training data")
     hyperparameters: Optional[Dict[str, Any]] = Field(None, description="Model hyperparameters")
-    validation_split: Optional[float] = Field(0.2, ge=0.0, le=1.0, description="Validation split ratio")
+    validation_split: Optional[float] = Field(
+        0.2, ge=0.0, le=1.0, description="Validation split ratio"
+    )
 
 
 class PredictRequest(BaseModel):
@@ -66,4 +68,3 @@ class PredictionResponse(BaseModel):
     confidence: Optional[float] = None
     model_id: str
     metadata: Optional[Dict[str, Any]] = None
-

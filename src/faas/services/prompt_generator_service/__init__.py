@@ -10,4 +10,3 @@ __all__ = [
     "PromptGeneratorService",
     "create_prompt_generator_service",
 ]
-

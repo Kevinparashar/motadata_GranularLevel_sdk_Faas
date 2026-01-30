@@ -24,7 +24,9 @@ class SetCacheRequest(BaseModel):
 class InvalidateCacheRequest(BaseModel):
     """Request to invalidate cache."""
 
-    pattern: Optional[str] = Field(None, description="Key pattern to invalidate (supports wildcards)")
+    pattern: Optional[str] = Field(
+        None, description="Key pattern to invalidate (supports wildcards)"
+    )
     tenant_id: Optional[str] = Field(None, description="Tenant ID to clear cache for")
 
 
@@ -35,4 +37,3 @@ class CacheResponse(BaseModel):
     value: Optional[Any] = None
     found: bool = Field(False, description="Whether key was found in cache")
     ttl: Optional[int] = Field(None, description="Remaining TTL in seconds")
-

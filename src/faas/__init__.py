@@ -19,18 +19,18 @@ __version__ = "0.1.0"
 
 # Import from shared components
 try:
+    from .shared.config import ServiceConfig, load_config
     from .shared.contracts import (
+        ErrorResponse,
         ServiceRequest,
         ServiceResponse,
-        ErrorResponse,
         StandardHeaders,
     )
-    from .shared.config import ServiceConfig, load_config
     from .shared.exceptions import (
+        InternalServerError,
+        NotFoundError,
         ServiceException,
         ValidationError,
-        NotFoundError,
-        InternalServerError,
     )
 except ImportError:
     # Fallback if shared components not available
@@ -48,9 +48,9 @@ except ImportError:
 # Import from integrations
 try:
     from .integrations import (
+        create_codec_manager,
         create_nats_client,
         create_otel_tracer,
-        create_codec_manager,
     )
 except ImportError:
     create_nats_client = None
@@ -76,4 +76,3 @@ __all__ = [
     "create_otel_tracer",
     "create_codec_manager",
 ]
-

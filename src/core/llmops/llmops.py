@@ -4,18 +4,17 @@ LLMOps - LLM Operations and Monitoring
 Comprehensive logging, monitoring, and operational management for LLM operations.
 """
 
-from typing import Dict, Any, Optional, List
+import json
 from dataclasses import dataclass, field
 from datetime import datetime
 from enum import Enum
-from pydantic import BaseModel
-import json
 from pathlib import Path
-import time
+from typing import Any, Dict, List, Optional
 
 
 class LLMOperationType(str, Enum):
     """Types of LLM operations."""
+
     COMPLETION = "completion"
     EMBEDDING = "embedding"
     CHAT = "chat"
@@ -25,6 +24,7 @@ class LLMOperationType(str, Enum):
 
 class LLMOperationStatus(str, Enum):
     """Operation status."""
+
     SUCCESS = "success"
     ERROR = "error"
     TIMEOUT = "timeout"
@@ -35,6 +35,7 @@ class LLMOperationStatus(str, Enum):
 @dataclass
 class LLMOperation:
     """LLM operation record."""
+
     operation_id: str
     operation_type: LLMOperationType
     model: str
@@ -54,20 +55,20 @@ class LLMOperation:
 class LLMOps:
     """
     LLM Operations and Monitoring system.
-    
+
     Tracks LLM operations, monitors performance, logs usage,
     and provides insights for optimization.
     """
-    
+
     def __init__(
         self,
         storage_path: Optional[str] = None,
         enable_logging: bool = True,
-        enable_cost_tracking: bool = True
+        enable_cost_tracking: bool = True,
     ):
         """
         Initialize LLMOps.
-        
+
         Args:
             storage_path: Optional path for persistent storage
             enable_logging: Whether to enable operation logging
@@ -76,10 +77,10 @@ class LLMOps:
         self.storage_path = Path(storage_path) if storage_path else None
         self.enable_logging = enable_logging
         self.enable_cost_tracking = enable_cost_tracking
-        
+
         self.operations: List[LLMOperation] = []
         self.max_operations_in_memory = 10000
-        
+
         # Cost tracking (per 1M tokens)
         self.model_costs: Dict[str, Dict[str, float]] = {
             "gpt-4": {"prompt": 30.0, "completion": 60.0},
@@ -89,10 +90,10 @@ class LLMOps:
             "claude-3-sonnet": {"prompt": 3.0, "completion": 15.0},
             "claude-3-haiku": {"prompt": 0.25, "completion": 1.25},
         }
-        
+
         if self.storage_path and self.storage_path.exists():
             self._load()
-    
+
     def log_operation(
         self,
         operation_type: LLMOperationType,
@@ -104,11 +105,11 @@ class LLMOps:
         error_message: Optional[str] = None,
         tenant_id: Optional[str] = None,
         agent_id: Optional[str] = None,
-        metadata: Optional[Dict[str, Any]] = None
+        metadata: Optional[Dict[str, Any]] = None,
     ) -> str:
         """
         Log an LLM operation.
-        
+
         Args:
             operation_type: Type of operation
             model: Model used
@@ -120,28 +121,27 @@ class LLMOps:
             tenant_id: Optional tenant ID
             agent_id: Optional agent ID
             metadata: Optional metadata
-        
+
         Returns:
             Operation ID
         """
         if not self.enable_logging:
             return ""
-        
+
         import uuid
-        
+
         operation_id = str(uuid.uuid4())
         total_tokens = prompt_tokens + completion_tokens
-        
+
         # Calculate cost
         cost_usd = 0.0
         if self.enable_cost_tracking:
             model_key = model.split("/")[-1] if "/" in model else model
             costs = self.model_costs.get(model_key, {"prompt": 0.0, "completion": 0.0})
-            cost_usd = (
-                (prompt_tokens / 1_000_000) * costs.get("prompt", 0.0) +
-                (completion_tokens / 1_000_000) * costs.get("completion", 0.0)
-            )
-        
+            cost_usd = (prompt_tokens / 1_000_000) * costs.get("prompt", 0.0) + (
+                completion_tokens / 1_000_000
+            ) * costs.get("completion", 0.0)
+
         operation = LLMOperation(
             operation_id=operation_id,
             operation_type=operation_type,
@@ -155,48 +155,50 @@ class LLMOps:
             cost_usd=cost_usd,
             status=status,
             error_message=error_message,
-            metadata=metadata or {}
+            metadata=metadata or {},
         )
-        
+
         self.operations.append(operation)
-        
+
         # Trim if exceeds max
         if len(self.operations) > self.max_operations_in_memory:
-            self.operations = self.operations[-self.max_operations_in_memory:]
-        
+            self.operations = self.operations[-self.max_operations_in_memory :]
+
         self._persist()
-        
+
         return operation_id
-    
+
     def get_metrics(
         self,
         tenant_id: Optional[str] = None,
         agent_id: Optional[str] = None,
-        time_range_hours: Optional[int] = 24
+        time_range_hours: Optional[int] = 24,
     ) -> Dict[str, Any]:
         """
         Get LLM operation metrics.
-        
+
         Args:
             tenant_id: Optional tenant ID filter
             agent_id: Optional agent ID filter
             time_range_hours: Time range in hours (default: 24)
-        
+
         Returns:
             Dictionary with metrics
         """
         cutoff = datetime.now()
         if time_range_hours:
             from datetime import timedelta
+
             cutoff = cutoff - timedelta(hours=time_range_hours)
-        
+
         filtered = [
-            op for op in self.operations
-            if op.timestamp >= cutoff and
-            (not tenant_id or op.tenant_id == tenant_id) and
-            (not agent_id or op.agent_id == agent_id)
+            op
+            for op in self.operations
+            if op.timestamp >= cutoff
+            and (not tenant_id or op.tenant_id == tenant_id)
+            and (not agent_id or op.agent_id == agent_id)
         ]
-        
+
         if not filtered:
             return {
                 "total_operations": 0,
@@ -206,9 +208,9 @@ class LLMOps:
                 "success_rate": 0.0,
                 "by_model": {},
                 "by_type": {},
-                "error_rate": 0.0
+                "error_rate": 0.0,
             }
-        
+
         total_operations = len(filtered)
         total_tokens = sum(op.total_tokens for op in filtered)
         total_cost = sum(op.cost_usd for op in filtered)
@@ -217,7 +219,7 @@ class LLMOps:
         success_rate = success_count / total_operations if total_operations > 0 else 0.0
         error_count = len([op for op in filtered if op.status == LLMOperationStatus.ERROR])
         error_rate = error_count / total_operations if total_operations > 0 else 0.0
-        
+
         # By model
         by_model = {}
         for op in filtered:
@@ -226,17 +228,17 @@ class LLMOps:
                     "count": 0,
                     "tokens": 0,
                     "cost_usd": 0.0,
-                    "avg_latency_ms": 0.0
+                    "avg_latency_ms": 0.0,
                 }
             by_model[op.model]["count"] += 1
             by_model[op.model]["tokens"] += op.total_tokens
             by_model[op.model]["cost_usd"] += op.cost_usd
             by_model[op.model]["avg_latency_ms"] += op.latency_ms
-        
+
         for model in by_model:
             count = by_model[model]["count"]
             by_model[model]["avg_latency_ms"] /= count
-        
+
         # By type
         by_type = {}
         for op in filtered:
@@ -245,7 +247,7 @@ class LLMOps:
                 by_type[op_type] = {"count": 0, "tokens": 0}
             by_type[op_type]["count"] += 1
             by_type[op_type]["tokens"] += op.total_tokens
-        
+
         return {
             "total_operations": total_operations,
             "total_tokens": total_tokens,
@@ -255,53 +257,54 @@ class LLMOps:
             "error_rate": error_rate,
             "by_model": by_model,
             "by_type": by_type,
-            "time_range_hours": time_range_hours
+            "time_range_hours": time_range_hours,
         }
-    
+
     def get_cost_summary(
-        self,
-        tenant_id: Optional[str] = None,
-        time_range_hours: Optional[int] = 24
+        self, tenant_id: Optional[str] = None, time_range_hours: Optional[int] = 24
     ) -> Dict[str, Any]:
         """
         Get cost summary.
-        
+
         Args:
             tenant_id: Optional tenant ID filter
             time_range_hours: Time range in hours
-        
+
         Returns:
             Dictionary with cost summary
         """
         metrics = self.get_metrics(tenant_id=tenant_id, time_range_hours=time_range_hours)
-        
+
         return {
             "total_cost_usd": metrics["total_cost_usd"],
             "total_tokens": metrics["total_tokens"],
             "cost_per_1k_tokens": (
                 (metrics["total_cost_usd"] / metrics["total_tokens"]) * 1000
-                if metrics["total_tokens"] > 0 else 0.0
+                if metrics["total_tokens"] > 0
+                else 0.0
             ),
             "by_model": {
                 model: {
                     "cost_usd": data["cost_usd"],
                     "tokens": data["tokens"],
-                    "cost_per_1k_tokens": (data["cost_usd"] / data["tokens"]) * 1000 if data["tokens"] > 0 else 0.0
+                    "cost_per_1k_tokens": (
+                        (data["cost_usd"] / data["tokens"]) * 1000 if data["tokens"] > 0 else 0.0
+                    ),
                 }
                 for model, data in metrics["by_model"].items()
             },
-            "time_range_hours": time_range_hours
+            "time_range_hours": time_range_hours,
         }
-    
+
     def _persist(self) -> None:
         """Persist operations to disk."""
         if not self.storage_path:
             return
-        
+
         try:
             # Only persist recent operations
             recent_ops = self.operations[-1000:]
-            
+
             data = {
                 "operations": [
                     {
@@ -318,28 +321,28 @@ class LLMOps:
                         "status": op.status.value,
                         "error_message": op.error_message,
                         "timestamp": op.timestamp.isoformat(),
-                        "metadata": op.metadata
+                        "metadata": op.metadata,
                     }
                     for op in recent_ops
                 ]
             }
-            
+
             self.storage_path.parent.mkdir(parents=True, exist_ok=True)
             with self.storage_path.open("w", encoding="utf-8") as f:
                 json.dump(data, f, default=str, indent=2)
         except Exception:
             # Silently fail persistence
             pass
-    
+
     def _load(self) -> None:
         """Load operations from disk."""
         if not self.storage_path or not self.storage_path.exists():
             return
-        
+
         try:
             with self.storage_path.open("r", encoding="utf-8") as f:
                 data = json.load(f)
-            
+
             def _parse_operation(item: Dict[str, Any]) -> LLMOperation:
                 return LLMOperation(
                     operation_id=item["operation_id"],
@@ -355,14 +358,10 @@ class LLMOps:
                     status=LLMOperationStatus(item["status"]),
                     error_message=item.get("error_message"),
                     timestamp=datetime.fromisoformat(item["timestamp"]),
-                    metadata=item.get("metadata", {})
+                    metadata=item.get("metadata", {}),
                 )
-            
-            self.operations = [
-                _parse_operation(item) for item in data.get("operations", [])
-            ]
+
+            self.operations = [_parse_operation(item) for item in data.get("operations", [])]
         except Exception:
             # Silently fail loading
             pass
-
-

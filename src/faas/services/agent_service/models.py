@@ -3,7 +3,6 @@ Request/Response models for Agent Service.
 """
 
 from typing import Any, Dict, List, Optional
-from uuid import uuid4
 
 from pydantic import BaseModel, Field
 
@@ -77,4 +76,3 @@ class ChatResponse(BaseModel):
     agent_id: str
     message: str
     metadata: Optional[Dict[str, Any]] = None
-

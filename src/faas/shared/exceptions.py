@@ -72,7 +72,11 @@ class NotFoundError(ServiceException):
 class InternalServerError(ServiceException):
     """Exception for internal server errors."""
 
-    def __init__(self, message: str = "An internal server error occurred", details: Optional[Dict[str, Any]] = None):
+    def __init__(
+        self,
+        message: str = "An internal server error occurred",
+        details: Optional[Dict[str, Any]] = None,
+    ):
         """
         Initialize internal server error.
 
@@ -106,4 +110,3 @@ class DependencyError(ServiceException):
             error_code="DEPENDENCY_ERROR",
             details={"service_name": service_name, **(details or {})},
         )
-

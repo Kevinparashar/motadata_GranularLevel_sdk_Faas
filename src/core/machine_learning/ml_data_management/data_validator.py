@@ -4,49 +4,47 @@ Data Validator
 Validates data quality and schema.
 """
 
-from typing import Dict, Any, Optional
 import logging
-import pandas as pd
+from typing import Any, Dict, Optional
 
 logger = logging.getLogger(__name__)
+
+try:
+    import pandas as pd  # type: ignore[import-untyped]
+
+    _pandas_available = True
+except ImportError:
+    _pandas_available = False
+    pd = None
 
 
 class DataValidator:
     """Validates data quality and schema."""
-    
-    def validate(
-        self,
-        data: Any,
-        schema: Optional[Dict[str, Any]] = None
-    ) -> Dict[str, Any]:
+
+    def validate(self, data: Any, schema: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
         """
         Validate data.
-        
+
         Args:
             data: Data to validate
             schema: Optional schema
-            
+
         Returns:
             Validation results
         """
-        results = {
-            'valid': True,
-            'errors': []
-        }
-        
-        if isinstance(data, pd.DataFrame):
+        results = {"valid": True, "errors": []}
+
+        if _pandas_available and pd is not None and isinstance(data, pd.DataFrame):
             # Check for missing values
             missing = data.isnull().sum()
             if missing.any():
-                results['errors'].append(f"Missing values: {missing.to_dict()}")
-            
+                results["errors"].append(f"Missing values: {missing.to_dict()}")
+
             # Check schema if provided
             if schema:
-                for col, col_schema in schema.items():
+                for col in schema.keys():
                     if col not in data.columns:
-                        results['errors'].append(f"Missing column: {col}")
-        
-        results['valid'] = len(results['errors']) == 0
+                        results["errors"].append(f"Missing column: {col}")
+
+        results["valid"] = len(results["errors"]) == 0
         return results
-
-

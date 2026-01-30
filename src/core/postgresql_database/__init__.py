@@ -4,12 +4,12 @@ PostgreSQL Database Integration
 PostgreSQL database with pgvector extension for vector operations.
 """
 
-from .connection import DatabaseConnection, DatabaseConfig
+from .connection import DatabaseConfig, DatabaseConnection
 from .vector_index_manager import (
+    IndexDistance,
+    IndexType,
     VectorIndexManager,
     create_vector_index_manager,
-    IndexType,
-    IndexDistance
 )
 
 __all__ = [

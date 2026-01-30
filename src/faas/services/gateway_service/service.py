@@ -7,25 +7,24 @@ Provides unified LLM access via LiteLLM with rate limiting, caching, and provide
 import logging
 from typing import Any, Dict, Optional
 
-from fastapi import FastAPI, HTTPException, Header, status
+from fastapi import FastAPI, Header, HTTPException, status
 from fastapi.responses import StreamingResponse
 
-from ....core.litellm_gateway import create_gateway, LiteLLMGateway
+from ....core.litellm_gateway import LiteLLMGateway, create_gateway
+from ...integrations.codec import create_codec_manager
+from ...integrations.nats import create_nats_client
+from ...integrations.otel import create_otel_tracer
 from ...shared.config import ServiceConfig, load_config
 from ...shared.contracts import ServiceResponse, extract_headers
 from ...shared.database import get_database_connection
-from ...shared.exceptions import DependencyError
 from ...shared.middleware import setup_middleware
 from .models import (
-    GenerateRequest,
-    GenerateStreamRequest,
     EmbedRequest,
-    GenerateResponse,
     EmbedResponse,
+    GenerateRequest,
+    GenerateResponse,
+    GenerateStreamRequest,
 )
-from ...integrations.nats import create_nats_client
-from ...integrations.otel import create_otel_tracer
-from ...integrations.codec import create_codec_manager
 
 logger = logging.getLogger(__name__)
 
@@ -96,7 +95,9 @@ class GatewayService:
         gateway = create_gateway(
             providers=["openai"],
             default_model="gpt-4",
-            api_keys={"openai": self.config.get("OPENAI_API_KEY", "placeholder")},  # Get from config
+            api_keys={
+                "openai": self.config.get("OPENAI_API_KEY", "placeholder")
+            },  # Get from config
         )
         return gateway
 
@@ -265,7 +266,8 @@ class GatewayService:
             """Get rate limit information."""
             standard_headers = extract_headers(**headers)
 
-            # TODO: Implement rate limit retrieval
+            # TODO: SDK-SVC-002 - Implement rate limit retrieval
+            # Placeholder - replace with actual rate limit query implementation
             return ServiceResponse(
                 success=True,
                 data={"rate_limits": {}},
@@ -316,4 +318,3 @@ def create_gateway_service(
 
     logger.info(f"Gateway Service created: {service_name}")
     return service
-

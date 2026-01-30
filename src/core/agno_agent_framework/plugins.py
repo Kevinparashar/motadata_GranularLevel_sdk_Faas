@@ -4,16 +4,17 @@ Agent Plugins
 Plugin system for extending agent capabilities.
 """
 
-from typing import Dict, List, Optional, Any, Callable
-from pydantic import BaseModel, Field
+import importlib
 from abc import ABC, abstractmethod
 from enum import Enum
-import importlib
-import inspect
+from typing import Any, Callable, Dict, List, Optional
+
+from pydantic import BaseModel, Field
 
 
 class PluginStatus(str, Enum):
     """Plugin status enumeration."""
+
     LOADED = "loaded"
     ACTIVE = "active"
     INACTIVE = "inactive"
@@ -22,6 +23,7 @@ class PluginStatus(str, Enum):
 
 class PluginHook(BaseModel):
     """Plugin hook definition."""
+
     hook_name: str
     callback: Callable
     priority: int = 0  # Higher priority executes first
@@ -71,12 +73,7 @@ class AgentPlugin(BaseModel, ABC):
         """Cleanup plugin resources."""
         pass
 
-    def register_hook(
-        self,
-        hook_name: str,
-        callback: Callable,
-        priority: int = 0
-    ) -> None:
+    def register_hook(self, hook_name: str, callback: Callable, priority: int = 0) -> None:
         """
         Register a plugin hook.
 
@@ -85,11 +82,7 @@ class AgentPlugin(BaseModel, ABC):
             callback: Callback function
             priority: Hook priority
         """
-        hook = PluginHook(
-            hook_name=hook_name,
-            callback=callback,
-            priority=priority
-        )
+        hook = PluginHook(hook_name=hook_name, callback=callback, priority=priority)
         self.hooks.append(hook)
 
     def on_task_start(self, task: Any) -> Optional[Any]:
@@ -138,11 +131,7 @@ class PluginManager:
         self._plugins: Dict[str, AgentPlugin] = {}
         self._hooks: Dict[str, List[PluginHook]] = {}
 
-    def register_plugin(
-        self,
-        plugin: AgentPlugin,
-        agent: Optional[Any] = None
-    ) -> None:
+    def register_plugin(self, plugin: AgentPlugin, agent: Optional[Any] = None) -> None:
         """
         Register a plugin.
 
@@ -175,10 +164,7 @@ class PluginManager:
             self._hooks[hook.hook_name].sort(key=lambda h: h.priority, reverse=True)
 
     def load_plugin_from_module(
-        self,
-        module_path: str,
-        plugin_class_name: str,
-        agent: Optional[Any] = None
+        self, module_path: str, plugin_class_name: str, agent: Optional[Any] = None
     ) -> AgentPlugin:
         """
         Load a plugin from a Python module.
@@ -194,7 +180,7 @@ class PluginManager:
         try:
             module = importlib.import_module(module_path)
             plugin_class = getattr(module, plugin_class_name)
-            plugin = plugin_class()
+            plugin: "AgentPlugin" = plugin_class()
 
             self.register_plugin(plugin, agent)
             return plugin
@@ -222,12 +208,7 @@ class PluginManager:
         """
         return list(self._plugins.values())
 
-    def execute_hooks(
-        self,
-        hook_name: str,
-        *args,
-        **kwargs
-    ) -> List[Any]:
+    def execute_hooks(self, hook_name: str, *args, **kwargs) -> List[Any]:
         """
         Execute all hooks for a hook name.
 
@@ -268,8 +249,7 @@ class PluginManager:
             for hook in plugin.hooks:
                 if hook.hook_name in self._hooks:
                     self._hooks[hook.hook_name] = [
-                        h for h in self._hooks[hook.hook_name]
-                        if h not in plugin.hooks
+                        h for h in self._hooks[hook.hook_name] if h not in plugin.hooks
                     ]
 
             self._plugins.pop(plugin_id, None)
@@ -281,10 +261,11 @@ class ExamplePlugin(AgentPlugin):
     def __init__(self):
         """Initialize example plugin."""
         import uuid
+
         super().__init__(
             plugin_id=str(uuid.uuid4()),
             name="ExamplePlugin",
-            description="Example plugin for demonstration"
+            description="Example plugin for demonstration",
         )
 
     def initialize(self, agent: Any) -> None:
@@ -294,4 +275,3 @@ class ExamplePlugin(AgentPlugin):
     def cleanup(self) -> None:
         """Cleanup plugin resources."""
         self.status = PluginStatus.INACTIVE
-

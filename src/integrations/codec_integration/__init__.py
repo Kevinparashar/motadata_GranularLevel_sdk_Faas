@@ -8,4 +8,3 @@ Integration module for message encoding/decoding with schema versioning.
 # This will be implemented based on Core SDK CODEC envelope and schema APIs
 
 __all__ = []
-

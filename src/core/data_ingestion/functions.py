@@ -4,11 +4,11 @@ Data Ingestion - High-Level Functions
 
 from typing import Any, Dict, List, Optional
 
-from .ingestion_service import DataIngestionService
-from ..rag import RAGSystem
 from ..cache_mechanism import CacheMechanism
 from ..litellm_gateway import LiteLLMGateway
 from ..postgresql_database.connection import DatabaseConnection
+from ..rag import RAGSystem
+from .ingestion_service import DataIngestionService
 
 
 def create_ingestion_service(
@@ -21,11 +21,11 @@ def create_ingestion_service(
     enable_auto_ingest: bool = True,
     enable_caching: bool = True,
     tenant_id: Optional[str] = None,
-    **kwargs: Any
+    **kwargs: Any,
 ) -> DataIngestionService:
     """
     Create a data ingestion service.
-    
+
     Args:
         rag_system: Optional RAG system
         cache: Optional cache mechanism
@@ -37,10 +37,10 @@ def create_ingestion_service(
         enable_caching: Enable caching
         tenant_id: Optional tenant ID
         **kwargs: Additional configuration
-    
+
     Returns:
         DataIngestionService instance
-    
+
     Example:
         >>> service = create_ingestion_service(rag=rag, cache=cache)
         >>> result = service.upload_and_process("document.pdf")
@@ -55,7 +55,7 @@ def create_ingestion_service(
         enable_auto_ingest=enable_auto_ingest,
         enable_caching=enable_caching,
         tenant_id=tenant_id,
-        **kwargs
+        **kwargs,
     )
 
 
@@ -67,11 +67,11 @@ def upload_and_process(
     db: Optional[DatabaseConnection] = None,
     title: Optional[str] = None,
     metadata: Optional[Dict[str, Any]] = None,
-    tenant_id: Optional[str] = None
+    tenant_id: Optional[str] = None,
 ) -> Dict[str, Any]:
     """
     Convenience function to upload and process a file.
-    
+
     Args:
         file_path: Path to file
         rag_system: Optional RAG system
@@ -81,22 +81,14 @@ def upload_and_process(
         title: Optional title
         metadata: Optional metadata
         tenant_id: Optional tenant ID
-    
+
     Returns:
         Processing result
     """
     service = create_ingestion_service(
-        rag_system=rag_system,
-        cache=cache,
-        gateway=gateway,
-        db=db,
-        tenant_id=tenant_id
+        rag_system=rag_system, cache=cache, gateway=gateway, db=db, tenant_id=tenant_id
     )
-    return service.upload_and_process(
-        file_path=file_path,
-        title=title,
-        metadata=metadata
-    )
+    return service.upload_and_process(file_path=file_path, title=title, metadata=metadata)
 
 
 async def upload_and_process_async(
@@ -107,11 +99,11 @@ async def upload_and_process_async(
     db: Optional[DatabaseConnection] = None,
     title: Optional[str] = None,
     metadata: Optional[Dict[str, Any]] = None,
-    tenant_id: Optional[str] = None
+    tenant_id: Optional[str] = None,
 ) -> Dict[str, Any]:
     """
     Asynchronously upload and process a file.
-    
+
     Args:
         file_path: Path to file
         rag_system: Optional RAG system
@@ -121,21 +113,15 @@ async def upload_and_process_async(
         title: Optional title
         metadata: Optional metadata
         tenant_id: Optional tenant ID
-    
+
     Returns:
         Processing result
     """
     service = create_ingestion_service(
-        rag_system=rag_system,
-        cache=cache,
-        gateway=gateway,
-        db=db,
-        tenant_id=tenant_id
+        rag_system=rag_system, cache=cache, gateway=gateway, db=db, tenant_id=tenant_id
     )
     return await service.upload_and_process_async(
-        file_path=file_path,
-        title=title,
-        metadata=metadata
+        file_path=file_path, title=title, metadata=metadata
     )
 
 
@@ -147,11 +133,11 @@ def batch_upload_and_process(
     db: Optional[DatabaseConnection] = None,
     titles: Optional[List[str]] = None,
     metadata_list: Optional[List[Dict[str, Any]]] = None,
-    tenant_id: Optional[str] = None
+    tenant_id: Optional[str] = None,
 ) -> List[Dict[str, Any]]:
     """
     Batch upload and process multiple files.
-    
+
     Args:
         file_paths: List of file paths
         rag_system: Optional RAG system
@@ -161,20 +147,13 @@ def batch_upload_and_process(
         titles: Optional titles
         metadata_list: Optional metadata list
         tenant_id: Optional tenant ID
-    
+
     Returns:
         List of processing results
     """
     service = create_ingestion_service(
-        rag_system=rag_system,
-        cache=cache,
-        gateway=gateway,
-        db=db,
-        tenant_id=tenant_id
+        rag_system=rag_system, cache=cache, gateway=gateway, db=db, tenant_id=tenant_id
     )
     return service.batch_upload_and_process(
-        file_paths=file_paths,
-        titles=titles,
-        metadata_list=metadata_list
+        file_paths=file_paths, titles=titles, metadata_list=metadata_list
     )
-

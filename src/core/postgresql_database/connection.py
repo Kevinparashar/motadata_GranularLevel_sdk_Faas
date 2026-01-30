@@ -11,13 +11,14 @@ from typing import Optional
 
 # Third-party imports
 import psycopg2
-from psycopg2 import pool, sql
+from psycopg2 import pool
 from psycopg2.extras import RealDictCursor
 from pydantic import BaseModel, Field
 
 
 class DatabaseConfig(BaseModel):
     """Database configuration."""
+
     host: str = Field(default="localhost")
     port: int = Field(default=5432)
     database: str = Field(default="ai_app")
@@ -26,7 +27,7 @@ class DatabaseConfig(BaseModel):
     min_connections: int = Field(default=1)
     max_connections: int = Field(default=10)
     connection_timeout: int = Field(default=30)
-    
+
     @classmethod
     def from_env(cls) -> "DatabaseConfig":
         """Create config from environment variables."""
@@ -45,17 +46,17 @@ class DatabaseConnection:
     """
     PostgreSQL database connection manager with connection pooling.
     """
-    
+
     def __init__(self, config: DatabaseConfig):
         """
         Initialize database connection.
-        
+
         Args:
             config: Database configuration
         """
         self.config = config
         self.connection_pool: Optional[pool.ThreadedConnectionPool] = None
-    
+
     def connect(self) -> None:
         """Create connection pool."""
         try:
@@ -68,42 +69,42 @@ class DatabaseConnection:
                 user=self.config.user,
                 password=self.config.password,
             )
-        except (psycopg2.OperationalError, psycopg2.Error) as e:
+        except psycopg2.Error as e:
             raise ConnectionError(f"Failed to create connection pool: {e}")
         except Exception as e:
             raise ConnectionError(f"Unexpected error creating connection pool: {e}")
-    
+
     def close(self) -> None:
         """Close all connections in pool."""
         if self.connection_pool:
             self.connection_pool.closeall()
             self.connection_pool = None
-    
+
     @contextmanager
     def get_connection(self):
         """
         Get a connection from the pool.
-        
+
         Yields:
             Database connection
         """
         if not self.connection_pool:
             self.connect()
-        
+
         conn = self.connection_pool.getconn()
         try:
             yield conn
         finally:
             self.connection_pool.putconn(conn)
-    
+
     @contextmanager
     def get_cursor(self, cursor_factory=None):
         """
         Get a cursor from the connection pool.
-        
+
         Args:
             cursor_factory: Optional cursor factory (e.g., RealDictCursor)
-        
+
         Yields:
             Database cursor
         """
@@ -112,48 +113,52 @@ class DatabaseConnection:
             try:
                 yield cursor
                 conn.commit()
-            except (psycopg2.IntegrityError, psycopg2.ProgrammingError, psycopg2.OperationalError) as e:
+            except (
+                psycopg2.IntegrityError,
+                psycopg2.ProgrammingError,
+                psycopg2.OperationalError,
+            ):
                 conn.rollback()
                 raise
-            except Exception as e:
+            except Exception:
                 conn.rollback()
                 raise
             finally:
                 cursor.close()
-    
+
     def execute_query(
         self,
         query: str,
         params: Optional[tuple] = None,
         fetch_one: bool = False,
-        fetch_all: bool = True
+        fetch_all: bool = True,
     ):
         """
         Execute a query.
-        
+
         Args:
             query: SQL query
             params: Query parameters
             fetch_one: Return single row
             fetch_all: Return all rows
-        
+
         Returns:
             Query results
         """
         with self.get_cursor(cursor_factory=RealDictCursor) as cursor:
             cursor.execute(query, params)
-            
+
             if fetch_one:
                 return cursor.fetchone()
             elif fetch_all:
                 return cursor.fetchall()
             else:
                 return cursor.rowcount
-    
+
     def execute_transaction(self, queries: list[tuple[str, Optional[tuple]]]) -> None:
         """
         Execute multiple queries in a transaction.
-        
+
         Args:
             queries: List of (query, params) tuples
         """
@@ -163,19 +168,23 @@ class DatabaseConnection:
                 for query, params in queries:
                     cursor.execute(query, params)
                 conn.commit()
-            except (psycopg2.IntegrityError, psycopg2.ProgrammingError, psycopg2.OperationalError) as e:
+            except (
+                psycopg2.IntegrityError,
+                psycopg2.ProgrammingError,
+                psycopg2.OperationalError,
+            ):
                 conn.rollback()
                 raise
-            except Exception as e:
+            except Exception:
                 conn.rollback()
                 raise
             finally:
                 cursor.close()
-    
+
     def check_connection(self) -> bool:
         """
         Check if database connection is working.
-        
+
         Returns:
             True if connection is valid
         """
@@ -183,8 +192,7 @@ class DatabaseConnection:
             with self.get_cursor() as cursor:
                 cursor.execute("SELECT 1")
                 return True
-        except (psycopg2.OperationalError, ConnectionError) as e:
+        except (psycopg2.OperationalError, ConnectionError):
             return False
-        except Exception as e:
+        except Exception:
             return False
-

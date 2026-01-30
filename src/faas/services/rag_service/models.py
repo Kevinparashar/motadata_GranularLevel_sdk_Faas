@@ -28,14 +28,18 @@ class QueryRequest(BaseModel):
     threshold: Optional[float] = Field(None, ge=0.0, le=1.0, description="Similarity threshold")
     metadata_filters: Optional[Dict[str, Any]] = Field(None, description="Metadata filters")
     enable_rewrite: bool = Field(default=True, description="Enable query rewriting")
-    enable_hallucination_detection: bool = Field(default=False, description="Enable hallucination detection")
+    enable_hallucination_detection: bool = Field(
+        default=False, description="Enable hallucination detection"
+    )
 
 
 class SearchRequest(BaseModel):
     """Request for vector search."""
 
     query_embedding: Optional[List[float]] = Field(None, description="Query embedding vector")
-    query_text: Optional[str] = Field(None, description="Query text (will be embedded if query_embedding not provided)")
+    query_text: Optional[str] = Field(
+        None, description="Query text (will be embedded if query_embedding not provided)"
+    )
     top_k: int = Field(default=5, ge=1, le=100, description="Number of results")
     threshold: Optional[float] = Field(None, ge=0.0, le=1.0, description="Similarity threshold")
     metadata_filters: Optional[Dict[str, Any]] = Field(None, description="Metadata filters")
@@ -69,7 +73,9 @@ class QueryResponse(BaseModel):
     documents: List[Dict[str, Any]] = Field(default_factory=list, description="Source documents")
     sources: List[str] = Field(default_factory=list, description="Document sources")
     confidence: Optional[float] = Field(None, description="Confidence score")
-    hallucination_detected: Optional[bool] = Field(None, description="Whether hallucination was detected")
+    hallucination_detected: Optional[bool] = Field(
+        None, description="Whether hallucination was detected"
+    )
     metadata: Optional[Dict[str, Any]] = None
 
 
@@ -79,4 +85,3 @@ class SearchResponse(BaseModel):
     documents: List[Dict[str, Any]] = Field(default_factory=list, description="Retrieved documents")
     scores: List[float] = Field(default_factory=list, description="Similarity scores")
     count: int = Field(0, description="Number of documents retrieved")
-

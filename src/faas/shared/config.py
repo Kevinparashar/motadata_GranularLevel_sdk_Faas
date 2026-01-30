@@ -23,8 +23,12 @@ class ServiceConfig(BaseModel):
     agent_service_url: Optional[str] = Field(None, description="Agent service URL")
     ml_service_url: Optional[str] = Field(None, description="ML service URL")
     prompt_service_url: Optional[str] = Field(None, description="Prompt service URL")
-    data_ingestion_service_url: Optional[str] = Field(None, description="Data ingestion service URL")
-    prompt_generator_service_url: Optional[str] = Field(None, description="Prompt Generator service URL")
+    data_ingestion_service_url: Optional[str] = Field(
+        None, description="Data ingestion service URL"
+    )
+    prompt_generator_service_url: Optional[str] = Field(
+        None, description="Prompt Generator service URL"
+    )
     llmops_service_url: Optional[str] = Field(None, description="LLMOps service URL")
 
     # Database
@@ -33,7 +37,9 @@ class ServiceConfig(BaseModel):
 
     # Integrations
     nats_url: Optional[str] = Field(None, description="NATS server URL")
-    otel_exporter_otlp_endpoint: Optional[str] = Field(None, description="OTEL OTLP exporter endpoint")
+    otel_exporter_otlp_endpoint: Optional[str] = Field(
+        None, description="OTEL OTLP exporter endpoint"
+    )
     codec_type: str = Field(default="json", description="CODEC type (json, msgpack, protobuf)")
 
     # Logging
@@ -108,4 +114,3 @@ def get_config() -> ServiceConfig:
         raise RuntimeError("Configuration not loaded. Call load_config() first.")
 
     return _config
-

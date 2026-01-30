@@ -5,16 +5,15 @@ Provides a simple pluggable cache layer with in-memory and Dragonfly backends,
 supporting TTL, basic LRU eviction, and pattern-based invalidation.
 """
 
-from __future__ import annotations
 
 import time
 from collections import OrderedDict
-from dataclasses import dataclass, field
-from typing import Any, Optional
+from dataclasses import dataclass
+from typing import Any, List, Optional, cast
 
 try:
-    import redis  # type: ignore - Dragonfly is Redis-compatible
-except Exception:  # pragma: no cover - optional dependency
+    import redis  # Dragonfly is Redis-compatible
+except ImportError:  # pragma: no cover - optional dependency
     redis = None
 
 
@@ -38,8 +37,12 @@ class CacheMechanism:
 
         if self.backend == "dragonfly":
             if redis is None:
-                raise ImportError("redis package is required for Dragonfly backend (Dragonfly is Redis-compatible)")
-            self._client = redis.Redis.from_url(self.config.dragonfly_url or "dragonfly://localhost:6379/0")
+                raise ImportError(
+                    "redis package is required for Dragonfly backend (Dragonfly is Redis-compatible)"
+                )
+            self._client = redis.Redis.from_url(
+                self.config.dragonfly_url or "dragonfly://localhost:6379/0"
+            )
         else:
             # Simple in-memory LRU with TTL
             self._store: OrderedDict[str, tuple[Any, float]] = OrderedDict()
@@ -50,7 +53,9 @@ class CacheMechanism:
             return f"{self.config.namespace}:{tenant_id}:{key}"
         return f"{self.config.namespace}:{key}"
 
-    def set(self, key: str, value: Any, tenant_id: Optional[str] = None, ttl: Optional[int] = None) -> None:
+    def set(
+        self, key: str, value: Any, tenant_id: Optional[str] = None, ttl: Optional[int] = None
+    ) -> None:
         """
         Store a value in cache with TTL.
 
@@ -120,7 +125,9 @@ class CacheMechanism:
         if tenant_id:
             pattern = f"{tenant_id}:{pattern}"
         if self.backend == "dragonfly":
-            keys = self._client.keys(f"{self.config.namespace}:{pattern}*")
+            # Redis keys() returns a list synchronously
+            keys_result = self._client.keys(f"{self.config.namespace}:{pattern}*")
+            keys: List[Any] = cast(List[Any], keys_result)
             if keys:
                 self._client.delete(*keys)
             return
@@ -133,17 +140,17 @@ class CacheMechanism:
         while len(self._store) > self.config.max_size:
             # Pop oldest (LRU)
             self._store.popitem(last=False)
-    
+
     def cache_prompt_interpretation(
         self,
         prompt_hash: str,
         interpretation: Any,
         tenant_id: Optional[str] = None,
-        ttl: Optional[int] = None
+        ttl: Optional[int] = None,
     ) -> None:
         """
         Cache prompt interpretation result.
-        
+
         Args:
             prompt_hash: Hash of the prompt
             interpretation: Interpretation result (will be JSON serialized)
@@ -151,26 +158,26 @@ class CacheMechanism:
             ttl: Optional TTL override
         """
         import json
+
         if isinstance(interpretation, dict):
             interpretation = json.dumps(interpretation)
         self.set(f"prompt_interp:{prompt_hash}", interpretation, tenant_id=tenant_id, ttl=ttl)
-    
+
     def get_prompt_interpretation(
-        self,
-        prompt_hash: str,
-        tenant_id: Optional[str] = None
+        self, prompt_hash: str, tenant_id: Optional[str] = None
     ) -> Optional[Any]:
         """
         Get cached prompt interpretation.
-        
+
         Args:
             prompt_hash: Hash of the prompt
             tenant_id: Optional tenant ID
-            
+
         Returns:
             Cached interpretation or None
         """
         import json
+
         cached = self.get(f"prompt_interp:{prompt_hash}", tenant_id=tenant_id)
         if cached:
             try:
@@ -180,5 +187,3 @@ class CacheMechanism:
             except Exception:
                 return None
         return None
-
-

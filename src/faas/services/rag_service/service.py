@@ -7,29 +7,28 @@ Handles document ingestion, query processing, document management, and vector se
 import logging
 from typing import Any, Dict, Optional
 
-import httpx
-from fastapi import FastAPI, HTTPException, Header, status
+from fastapi import FastAPI, Header, HTTPException, status
 
+from ....core.litellm_gateway import create_gateway
 from ....core.rag import create_rag_system, quick_rag_query_async
 from ....core.rag.rag_system import RAGSystem
-from ....core.litellm_gateway import create_gateway
+from ...integrations.codec import create_codec_manager
+from ...integrations.nats import create_nats_client
+from ...integrations.otel import create_otel_tracer
 from ...shared.config import ServiceConfig, load_config
 from ...shared.contracts import ServiceResponse, extract_headers
 from ...shared.database import get_database_connection
-from ...shared.exceptions import NotFoundError, DependencyError
+from ...shared.exceptions import DependencyError, NotFoundError
 from ...shared.middleware import setup_middleware
 from .models import (
+    DocumentResponse,
     IngestDocumentRequest,
     QueryRequest,
-    SearchRequest,
-    UpdateDocumentRequest,
-    DocumentResponse,
     QueryResponse,
+    SearchRequest,
     SearchResponse,
+    UpdateDocumentRequest,
 )
-from ...integrations.nats import create_nats_client
-from ...integrations.otel import create_otel_tracer
-from ...integrations.codec import create_codec_manager
 
 logger = logging.getLogger(__name__)
 
@@ -132,7 +131,11 @@ class RAGService:
     def _register_routes(self):
         """Register FastAPI routes."""
 
-        @self.app.post("/api/v1/rag/documents", response_model=ServiceResponse, status_code=status.HTTP_201_CREATED)
+        @self.app.post(
+            "/api/v1/rag/documents",
+            response_model=ServiceResponse,
+            status_code=status.HTTP_201_CREATED,
+        )
         async def ingest_document(
             request: IngestDocumentRequest,
             headers: dict = Header(...),
@@ -300,7 +303,8 @@ class RAGService:
             """Get document by ID."""
             standard_headers = extract_headers(**headers)
 
-            # TODO: Implement document retrieval from database
+            # TODO: SDK-SVC-004 - Implement document retrieval from database
+            # Placeholder - replace with actual database query implementation
             raise HTTPException(
                 status_code=status.HTTP_501_NOT_IMPLEMENTED,
                 detail="Document retrieval not yet implemented",
@@ -343,7 +347,9 @@ class RAGService:
                     detail=f"Failed to update document: {str(e)}",
                 )
 
-        @self.app.delete("/api/v1/rag/documents/{document_id}", status_code=status.HTTP_204_NO_CONTENT)
+        @self.app.delete(
+            "/api/v1/rag/documents/{document_id}", status_code=status.HTTP_204_NO_CONTENT
+        )
         async def delete_document(
             document_id: str,
             headers: dict = Header(...),
@@ -378,7 +384,8 @@ class RAGService:
             """List documents."""
             standard_headers = extract_headers(**headers)
 
-            # TODO: Implement document listing from database
+            # TODO: SDK-SVC-004 - Implement document listing from database
+            # Placeholder - replace with actual database query implementation
             return ServiceResponse(
                 success=True,
                 data={"documents": [], "total": 0},
@@ -427,4 +434,3 @@ def create_rag_service(
 
     logger.info(f"RAG Service created: {service_name}")
     return service
-
