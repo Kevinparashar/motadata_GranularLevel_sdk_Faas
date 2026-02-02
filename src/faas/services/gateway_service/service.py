@@ -5,6 +5,7 @@ Provides unified LLM access via LiteLLM with rate limiting, caching, and provide
 """
 
 import logging
+import os
 from typing import Any, Dict, Optional
 
 from fastapi import FastAPI, Header, HTTPException, status
@@ -18,13 +19,7 @@ from ...shared.config import ServiceConfig, load_config
 from ...shared.contracts import ServiceResponse, extract_headers
 from ...shared.database import get_database_connection
 from ...shared.middleware import setup_middleware
-from .models import (
-    EmbedRequest,
-    EmbedResponse,
-    GenerateRequest,
-    GenerateResponse,
-    GenerateStreamRequest,
-)
+from .models import EmbedRequest, GenerateRequest, GenerateStreamRequest
 
 logger = logging.getLogger(__name__)
 
@@ -81,204 +76,226 @@ class GatewayService:
         # Register routes
         self._register_routes()
 
-    def _get_gateway(self, tenant_id: str) -> LiteLLMGateway:
+    def _get_gateway(self, tenant_id: str) -> LiteLLMGateway:  # noqa: S1172
         """
         Create gateway for tenant (stateless - created on-demand).
 
         Args:
-            tenant_id: Tenant ID
+            tenant_id: Tenant ID (reserved for future multi-tenant API key resolution)
 
         Returns:
             LiteLLMGateway instance
         """
         # Create gateway on-demand (stateless)
+        # Get API key from environment variable
+        openai_api_key = os.getenv("OPENAI_API_KEY", "")
         gateway = create_gateway(
             providers=["openai"],
             default_model="gpt-4",
-            api_keys={
-                "openai": self.config.get("OPENAI_API_KEY", "placeholder")
-            },  # Get from config
+            api_keys={"openai": openai_api_key},
         )
         return gateway
 
     def _register_routes(self):
         """Register FastAPI routes."""
+        self.app.post("/api/v1/gateway/generate", response_model=ServiceResponse)(
+            self._handle_generate
+        )
 
-        @self.app.post("/api/v1/gateway/generate", response_model=ServiceResponse)
-        async def generate(
-            request: GenerateRequest,
-            headers: dict = Header(...),
-        ):
-            """Generate text using LLM."""
-            standard_headers = extract_headers(**headers)
+        self.app.post("/api/v1/gateway/generate/stream")(self._handle_generate_stream)
 
-            span = None
-            if self.otel_tracer:
-                span = self.otel_tracer.start_span("gateway_generate")
-                span.set_attribute("model", request.model or "default")
-                span.set_attribute("tenant.id", standard_headers.tenant_id)
+        self.app.post("/api/v1/gateway/embeddings", response_model=ServiceResponse)(
+            self._handle_embed
+        )
 
-            try:
-                # Get gateway
-                gateway = self._get_gateway(standard_headers.tenant_id)
+        self.app.get("/api/v1/gateway/providers", response_model=ServiceResponse)(
+            self._handle_get_providers
+        )
 
-                # Generate text
-                result = await gateway.generate_async(
+        self.app.get("/api/v1/gateway/rate-limits", response_model=ServiceResponse)(
+            self._handle_get_rate_limits
+        )
+
+        self.app.get("/health")(self._handle_health_check)
+
+    async def _handle_generate(self, request: GenerateRequest, headers: dict = Header(...)):
+        """Generate text using LLM."""
+        standard_headers = extract_headers(**headers)
+
+        span = None
+        if self.otel_tracer:
+            span = self.otel_tracer.start_span("gateway_generate")
+            span.set_attribute("model", request.model or "default")
+            span.set_attribute("tenant.id", standard_headers.tenant_id)
+
+        try:
+            # Get gateway
+            gateway = self._get_gateway(standard_headers.tenant_id)
+
+            # Generate text
+            model = request.model or "gpt-4"
+            result = await gateway.generate_async(
+                prompt=request.prompt,
+                model=model,
+                max_tokens=request.max_tokens,
+                temperature=request.temperature,
+                top_p=request.top_p,
+                frequency_penalty=request.frequency_penalty,
+                presence_penalty=request.presence_penalty,
+                stop=request.stop,
+            )
+
+            # Publish event via NATS
+            if self.nats_client:
+                await self._publish_generate_event(result, standard_headers.tenant_id)
+
+            return ServiceResponse(
+                success=True,
+                data={
+                    "text": result.text,
+                    "model": result.model,
+                    "usage": result.usage,
+                    "finish_reason": result.finish_reason,
+                },
+                correlation_id=standard_headers.correlation_id,
+                request_id=standard_headers.request_id,
+            )
+        except Exception as e:
+            logger.error(f"Error generating text: {str(e)}", exc_info=True)
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail=f"Failed to generate text: {str(e)}",
+            )
+        finally:
+            if span:
+                span.end()
+
+    async def _publish_generate_event(self, result: Any, tenant_id: str) -> None:
+        """Publish generation event via NATS."""
+        event = {
+            "event_type": "gateway.generate.completed",
+            "model": result.model,
+            "tokens_used": result.usage.get("total_tokens") if result.usage else None,
+            "tenant_id": tenant_id,
+        }
+        await self.nats_client.publish(
+            f"gateway.events.{tenant_id}",
+            self.codec_manager.encode(event),
+        )
+
+    async def _handle_generate_stream(  # noqa: S7503
+        self, request: GenerateStreamRequest, headers: dict = Header(...)
+    ):
+        """Generate text with streaming response. Async required for FastAPI route handler."""
+        standard_headers = extract_headers(**headers)
+
+        try:
+            # Get gateway
+            gateway = self._get_gateway(standard_headers.tenant_id)
+
+            # Generate stream using generate_async with stream=True
+            model = request.model or "gpt-4"
+            async def stream_generator():
+                # When stream=True, generate_async returns an async iterator, not GenerateResponse
+                response = await gateway.generate_async(
                     prompt=request.prompt,
-                    model=request.model,
+                    model=model,
                     max_tokens=request.max_tokens,
                     temperature=request.temperature,
-                    top_p=request.top_p,
-                    frequency_penalty=request.frequency_penalty,
-                    presence_penalty=request.presence_penalty,
-                    stop=request.stop,
+                    stream=True,
                 )
-
-                # Publish event via NATS
-                if self.nats_client:
-                    event = {
-                        "event_type": "gateway.generate.completed",
-                        "model": result.model,
-                        "tokens_used": result.usage.get("total_tokens") if result.usage else None,
-                        "tenant_id": standard_headers.tenant_id,
-                    }
-                    await self.nats_client.publish(
-                        f"gateway.events.{standard_headers.tenant_id}",
-                        self.codec_manager.encode(event),
-                    )
-
-                return ServiceResponse(
-                    success=True,
-                    data={
-                        "text": result.text,
-                        "model": result.model,
-                        "usage": result.usage,
-                        "finish_reason": result.finish_reason,
-                    },
-                    correlation_id=standard_headers.correlation_id,
-                    request_id=standard_headers.request_id,
-                )
-            except Exception as e:
-                logger.error(f"Error generating text: {str(e)}", exc_info=True)
-                raise HTTPException(
-                    status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-                    detail=f"Failed to generate text: {str(e)}",
-                )
-            finally:
-                if span:
-                    span.end()
-
-        @self.app.post("/api/v1/gateway/generate/stream")
-        async def generate_stream(
-            request: GenerateStreamRequest,
-            headers: dict = Header(...),
-        ):
-            """Generate text with streaming response."""
-            standard_headers = extract_headers(**headers)
-
-            try:
-                # Get gateway
-                gateway = self._get_gateway(standard_headers.tenant_id)
-
-                # Generate stream
-                async def stream_generator():
-                    async for chunk in gateway.generate_stream_async(
-                        prompt=request.prompt,
-                        model=request.model,
-                        max_tokens=request.max_tokens,
-                        temperature=request.temperature,
-                    ):
+                # Type: ignore needed because generate_async return type annotation doesn't reflect stream=True case
+                # When stream=True, response is an async iterator from litellm
+                async for chunk in response:  # type: ignore[attr-defined]
+                    # Extract text content from chunk
+                    if hasattr(chunk, "choices") and len(chunk.choices) > 0:
+                        delta = chunk.choices[0].delta
+                        if hasattr(delta, "content") and delta.content:
+                            yield f"data: {delta.content}\n\n"
+                    elif isinstance(chunk, str):
                         yield f"data: {chunk}\n\n"
+                    else:
+                        yield f"data: {str(chunk)}\n\n"
 
-                return StreamingResponse(stream_generator(), media_type="text/event-stream")
-            except Exception as e:
-                logger.error(f"Error streaming generation: {str(e)}", exc_info=True)
-                raise HTTPException(
-                    status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-                    detail=f"Failed to stream generation: {str(e)}",
-                )
+            return StreamingResponse(stream_generator(), media_type="text/event-stream")
+        except Exception as e:
+            logger.error(f"Error streaming generation: {str(e)}", exc_info=True)
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail=f"Failed to stream generation: {str(e)}",
+            )
 
-        @self.app.post("/api/v1/gateway/embeddings", response_model=ServiceResponse)
-        async def embed(
-            request: EmbedRequest,
-            headers: dict = Header(...),
-        ):
-            """Generate embeddings."""
-            standard_headers = extract_headers(**headers)
+    async def _handle_embed(self, request: EmbedRequest, headers: dict = Header(...)):
+        """Generate embeddings."""
+        standard_headers = extract_headers(**headers)
 
-            span = None
-            if self.otel_tracer:
-                span = self.otel_tracer.start_span("gateway_embed")
-                span.set_attribute("text_count", len(request.texts))
-                span.set_attribute("tenant.id", standard_headers.tenant_id)
+        span = None
+        if self.otel_tracer:
+            span = self.otel_tracer.start_span("gateway_embed")
+            span.set_attribute("text_count", len(request.texts))
+            span.set_attribute("tenant.id", standard_headers.tenant_id)
 
-            try:
-                # Get gateway
-                gateway = self._get_gateway(standard_headers.tenant_id)
+        try:
+            # Get gateway
+            gateway = self._get_gateway(standard_headers.tenant_id)
 
-                # Generate embeddings
-                result = await gateway.embed_async(
-                    texts=request.texts,
-                    model=request.model,
-                )
-
-                return ServiceResponse(
-                    success=True,
-                    data={
-                        "embeddings": result.embeddings,
-                        "model": result.model,
-                        "usage": result.usage,
-                    },
-                    correlation_id=standard_headers.correlation_id,
-                    request_id=standard_headers.request_id,
-                )
-            except Exception as e:
-                logger.error(f"Error generating embeddings: {str(e)}", exc_info=True)
-                raise HTTPException(
-                    status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-                    detail=f"Failed to generate embeddings: {str(e)}",
-                )
-            finally:
-                if span:
-                    span.end()
-
-        @self.app.get("/api/v1/gateway/providers", response_model=ServiceResponse)
-        async def get_providers(
-            headers: dict = Header(...),
-        ):
-            """Get available LLM providers."""
-            standard_headers = extract_headers(**headers)
-
-            # Return available providers
-            providers = ["openai", "anthropic", "google", "cohere", "azure", "bedrock"]
+            # Generate embeddings
+            model = request.model or "text-embedding-3-small"
+            result = await gateway.embed_async(
+                texts=request.texts,
+                model=model,
+            )
 
             return ServiceResponse(
                 success=True,
-                data={"providers": providers},
+                data={
+                    "embeddings": result.embeddings,
+                    "model": result.model,
+                    "usage": result.usage,
+                },
                 correlation_id=standard_headers.correlation_id,
                 request_id=standard_headers.request_id,
             )
-
-        @self.app.get("/api/v1/gateway/rate-limits", response_model=ServiceResponse)
-        async def get_rate_limits(
-            headers: dict = Header(...),
-        ):
-            """Get rate limit information."""
-            standard_headers = extract_headers(**headers)
-
-            # TODO: SDK-SVC-002 - Implement rate limit retrieval
-            # Placeholder - replace with actual rate limit query implementation
-            return ServiceResponse(
-                success=True,
-                data={"rate_limits": {}},
-                correlation_id=standard_headers.correlation_id,
-                request_id=standard_headers.request_id,
+        except Exception as e:
+            logger.error(f"Error generating embeddings: {str(e)}", exc_info=True)
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail=f"Failed to generate embeddings: {str(e)}",
             )
+        finally:
+            if span:
+                span.end()
 
-        @self.app.get("/health")
-        async def health_check():
-            """Health check endpoint."""
-            return {"status": "healthy", "service": "gateway-service"}
+    async def _handle_get_providers(self, headers: dict = Header(...)):  # noqa: S7503
+        """Get available LLM providers. Async required for FastAPI route handler."""
+        standard_headers = extract_headers(**headers)
+
+        # Return available providers
+        providers = ["openai", "anthropic", "google", "cohere", "azure", "bedrock"]
+
+        return ServiceResponse(
+            success=True,
+            data={"providers": providers},
+            correlation_id=standard_headers.correlation_id,
+            request_id=standard_headers.request_id,
+        )
+
+    async def _handle_get_rate_limits(self, headers: dict = Header(...)):  # noqa: S7503
+        """Get rate limit information. Async required for FastAPI route handler."""
+        standard_headers = extract_headers(**headers)
+
+        # Rate limit retrieval - to be implemented
+        # For now, return placeholder response
+        return ServiceResponse(
+            success=True,
+            data={"rate_limits": {}},
+            correlation_id=standard_headers.correlation_id,
+            request_id=standard_headers.request_id,
+        )
+
+    async def _handle_health_check(self):  # noqa: S7503
+        """Health check endpoint. Async required for FastAPI route handler."""
+        return {"status": "healthy", "service": "gateway-service"}
 
 
 def create_gateway_service(

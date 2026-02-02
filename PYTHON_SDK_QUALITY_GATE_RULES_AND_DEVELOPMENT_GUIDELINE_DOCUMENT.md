@@ -66,42 +66,54 @@ Define a clear and enforceable SonarQube Quality Gate for the Motadata Python AI
 
 ## 📊 ENFORCED RULE CATEGORIES
 
+> **📝 Tool Responsibility:** Rules are enforced by either SonarQube (code quality analysis) or CI tools (formatting, linting, type checking). See [Section 2.1.1](#211-sonarqube-vs-ci-tools-responsibility-split) for complete responsibility breakdown.
+
 ### 1. Reliability (Bugs) - Gate Rule: **New Bugs = 0**
-- ❌ No unused imports or variables
-- ❌ No undefined names
-- ❌ No unreachable or dead code
-- ❌ No duplicate conditions in if/elif
-- ❌ No self-assigned variables
-- ❌ No useless if(True) / if(False) blocks
+**Enforced by:** SonarQube + CI Tools (Ruff, MyPy)
+
+- ❌ No unused imports or variables *(CI: Ruff)*
+- ❌ No undefined names *(CI: Ruff, MyPy)*
+- ❌ No unreachable or dead code *(SonarQube)*
+- ❌ No duplicate conditions in if/elif *(SonarQube)*
+- ❌ No self-assigned variables *(SonarQube)*
+- ❌ No useless if(True) / if(False) blocks *(SonarQube)*
 
 ### 2. Security Hotspots - Gate Rule: **Unreviewed Hotspots = 0**
-- ❌ Hard-coded credentials not allowed
-- ❌ Hard-coded IP addresses not allowed
-- ❌ SQL injection vulnerabilities not allowed
-- ❌ Dangerous calls (eval, exec) not allowed
-- ❌ Secrets in code not allowed
+**Enforced by:** SonarQube + CI Tools (Bandit, detect-secrets)
+
+- ❌ Hard-coded credentials not allowed *(CI: detect-secrets, Bandit)*
+- ❌ Hard-coded IP addresses not allowed *(SonarQube)*
+- ❌ SQL injection vulnerabilities not allowed *(SonarQube, Bandit)*
+- ❌ Dangerous calls (eval, exec) not allowed *(SonarQube, Bandit)*
+- ❌ Secrets in code not allowed *(CI: detect-secrets)*
 
 ### 3. Maintainability & Complexity - Gate Rule: **No new Critical/Major issues**
-- ⚠️ Function cognitive complexity ≤ 10 (warning at 11-15)
-- ❌ Function cognitive complexity > 15 (blocks merge)
-- ❌ Deeply nested if/for/while statements not allowed
-- ❌ Overly complex expressions not allowed
-- ❌ Code duplication > 3% not allowed
+**Enforced by:** SonarQube
+
+- ⚠️ Function cognitive complexity ≤ 10 (warning at 11-15) *(SonarQube)*
+- ❌ Function cognitive complexity > 15 (blocks merge) *(SonarQube)*
+- ❌ Deeply nested if/for/while statements not allowed *(SonarQube)*
+- ❌ Overly complex expressions not allowed *(SonarQube)*
+- ❌ Code duplication > 3% not allowed *(SonarQube CPD)*
 
 ### 4. Function & File Constraints
-- ❌ Functions must not be empty
-- ❌ Functions must not have identical implementations
-- ⚠️ Parameters should be limited (≤ 5 recommended)
-- ⚠️ Functions should be reasonably sized (≤ 60 lines recommended)
-- ⚠️ Files should not be excessively large
+**Enforced by:** SonarQube
+
+- ❌ Functions must not be empty *(SonarQube)*
+- ❌ Functions must not have identical implementations *(SonarQube)*
+- ⚠️ Parameters should be limited (≤ 5 recommended) *(SonarQube warning)*
+- ⚠️ Functions should be reasonably sized (≤ 60 lines recommended) *(SonarQube warning)*
+- ⚠️ Files should not be excessively large *(SonarQube warning)*
 
 ### 5. Coding Standards & Hygiene
-- ❌ Type hints required on all public functions
-- ❌ No bare except: clauses
-- ❌ No mutable default arguments
-- ❌ No swallowing exceptions without logging
-- ⚠️ TODO/FIXME must have ticket reference (warning)
-- ❌ Docstrings required on public classes/functions
+**Enforced by:** CI Tools (Black, Ruff, MyPy) + SonarQube
+
+- ❌ Type hints required on all public functions *(CI: MyPy)*
+- ❌ No bare except: clauses *(CI: Ruff, SonarQube)*
+- ❌ No mutable default arguments *(CI: Ruff, MyPy)*
+- ❌ No swallowing exceptions without logging *(SonarQube)*
+- ⚠️ TODO/FIXME must have ticket reference (warning) *(SonarQube)*
+- ❌ Docstrings required on public classes/functions *(CI: Ruff, SonarQube)*
 
 ---
 
@@ -277,6 +289,33 @@ A PR is mergeable only if **all** pass:
 
 > **Rule:** If Sonar or CI is red → **no merge**.
 
+### 2.1.1 SonarQube vs CI Tools: Responsibility Split
+
+**Clear separation of responsibilities prevents confusion and ensures accurate enforcement:**
+
+| Responsibility | Tool(s) | What It Enforces |
+|----------------|---------|------------------|
+| **Bugs Detection** | SonarQube | Unreachable code, dead code, logic errors, undefined variables |
+| **Security Hotspots** | SonarQube | Hard-coded credentials, SQL injection, dangerous patterns |
+| **Code Smells** | SonarQube | Maintainability issues, complexity violations, code smells |
+| **Code Duplication** | SonarQube CPD | Token-based duplicate code blocks (≥6 lines) |
+| **Coverage on New Code** | SonarQube | Test coverage percentage on new/modified code |
+| **Quality Ratings** | SonarQube | Reliability, Security, Maintainability ratings (A/B/C/D) |
+| **Code Formatting** | CI Tools (Black, isort) | Line length, import sorting, code style |
+| **Linting** | CI Tools (Ruff) | Unused imports, undefined names, style violations |
+| **Type Checking** | CI Tools (MyPy) | Type annotation correctness, type errors |
+| **Secrets Detection** | CI Tools (detect-secrets, bandit) | Hard-coded secrets, API keys, passwords |
+| **Dependency Auditing** | CI Tools (pip-audit) | Known vulnerabilities in dependencies |
+| **Test Execution** | CI Tools (Pytest) | Unit and integration test execution |
+| **Build Verification** | CI Tools (python -m build) | Package builds successfully |
+
+**Key Points:**
+- **SonarQube** focuses on code quality metrics, bugs, security hotspots, and maintainability ratings
+- **CI Tools** handle formatting, linting, type checking, secrets detection, and test execution
+- **Both** enforce coverage thresholds (SonarQube via Quality Gate, CI via `--cov-fail-under=85`)
+- **PR Decoration:** SonarQube results are displayed in pull requests via PR decoration (not preview mode)
+- **Local Scans:** SonarQube scanner can be run locally for validation, but gates are enforced in CI/CD
+
 ### 2.2 Release Quality Gate (stricter)
 All PR gates plus:
 - cross-version run (e.g., 3.8–3.12)
@@ -342,11 +381,13 @@ This section defines what constitutes code duplication, when it's acceptable, an
 
 #### 2.4.1 What Counts as Duplication
 
-**SonarQube detects duplication as:**
-- **Identical code blocks** ≥ 6 lines in length
+**SonarQube CPD (Copy/Paste Detector) detects duplication as:**
+- **Identical code blocks** ≥ 6 lines in length (token-based matching)
 - **Copy-pasted functions** with minor variable name changes
-- **Repeated string literals** (≥ 3 occurrences of the same literal)
 - **Duplicated logic patterns** across different modules
+- **Similar code structures** with only variable/function name differences
+
+> **📝 Note:** SonarQube CPD uses token-based analysis, not string literal matching. Repeated string literals are tracked separately as code smells (not duplication) and should be centralized as a coding best practice, but they do not count toward the duplication percentage.
 
 **Measurement:**
 ```
@@ -432,10 +473,12 @@ def validate_tool_input(data: Dict[str, Any]) -> bool:
     return True
 ```
 
-**Example 2: Duplicated String Literals**
+**Example 2: String Literal Centralization (Coding Best Practice)**
+
+> **Note:** While repeated string literals don't count as Sonar duplication, centralizing them is a coding best practice for maintainability.
 
 ```python
-# ❌ BAD: Repeated string literals
+# ❌ BAD: Repeated string literals (maintenance risk)
 def create_agent_cache_key(agent_id: str, tenant_id: str) -> str:
     return f"agent:{tenant_id}:{agent_id}"
 
@@ -519,10 +562,15 @@ tool = await tool_repo.get_by_id("tool_789", "tenant_456")
       -Dsonar.cpd.exclusions=**/tests/**,**/__init__.py
 ```
 
-**Pre-commit Hook:**
+**Local Validation (Before Commit):**
 ```bash
-# Detect duplications locally before commit
-sonar-scanner -Dsonar.analysis.mode=preview
+# Run SonarQube scanner locally for validation
+# Note: This validates code quality but does not enforce gates
+# Quality gates are enforced in CI/CD pipelines
+sonar-scanner
+
+# View results in SonarQube dashboard
+# PR decoration will show results in your pull request
 ```
 
 **SonarQube Dashboard:**
@@ -963,7 +1011,7 @@ pydocstyle src --convention=google
    - **Action:** PR is blocked, must fix
 
 5. **Coverage Threshold (FAILS CI)**
-   - New code coverage < 80%
+   - New code coverage < 85%
    - Overall coverage drops below threshold
    - **Action:** PR is blocked, must add tests
 
@@ -981,7 +1029,7 @@ pydocstyle src --convention=google
 8. **Sonar Quality Gate (FAILS CI)**
    - Quality Gate = FAILED
    - New Blocker/Critical issues
-   - Coverage on new code < 80%
+   - Coverage on new code < 85%
    - Security rating < A
    - **Action:** PR is blocked, must fix
 
@@ -1022,7 +1070,7 @@ pydocstyle src --convention=google
 | Lint errors | ❌ **FAILS CI** | Block merge, must fix |
 | Type errors | ❌ **FAILS CI** | Block merge, must fix |
 | Test failures | ❌ **FAILS CI** | Block merge, must fix |
-| Coverage < 80% | ❌ **FAILS CI** | Block merge, must add tests |
+| Coverage < 85% | ❌ **FAILS CI** | Block merge, must add tests |
 | Secrets detected | ❌ **FAILS CI** | Block merge, must remove |
 | Sonar gate failed | ❌ **FAILS CI** | Block merge, must fix |
 | Complexity > 15 | ⚠️ **WARNING** | Review recommended |
@@ -1045,7 +1093,7 @@ pydocstyle src --convention=google
    - src/core/rag/rag_system.py:67 - Missing return type annotation
 
 ❌ Coverage: FAILED
-   - New code coverage: 65% (required: 80%)
+   - New code coverage: 65% (required: 85%)
    - Missing coverage in: src/core/rag/retriever.py
 
 → PR BLOCKED: Must fix all failures before merge
@@ -1257,7 +1305,7 @@ detect-secrets scan > .secrets.baseline
 - [ ] PR has description + risk assessment
 - [ ] CI green
 - [ ] Sonar gate green
-- [ ] Coverage ≥ 80% new code
+- [ ] Coverage ≥ 85% new code
 - [ ] Lint passes (ruff)
 - [ ] Type-check passes (mypy)
 - [ ] Security scans pass
@@ -1281,7 +1329,7 @@ detect-secrets scan > .secrets.baseline
 - [ ] mypy src
 - [ ] pytest unit
 - [ ] pytest integration (if applicable)
-- [ ] coverage >= 80%
+- [ ] coverage >= 85%
 - [ ] security scans (bandit/pip-audit/detect-secrets)
 
 ## Sonar
@@ -2282,7 +2330,7 @@ class MLModel(BaseModel):
 A "component" is any top-level functional module under `src/` (e.g., `src/core/agno_agent_framework`, `src/core/rag`, `src/core/litellm_gateway`, `src/faas/services/agent_service`).
 
 For every component modified, PR must include:
-- [ ] **Unit tests** for new/changed logic (≥80% coverage)
+- [ ] **Unit tests** for new/changed logic (≥85% coverage)
 - [ ] **Integration tests** if component touches external dependency (database, HTTP, LLM)
 - [ ] **Component-specific rules** followed (see sections 8.1-8.6)
 - [ ] **Tenant isolation** implemented (if applicable)
@@ -2504,7 +2552,7 @@ python -m build
 - Format check
 - Ruff lint
 - Mypy
-- Tests + coverage fail-under 80
+- Tests + coverage fail-under 85
 - Secret scan
 - Bandit
 - Pip-audit

@@ -5,12 +5,12 @@ Handles LLM operations logging, monitoring, metrics, and cost tracking.
 """
 
 import logging
-from datetime import datetime
-from typing import Any, Dict, Optional
+from datetime import datetime, timedelta
+from typing import Any, Dict, List, Optional
 
 from fastapi import FastAPI, Header, HTTPException, Query, status
 
-from ....core.llmops import LLMOperation, LLMOperationStatus, LLMOperationType, LLMOps
+from ....core.llmops import LLMOperationStatus, LLMOperationType, LLMOps
 from ...integrations.codec import create_codec_manager
 from ...integrations.nats import create_nats_client
 from ...integrations.otel import create_otel_tracer
@@ -18,15 +18,7 @@ from ...shared.config import ServiceConfig, load_config
 from ...shared.contracts import ServiceResponse, extract_headers
 from ...shared.database import get_database_connection
 from ...shared.middleware import setup_middleware
-from .models import (
-    CostAnalysisResponse,
-    LogOperationRequest,
-    MetricsResponse,
-    OperationResponse,
-    OperationStatus,
-    OperationType,
-    QueryOperationsRequest,
-)
+from .models import LogOperationRequest
 
 logger = logging.getLogger(__name__)
 
@@ -110,8 +102,6 @@ class LLMOpsService:
         self, start_date: Optional[datetime], end_date: Optional[datetime]
     ) -> datetime:
         """Calculate cutoff date for filtering operations."""
-        from datetime import timedelta
-
         if start_date:
             return start_date
         elif end_date:
@@ -207,8 +197,6 @@ class LLMOpsService:
         self, start_date: Optional[datetime], end_date: Optional[datetime]
     ) -> int:
         """Calculate time range in hours."""
-        from datetime import timedelta
-
         if start_date and end_date:
             return int((end_date - start_date).total_seconds() / 3600)
         elif start_date:
@@ -248,14 +236,12 @@ class LLMOpsService:
         time_range_hours: int,
     ) -> Dict[str, Any]:
         """Format cost analysis for response."""
-        from datetime import timedelta
-
         return {
             "total_cost_usd": cost_summary.get("total_cost_usd", 0.0),
             "cost_by_model": {
                 k: v.get("cost_usd", 0.0) for k, v in cost_summary.get("by_model", {}).items()
             },
-            "cost_by_operation_type": {k: 0.0 for k in metrics.get("by_type", {}).keys()},
+            "cost_by_operation_type": dict.fromkeys(metrics.get("by_type", {}).keys(), 0.0),
             "cost_by_tenant": (
                 {filter_tenant_id: cost_summary.get("total_cost_usd", 0.0)}
                 if filter_tenant_id
@@ -272,137 +258,149 @@ class LLMOpsService:
 
     def _register_routes(self):
         """Register FastAPI routes."""
-
-        @self.app.post(
+        self.app.post(
             "/api/v1/llmops/operations",
             response_model=ServiceResponse,
             status_code=status.HTTP_201_CREATED,
+        )(self._handle_log_operation_route)
+
+        self.app.get("/api/v1/llmops/operations", response_model=ServiceResponse)(
+            self._handle_query_operations_route
         )
-        async def log_operation(
-            request: LogOperationRequest,
-            headers: dict = Header(...),
-        ):
-            """Log an LLM operation."""
-            standard_headers = extract_headers(**headers)
-            try:
-                return self._handle_log_operation(request, standard_headers)
-            except Exception as e:
-                logger.error(f"Error logging operation: {e}", exc_info=True)
-                raise HTTPException(
-                    status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-                    detail=f"Failed to log operation: {str(e)}",
-                )
 
-        @self.app.get("/api/v1/llmops/operations", response_model=ServiceResponse)
-        async def query_operations(
-            tenant_id: Optional[str] = Query(None, alias="tenant_id"),
-            agent_id: Optional[str] = Query(None, alias="agent_id"),
-            model: Optional[str] = Query(None, alias="model"),
-            operation_type: Optional[str] = Query(None, alias="operation_type"),
-            status_filter: Optional[str] = Query(None, alias="status"),
-            start_date: Optional[datetime] = Query(None, alias="start_date"),
-            end_date: Optional[datetime] = Query(None, alias="end_date"),
-            limit: int = Query(100, ge=1, le=1000),
-            offset: int = Query(0, ge=0),
-            headers: dict = Header(...),
-        ):
-            """Query LLM operations."""
-            standard_headers = extract_headers(**headers)
-            try:
-                return self._handle_query_operations(
-                    tenant_id=tenant_id,
-                    agent_id=agent_id,
-                    model=model,
-                    operation_type=operation_type,
-                    status_filter=status_filter,
-                    start_date=start_date,
-                    end_date=end_date,
-                    limit=limit,
-                    offset=offset,
-                    standard_headers=standard_headers,
-                )
-            except Exception as e:
-                logger.error(f"Error querying operations: {e}", exc_info=True)
-                raise HTTPException(
-                    status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-                    detail=f"Failed to query operations: {str(e)}",
-                )
+        self.app.get("/api/v1/llmops/metrics", response_model=ServiceResponse)(
+            self._handle_get_metrics_route
+        )
 
-        @self.app.get("/api/v1/llmops/metrics", response_model=ServiceResponse)
-        async def get_metrics(
-            tenant_id: Optional[str] = Query(None, alias="tenant_id"),
-            start_date: Optional[datetime] = Query(None, alias="start_date"),
-            end_date: Optional[datetime] = Query(None, alias="end_date"),
-            headers: dict = Header(...),
-        ):
-            """Get LLM operations metrics."""
-            standard_headers = extract_headers(**headers)
-            try:
-                filter_tenant_id = tenant_id or standard_headers.tenant_id
-                time_range_hours = self._calculate_time_range(start_date, end_date)
-                metrics = self.llmops.get_metrics(
-                    tenant_id=filter_tenant_id,
-                    time_range_hours=time_range_hours,
-                )
-                formatted_metrics = self._format_metrics_response(metrics)
-                return ServiceResponse(
-                    success=True,
-                    data=formatted_metrics,
-                    correlation_id=standard_headers.correlation_id,
-                    request_id=standard_headers.request_id,
-                )
-            except Exception as e:
-                logger.error(f"Error getting metrics: {e}", exc_info=True)
-                raise HTTPException(
-                    status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-                    detail=f"Failed to get metrics: {str(e)}",
-                )
+        self.app.get("/api/v1/llmops/cost-analysis", response_model=ServiceResponse)(
+            self._handle_get_cost_analysis_route
+        )
 
-        @self.app.get("/api/v1/llmops/cost-analysis", response_model=ServiceResponse)
-        async def get_cost_analysis(
-            tenant_id: Optional[str] = Query(None, alias="tenant_id"),
-            start_date: Optional[datetime] = Query(None, alias="start_date"),
-            end_date: Optional[datetime] = Query(None, alias="end_date"),
-            headers: dict = Header(...),
-        ):
-            """Get cost analysis."""
-            standard_headers = extract_headers(**headers)
-            try:
-                filter_tenant_id = tenant_id or standard_headers.tenant_id
-                time_range_hours = self._calculate_time_range(start_date, end_date)
-                cost_summary = self.llmops.get_cost_summary(
-                    tenant_id=filter_tenant_id,
-                    time_range_hours=time_range_hours,
-                )
-                metrics = self.llmops.get_metrics(
-                    tenant_id=filter_tenant_id,
-                    time_range_hours=time_range_hours,
-                )
-                cost_analysis = self._format_cost_analysis(
-                    cost_summary=cost_summary,
-                    metrics=metrics,
-                    filter_tenant_id=filter_tenant_id,
-                    start_date=start_date,
-                    end_date=end_date,
-                    time_range_hours=time_range_hours,
-                )
-                return ServiceResponse(
-                    success=True,
-                    data=cost_analysis,
-                    correlation_id=standard_headers.correlation_id,
-                    request_id=standard_headers.request_id,
-                )
-            except Exception as e:
-                logger.error(f"Error getting cost analysis: {e}", exc_info=True)
-                raise HTTPException(
-                    status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-                    detail=f"Failed to get cost analysis: {str(e)}",
-                )
+        self.app.get("/health")(self._handle_health_check)
 
-        @self.app.get("/health")
-        async def health_check():
-            """Health check endpoint."""
-            return {"status": "healthy", "service": "llmops-service"}
+    async def _handle_log_operation_route(  # noqa: S7503
+        self, request: LogOperationRequest, headers: dict = Header(...)
+    ):
+        """Log an LLM operation. Async required for FastAPI route handler."""
+        standard_headers = extract_headers(**headers)
+        try:
+            return self._handle_log_operation(request, standard_headers)
+        except Exception as e:
+            logger.error(f"Error logging operation: {e}", exc_info=True)
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail=f"Failed to log operation: {str(e)}",
+            )
+
+    async def _handle_query_operations_route(  # noqa: S7503
+        self,
+        tenant_id: Optional[str] = Query(None, alias="tenant_id"),
+        agent_id: Optional[str] = Query(None, alias="agent_id"),
+        model: Optional[str] = Query(None, alias="model"),
+        operation_type: Optional[str] = Query(None, alias="operation_type"),
+        status_filter: Optional[str] = Query(None, alias="status"),
+        start_date: Optional[datetime] = Query(None, alias="start_date"),
+        end_date: Optional[datetime] = Query(None, alias="end_date"),
+        limit: int = Query(100, ge=1, le=1000),
+        offset: int = Query(0, ge=0),
+        headers: dict = Header(...),
+    ):
+        """Query LLM operations. Async required for FastAPI route handler."""
+        standard_headers = extract_headers(**headers)
+        try:
+            return self._handle_query_operations(
+                tenant_id=tenant_id,
+                agent_id=agent_id,
+                model=model,
+                operation_type=operation_type,
+                status_filter=status_filter,
+                start_date=start_date,
+                end_date=end_date,
+                limit=limit,
+                offset=offset,
+                standard_headers=standard_headers,
+            )
+        except Exception as e:
+            logger.error(f"Error querying operations: {e}", exc_info=True)
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail=f"Failed to query operations: {str(e)}",
+            )
+
+    async def _handle_get_metrics_route(  # noqa: S7503
+        self,
+        tenant_id: Optional[str] = Query(None, alias="tenant_id"),
+        start_date: Optional[datetime] = Query(None, alias="start_date"),
+        end_date: Optional[datetime] = Query(None, alias="end_date"),
+        headers: dict = Header(...),
+    ):
+        """Get LLM operations metrics. Async required for FastAPI route handler."""
+        standard_headers = extract_headers(**headers)
+        try:
+            filter_tenant_id = tenant_id or standard_headers.tenant_id
+            time_range_hours = self._calculate_time_range(start_date, end_date)
+            metrics = self.llmops.get_metrics(
+                tenant_id=filter_tenant_id,
+                time_range_hours=time_range_hours,
+            )
+            formatted_metrics = self._format_metrics_response(metrics)
+            return ServiceResponse(
+                success=True,
+                data=formatted_metrics,
+                correlation_id=standard_headers.correlation_id,
+                request_id=standard_headers.request_id,
+            )
+        except Exception as e:
+            logger.error(f"Error getting metrics: {e}", exc_info=True)
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail=f"Failed to get metrics: {str(e)}",
+            )
+
+    async def _handle_get_cost_analysis_route(  # noqa: S7503
+        self,
+        tenant_id: Optional[str] = Query(None, alias="tenant_id"),
+        start_date: Optional[datetime] = Query(None, alias="start_date"),
+        end_date: Optional[datetime] = Query(None, alias="end_date"),
+        headers: dict = Header(...),
+    ):
+        """Get cost analysis. Async required for FastAPI route handler."""
+        standard_headers = extract_headers(**headers)
+        try:
+            filter_tenant_id = tenant_id or standard_headers.tenant_id
+            time_range_hours = self._calculate_time_range(start_date, end_date)
+            cost_summary = self.llmops.get_cost_summary(
+                tenant_id=filter_tenant_id,
+                time_range_hours=time_range_hours,
+            )
+            metrics = self.llmops.get_metrics(
+                tenant_id=filter_tenant_id,
+                time_range_hours=time_range_hours,
+            )
+            cost_analysis = self._format_cost_analysis(
+                cost_summary=cost_summary,
+                metrics=metrics,
+                filter_tenant_id=filter_tenant_id,
+                start_date=start_date,
+                end_date=end_date,
+                time_range_hours=time_range_hours,
+            )
+            return ServiceResponse(
+                success=True,
+                data=cost_analysis,
+                correlation_id=standard_headers.correlation_id,
+                request_id=standard_headers.request_id,
+            )
+        except Exception as e:
+            logger.error(f"Error getting cost analysis: {e}", exc_info=True)
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail=f"Failed to get cost analysis: {str(e)}",
+            )
+
+    async def _handle_health_check(self):  # noqa: S7503
+        """Health check endpoint. Async required for FastAPI route handler."""
+        return {"status": "healthy", "service": "llmops-service"}
 
 
 def create_llmops_service(
@@ -419,16 +417,12 @@ def create_llmops_service(
     Returns:
         Configured FastAPI application
     """
-    config = load_config(service_name, config_overrides)
+    config = load_config(service_name, **(config_overrides or {}))
     db_connection = get_database_connection(config.database_url)
 
     # Initialize integrations
-    nats_client = create_nats_client(config.nats_url) if config.enable_nats else None
-    otel_tracer = (
-        create_otel_tracer(service_name, config.otel_exporter_otlp_endpoint)
-        if config.enable_otel
-        else None
-    )
+    nats_client = create_nats_client() if config.enable_nats else None
+    otel_tracer = create_otel_tracer() if config.enable_otel else None
 
     # Create service
     service = LLMOpsService(

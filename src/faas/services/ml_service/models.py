@@ -6,6 +6,9 @@ from typing import Any, Dict, List, Optional
 
 from pydantic import BaseModel, Field
 
+# Constants for field descriptions
+MODEL_ID_DESCRIPTION = "Model ID"
+
 
 class TrainModelRequest(BaseModel):
     """Request to train a model."""
@@ -21,21 +24,21 @@ class TrainModelRequest(BaseModel):
 class PredictRequest(BaseModel):
     """Request for model prediction."""
 
-    model_id: str = Field(..., description="Model ID")
+    model_id: str = Field(..., description=MODEL_ID_DESCRIPTION)
     features: Dict[str, Any] = Field(..., description="Input features")
 
 
 class BatchPredictRequest(BaseModel):
     """Request for batch prediction."""
 
-    model_id: str = Field(..., description="Model ID")
+    model_id: str = Field(..., description=MODEL_ID_DESCRIPTION)
     features_list: List[Dict[str, Any]] = Field(..., description="List of input features")
 
 
 class DeployModelRequest(BaseModel):
     """Request to deploy a model."""
 
-    model_id: str = Field(..., description="Model ID")
+    model_id: str = Field(..., description=MODEL_ID_DESCRIPTION)
     version: Optional[str] = Field(None, description="Model version")
 
 

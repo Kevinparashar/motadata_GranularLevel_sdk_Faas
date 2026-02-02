@@ -5,11 +5,12 @@ Handles agent management, task execution, chat interactions, and memory manageme
 """
 
 import logging
+import os
 from typing import Any, Dict, Optional
 
 from fastapi import FastAPI, Header, HTTPException, status
 
-from ....core.agno_agent_framework import Agent, AgentTask, create_agent
+from ....core.agno_agent_framework import AgentTask, chat_with_agent, create_agent
 from ....core.litellm_gateway import create_gateway
 from ...integrations.codec import create_codec_manager
 from ...integrations.nats import create_nats_client
@@ -17,18 +18,10 @@ from ...integrations.otel import create_otel_tracer
 from ...shared.agent_storage import AgentStorage
 from ...shared.config import ServiceConfig, load_config
 from ...shared.contracts import ServiceResponse, extract_headers
-from ...shared.exceptions import DependencyError, NotFoundError, ValidationError
-from ...shared.http_client import ServiceClientManager, ServiceHTTPClient
+from ...shared.exceptions import NotFoundError
+from ...shared.http_client import ServiceClientManager
 from ...shared.middleware import setup_middleware
-from .models import (
-    AgentResponse,
-    ChatRequest,
-    ChatResponse,
-    CreateAgentRequest,
-    ExecuteTaskRequest,
-    TaskResponse,
-    UpdateAgentRequest,
-)
+from .models import ChatRequest, CreateAgentRequest, ExecuteTaskRequest
 
 logger = logging.getLogger(__name__)
 
@@ -90,229 +83,234 @@ class AgentService:
 
     def _register_routes(self):
         """Register FastAPI routes."""
+        self.app.post(
+            "/api/v1/agents",
+            response_model=ServiceResponse,
+            status_code=status.HTTP_201_CREATED,
+        )(self._handle_create_agent)
 
-        @self.app.post(
-            "/api/v1/agents", response_model=ServiceResponse, status_code=status.HTTP_201_CREATED
+        self.app.get("/api/v1/agents/{agent_id}", response_model=ServiceResponse)(
+            self._handle_get_agent
         )
-        async def create_agent(
-            request: CreateAgentRequest,
-            headers: dict = Header(...),
-        ):
-            """Create a new agent."""
-            standard_headers = extract_headers(**headers)
 
-            # Start OTEL span
-            span = None
-            if self.otel_tracer:
-                span = self.otel_tracer.start_span("create_agent")
-                span.set_attribute("agent.name", request.name)
-                span.set_attribute("tenant.id", standard_headers.tenant_id)
+        self.app.post("/api/v1/agents/{agent_id}/execute", response_model=ServiceResponse)(
+            self._handle_execute_task
+        )
 
-            try:
-                # Generate agent ID if not provided
-                agent_id = request.agent_id or f"agent_{standard_headers.request_id[:8]}"
+        self.app.post("/api/v1/agents/{agent_id}/chat", response_model=ServiceResponse)(
+            self._handle_chat
+        )
 
-                # Create agent using core SDK
-                gateway = await self._get_gateway_client(standard_headers.tenant_id)
-                agent = create_agent(
-                    agent_id=agent_id,
-                    name=request.name,
-                    description=request.description,
-                    gateway=gateway,
-                    llm_model=request.llm_model,
-                    llm_provider=request.llm_provider,
-                    system_prompt=request.system_prompt,
-                    tenant_id=standard_headers.tenant_id,
+        self.app.get("/api/v1/agents", response_model=ServiceResponse)(self._handle_list_agents)
+
+        self.app.get("/health")(self._handle_health_check)
+
+    async def _handle_create_agent(
+        self, request: CreateAgentRequest, headers: dict = Header(...)
+    ):
+        """Create a new agent."""
+        standard_headers = extract_headers(**headers)
+
+        # Start OTEL span
+        span = None
+        if self.otel_tracer:
+            span = self.otel_tracer.start_span("create_agent")
+            span.set_attribute("agent.name", request.name)
+            span.set_attribute("tenant.id", standard_headers.tenant_id)
+
+        try:
+            # Generate agent ID if not provided
+            agent_id = request.agent_id or f"agent_{standard_headers.request_id[:8]}"
+
+            # Create agent using core SDK
+            gateway = self._get_gateway_client(standard_headers.tenant_id)
+            agent = create_agent(
+                agent_id=agent_id,
+                name=request.name,
+                description=request.description or "",
+                gateway=gateway,
+                llm_model=request.llm_model,
+                llm_provider=request.llm_provider,
+                tenant_id=standard_headers.tenant_id,
+            )
+
+            # Set system prompt if provided
+            if request.system_prompt:
+                agent.system_prompt = request.system_prompt
+
+            # Add capabilities
+            for capability in request.capabilities:
+                agent.add_capability(capability, f"Capability: {capability}")
+
+            # Store agent in database (stateless)
+            self.agent_storage.save_agent(agent, standard_headers.tenant_id)
+
+            # Publish event via NATS (if enabled)
+            if self.nats_client:
+                event = {
+                    "event_type": "agent.created",
+                    "agent_id": agent_id,
+                    "tenant_id": standard_headers.tenant_id,
+                }
+                await self.nats_client.publish(
+                    f"agent.events.{standard_headers.tenant_id}",
+                    self.codec_manager.encode(event),
                 )
-
-                # Add capabilities
-                for capability in request.capabilities:
-                    agent.add_capability(capability, f"Capability: {capability}")
-
-                # Store agent in database (stateless)
-                self.agent_storage.save_agent(agent, standard_headers.tenant_id)
-
-                # Publish event via NATS (if enabled)
-                if self.nats_client:
-                    event = {
-                        "event_type": "agent.created",
-                        "agent_id": agent_id,
-                        "tenant_id": standard_headers.tenant_id,
-                    }
-                    await self.nats_client.publish(
-                        f"agent.events.{standard_headers.tenant_id}",
-                        self.codec_manager.encode(event),
-                    )
-
-                return ServiceResponse(
-                    success=True,
-                    data={
-                        "agent_id": agent_id,
-                        "name": agent.name,
-                        "status": agent.status.value,
-                    },
-                    message="Agent created successfully",
-                    correlation_id=standard_headers.correlation_id,
-                    request_id=standard_headers.request_id,
-                )
-            except Exception as e:
-                logger.error(f"Error creating agent: {str(e)}", exc_info=True)
-                raise HTTPException(
-                    status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-                    detail=f"Failed to create agent: {str(e)}",
-                )
-            finally:
-                if span:
-                    span.end()
-
-        @self.app.get("/api/v1/agents/{agent_id}", response_model=ServiceResponse)
-        async def get_agent(
-            agent_id: str,
-            headers: dict = Header(...),
-        ):
-            """Get agent by ID."""
-            standard_headers = extract_headers(**headers)
-
-            # Load agent from database (stateless)
-            gateway = await self._get_gateway_client(standard_headers.tenant_id)
-            agent = self.agent_storage.load_agent(agent_id, standard_headers.tenant_id, gateway)
-            if not agent:
-                raise NotFoundError("agent", agent_id)
 
             return ServiceResponse(
                 success=True,
                 data={
-                    "agent_id": agent.agent_id,
+                    "agent_id": agent_id,
                     "name": agent.name,
-                    "description": agent.description,
                     "status": agent.status.value,
-                    "capabilities": [cap.name for cap in agent.capabilities],
+                },
+                message="Agent created successfully",
+                correlation_id=standard_headers.correlation_id,
+                request_id=standard_headers.request_id,
+            )
+        except Exception as e:
+            logger.error(f"Error creating agent: {str(e)}", exc_info=True)
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail=f"Failed to create agent: {str(e)}",
+            )
+        finally:
+            if span:
+                span.end()
+
+    async def _handle_get_agent(self, agent_id: str, headers: dict = Header(...)):  # noqa: S7503
+        """Get agent by ID. Async required for FastAPI route handler."""
+        standard_headers = extract_headers(**headers)
+
+        # Load agent from database (stateless)
+        gateway = self._get_gateway_client(standard_headers.tenant_id)
+        agent = self.agent_storage.load_agent(agent_id, standard_headers.tenant_id, gateway)
+        if not agent:
+            raise NotFoundError("agent", agent_id)
+
+        return ServiceResponse(
+            success=True,
+            data={
+                "agent_id": agent.agent_id,
+                "name": agent.name,
+                "description": agent.description,
+                "status": agent.status.value,
+                "capabilities": [cap.name for cap in agent.capabilities],
+            },
+            correlation_id=standard_headers.correlation_id,
+            request_id=standard_headers.request_id,
+        )
+
+    async def _handle_execute_task(
+        self, agent_id: str, request: ExecuteTaskRequest, headers: dict = Header(...)
+    ):
+        """Execute a task with an agent."""
+        standard_headers = extract_headers(**headers)
+
+        # Load agent from database (stateless)
+        gateway = self._get_gateway_client(standard_headers.tenant_id)
+        agent = self.agent_storage.load_agent(agent_id, standard_headers.tenant_id, gateway)
+        if not agent:
+            raise NotFoundError("agent", agent_id)
+
+        try:
+            # Create task
+            task = AgentTask(
+                task_id=f"task_{standard_headers.request_id[:8]}",
+                task_type=request.task_type,
+                parameters=request.parameters,
+                priority=request.priority,
+            )
+
+            # Execute task
+            result = await agent.execute_task(task, tenant_id=standard_headers.tenant_id)
+
+            return ServiceResponse(
+                success=True,
+                data={
+                    "task_id": task.task_id,
+                    "status": "completed",
+                    "result": result,
                 },
                 correlation_id=standard_headers.correlation_id,
                 request_id=standard_headers.request_id,
             )
+        except Exception as e:
+            logger.error(f"Error executing task: {str(e)}", exc_info=True)
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail=f"Failed to execute task: {str(e)}",
+            )
 
-        @self.app.post("/api/v1/agents/{agent_id}/execute", response_model=ServiceResponse)
-        async def execute_task(
-            agent_id: str,
-            request: ExecuteTaskRequest,
-            headers: dict = Header(...),
-        ):
-            """Execute a task with an agent."""
-            standard_headers = extract_headers(**headers)
+    async def _handle_chat(self, agent_id: str, request: ChatRequest, headers: dict = Header(...)):
+        """Chat with an agent."""
+        standard_headers = extract_headers(**headers)
 
-            # Load agent from database (stateless)
-            gateway = await self._get_gateway_client(standard_headers.tenant_id)
-            agent = self.agent_storage.load_agent(agent_id, standard_headers.tenant_id, gateway)
-            if not agent:
-                raise NotFoundError("agent", agent_id)
+        # Load agent from database (stateless)
+        gateway = self._get_gateway_client(standard_headers.tenant_id)
+        agent = self.agent_storage.load_agent(agent_id, standard_headers.tenant_id, gateway)
+        if not agent:
+            raise NotFoundError("agent", agent_id)
 
-            try:
-                # Create task
-                task = AgentTask(
-                    task_id=f"task_{standard_headers.request_id[:8]}",
-                    task_type=request.task_type,
-                    parameters=request.parameters,
-                    priority=request.priority,
-                )
-
-                # Execute task
-                result = await agent.execute_task(task, tenant_id=standard_headers.tenant_id)
-
-                return ServiceResponse(
-                    success=True,
-                    data={
-                        "task_id": task.task_id,
-                        "status": "completed",
-                        "result": result,
-                    },
-                    correlation_id=standard_headers.correlation_id,
-                    request_id=standard_headers.request_id,
-                )
-            except Exception as e:
-                logger.error(f"Error executing task: {str(e)}", exc_info=True)
-                raise HTTPException(
-                    status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-                    detail=f"Failed to execute task: {str(e)}",
-                )
-
-        @self.app.post("/api/v1/agents/{agent_id}/chat", response_model=ServiceResponse)
-        async def chat(
-            agent_id: str,
-            request: ChatRequest,
-            headers: dict = Header(...),
-        ):
-            """Chat with an agent."""
-            standard_headers = extract_headers(**headers)
-
-            # Load agent from database (stateless)
-            gateway = await self._get_gateway_client(standard_headers.tenant_id)
-            agent = self.agent_storage.load_agent(agent_id, standard_headers.tenant_id, gateway)
-            if not agent:
-                raise NotFoundError("agent", agent_id)
-
-            try:
-                # Chat with agent
-                response = await agent.chat_async(
-                    message=request.message,
-                    session_id=request.session_id,
-                    tenant_id=standard_headers.tenant_id,
-                )
-
-                return ServiceResponse(
-                    success=True,
-                    data={
-                        "session_id": response.get("session_id"),
-                        "message": response.get("message"),
-                        "metadata": response.get("metadata"),
-                    },
-                    correlation_id=standard_headers.correlation_id,
-                    request_id=standard_headers.request_id,
-                )
-            except Exception as e:
-                logger.error(f"Error in chat: {str(e)}", exc_info=True)
-                raise HTTPException(
-                    status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-                    detail=f"Failed to chat: {str(e)}",
-                )
-
-        @self.app.get("/api/v1/agents", response_model=ServiceResponse)
-        async def list_agents(
-            headers: dict = Header(...),
-            limit: int = 100,
-            offset: int = 0,
-        ):
-            """List all agents."""
-            standard_headers = extract_headers(**headers)
-
-            # Load agents from database (stateless)
-            agents = self.agent_storage.list_agents(
-                standard_headers.tenant_id, limit=limit, offset=offset
+        try:
+            # Chat with agent using chat_with_agent function
+            response = await chat_with_agent(
+                agent=agent,
+                message=request.message,
+                session_id=request.session_id,
+                tenant_id=standard_headers.tenant_id,
             )
 
             return ServiceResponse(
                 success=True,
                 data={
-                    "agents": agents,
-                    "total": len(agents),
+                    "session_id": response.get("session_id"),
+                    "message": response.get("answer"),
+                    "metadata": response.get("result"),
                 },
                 correlation_id=standard_headers.correlation_id,
                 request_id=standard_headers.request_id,
             )
+        except Exception as e:
+            logger.error(f"Error in chat: {str(e)}", exc_info=True)
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail=f"Failed to chat: {str(e)}",
+            )
 
-        @self.app.get("/health")
-        async def health_check():
-            """Health check endpoint."""
-            return {"status": "healthy", "service": "agent-service"}
+    async def _handle_list_agents(  # noqa: S7503
+        self, headers: dict = Header(...), limit: int = 100, offset: int = 0
+    ):
+        """List all agents. Async required for FastAPI route handler."""
+        standard_headers = extract_headers(**headers)
 
-    async def _get_gateway_client(self, tenant_id: str):
+        # Load agents from database (stateless)
+        agents = self.agent_storage.list_agents(
+            standard_headers.tenant_id, limit=limit, offset=offset
+        )
+
+        return ServiceResponse(
+            success=True,
+            data={
+                "agents": agents,
+                "total": len(agents),
+            },
+            correlation_id=standard_headers.correlation_id,
+            request_id=standard_headers.request_id,
+        )
+
+    async def _handle_health_check(self):  # noqa: S7503
+        """Health check endpoint. Async required for FastAPI route handler."""
+        return {"status": "healthy", "service": "agent-service"}
+
+    def _get_gateway_client(self, tenant_id: str):  # noqa: S1172
         """
         Get gateway client for LLM calls.
 
         Uses Gateway Service via HTTP if configured, otherwise falls back to direct SDK.
 
         Args:
-            tenant_id: Tenant ID
+            tenant_id: Tenant ID (reserved for future multi-tenant API key resolution)
 
         Returns:
             Gateway client instance (LiteLLMGateway or ServiceHTTPClient wrapper)
@@ -327,8 +325,10 @@ class AgentService:
 
         # Fallback to direct SDK (for development or when Gateway Service not available)
         # In production, this should use Gateway Service via HTTP
+        # Get API key from environment variable
+        openai_api_key = os.getenv("OPENAI_API_KEY", "")
         gateway = create_gateway(
-            api_keys={"openai": self.config.get("OPENAI_API_KEY", "")}, default_model="gpt-4"
+            api_keys={"openai": openai_api_key}, default_model="gpt-4"
         )
         return gateway
 
@@ -351,9 +351,11 @@ def create_agent_service(
     config = load_config(service_name, **(config_overrides or {}))
 
     # Get database connection (direct connection for stateless services)
-    from ...core.postgresql_database import create_database_connection
+    from ....core.postgresql_database.connection import DatabaseConfig, DatabaseConnection
 
-    db_connection = create_database_connection(config.database_url)
+    # Parse database URL and create connection
+    db_config = DatabaseConfig.from_env()
+    db_connection = DatabaseConnection(db_config)
     db_connection.connect()
 
     # Initialize integrations

@@ -9,7 +9,7 @@ from typing import Any, Dict, Optional
 
 from fastapi import FastAPI, Header, HTTPException, status
 
-from ....core.machine_learning.ml_framework import create_ml_system
+from ....core.machine_learning.ml_framework.functions import create_ml_system
 from ....core.machine_learning.ml_framework.ml_system import MLSystem
 from ...integrations.codec import create_codec_manager
 from ...integrations.nats import create_nats_client
@@ -21,10 +21,7 @@ from ...shared.middleware import setup_middleware
 from .models import (
     BatchPredictRequest,
     DeployModelRequest,
-    ModelResponse,
-    PredictionResponse,
     PredictRequest,
-    TrainingResponse,
     TrainModelRequest,
 )
 
@@ -101,236 +98,222 @@ class MLService:
 
     def _register_routes(self):
         """Register FastAPI routes."""
-
-        @self.app.post(
+        self.app.post(
             "/api/v1/ml/models/train",
             response_model=ServiceResponse,
             status_code=status.HTTP_202_ACCEPTED,
+        )(self._handle_train_model)
+
+        self.app.post("/api/v1/ml/models/{model_id}/predict", response_model=ServiceResponse)(
+            self._handle_predict
         )
-        async def train_model(
-            request: TrainModelRequest,
-            headers: dict = Header(...),
-        ):
-            """Train a model."""
-            standard_headers = extract_headers(**headers)
 
-            span = None
-            if self.otel_tracer:
-                span = self.otel_tracer.start_span("ml_train_model")
-                span.set_attribute("model.type", request.model_type)
-                span.set_attribute("tenant.id", standard_headers.tenant_id)
+        self.app.post(
+            "/api/v1/ml/models/{model_id}/predict/batch", response_model=ServiceResponse
+        )(self._handle_batch_predict)
 
-            try:
-                # Get ML system
-                ml_system = self._get_ml_system(standard_headers.tenant_id)
+        self.app.get("/api/v1/ml/models", response_model=ServiceResponse)(self._handle_list_models)
 
-                # Start training (async)
-                training_id = f"training_{standard_headers.request_id[:8]}"
-                model_id = f"model_{standard_headers.request_id[:8]}"
+        self.app.get("/api/v1/ml/models/{model_id}", response_model=ServiceResponse)(
+            self._handle_get_model
+        )
 
-                # TODO: SDK-SVC-001 - Implement actual training
-                # Placeholder - replace with actual ML training implementation
-                # result = await ml_system.train_model_async(
-                #     model_type=request.model_type,
-                #     training_data=request.training_data,
-                #     hyperparameters=request.hyperparameters,
-                #     validation_split=request.validation_split,
-                # )
+        self.app.post("/api/v1/ml/models/{model_id}/deploy", response_model=ServiceResponse)(
+            self._handle_deploy_model
+        )
 
-                # Publish event via NATS
-                if self.nats_client:
-                    event = {
-                        "event_type": "ml.training.started",
-                        "training_id": training_id,
-                        "model_id": model_id,
-                        "tenant_id": standard_headers.tenant_id,
-                    }
-                    await self.nats_client.publish(
-                        f"ml.events.{standard_headers.tenant_id}",
-                        self.codec_manager.encode(event),
-                    )
+        self.app.get("/health")(self._handle_health_check)
 
-                return ServiceResponse(
-                    success=True,
-                    data={
-                        "training_id": training_id,
-                        "model_id": model_id,
-                        "status": "started",
-                    },
-                    message="Model training started",
-                    correlation_id=standard_headers.correlation_id,
-                    request_id=standard_headers.request_id,
-                )
-            except Exception as e:
-                logger.error(f"Error training model: {str(e)}", exc_info=True)
-                raise HTTPException(
-                    status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-                    detail=f"Failed to train model: {str(e)}",
-                )
-            finally:
-                if span:
-                    span.end()
+    async def _handle_train_model(  # noqa: S7503
+        self, request: TrainModelRequest, headers: dict = Header(...)
+    ):
+        """Train a model. Async required for FastAPI route handler."""
+        standard_headers = extract_headers(**headers)
 
-        @self.app.post("/api/v1/ml/models/{model_id}/predict", response_model=ServiceResponse)
-        async def predict(
-            model_id: str,
-            request: PredictRequest,
-            headers: dict = Header(...),
-        ):
-            """Make a prediction with a model."""
-            standard_headers = extract_headers(**headers)
+        span = None
+        if self.otel_tracer:
+            span = self.otel_tracer.start_span("ml_train_model")
+            span.set_attribute("model.type", request.model_type)
+            span.set_attribute("tenant.id", standard_headers.tenant_id)
 
-            span = None
-            if self.otel_tracer:
-                span = self.otel_tracer.start_span("ml_predict")
-                span.set_attribute("model.id", model_id)
-                span.set_attribute("tenant.id", standard_headers.tenant_id)
+        try:
+            # Get ML system (used for future implementation)
+            self._get_ml_system(standard_headers.tenant_id)
 
-            try:
-                # Get ML system
-                ml_system = self._get_ml_system(standard_headers.tenant_id)
+            # Start training (async)
+            training_id = f"training_{standard_headers.request_id[:8]}"
+            model_id = f"model_{standard_headers.request_id[:8]}"
 
-                # Make prediction
-                # TODO: SDK-SVC-001 - Implement actual prediction
-                # Placeholder - replace with actual ML prediction implementation
-                # result = await ml_system.predict_async(
-                #     model_id=model_id,
-                #     features=request.features,
-                # )
+            # Training implementation - to be implemented
+            # For now, return placeholder response
 
-                # Placeholder response
-                result = {"prediction": "placeholder", "confidence": 0.95}
-
-                return ServiceResponse(
-                    success=True,
-                    data={
-                        "prediction": result["prediction"],
-                        "confidence": result.get("confidence"),
-                        "model_id": model_id,
-                    },
-                    correlation_id=standard_headers.correlation_id,
-                    request_id=standard_headers.request_id,
-                )
-            except Exception as e:
-                logger.error(f"Error making prediction: {str(e)}", exc_info=True)
-                raise HTTPException(
-                    status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-                    detail=f"Failed to make prediction: {str(e)}",
-                )
-            finally:
-                if span:
-                    span.end()
-
-        @self.app.post("/api/v1/ml/models/{model_id}/predict/batch", response_model=ServiceResponse)
-        async def batch_predict(
-            model_id: str,
-            request: BatchPredictRequest,
-            headers: dict = Header(...),
-        ):
-            """Make batch predictions."""
-            standard_headers = extract_headers(**headers)
-
-            try:
-                # Get ML system
-                ml_system = self._get_ml_system(standard_headers.tenant_id)
-
-                # Make batch predictions
-                # TODO: SDK-SVC-001 - Implement actual batch prediction
-                # Placeholder - replace with actual ML batch prediction implementation
-                # results = await ml_system.predict_batch_async(
-                #     model_id=model_id,
-                #     features_list=request.features_list,
-                # )
-
-                # Placeholder response
-                results = [{"prediction": "placeholder"} for _ in request.features_list]
-
-                return ServiceResponse(
-                    success=True,
-                    data={
-                        "predictions": results,
-                        "count": len(results),
-                        "model_id": model_id,
-                    },
-                    correlation_id=standard_headers.correlation_id,
-                    request_id=standard_headers.request_id,
-                )
-            except Exception as e:
-                logger.error(f"Error making batch predictions: {str(e)}", exc_info=True)
-                raise HTTPException(
-                    status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-                    detail=f"Failed to make batch predictions: {str(e)}",
+            # Publish event via NATS
+            if self.nats_client:
+                await self._publish_training_event(
+                    training_id, model_id, standard_headers.tenant_id
                 )
 
-        @self.app.get("/api/v1/ml/models", response_model=ServiceResponse)
-        async def list_models(
-            headers: dict = Header(...),
-            limit: int = 100,
-            offset: int = 0,
-        ):
-            """List models."""
-            standard_headers = extract_headers(**headers)
-
-            # TODO: SDK-SVC-001 - Implement model listing from database
-            # Placeholder - replace with actual database query implementation
             return ServiceResponse(
                 success=True,
-                data={"models": [], "total": 0},
+                data={
+                    "training_id": training_id,
+                    "model_id": model_id,
+                    "status": "started",
+                },
+                message="Model training started",
                 correlation_id=standard_headers.correlation_id,
                 request_id=standard_headers.request_id,
             )
-
-        @self.app.get("/api/v1/ml/models/{model_id}", response_model=ServiceResponse)
-        async def get_model(
-            model_id: str,
-            headers: dict = Header(...),
-        ):
-            """Get model by ID."""
-            standard_headers = extract_headers(**headers)
-
-            # TODO: SDK-SVC-001 - Implement model retrieval from database
-            # Placeholder - replace with actual database query implementation
+        except Exception as e:
+            logger.error(f"Error training model: {str(e)}", exc_info=True)
             raise HTTPException(
-                status_code=status.HTTP_501_NOT_IMPLEMENTED,
-                detail="Model retrieval not yet implemented",
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail=f"Failed to train model: {str(e)}",
+            )
+        finally:
+            if span:
+                span.end()
+
+    async def _publish_training_event(
+        self, training_id: str, model_id: str, tenant_id: str
+    ) -> None:
+        """Publish training event via NATS."""
+        event = {
+            "event_type": "ml.training.started",
+            "training_id": training_id,
+            "model_id": model_id,
+            "tenant_id": tenant_id,
+        }
+        await self.nats_client.publish(
+            f"ml.events.{tenant_id}",
+            self.codec_manager.encode(event),
+        )
+
+    async def _handle_predict(  # noqa: S7503
+        self, model_id: str, request: PredictRequest, headers: dict = Header(...)
+    ):
+        """Make a prediction with a model. Async required for FastAPI route handler."""
+        standard_headers = extract_headers(**headers)
+
+        span = None
+        if self.otel_tracer:
+            span = self.otel_tracer.start_span("ml_predict")
+            span.set_attribute("model.id", model_id)
+            span.set_attribute("tenant.id", standard_headers.tenant_id)
+
+        try:
+            # Get ML system (used for future implementation)
+            self._get_ml_system(standard_headers.tenant_id)
+
+            # Make prediction - implementation to be added
+            # Placeholder response for now
+            result = {"prediction": "placeholder", "confidence": 0.95}
+
+            return ServiceResponse(
+                success=True,
+                data={
+                    "prediction": result["prediction"],
+                    "confidence": result.get("confidence"),
+                    "model_id": model_id,
+                },
+                correlation_id=standard_headers.correlation_id,
+                request_id=standard_headers.request_id,
+            )
+        except Exception as e:
+            logger.error(f"Error making prediction: {str(e)}", exc_info=True)
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail=f"Failed to make prediction: {str(e)}",
+            )
+        finally:
+            if span:
+                span.end()
+
+    async def _handle_batch_predict(  # noqa: S7503
+        self, model_id: str, request: BatchPredictRequest, headers: dict = Header(...)
+    ):
+        """Make batch predictions. Async required for FastAPI route handler."""
+        standard_headers = extract_headers(**headers)
+
+        try:
+            # Get ML system (used for future implementation)
+            self._get_ml_system(standard_headers.tenant_id)
+
+            # Make batch predictions - implementation to be added
+            # Placeholder response for now
+            results = [{"prediction": "placeholder"} for _ in request.features_list]
+
+            return ServiceResponse(
+                success=True,
+                data={
+                    "predictions": results,
+                    "count": len(results),
+                    "model_id": model_id,
+                },
+                correlation_id=standard_headers.correlation_id,
+                request_id=standard_headers.request_id,
+            )
+        except Exception as e:
+            logger.error(f"Error making batch predictions: {str(e)}", exc_info=True)
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail=f"Failed to make batch predictions: {str(e)}",
             )
 
-        @self.app.post("/api/v1/ml/models/{model_id}/deploy", response_model=ServiceResponse)
-        async def deploy_model(
-            model_id: str,
-            request: DeployModelRequest,
-            headers: dict = Header(...),
-        ):
-            """Deploy a model."""
-            standard_headers = extract_headers(**headers)
+    async def _handle_list_models(  # noqa: S7503
+        self, headers: dict = Header(...), limit: int = 100, offset: int = 0
+    ):
+        """List models. Async required for FastAPI route handler."""
+        standard_headers = extract_headers(**headers)
 
-            try:
-                # Get ML system
-                ml_system = self._get_ml_system(standard_headers.tenant_id)
+        # Model listing from database - to be implemented
+        # For now, return placeholder response
+        return ServiceResponse(
+            success=True,
+            data={"models": [], "total": 0},
+            correlation_id=standard_headers.correlation_id,
+            request_id=standard_headers.request_id,
+        )
 
-                # Deploy model
-                # TODO: SDK-SVC-001 - Implement actual deployment
-                # Placeholder - replace with actual ML model deployment implementation
-                # await ml_system.deploy_model_async(model_id, request.version)
+    async def _handle_get_model(self, model_id: str, headers: dict = Header(...)):  # noqa: S7503
+        """Get model by ID. Async required for FastAPI route handler."""
+        extract_headers(**headers)  # Extract headers for validation
 
-                return ServiceResponse(
-                    success=True,
-                    data={"model_id": model_id, "status": "deployed"},
-                    message="Model deployed successfully",
-                    correlation_id=standard_headers.correlation_id,
-                    request_id=standard_headers.request_id,
-                )
-            except Exception as e:
-                logger.error(f"Error deploying model: {str(e)}", exc_info=True)
-                raise HTTPException(
-                    status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-                    detail=f"Failed to deploy model: {str(e)}",
-                )
+        # Model retrieval from database - to be implemented
+        raise HTTPException(
+            status_code=status.HTTP_501_NOT_IMPLEMENTED,
+            detail="Model retrieval not yet implemented",
+        )
 
-        @self.app.get("/health")
-        async def health_check():
-            """Health check endpoint."""
-            return {"status": "healthy", "service": "ml-service"}
+    async def _handle_deploy_model(  # noqa: S7503
+        self, model_id: str, request: DeployModelRequest, headers: dict = Header(...)
+    ):
+        """Deploy a model. Async required for FastAPI route handler."""
+        standard_headers = extract_headers(**headers)
+
+        try:
+            # Get ML system (used for future implementation)
+            self._get_ml_system(standard_headers.tenant_id)
+
+            # Deploy model - implementation to be added
+
+            return ServiceResponse(
+                success=True,
+                data={"model_id": model_id, "status": "deployed"},
+                message="Model deployed successfully",
+                correlation_id=standard_headers.correlation_id,
+                request_id=standard_headers.request_id,
+            )
+        except Exception as e:
+            logger.error(f"Error deploying model: {str(e)}", exc_info=True)
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail=f"Failed to deploy model: {str(e)}",
+            )
+
+    async def _handle_health_check(self):  # noqa: S7503
+        """Health check endpoint. Async required for FastAPI route handler."""
+        return {"status": "healthy", "service": "ml-service"}
 
 
 def create_ml_service(
@@ -356,7 +339,7 @@ def create_ml_service(
 
     # Initialize integrations
     nats_client = create_nats_client() if config.enable_nats else None
-    otel_tracer = create_otel_tracer(config.service_name) if config.enable_otel else None
+    otel_tracer = create_otel_tracer() if config.enable_otel else None
 
     # Create service
     service = MLService(

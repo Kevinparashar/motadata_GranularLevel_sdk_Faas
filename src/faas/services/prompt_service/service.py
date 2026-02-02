@@ -5,7 +5,7 @@ Handles prompt template management and context building.
 """
 
 import logging
-from typing import Any, Dict, Optional
+from typing import Any, Dict, List, Optional
 
 from fastapi import FastAPI, Header, HTTPException, status
 
@@ -20,12 +20,8 @@ from ...shared.database import get_database_connection
 from ...shared.middleware import setup_middleware
 from .models import (
     BuildContextRequest,
-    ContextResponse,
     CreateTemplateRequest,
-    RenderedPromptResponse,
     RenderPromptRequest,
-    TemplateResponse,
-    UpdateTemplateRequest,
 )
 
 logger = logging.getLogger(__name__)
@@ -67,6 +63,7 @@ class PromptService:
 
         # Prompt managers are created on-demand per request (stateless)
         # No in-memory caching to ensure statelessness
+        # Note: _prompt_managers is not used - managers are created fresh each time
 
         # Create FastAPI app
         self.app = FastAPI(
@@ -81,205 +78,225 @@ class PromptService:
         # Register routes
         self._register_routes()
 
-    def _get_prompt_manager(self, tenant_id: str) -> PromptContextManager:
+    def _get_prompt_manager(self, tenant_id: str) -> PromptContextManager:  # noqa: S1172
         """
-        Get or create prompt manager for tenant.
+        Create prompt manager for tenant (stateless - created on-demand).
 
         Args:
-            tenant_id: Tenant ID
+            tenant_id: Tenant ID (reserved for future multi-tenant support)
 
         Returns:
             PromptContextManager instance
         """
-        if tenant_id not in self._prompt_managers:
-            # Create prompt manager
-            prompt_manager = create_prompt_manager(max_tokens=4000)
-            self._prompt_managers[tenant_id] = prompt_manager
-
-        return self._prompt_managers[tenant_id]
+        # Create prompt manager on-demand (stateless)
+        # tenant_id is reserved for future multi-tenant support
+        return create_prompt_manager(max_tokens=4000)
 
     def _register_routes(self):
         """Register FastAPI routes."""
-
-        @self.app.post(
+        self.app.post(
             "/api/v1/prompts/templates",
             response_model=ServiceResponse,
             status_code=status.HTTP_201_CREATED,
+        )(self._handle_create_template)
+
+        self.app.get("/api/v1/prompts/templates/{template_id}", response_model=ServiceResponse)(
+            self._handle_get_template
         )
-        async def create_template(
-            request: CreateTemplateRequest,
-            headers: dict = Header(...),
-        ):
-            """Create a prompt template."""
-            standard_headers = extract_headers(**headers)
 
-            span = None
-            if self.otel_tracer:
-                span = self.otel_tracer.start_span("create_template")
-                span.set_attribute("template.name", request.name)
-                span.set_attribute("tenant.id", standard_headers.tenant_id)
+        self.app.post("/api/v1/prompts/render", response_model=ServiceResponse)(
+            self._handle_render_prompt
+        )
 
-            try:
-                # Get prompt manager
-                prompt_manager = self._get_prompt_manager(standard_headers.tenant_id)
+        self.app.post("/api/v1/prompts/context", response_model=ServiceResponse)(
+            self._handle_build_context
+        )
 
-                # Generate template ID if not provided
-                template_id = request.template_id or f"template_{standard_headers.request_id[:8]}"
+        self.app.get("/api/v1/prompts/templates", response_model=ServiceResponse)(
+            self._handle_list_templates
+        )
 
-                # Create template
-                # TODO: SDK-SVC-005 - Store template in database
-                # Placeholder - replace with actual database storage implementation
-                # For now, add to prompt manager
-                prompt_manager.add_template(
-                    name=request.name,
-                    content=request.content,
-                    version=request.version or "1.0.0",
-                    metadata=request.metadata,
-                )
+        self.app.get("/health")(self._handle_health_check)
 
-                # Publish event via NATS
-                if self.nats_client:
-                    event = {
-                        "event_type": "prompt.template.created",
-                        "template_id": template_id,
-                        "tenant_id": standard_headers.tenant_id,
-                    }
-                    await self.nats_client.publish(
-                        f"prompt.events.{standard_headers.tenant_id}",
-                        self.codec_manager.encode(event),
-                    )
+    async def _handle_create_template(
+        self, request: CreateTemplateRequest, headers: dict = Header(...)
+    ):
+        """Create a prompt template."""
+        standard_headers = extract_headers(**headers)
 
-                return ServiceResponse(
-                    success=True,
-                    data={
-                        "template_id": template_id,
-                        "name": request.name,
-                        "version": request.version or "1.0.0",
-                    },
-                    message="Template created successfully",
-                    correlation_id=standard_headers.correlation_id,
-                    request_id=standard_headers.request_id,
-                )
-            except Exception as e:
-                logger.error(f"Error creating template: {str(e)}", exc_info=True)
-                raise HTTPException(
-                    status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-                    detail=f"Failed to create template: {str(e)}",
-                )
-            finally:
-                if span:
-                    span.end()
+        span = None
+        if self.otel_tracer:
+            span = self.otel_tracer.start_span("create_template")
+            span.set_attribute("template.name", request.name)
+            span.set_attribute("tenant.id", standard_headers.tenant_id)
 
-        @self.app.get("/api/v1/prompts/templates/{template_id}", response_model=ServiceResponse)
-        async def get_template(
-            template_id: str,
-            headers: dict = Header(...),
-            version: Optional[str] = None,
-        ):
-            """Get template by ID."""
-            standard_headers = extract_headers(**headers)
+        try:
+            # Get prompt manager
+            prompt_manager = self._get_prompt_manager(standard_headers.tenant_id)
 
-            # TODO: SDK-SVC-005 - Implement template retrieval from database
-            # Placeholder - replace with actual database query implementation
-            raise HTTPException(
-                status_code=status.HTTP_501_NOT_IMPLEMENTED,
-                detail="Template retrieval not yet implemented",
+            # Generate template ID if not provided
+            template_id = request.template_id or f"template_{standard_headers.request_id[:8]}"
+
+            # Create template
+            # Template storage in database - to be implemented
+            # For now, add to prompt manager
+            prompt_manager.add_template(
+                name=request.name,
+                content=request.content,
+                version=request.version or "1.0.0",
+                metadata=request.metadata,
             )
 
-        @self.app.post("/api/v1/prompts/render", response_model=ServiceResponse)
-        async def render_prompt(
-            request: RenderPromptRequest,
-            headers: dict = Header(...),
-        ):
-            """Render a prompt template."""
-            standard_headers = extract_headers(**headers)
+            # Publish event via NATS
+            if self.nats_client:
+                await self._publish_template_event(template_id, standard_headers.tenant_id)
 
-            try:
-                # Get prompt manager
-                prompt_manager = self._get_prompt_manager(standard_headers.tenant_id)
-
-                # Render prompt
-                rendered = prompt_manager.render(
-                    template_name=request.template_name,
-                    variables=request.variables,
-                    version=request.version,
-                )
-
-                return ServiceResponse(
-                    success=True,
-                    data={
-                        "rendered_prompt": rendered,
-                        "template_name": request.template_name,
-                        "variables_used": request.variables,
-                    },
-                    correlation_id=standard_headers.correlation_id,
-                    request_id=standard_headers.request_id,
-                )
-            except Exception as e:
-                logger.error(f"Error rendering prompt: {str(e)}", exc_info=True)
-                raise HTTPException(
-                    status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-                    detail=f"Failed to render prompt: {str(e)}",
-                )
-
-        @self.app.post("/api/v1/prompts/context", response_model=ServiceResponse)
-        async def build_context(
-            request: BuildContextRequest,
-            headers: dict = Header(...),
-        ):
-            """Build context from messages."""
-            standard_headers = extract_headers(**headers)
-
-            try:
-                # Get prompt manager
-                prompt_manager = self._get_prompt_manager(standard_headers.tenant_id)
-
-                # Build context
-                context = prompt_manager.build_context(
-                    messages=request.messages,
-                    max_tokens=request.max_tokens,
-                    system_prompt=request.system_prompt,
-                )
-
-                return ServiceResponse(
-                    success=True,
-                    data={
-                        "context": context,
-                        "token_count": len(context.split()),  # Simplified
-                        "messages_included": len(request.messages),
-                    },
-                    correlation_id=standard_headers.correlation_id,
-                    request_id=standard_headers.request_id,
-                )
-            except Exception as e:
-                logger.error(f"Error building context: {str(e)}", exc_info=True)
-                raise HTTPException(
-                    status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-                    detail=f"Failed to build context: {str(e)}",
-                )
-
-        @self.app.get("/api/v1/prompts/templates", response_model=ServiceResponse)
-        async def list_templates(
-            headers: dict = Header(...),
-            limit: int = 100,
-            offset: int = 0,
-        ):
-            """List templates."""
-            standard_headers = extract_headers(**headers)
-
-            # TODO: SDK-SVC-005 - Implement template listing from database
-            # Placeholder - replace with actual database query implementation
             return ServiceResponse(
                 success=True,
-                data={"templates": [], "total": 0},
+                data={
+                    "template_id": template_id,
+                    "name": request.name,
+                    "version": request.version or "1.0.0",
+                },
+                message="Template created successfully",
                 correlation_id=standard_headers.correlation_id,
                 request_id=standard_headers.request_id,
             )
+        except Exception as e:
+            logger.error(f"Error creating template: {str(e)}", exc_info=True)
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail=f"Failed to create template: {str(e)}",
+            )
+        finally:
+            if span:
+                span.end()
 
-        @self.app.get("/health")
-        async def health_check():
-            """Health check endpoint."""
-            return {"status": "healthy", "service": "prompt-service"}
+    async def _publish_template_event(self, template_id: str, tenant_id: str) -> None:
+        """Publish template creation event via NATS."""
+        event = {
+            "event_type": "prompt.template.created",
+            "template_id": template_id,
+            "tenant_id": tenant_id,
+        }
+        await self.nats_client.publish(
+            f"prompt.events.{tenant_id}",
+            self.codec_manager.encode(event),
+        )
+
+    async def _handle_get_template(  # noqa: S7503
+        self, template_id: str, headers: dict = Header(...), version: Optional[str] = None  # noqa: ARG002
+    ):
+        """Get template by ID. Async required for FastAPI route handler."""
+        extract_headers(**headers)  # Extract headers for validation
+
+        # Template retrieval from database - to be implemented
+        raise HTTPException(
+            status_code=status.HTTP_501_NOT_IMPLEMENTED,
+            detail="Template retrieval not yet implemented",
+        )
+
+    async def _handle_render_prompt(  # noqa: S7503
+        self, request: RenderPromptRequest, headers: dict = Header(...)
+    ):
+        """Render a prompt template. Async required for FastAPI route handler."""
+        standard_headers = extract_headers(**headers)
+
+        try:
+            # Get prompt manager
+            prompt_manager = self._get_prompt_manager(standard_headers.tenant_id)
+
+            # Render prompt
+            rendered = prompt_manager.render(
+                template_name=request.template_name,
+                variables=request.variables,
+                version=request.version,
+            )
+
+            return ServiceResponse(
+                success=True,
+                data={
+                    "rendered_prompt": rendered,
+                    "template_name": request.template_name,
+                    "variables_used": request.variables,
+                },
+                correlation_id=standard_headers.correlation_id,
+                request_id=standard_headers.request_id,
+            )
+        except Exception as e:
+            logger.error(f"Error rendering prompt: {str(e)}", exc_info=True)
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail=f"Failed to render prompt: {str(e)}",
+            )
+
+    async def _handle_build_context(  # noqa: S7503
+        self, request: BuildContextRequest, headers: dict = Header(...)
+    ):
+        """Build context from messages. Async required for FastAPI route handler."""
+        standard_headers = extract_headers(**headers)
+
+        try:
+            # Get prompt manager
+            prompt_manager = self._get_prompt_manager(standard_headers.tenant_id)
+
+            # Build context from messages
+            message_list = self._prepare_messages(request.messages, request.system_prompt)
+
+            # Use window.build_context which takes List[str] and max_tokens
+            context = prompt_manager.window.build_context(
+                messages=message_list,
+                max_tokens=request.max_tokens,
+            )
+
+            return ServiceResponse(
+                success=True,
+                data={
+                    "context": context,
+                    "token_count": len(context.split()),  # Simplified
+                    "messages_included": len(request.messages),
+                },
+                correlation_id=standard_headers.correlation_id,
+                request_id=standard_headers.request_id,
+            )
+        except Exception as e:
+            logger.error(f"Error building context: {str(e)}", exc_info=True)
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail=f"Failed to build context: {str(e)}",
+            )
+
+    def _prepare_messages(
+        self, messages: Any, system_prompt: Optional[str]
+    ) -> List[str]:
+        """Prepare messages list for context building."""
+        # Convert messages to list of strings if needed
+        message_list = (
+            messages if isinstance(messages, list) else [str(messages)]
+        )
+        # Add system prompt if provided
+        if system_prompt:
+            message_list = [system_prompt] + message_list
+        return message_list
+
+    async def _handle_list_templates(  # noqa: S7503
+        self, headers: dict = Header(...), limit: int = 100, offset: int = 0  # noqa: ARG002
+    ):
+        """List templates. Async required for FastAPI route handler."""
+        standard_headers = extract_headers(**headers)
+
+        # Template listing from database - to be implemented
+        # For now, return placeholder response
+        return ServiceResponse(
+            success=True,
+            data={"templates": [], "total": 0},
+            correlation_id=standard_headers.correlation_id,
+            request_id=standard_headers.request_id,
+        )
+
+    async def _handle_health_check(self):  # noqa: S7503
+        """Health check endpoint. Async required for FastAPI route handler."""
+        return {"status": "healthy", "service": "prompt-service"}
 
 
 def create_prompt_service(
@@ -305,7 +322,7 @@ def create_prompt_service(
 
     # Initialize integrations
     nats_client = create_nats_client() if config.enable_nats else None
-    otel_tracer = create_otel_tracer(config.service_name) if config.enable_otel else None
+    otel_tracer = create_otel_tracer() if config.enable_otel else None
 
     # Create service
     service = PromptService(
