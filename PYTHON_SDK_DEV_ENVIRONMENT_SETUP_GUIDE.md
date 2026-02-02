@@ -1883,11 +1883,3 @@ If issues persist:
 - [Development Standards](#13-development-standards) - Code quality requirements
 
 ---
-
-<div align="center">
-
-**🎉 You're all set! Happy coding with Motadata Python AI SDK! 🚀**
-
-For questions: **#motadata-sdk-support** on Slack
-
-</div>
