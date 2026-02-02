@@ -59,6 +59,7 @@ This guide focuses **exclusively on local development setup**. For other topics,
 ### Optional & Standards
 12. [Optional Dependencies](#12-optional-dependencies-advanced-features)
 13. [Development Standards](#13-development-standards)
+    - [13.6 SonarQube Scanner Setup](#136-sonarqube-scanner-setup-optional)
 
 ### Validation & Help
 14. [Validation](#14-validation-checklist)
@@ -1315,6 +1316,287 @@ make ci  # Runs full CI pipeline locally
 ```
 
 **Minimum coverage:** 80% (enforced in CI)
+
+### 13.6 SonarQube Scanner Setup (Optional)
+
+> **📊 Purpose:** Run SonarQube code quality analysis locally before pushing to CI. This helps catch quality gate issues early.
+
+#### Prerequisites
+
+- **SonarQube Server:** Access to a SonarQube instance (organization-provided or local)
+- **SonarQube Token:** Authentication token from your SonarQube server
+- **Java 11+:** Required for SonarQube Scanner (if using standalone scanner)
+
+#### Installation Options
+
+**Option 1: Docker (Recommended - No Java Required)**
+
+```bash
+# Pull SonarQube Scanner image
+docker pull sonarsource/sonar-scanner-cli:latest
+
+# Verify installation
+docker run --rm sonarsource/sonar-scanner-cli:latest sonar-scanner --version
+```
+
+**Option 2: Standalone Scanner (Requires Java 11+)**
+
+```bash
+# Download SonarQube Scanner
+cd /tmp
+wget https://binaries.sonarsource.com/Distribution/sonar-scanner-cli/sonar-scanner-cli-5.0.1.3006-linux-x64.zip
+unzip sonar-scanner-cli-*.zip
+sudo mv sonar-scanner-* /opt/sonar-scanner
+sudo ln -s /opt/sonar-scanner/bin/sonar-scanner /usr/local/bin/
+
+# Verify installation
+sonar-scanner --version
+```
+
+**Option 3: npm (If Node.js is available)**
+
+```bash
+npm install -g sonarqube-scanner
+```
+
+#### Configuration
+
+**Step 1: Create `sonar-project.properties`**
+
+Create this file in the repository root:
+
+```properties
+# SonarQube Project Configuration
+sonar.projectKey=motadata-python-ai-sdk
+sonar.projectName=Motadata Python AI SDK
+sonar.projectVersion=1.0.0
+
+# Source code
+sonar.sources=src
+sonar.sourceEncoding=UTF-8
+
+# Exclusions
+sonar.exclusions=**/tests/**,**/__pycache__/**,**/*.pyc,**/venv/**,**/.venv/**,**/node_modules/**
+
+# Test coverage
+sonar.python.coverage.reportPaths=coverage.xml
+sonar.python.xunit.reportPath=test-results.xml
+
+# Python-specific
+sonar.python.version=3.11
+```
+
+**Step 2: Set Environment Variables**
+
+Add to your `.env` file:
+
+```bash
+# SonarQube Configuration
+SONAR_HOST_URL=https://sonarqube.your-org.com  # Your SonarQube server URL
+SONAR_TOKEN=your-sonar-token-here              # Get from SonarQube UI
+```
+
+**Step 3: Load Environment Variables**
+
+```bash
+# Load from .env
+set -a; source .env; set +a
+
+# Or export directly
+export SONAR_HOST_URL=https://sonarqube.your-org.com
+export SONAR_TOKEN=your-sonar-token-here
+```
+
+#### Running SonarQube Analysis
+
+**Using Docker (Recommended):**
+
+```bash
+# Run analysis
+docker run --rm \
+  -v $(pwd):/usr/src \
+  -w /usr/src \
+  -e SONAR_HOST_URL="${SONAR_HOST_URL}" \
+  -e SONAR_TOKEN="${SONAR_TOKEN}" \
+  sonarsource/sonar-scanner-cli:latest
+
+# Or create an alias for convenience
+alias sonar-scan='docker run --rm -v $(pwd):/usr/src -w /usr/src -e SONAR_HOST_URL="${SONAR_HOST_URL}" -e SONAR_TOKEN="${SONAR_TOKEN}" sonarsource/sonar-scanner-cli:latest'
+```
+
+**Using Standalone Scanner:**
+
+```bash
+# Ensure environment variables are set
+export SONAR_HOST_URL="${SONAR_HOST_URL}"
+export SONAR_TOKEN="${SONAR_TOKEN}"
+
+# Run analysis
+sonar-scanner
+```
+
+**Using npm:**
+
+```bash
+sonar-scanner \
+  -Dsonar.host.url="${SONAR_HOST_URL}" \
+  -Dsonar.login="${SONAR_TOKEN}"
+```
+
+#### Integration with Makefile
+
+Add to your `Makefile`:
+
+```makefile
+# SonarQube Analysis
+.PHONY: sonar
+sonar:
+	@echo "Running SonarQube analysis..."
+	docker run --rm \
+		-v $(PWD):/usr/src \
+		-w /usr/src \
+		-e SONAR_HOST_URL="$${SONAR_HOST_URL}" \
+		-e SONAR_TOKEN="$${SONAR_TOKEN}" \
+		sonarsource/sonar-scanner-cli:latest
+
+.PHONY: sonar-check
+sonar-check:
+	@if [ -z "$$SONAR_HOST_URL" ] || [ -z "$$SONAR_TOKEN" ]; then \
+		echo "⚠️  SONAR_HOST_URL and SONAR_TOKEN must be set"; \
+		exit 1; \
+	fi
+	$(MAKE) sonar
+```
+
+**Usage:**
+
+```bash
+# Run SonarQube analysis
+make sonar-check
+```
+
+#### Understanding SonarQube Results
+
+After running the scanner, view results:
+
+1. **Open SonarQube Dashboard:**
+   - Navigate to: `https://sonarqube.your-org.com/dashboard?id=motadata-python-ai-sdk`
+   - Or find your project in the SonarQube UI
+
+2. **Check Quality Gate Status:**
+   - ✅ **PASSED:** All thresholds met, safe to merge
+   - ❌ **FAILED:** One or more thresholds violated, fix before merging
+
+3. **Review Issues:**
+   - **Bugs:** Actual errors that need fixing
+   - **Vulnerabilities:** Security issues
+   - **Code Smells:** Maintainability issues
+   - **Coverage:** Test coverage percentage
+
+#### Common SonarQube Issues and Fixes
+
+**Issue: Authentication Failed**
+
+```bash
+# Solution: Verify token is correct
+echo $SONAR_TOKEN  # Should show your token
+
+# Regenerate token in SonarQube UI if needed:
+# User → My Account → Security → Generate Token
+```
+
+**Issue: Project Not Found**
+
+```bash
+# Solution: Ensure project key matches in sonar-project.properties
+# Or create project manually in SonarQube UI first
+```
+
+**Issue: Coverage Not Reported**
+
+```bash
+# Solution: Ensure coverage.xml exists
+pytest --cov=src --cov-report=xml
+
+# Verify file exists
+ls coverage.xml
+
+# Re-run SonarQube scan
+make sonar-check
+```
+
+**Issue: Too Many Files Analyzed**
+
+```bash
+# Solution: Update sonar-project.properties exclusions
+sonar.exclusions=**/tests/**,**/__pycache__/**,**/venv/**,**/.venv/**,**/node_modules/**,**/*.pyc
+```
+
+#### Pre-commit Integration (Optional)
+
+Add SonarQube check to pre-commit (warning only, not blocking):
+
+```yaml
+# .pre-commit-config.yaml (add to existing hooks)
+- repo: local
+  hooks:
+    - id: sonar-check
+      name: SonarQube Analysis (Warning)
+      entry: bash -c 'if [ -n "$SONAR_TOKEN" ]; then make sonar-check || true; fi'
+      language: system
+      pass_filenames: false
+      always_run: true
+```
+
+#### CI/CD Integration
+
+For CI pipelines, add SonarQube step:
+
+```yaml
+# Example: GitHub Actions
+- name: SonarQube Scan
+  uses: sonarsource/sonarqube-scan-action@master
+  env:
+    SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+    SONAR_HOST_URL: ${{ secrets.SONAR_HOST_URL }}
+```
+
+#### Troubleshooting
+
+**Scanner fails with "Unable to execute SonarQube Scanner"**
+
+```bash
+# Check Java version (if using standalone)
+java -version  # Should be 11+
+
+# Check Docker (if using Docker)
+docker --version
+
+# Check network connectivity
+curl -I ${SONAR_HOST_URL}
+```
+
+**Analysis takes too long**
+
+```bash
+# Exclude unnecessary files in sonar-project.properties
+sonar.exclusions=**/tests/**,**/venv/**,**/.venv/**,**/node_modules/**,**/build/**,**/dist/**
+```
+
+**Coverage not showing**
+
+```bash
+# Generate coverage report first
+pytest --cov=src --cov-report=xml --cov-report=term
+
+# Verify coverage.xml exists
+ls -lh coverage.xml
+
+# Check sonar-project.properties has correct path
+grep coverage sonar-project.properties
+```
+
+> **💡 Tip:** SonarQube analysis is typically run in CI/CD pipelines. Local setup is optional but helpful for catching issues early.
 
 ---
 
