@@ -10,8 +10,6 @@
 |----------|-------|
 | **Document Type** | Project README / Quick Start Guide |
 | **Audience** | Developers, Architects, Technical Leads |
-| **Status** | ✅ Active (Updated: 2026-02-02) |
-| **Version** | SDK v0.1.0 |
 | **Scope** | High-level SDK overview and quick start only |
 | **Related Docs** | [Full Documentation](docs/README.md), [Onboarding Guide](docs/ONBOARDING_GUIDE.md) |
 
