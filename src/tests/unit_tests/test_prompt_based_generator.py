@@ -4,22 +4,15 @@ Unit Tests for Prompt-Based Generator
 Tests for prompt interpretation, agent generation, and tool generation.
 """
 
-from unittest.mock import AsyncMock, MagicMock, Mock, patch
+from unittest.mock import AsyncMock, MagicMock, Mock
 
-import pytest  # pyright: ignore[reportMissingImports]
+import pytest
 
 from src.core.prompt_based_generator import (
     AccessControl,
-    AgentGenerator,
     Permission,
     PromptInterpreter,
     ResourceType,
-    ToolGenerator,
-)
-from src.core.prompt_based_generator.exceptions import (
-    AgentGenerationError,
-    PromptInterpretationError,
-    ToolGenerationError,
 )
 
 

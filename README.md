@@ -4,6 +4,33 @@
 
 ---
 
+## 📄 Document Metadata
+
+| Property | Value |
+|----------|-------|
+| **Document Type** | Project README / Quick Start Guide |
+| **Audience** | Developers, Architects, Technical Leads |
+| **Status** | ✅ Active (Updated: 2026-02-02) |
+| **Version** | SDK v0.1.0 |
+| **Scope** | High-level SDK overview and quick start only |
+| **Related Docs** | [Full Documentation](docs/README.md), [Onboarding Guide](docs/ONBOARDING_GUIDE.md) |
+
+### What This Document Covers
+
+- ✅ **What** the SDK is and who it's for
+- ✅ **Why** you would use this SDK
+- ✅ **Quick start** (5 minutes to first working code)
+- ✅ **Documentation roadmap** (where to go next)
+
+### What This Document Does NOT Cover
+
+- ❌ **Detailed component usage** → See [Component Documentation](docs/components/)
+- ❌ **Integration patterns** → See [Developer Integration Guide](docs/guide/DEVELOPER_INTEGRATION_GUIDE.md)
+- ❌ **Troubleshooting** → See [Troubleshooting Index](docs/troubleshooting/README.md)
+- ❌ **Development setup** → See [Development Guide](PYTHON_SDK_DEV_ENVIRONMENT_SETUP_GUIDE.md)
+
+---
+
 ## Table of Contents
 
 - [Quick Start](#-quick-start-5-minutes)
@@ -67,9 +94,51 @@ AI Response: Hello! I'm an AI assistant ready to help you.
 
 ---
 
-## Overview
+## What Is This SDK?
 
-The Motadata Python AI SDK is a comprehensive, modular SDK for building AI-powered applications. It provides a unified interface for LLM operations, agent frameworks, RAG systems, machine learning capabilities, and database operations, all designed with modularity and swappability in mind.
+### The 30-Second Summary
+
+The **Motadata Python AI SDK** is a production-ready, modular framework for building AI-powered applications in Python.
+
+**What it provides:**
+- 🤖 **Autonomous AI Agents** with memory, tools, and multi-agent orchestration
+- 📚 **RAG (Retrieval-Augmented Generation)** for document Q&A systems
+- 🔌 **Unified LLM Gateway** supporting OpenAI, Anthropic, Google, and more
+- 🧠 **Machine Learning Framework** with training, inference, and MLOps
+- 💾 **Built-in Infrastructure** (vector DB, caching, observability)
+- ⚡ **Dual Mode**: Use as a library or deploy as microservices (FaaS)
+
+### Who This Is For
+
+- **Developers** building AI-powered SaaS applications
+- **Teams** who need production-ready AI infrastructure
+- **Enterprises** requiring multi-tenant AI systems
+- **Startups** wanting to move fast without reinventing AI plumbing
+
+### Why Use This SDK?
+
+**Instead of...**
+- ❌ Building your own LLM abstraction layer
+- ❌ Figuring out vector databases and embeddings
+- ❌ Implementing agent frameworks from scratch
+- ❌ Setting up observability and caching
+
+**You get...**
+- ✅ **Pre-built, tested components** that work together
+- ✅ **Multi-tenant by design** (tenant isolation everywhere)
+- ✅ **Production-grade features** (caching, retries, circuit breakers)
+- ✅ **Swappable components** (not locked into any single framework)
+
+### How Documentation Is Organized
+
+1. **This README** - Quick start and SDK overview
+2. **[Onboarding Guide](docs/ONBOARDING_GUIDE.md)** - Complete introduction for new team members
+3. **[Component Documentation](docs/components/)** - Deep dives into each component
+4. **[Integration Guides](docs/guide/DEVELOPER_INTEGRATION_GUIDE.md)** - How to build with the SDK
+5. **[Troubleshooting](docs/troubleshooting/)** - Solutions to common problems
+6. **[Examples](examples/)** - Working code samples for every component
+
+---
 
 ## Features
 

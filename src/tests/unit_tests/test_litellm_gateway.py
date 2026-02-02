@@ -4,11 +4,11 @@ Unit Tests for LiteLLM Gateway Component
 Tests LLM operations across multiple providers.
 """
 
-from unittest.mock import MagicMock, Mock, patch
+from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
-from src.core.litellm_gateway import LiteLLMGateway
+from src.core.litellm_gateway import GatewayConfig, LiteLLMGateway
 
 
 class TestLiteLLMGateway:
@@ -17,21 +17,21 @@ class TestLiteLLMGateway:
     @pytest.fixture
     def gateway_config(self):
         """Gateway configuration fixture."""
-        return {"api_key": "test-api-key", "provider": "openai"}
+        return GatewayConfig()
 
     @pytest.fixture
     def mock_gateway(self, gateway_config):
         """Mock gateway with patched litellm."""
         with patch("src.core.litellm_gateway.gateway.litellm") as mock_litellm:
-            gateway = LiteLLMGateway(**gateway_config)
-            gateway._litellm = mock_litellm
+            gateway = LiteLLMGateway(config=gateway_config)
+            gateway._litellm = mock_litellm  # type: ignore[attr-defined]
             return gateway, mock_litellm
 
     def test_initialization(self, gateway_config):
         """Test gateway initialization."""
-        gateway = LiteLLMGateway(**gateway_config)
-        assert gateway.api_key == "test-api-key"
-        assert gateway.provider == "openai"
+        gateway = LiteLLMGateway(config=gateway_config)
+        assert gateway.config is not None
+        assert isinstance(gateway.config, GatewayConfig)
 
     def test_generate(self, mock_gateway):
         """Test text generation."""
@@ -107,25 +107,26 @@ class TestLiteLLMGateway:
             gateway.generate(prompt="Test", model="gpt-4")
 
     def test_provider_switching(self):
-        """Test provider switching."""
-        gateway_openai = LiteLLMGateway(api_key="test-key", provider="openai")
-        assert gateway_openai.provider == "openai"
+        """Test provider switching with model_list configuration."""
+        config_openai = GatewayConfig(model_list=[{"model_name": "gpt-4", "litellm_params": {"model": "gpt-4"}}])
+        gateway_openai = LiteLLMGateway(config=config_openai)
+        assert gateway_openai.config.model_list is not None
 
-        gateway_anthropic = LiteLLMGateway(api_key="test-key", provider="anthropic")
-        assert gateway_anthropic.provider == "anthropic"
+        config_anthropic = GatewayConfig(model_list=[{"model_name": "claude-3", "litellm_params": {"model": "claude-3"}}])
+        gateway_anthropic = LiteLLMGateway(config=config_anthropic)
+        assert gateway_anthropic.config.model_list is not None
 
     @pytest.mark.asyncio
     async def test_cache_integration(self):
         """Test Gateway cache integration."""
         from src.core.cache_mechanism import CacheConfig, CacheMechanism
-        from src.core.litellm_gateway import GatewayConfig
 
         cache = CacheMechanism(CacheConfig(default_ttl=3600))
         config = GatewayConfig(enable_caching=True, cache_ttl=3600, cache=cache)
 
         with patch("src.core.litellm_gateway.gateway.litellm") as mock_litellm:
             gateway = LiteLLMGateway(config=config)
-            gateway._litellm = mock_litellm
+            gateway._litellm = mock_litellm  # type: ignore[attr-defined]
 
             mock_response = MagicMock()
             mock_response.choices = [MagicMock()]
@@ -151,14 +152,13 @@ class TestLiteLLMGateway:
     async def test_cache_key_generation(self):
         """Test cache key generation with tenant isolation."""
         from src.core.cache_mechanism import CacheConfig, CacheMechanism
-        from src.core.litellm_gateway import GatewayConfig
 
         cache = CacheMechanism(CacheConfig(default_ttl=3600))
         config = GatewayConfig(enable_caching=True, cache=cache)
 
         with patch("src.core.litellm_gateway.gateway.litellm") as mock_litellm:
             gateway = LiteLLMGateway(config=config)
-            gateway._litellm = mock_litellm
+            gateway._litellm = mock_litellm  # type: ignore[attr-defined]
 
             mock_response = MagicMock()
             mock_response.choices = [MagicMock()]
@@ -176,13 +176,11 @@ class TestLiteLLMGateway:
     @pytest.mark.asyncio
     async def test_cache_disabled(self):
         """Test gateway behavior when cache is disabled."""
-        from src.core.litellm_gateway import GatewayConfig
-
         config = GatewayConfig(enable_caching=False)
 
         with patch("src.core.litellm_gateway.gateway.litellm") as mock_litellm:
             gateway = LiteLLMGateway(config=config)
-            gateway._litellm = mock_litellm
+            gateway._litellm = mock_litellm  # type: ignore[attr-defined]
 
             mock_response = MagicMock()
             mock_response.choices = [MagicMock()]

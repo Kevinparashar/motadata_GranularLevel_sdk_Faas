@@ -4,6 +4,73 @@
 
 ---
 
+## 📄 Document Metadata
+
+| Property | Value |
+|----------|-------|
+| **Document Type** | Onboarding / Learning Path |
+| **Audience** | New team members, Developers, Architects |
+| **Status** | ✅ Active (Updated: 2026-02-02) |
+| **Time to Complete** | 2-4 hours (foundation), 1-2 days (advanced) |
+
+### What "Onboarding" Means in This Context
+
+**This guide covers:**
+- ✅ Understanding SDK architecture and design principles
+- ✅ Learning core components and how they work together
+- ✅ Following a structured learning path from basics to advanced
+- ✅ Common workflows and integration patterns
+
+**This guide does NOT cover:**
+- ❌ **Step-by-step installation** → See [Development Setup Guide](../../PYTHON_SDK_DEV_ENVIRONMENT_SETUP_GUIDE.md)
+- ❌ **API reference** → See [Quick Reference](QUICK_REFERENCE.md)
+- ❌ **Code examples** → See [Examples Directory](../../examples/)
+- ❌ **Production deployment** → See [Deployment Guides](../deployment/)
+
+**For quick start without full onboarding:** See [README Quick Start](../../README.md#quick-start-5-minutes)
+
+---
+
+## 📋 Prerequisites
+
+### Required Knowledge
+
+| Skill | Level | Why You Need It |
+|-------|-------|-----------------|
+| **Python 3.8+** | Intermediate | SDK is written in Python; requires async/await understanding |
+| **Async/Await** | Intermediate | Most SDK operations are async for performance |
+| **REST APIs** | Basic | Understanding HTTP requests/responses for FaaS services |
+| **Docker (optional)** | Basic | If deploying as services |
+
+### Required Software
+
+| Software | Minimum Version | Purpose | Installation |
+|----------|----------------|---------|--------------|
+| **Python** | 3.8.1+ | Runtime environment | [python.org](https://python.org) |
+| **PostgreSQL** | 12+ | Vector database (pgvector) | [postgresql.org](https://postgresql.org) |
+| **pip** | 21+ | Package manager | Included with Python |
+| **Git** | 2.0+ | Version control | [git-scm.com](https://git-scm.com) |
+
+### Optional (But Recommended)
+
+| Software | Purpose | When You Need It |
+|----------|---------|------------------|
+| **Dragonfly** | Distributed caching | Production deployments |
+| **Docker** | Containerization | FaaS/microservices deployment |
+| **VS Code** | IDE | Development (any IDE works) |
+
+### Environment Setup Checklist
+
+Before starting this guide, ensure you have:
+
+- [ ] Python 3.8+ installed (`python --version`)
+- [ ] PostgreSQL running locally or accessible
+- [ ] `pip` and `venv` available
+- [ ] Text editor or IDE ready
+- [ ] API keys for at least one LLM provider (OpenAI, Anthropic, or Google)
+
+**If you're missing any prerequisites:** See [Development Setup Guide](../../PYTHON_SDK_DEV_ENVIRONMENT_SETUP_GUIDE.md) for detailed installation instructions.
+
 ---
 
 ## 🎯 Who This Guide Is For
@@ -647,13 +714,152 @@ Check Cache (by prompt hash + tenant)
 
 ---
 
+## 🚨 Common Onboarding Failures & Solutions
+
+### Issue 1: "Module not found" errors
+
+**Symptoms:**
+```bash
+ImportError: No module named 'litellm'
+ModuleNotFoundError: No module named 'src'
+```
+
+**Causes:**
+- Virtual environment not activated
+- Dependencies not installed
+- Wrong Python version
+
+**Solutions:**
+1. Activate virtual environment: `source venv/bin/activate`
+2. Install dependencies: `pip install -r requirements.txt`
+3. Verify Python version: `python --version` (should be 3.8+)
+
+**Reference:** [Development Setup Guide](../../PYTHON_SDK_DEV_ENVIRONMENT_SETUP_GUIDE.md#step-2-set-up-virtual-environment)
+
+---
+
+### Issue 2: "Connection refused" to PostgreSQL
+
+**Symptoms:**
+```
+psycopg2.OperationalError: could not connect to server
+Connection refused (port 5432)
+```
+
+**Causes:**
+- PostgreSQL not running
+- Wrong connection string
+- Port already in use
+
+**Solutions:**
+1. Start PostgreSQL: `sudo systemctl start postgresql` (Linux) or use homebrew services (macOS)
+2. Verify connection: `psql -U postgres -h localhost`
+3. Check port: `sudo lsof -i :5432`
+
+**Reference:** [PostgreSQL Database Troubleshooting](../troubleshooting/postgresql_database_troubleshooting.md)
+
+---
+
+### Issue 3: "API key not found" errors
+
+**Symptoms:**
+```
+ValueError: API key not found for provider 'openai'
+GatewayError: Missing API key
+```
+
+**Causes:**
+- `.env` file not created
+- Environment variables not exported
+- Wrong key format
+
+**Solutions:**
+1. Create `.env` file in project root
+2. Add: `OPENAI_API_KEY=your-key-here`
+3. Or export: `export OPENAI_API_KEY='your-key-here'`
+
+**Reference:** [Gateway Troubleshooting](../troubleshooting/litellm_gateway_troubleshooting.md#api-key-issues)
+
+---
+
+### Issue 4: Examples fail with "No such file or directory"
+
+**Symptoms:**
+```
+FileNotFoundError: [Errno 2] No such file or directory: 'src/core/...'
+```
+
+**Causes:**
+- Running examples from wrong directory
+- `PYTHONPATH` not set correctly
+
+**Solutions:**
+1. Always run from project root: `cd motadata-python-ai-sdk`
+2. Run examples: `python examples/hello_world.py`
+3. Or set PYTHONPATH: `export PYTHONPATH="${PYTHONPATH}:$(pwd)"`
+
+**Reference:** [Examples README](../../examples/README.md)
+
+---
+
+### Issue 5: Async function errors
+
+**Symptoms:**
+```
+RuntimeWarning: coroutine 'create_agent' was never awaited
+TypeError: object async_generator can't be used in 'await' expression
+```
+
+**Causes:**
+- Forgetting to use `await` with async functions
+- Calling async function outside async context
+
+**Solutions:**
+1. Add `await` to async calls: `result = await agent.execute_task(...)`
+2. Run in async context:
+```python
+import asyncio
+
+async def main():
+    result = await agent.execute_task(...)
+    print(result)
+
+asyncio.run(main())
+```
+
+**Reference:** [Python Asyncio Documentation](https://docs.python.org/3/library/asyncio.html)
+
+---
+
+### Still Stuck?
+
+1. **Check Troubleshooting Guides**: [Troubleshooting Index](../troubleshooting/README.md)
+2. **Search Documentation**: [Documentation Index](DOCUMENTATION_INDEX.md)
+3. **Review Component READMEs**: Each component has troubleshooting section
+4. **Check Examples**: Working code in [Examples Directory](../../examples/)
+
+---
+
 ## 🆘 Need Help?
 
 1. **Start Here**: This onboarding guide
-2. **Quick Start**: [README Quick Start](../README.md#quick-start-5-minutes)
-3. **Examples**: [Examples Directory](../examples/)
-4. **Troubleshooting**: [Troubleshooting Index](troubleshooting/README.md)
-5. **Search**: [Documentation Index](guide/DOCUMENTATION_INDEX.md)
+2. **Quick Start**: [README Quick Start](../../README.md#quick-start-5-minutes)
+3. **Examples**: [Examples Directory](../../examples/)
+4. **Troubleshooting**: [Troubleshooting Index](../troubleshooting/README.md)
+5. **Search**: [Documentation Index](DOCUMENTATION_INDEX.md)
+
+---
+
+## 📚 Reference Documentation Quick Links
+
+**For detailed information, refer to:**
+
+- **[Main README](../../README.md)** - Project overview and quick start
+- **[Quick Reference](QUICK_REFERENCE.md)** - Common tasks and APIs
+- **[Developer Integration Guide](DEVELOPER_INTEGRATION_GUIDE.md)** - Component development patterns
+- **[Component Documentation](../components/)** - Deep dives into each component
+- **[Troubleshooting](../troubleshooting/)** - Solutions to common problems
+- **[Examples](../../examples/)** - Working code samples
 
 ---
 

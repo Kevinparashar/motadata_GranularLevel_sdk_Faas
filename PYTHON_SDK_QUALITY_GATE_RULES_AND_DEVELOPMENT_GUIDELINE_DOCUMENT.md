@@ -4,6 +4,191 @@
 
 ---
 
+# 📋 EXECUTIVE SUMMARY - QUICK REFERENCE
+
+## SonarQube Quality Gate - Python AI SDK
+
+### Purpose
+Define a clear and enforceable SonarQube Quality Gate for the Motadata Python AI SDK, aligned with organizational standards and Go SDK team requirements, focused on mandatory rules and thresholds required for production readiness.
+
+### Scope
+- **Language:** Python 3.8+
+- **Domain:** AI/ML SDK (RAG, Agents, LLM Gateway, Multi-tenant Architecture)
+- **Based on:** Official SonarQube Python ruleset + Python best practices
+- **Alignment:** Cross-team consistency with Go SDK Quality Gate
+
+---
+
+## ⚠️ MERGE-BLOCKING THRESHOLDS
+
+**A build MUST FAIL if any condition below is violated:**
+
+### SonarQube Quality Gate Conditions
+
+| Category | Threshold | Status |
+|----------|-----------|--------|
+| **New Bugs** | 0 | ❌ **BLOCKS MERGE** |
+| **New Security Hotspots (Unreviewed)** | 0 | ❌ **BLOCKS MERGE** |
+| **New Critical / Major Code Smells** | 0 | ❌ **BLOCKS MERGE** |
+| **Reliability Rating** | A | ❌ **BLOCKS MERGE** |
+| **Security Rating** | A | ❌ **BLOCKS MERGE** |
+| **Maintainability Rating** | A | ❌ **BLOCKS MERGE** |
+| **Coverage on New Code** | ≥ 85% | ❌ **BLOCKS MERGE** |
+| **Duplications on New Code** | ≤ 3% | ❌ **BLOCKS MERGE** |
+
+### CI Pipeline Checks (Mandatory)
+
+| Check | Tool | Status |
+|-------|------|--------|
+| **Format Check** | Black + isort | ❌ **BLOCKS MERGE** |
+| **Lint Check** | Ruff | ❌ **BLOCKS MERGE** |
+| **Type Check** | MyPy | ❌ **BLOCKS MERGE** |
+| **Unit Tests** | Pytest | ❌ **BLOCKS MERGE** |
+| **Integration Tests** | Pytest | ❌ **BLOCKS MERGE** |
+| **Security Scans** | Bandit + pip-audit + detect-secrets | ❌ **BLOCKS MERGE** |
+| **Build Verification** | python -m build | ❌ **BLOCKS MERGE** |
+
+---
+
+## ⚠️ WARNINGS (Non-Blocking)
+
+**These generate warnings but do NOT block merge:**
+
+| Check | Threshold | Status |
+|-------|-----------|--------|
+| **Cognitive Complexity** | 11-15 | ⚠️ **WARNING** - Review recommended |
+| **Function Length** | 80-120 LOC | ⚠️ **WARNING** - Review recommended |
+| **Missing Private Docstrings** | Any | ⚠️ **WARNING** - Improve recommended |
+| **Minor Code Smells** | Non-critical | ⚠️ **WARNING** - Technical debt |
+| **Low/Medium Vulnerabilities** | Dependency issues | ⚠️ **WARNING** - Update recommended |
+
+---
+
+## 📊 ENFORCED RULE CATEGORIES
+
+### 1. Reliability (Bugs) - Gate Rule: **New Bugs = 0**
+- ❌ No unused imports or variables
+- ❌ No undefined names
+- ❌ No unreachable or dead code
+- ❌ No duplicate conditions in if/elif
+- ❌ No self-assigned variables
+- ❌ No useless if(True) / if(False) blocks
+
+### 2. Security Hotspots - Gate Rule: **Unreviewed Hotspots = 0**
+- ❌ Hard-coded credentials not allowed
+- ❌ Hard-coded IP addresses not allowed
+- ❌ SQL injection vulnerabilities not allowed
+- ❌ Dangerous calls (eval, exec) not allowed
+- ❌ Secrets in code not allowed
+
+### 3. Maintainability & Complexity - Gate Rule: **No new Critical/Major issues**
+- ⚠️ Function cognitive complexity ≤ 10 (warning at 11-15)
+- ❌ Function cognitive complexity > 15 (blocks merge)
+- ❌ Deeply nested if/for/while statements not allowed
+- ❌ Overly complex expressions not allowed
+- ❌ Code duplication > 3% not allowed
+
+### 4. Function & File Constraints
+- ❌ Functions must not be empty
+- ❌ Functions must not have identical implementations
+- ⚠️ Parameters should be limited (≤ 5 recommended)
+- ⚠️ Functions should be reasonably sized (≤ 60 lines recommended)
+- ⚠️ Files should not be excessively large
+
+### 5. Coding Standards & Hygiene
+- ❌ Type hints required on all public functions
+- ❌ No bare except: clauses
+- ❌ No mutable default arguments
+- ❌ No swallowing exceptions without logging
+- ⚠️ TODO/FIXME must have ticket reference (warning)
+- ❌ Docstrings required on public classes/functions
+
+---
+
+## 🔄 CROSS-TEAM ALIGNMENT (Go SDK)
+
+To maintain consistency across SDK teams (Python and Go):
+
+### Aligned Thresholds
+- ✅ **New Bugs:** 0 (both teams)
+- ✅ **Security Hotspots:** 0 (both teams)
+- ✅ **Coverage:** ≥ 85% (both teams)
+- ✅ **Duplications:** ≤ 3% (both teams)
+- ✅ **Reliability Rating:** A (both teams)
+- ✅ **Security Rating:** A (both teams)
+
+### Language-Specific Differences
+
+| Aspect | Python AI/ML SDK | Go Microservices SDK | Rationale |
+|--------|------------------|---------------------|-----------|
+| **Maintainability** | A required | A or B accepted | AI complexity justifies stricter standard |
+| **Complexity (warning)** | > 10 | > 15 | Python team maintains higher quality bar |
+| **Complexity (blocking)** | > 15 | > 15 | Aligned blocking threshold |
+| **Type Checking** | MyPy required | Built-in | Language feature difference |
+| **Async Patterns** | Heavily emphasized | Less common | AI operations are async-first |
+| **Multi-tenant** | Mandatory | Context-dependent | AI SDK is multi-tenant by design |
+
+---
+
+## 🎯 FINAL QUALITY GATE SUMMARY
+
+### QUALITY GATE: Python AI SDK Production Gate
+
+**FAIL IF:**
+```
+❌ New Bugs > 0
+❌ Unreviewed Security Hotspots > 0
+❌ New Critical/Major Code Smells > 0
+❌ Reliability Rating < A
+❌ Security Rating < A
+❌ Maintainability Rating < A
+❌ Coverage on New Code < 85%
+❌ Duplications on New Code > 3%
+❌ CI Checks (format/lint/type/test/security) failing
+```
+
+**WARN IF:**
+```
+⚠️ Cognitive Complexity 11-15
+⚠️ Function Length 80-120 LOC
+⚠️ Missing private method docstrings
+⚠️ Minor code smells (non-critical)
+⚠️ Low/Medium dependency vulnerabilities
+```
+
+---
+
+## 📖 DOCUMENT STRUCTURE
+
+This document is organized as follows:
+
+1. **Section 0:** Current SDK Status & Gaps
+2. **Section 1:** Mandatory Operating Model (Branch Protection, Waiver Policy)
+3. **Section 2:** Quality Gate Definition (PR Gate, Release Gate, Cross-Team Alignment)
+4. **Section 3:** Mandatory Code Rules (Formatting, Linting, Type Hints)
+5. **Section 4:** Coverage Gate (≥ 85%)
+6. **Section 5:** Security Gate (SAST, Secrets, Dependencies)
+7. **Section 6:** Complexity Gate (Cognitive Complexity)
+8. **Section 7:** Documentation Standards
+9. **Section 8:** Component-Specific Rules (Agent, RAG, Gateway, Cache, FaaS)
+10. **Section 9:** Testing Standards (Unit, Integration, E2E)
+11. **Section 10:** CI/CD Pipeline Definition
+
+**For detailed guidance on any topic, refer to the full sections below.**
+
+---
+
+## 🚀 APPROVAL
+
+This Quality Gate is intended to be applied across all Python SDK repositories for production deployments, aligned with organizational standards and Go SDK team requirements.
+
+**Last Updated:** 2026-02-02  
+**Version:** 2.0 (Cross-team aligned)
+
+---
+
+---
+
 ### 0.1 Verified in your SDK repo (already present)
 **Tooling**
 - `pyproject.toml` config exists for: **black**, **isort**, **mypy**, **pytest**.
@@ -23,11 +208,12 @@
 These are **Quality Gate must-haves** that are missing today:
 - ❌ **No CI pipeline configuration** (no `.github/workflows/*`, no GitLab CI, etc.)
 - ❌ **No Sonar configuration** (`sonar-project.properties` / scanner settings)
-- ❌ **No enforced coverage threshold** (`--cov-fail-under=80` is not used in Makefile)
+- ❌ **No enforced coverage threshold** (`--cov-fail-under=85` is not used in Makefile)
 - ❌ **Lint is a placeholder** in Makefile (no ruff/flake8/pylint installed or executed)
 - ❌ **No complexity enforcement**
 - ❌ **No security gates** (`bandit`, `pip-audit`, `detect-secrets`) not present
 - ❌ **No branch protection / PR governance documented with templates**
+- ❌ **No duplication threshold enforcement** (≤ 3% on new code)
 
 This document upgrades your current baseline into a **merge-blocking Quality Gate system**.
 
@@ -72,17 +258,22 @@ A PR is mergeable only if **all** pass:
 3. Type check (mypy)
 4. Unit tests
 5. Integration tests (when component touches external dependency)
-6. Coverage threshold: **≥ 80% (new code)**
+6. Coverage threshold: **≥ 85% (new code)** *(aligned with Go SDK standard)*
 7. Security scans: secrets + SAST + dependency audit
 8. Build/package verification
 
 **Sonar checks**
 1. **Quality Gate = PASSED**
-2. **Coverage on New Code ≥ 80%**
-3. Reliability rating on New Code = **A**
-4. Security rating on New Code = **A**
-5. Maintainability rating on New Code = **A**
-6. **0 new Blocker/Critical** issues
+2. **Coverage on New Code ≥ 85%** *(aligned with Go SDK standard)*
+3. **Duplications on New Code ≤ 3%** *(aligned with Go SDK standard)*
+4. Reliability rating on New Code = **A**
+5. Security rating on New Code = **A**
+6. Maintainability rating on New Code = **A**
+   - **Exception:** Rating B allowed for complex AI algorithm implementations with:
+     - Written justification in PR
+     - Code review by 2+ engineers
+     - Tracked technical debt ticket
+7. **0 new Blocker/Critical** issues
 
 > **Rule:** If Sonar or CI is red → **no merge**.
 
@@ -91,6 +282,274 @@ All PR gates plus:
 - cross-version run (e.g., 3.8–3.12)
 - packaging install smoke test in clean environment
 - vulnerability scan must have **0 High/Critical** (or approved waiver)
+
+---
+
+### 2.3 Cross-Team Alignment (Go SDK)
+
+To maintain consistency across SDK teams (Python AI/ML SDK and Go Microservices SDK), the following thresholds are aligned:
+
+#### 2.3.1 Aligned Quality Thresholds
+
+| Metric | Python AI/ML SDK | Go Microservices SDK | Status |
+|--------|------------------|---------------------|--------|
+| **New Bugs** | 0 | 0 | ✅ **ALIGNED** |
+| **Security Hotspots (Unreviewed)** | 0 | 0 | ✅ **ALIGNED** |
+| **Coverage on New Code** | ≥ 85% | ≥ 85% | ✅ **ALIGNED** |
+| **Duplications on New Code** | ≤ 3% | ≤ 3% | ✅ **ALIGNED** |
+| **Reliability Rating** | A | A | ✅ **ALIGNED** |
+| **Security Rating** | A | A | ✅ **ALIGNED** |
+| **Cognitive Complexity (Blocking)** | > 15 | > 15 | ✅ **ALIGNED** |
+
+#### 2.3.2 Language-Specific Differences
+
+These differences are intentional and reflect the unique requirements of each SDK:
+
+| Aspect | Python AI/ML SDK | Go Microservices SDK | Rationale |
+|--------|------------------|---------------------|-----------|
+| **Maintainability Rating** | A required (B with waiver) | A or B accepted | AI/ML complexity justifies stricter standard |
+| **Complexity Warning Threshold** | > 10 | > 15 | Python team maintains higher quality bar |
+| **Type Checking Requirement** | MyPy mandatory | Built-in (Go) | Language feature difference |
+| **Async Patterns Emphasis** | Heavy (async-first) | Moderate | AI operations are inherently async |
+| **Multi-tenant Architecture** | Mandatory everywhere | Context-dependent | AI SDK is multi-tenant by design |
+| **Test Coverage Focus** | Unit + Integration + E2E | Unit + Integration | AI workflows require E2E validation |
+| **Component-Specific Rules** | RAG, Agent, Gateway, Memory | Service, Handler, Repository | Domain-specific patterns |
+
+#### 2.3.3 Rationale for Python-Specific Strictness
+
+The Python AI/ML SDK has stricter standards in certain areas because:
+
+1. **AI/ML Complexity:** LLM interactions, RAG systems, and agent orchestration are inherently more complex than typical microservices
+2. **Non-Deterministic Behavior:** AI operations require more rigorous testing and error handling
+3. **Cost Implications:** Token usage, API calls, and embeddings have direct cost impact requiring careful design
+4. **Multi-Tenant Security:** AI systems handle sensitive data across tenants requiring strict isolation
+5. **Production Reliability:** AI systems are mission-critical and require higher maintainability for long-term operation
+
+#### 2.3.4 Synchronization Process
+
+- **Quarterly Review:** Both teams review and align thresholds every quarter
+- **Threshold Changes:** Any threshold change requires approval from both team leads
+- **New Rules:** New rules are evaluated for cross-team applicability
+- **Tooling Alignment:** Where possible, use the same tools (SonarQube, security scanners)
+
+---
+
+### 2.4 Code Duplication Rules
+
+**Threshold:** ≤ 3% duplications on new code *(aligned with Go SDK standard)*
+
+This section defines what constitutes code duplication, when it's acceptable, and how to fix it.
+
+#### 2.4.1 What Counts as Duplication
+
+**SonarQube detects duplication as:**
+- **Identical code blocks** ≥ 6 lines in length
+- **Copy-pasted functions** with minor variable name changes
+- **Repeated string literals** (≥ 3 occurrences of the same literal)
+- **Duplicated logic patterns** across different modules
+
+**Measurement:**
+```
+Duplication % = (Duplicated Lines / Total Lines) × 100
+```
+
+#### 2.4.2 Acceptable Exceptions
+
+The following are **NOT** considered violations:
+
+1. **Test Setup/Teardown Boilerplate**
+   - Pytest fixtures with similar structure
+   - Mock configurations for different test classes
+   - Test data initialization patterns
+
+2. **Type Definitions**
+   - Pydantic models with similar field patterns
+   - TypedDict definitions
+   - Dataclass definitions with standard fields
+
+3. **Protocol Implementations**
+   - Interface/Protocol method implementations that must match signatures
+   - Abstract base class method stubs
+
+4. **Configuration Patterns**
+   - Service initialization with similar parameters
+   - Standard error handling patterns
+
+#### 2.4.3 How to Fix Duplication
+
+**Example 1: Duplicated Validation Logic**
+
+```python
+# ❌ BAD: Duplicated validation logic
+def validate_agent_input(data: Dict[str, Any]) -> bool:
+    if not data.get("name"):
+        raise ValueError("name is required")
+    if len(data.get("name", "")) < 3:
+        raise ValueError("name must be at least 3 characters")
+    if not data.get("tenant_id"):
+        raise ValueError("tenant_id is required")
+    return True
+
+def validate_tool_input(data: Dict[str, Any]) -> bool:
+    if not data.get("name"):
+        raise ValueError("name is required")
+    if len(data.get("name", "")) < 3:
+        raise ValueError("name must be at least 3 characters")
+    if not data.get("tenant_id"):
+        raise ValueError("tenant_id is required")
+    return True
+
+# ✅ GOOD: Extracted common validation
+from typing import Dict, Any, Optional
+
+def validate_name_field(
+    data: Dict[str, Any], 
+    min_length: int = 3,
+    field_name: str = "name"
+) -> None:
+    """Validate name field with configurable constraints."""
+    value = data.get(field_name)
+    if not value:
+        raise ValueError(f"{field_name} is required")
+    if len(value) < min_length:
+        raise ValueError(f"{field_name} must be at least {min_length} characters")
+
+def validate_tenant_id(data: Dict[str, Any]) -> None:
+    """Validate tenant_id field."""
+    if not data.get("tenant_id"):
+        raise ValueError("tenant_id is required")
+
+def validate_agent_input(data: Dict[str, Any]) -> bool:
+    """Validate agent input data."""
+    validate_name_field(data)
+    validate_tenant_id(data)
+    return True
+
+def validate_tool_input(data: Dict[str, Any]) -> bool:
+    """Validate tool input data."""
+    validate_name_field(data)
+    validate_tenant_id(data)
+    return True
+```
+
+**Example 2: Duplicated String Literals**
+
+```python
+# ❌ BAD: Repeated string literals
+def create_agent_cache_key(agent_id: str, tenant_id: str) -> str:
+    return f"agent:{tenant_id}:{agent_id}"
+
+def get_agent_from_cache(agent_id: str, tenant_id: str) -> Optional[Agent]:
+    key = f"agent:{tenant_id}:{agent_id}"
+    return cache.get(key)
+
+def invalidate_agent_cache(agent_id: str, tenant_id: str) -> None:
+    key = f"agent:{tenant_id}:{agent_id}"
+    cache.delete(key)
+
+# ✅ GOOD: Centralized key generation
+AGENT_CACHE_PREFIX = "agent"
+
+def create_agent_cache_key(agent_id: str, tenant_id: str) -> str:
+    """Generate standardized agent cache key."""
+    return f"{AGENT_CACHE_PREFIX}:{tenant_id}:{agent_id}"
+
+def get_agent_from_cache(agent_id: str, tenant_id: str) -> Optional[Agent]:
+    """Retrieve agent from cache."""
+    key = create_agent_cache_key(agent_id, tenant_id)
+    return cache.get(key)
+
+def invalidate_agent_cache(agent_id: str, tenant_id: str) -> None:
+    """Invalidate agent cache entry."""
+    key = create_agent_cache_key(agent_id, tenant_id)
+    cache.delete(key)
+```
+
+**Example 3: Duplicated Database Query Patterns**
+
+```python
+# ❌ BAD: Duplicated query patterns
+async def get_agent_by_id(db: DatabaseConnection, agent_id: str, tenant_id: str) -> Optional[Dict]:
+    query = "SELECT * FROM agents WHERE agent_id = %s AND tenant_id = %s"
+    result = await db.execute_query(query, (agent_id, tenant_id))
+    return result[0] if result else None
+
+async def get_tool_by_id(db: DatabaseConnection, tool_id: str, tenant_id: str) -> Optional[Dict]:
+    query = "SELECT * FROM tools WHERE tool_id = %s AND tenant_id = %s"
+    result = await db.execute_query(query, (tool_id, tool_id))
+    return result[0] if result else None
+
+# ✅ GOOD: Generic repository pattern
+from typing import TypeVar, Generic, Optional, Dict, Any
+
+T = TypeVar('T')
+
+class TenantScopedRepository(Generic[T]):
+    """Generic repository with tenant isolation."""
+    
+    def __init__(self, db: DatabaseConnection, table_name: str, id_field: str):
+        self.db = db
+        self.table_name = table_name
+        self.id_field = id_field
+    
+    async def get_by_id(self, id_value: str, tenant_id: str) -> Optional[Dict[str, Any]]:
+        """Get entity by ID with tenant isolation."""
+        query = f"SELECT * FROM {self.table_name} WHERE {self.id_field} = %s AND tenant_id = %s"
+        result = await self.db.execute_query(query, (id_value, tenant_id))
+        return result[0] if result else None
+
+# Usage
+agent_repo = TenantScopedRepository(db, "agents", "agent_id")
+tool_repo = TenantScopedRepository(db, "tools", "tool_id")
+
+agent = await agent_repo.get_by_id("agent_123", "tenant_456")
+tool = await tool_repo.get_by_id("tool_789", "tenant_456")
+```
+
+#### 2.4.4 Monitoring and Enforcement
+
+**CI Pipeline:**
+```yaml
+# .github/workflows/quality-gate.yml
+- name: Check Code Duplication
+  run: |
+    sonar-scanner \
+      -Dsonar.projectKey=motadata-python-sdk \
+      -Dsonar.sources=src \
+      -Dsonar.cpd.exclusions=**/tests/**,**/__init__.py
+```
+
+**Pre-commit Hook:**
+```bash
+# Detect duplications locally before commit
+sonar-scanner -Dsonar.analysis.mode=preview
+```
+
+**SonarQube Dashboard:**
+- Monitor duplication percentage over time
+- Track duplication hotspots
+- Review duplication trends per component
+
+#### 2.4.5 Waiver Process
+
+If duplication > 3% is unavoidable:
+
+1. **Document Justification:** Explain why duplication cannot be eliminated
+2. **Risk Assessment:** Assess maintenance risk
+3. **Remediation Plan:** Create ticket for future refactoring
+4. **Approval Required:** 2+ engineer review + tech lead approval
+5. **Time Bound:** Set deadline for remediation (max 2 sprints)
+
+**Example Waiver Comment:**
+```python
+# DUPLICATION WAIVER: TECH-1234
+# Justification: Legacy LLM provider adapters have similar structure
+#                but different authentication patterns that cannot be
+#                easily abstracted without breaking compatibility.
+# Risk: Medium - Changes require updates to multiple adapters
+# Remediation: Refactor to strategy pattern in Q2 2026 (TECH-1235)
+# Approved by: @tech-lead, @senior-engineer-1, @senior-engineer-2
+```
 
 ---
 
@@ -612,11 +1071,12 @@ pydocstyle src --convention=google
 
 ---
 
-## 4) Coverage Gate (≥ 80%) — Mandatory with examples
+## 4) Coverage Gate (≥ 85%) — Mandatory with examples
 
 ### 4.1 Coverage threshold (mandatory)
-- **Coverage on New Code ≥ 80%** (Sonar gate)
-- CI must enforce `--cov-fail-under=80` for immediate feedback.
+- **Coverage on New Code ≥ 85%** (Sonar gate) *(aligned with Go SDK standard)*
+- CI must enforce `--cov-fail-under=85` for immediate feedback.
+- This threshold is 5% higher than the previous standard to align with organizational best practices and Go SDK team requirements.
 
 **Repo current-state note**
 - `pytest-cov` exists, but `test-cov` does not enforce threshold today.
@@ -628,7 +1088,7 @@ Replace `test-cov` with:
 test-cov: ## Run tests with coverage report + enforce threshold
 	$(PYTHON) -m pytest $(TESTS_DIR) \
 		--cov=$(SRC_DIR) --cov-report=term-missing --cov-report=xml \
-		--cov-fail-under=80
+		--cov-fail-under=85
 ```
 
 ### 4.3 Example: what “good coverage” means
@@ -655,9 +1115,31 @@ def test_normalize_headers_lowercases_and_strips():
 ## 5) Complexity Limits (mandatory)
 
 ### 5.1 Limits (enforced)
-- **Cyclomatic complexity per function: ≤ 10**
-- **Cognitive complexity per function: ≤ 15** (Sonar)
-- **Function length soft limit: ≤ 80 LOC** (review gate; make hard later if needed)
+
+#### 5.1.1 Cognitive Complexity Thresholds
+
+**Aligned with Go SDK Standard:**
+
+| Cognitive Complexity | Action | Status |
+|---------------------|--------|--------|
+| **≤ 10** | ✅ Ideal - No issues | **PASS** |
+| **11-15** | ⚠️ Warning - Review recommended | **WARN** (non-blocking) |
+| **> 15** | ❌ Must refactor or get waiver | **FAIL** (blocks merge) |
+
+**Python Team Higher Quality Bar:**
+- While the blocking threshold is 15 (aligned with Go SDK), the Python team maintains a warning at 10 to encourage simpler, more maintainable code for AI/ML operations.
+
+**Rationale for Threshold 15:**
+- Aligned with Go SDK team standard
+- Industry best practice for maintainability
+- Complex AI algorithms may legitimately approach this limit
+- Functions > 15 are difficult to test and maintain
+
+#### 5.1.2 Additional Complexity Limits
+
+- **Cyclomatic complexity per function: ≤ 10** (recommended)
+- **Function length soft limit: ≤ 80 LOC** (warning at 80-120, blocks at >120)
+- **Nesting depth: ≤ 4 levels** (deeply nested code is hard to understand)
 
 ### 5.2 Enforcement options (choose 1 path, but enforce consistently)
 **Primary (recommended): Sonar**
@@ -1947,7 +2429,7 @@ jobs:
 
       - name: Tests + Coverage Gate
         run: |
-          pytest -q src/tests --cov=src --cov-report=term-missing --cov-report=xml --cov-fail-under=80
+          pytest -q src/tests --cov=src --cov-report=term-missing --cov-report=xml --cov-fail-under=85
 
       - name: Security - secrets
         run: |
@@ -1991,7 +2473,7 @@ quality_gate:
     - ruff format --check .
     - ruff check .
     - python -m mypy src
-    - pytest -q src/tests --cov=src --cov-report=xml --cov-fail-under=80
+    - pytest -q src/tests --cov=src --cov-report=xml --cov-fail-under=85
     - detect-secrets scan --baseline .secrets.baseline
     - bandit -r src -q
     - pip-audit
@@ -2010,7 +2492,7 @@ quality_gate:
 make format
 ruff check .
 python -m mypy src
-pytest -q src/tests --cov=src --cov-report=xml --cov-fail-under=80
+pytest -q src/tests --cov=src --cov-report=xml --cov-fail-under=85
 bandit -r src -q
 pip-audit
 detect-secrets scan --baseline .secrets.baseline
@@ -2029,24 +2511,6 @@ python -m build
 - Complexity gate
 - Build + smoke import (optional but recommended)
 - Sonar Quality Gate pass
-
----
-
-## 11) Action plan to fully align the repo (what to change now)
-
-**P0 (must-do to be “Quality Gate compliant”)**
-1. Add **CI pipeline** (GitHub/GitLab).
-2. Add **Sonar properties + scanner** integration.
-3. Enforce **coverage threshold** (`--cov-fail-under=80`) in CI and Makefile.
-4. Replace placeholder `lint` target with **ruff**.
-5. Add **security scanners** (`detect-secrets`, `bandit`, `pip-audit`).
-6. Add **complexity gate** (Sonar + radon).
-
-**P1 (next hardening)**
-- Multi-Python version matrix (3.8–3.12)
-- Pre-commit hooks
-- Packaging smoke test in clean venv/container
-- Changelog and semantic versioning policy
 
 ---
 

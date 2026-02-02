@@ -6,7 +6,7 @@ Manages permissions for agents and tools created through prompt-based generation
 
 from datetime import datetime
 from enum import Enum
-from typing import Dict, List, Optional, Set
+from typing import Dict, List, Optional
 
 from pydantic import BaseModel, Field
 
@@ -232,7 +232,7 @@ class AccessControl:
 
         # Return all permissions
         all_perms = {}
-        for rt, resources in user_perms.items():
+        for _, resources in user_perms.items():
             all_perms.update(resources)
 
         return all_perms

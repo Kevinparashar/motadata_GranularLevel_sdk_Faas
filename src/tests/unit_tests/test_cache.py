@@ -66,19 +66,19 @@ class TestCacheMechanism:
         assert cache.get("post:1") == "value3"  # Should remain
 
     @patch("src.core.cache_mechanism.cache.redis")
-    def test_redis_cache(self, mock_redis_module):
-        """Test Redis cache backend."""
+    def test_dragonfly_cache(self, mock_redis_module):
+        """Test Dragonfly cache backend."""
         mock_redis_client = Mock()
         mock_redis_module.Redis.from_url.return_value = mock_redis_client
         mock_redis_client.get.return_value = b"value1"
         mock_redis_client.set.return_value = True
 
-        config = CacheConfig(backend="redis", redis_url="redis://localhost:6379/0")
+        config = CacheConfig(backend="dragonfly", dragonfly_url="redis://localhost:6379/0")
         cache = CacheMechanism(config=config)
 
         cache.set("key1", "value1")
         value = cache.get("key1")
-        # Redis returns bytes, so we check it's not None
+        # Dragonfly (Redis-compatible) returns bytes, so we check it's not None
         assert value is not None
 
 

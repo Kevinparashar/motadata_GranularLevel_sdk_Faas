@@ -4,11 +4,9 @@ Unit Tests for Cache Mechanism Functions
 Tests factory functions, convenience functions, and utilities for cache mechanism.
 """
 
-from unittest.mock import MagicMock, Mock, patch
-
 import pytest
 
-from src.core.cache_mechanism import (  # type: ignore[import-untyped]  # Core classes; Factory functions; High-level convenience functions; Utility functions
+from src.core.cache_mechanism import (  # Core classes; Factory functions; High-level convenience functions; Utility functions
     CacheConfig,
     CacheMechanism,
     batch_cache_get,
@@ -21,7 +19,6 @@ from src.core.cache_mechanism import (  # type: ignore[import-untyped]  # Core c
     configure_cache,
     create_cache,
     create_memory_cache,
-    create_redis_cache,
 )
 
 
@@ -48,21 +45,6 @@ class TestFactoryFunctions:
         assert cache.config.backend == "memory"
         assert cache.config.default_ttl == 300
         assert cache.config.max_size == 1024
-
-    @patch("src.core.cache_mechanism.functions.redis")
-    def test_create_redis_cache(self, mock_redis_module):
-        """Test create_redis_cache factory function."""
-        mock_redis_client = Mock()
-        mock_redis_module.Redis.from_url.return_value = mock_redis_client
-
-        cache = create_redis_cache(
-            redis_url="redis://localhost:6379/0", default_ttl=600, namespace="redis_cache"
-        )
-
-        assert isinstance(cache, CacheMechanism)
-        assert cache.config.backend == "redis"
-        assert cache.config.default_ttl == 600
-        assert cache.config.namespace == "redis_cache"
 
     def test_create_memory_cache(self):
         """Test create_memory_cache factory function."""
@@ -212,8 +194,8 @@ class TestUtilityFunctions:
         """Test batch_cache_set with empty dictionary."""
         batch_cache_set(cache, {}, ttl=600)
 
-        # Should not raise exception
-        assert True
+        # Should not raise exception - verify no items were cached
+        # This is a no-op operation with empty dictionary
 
     def test_batch_cache_get(self, cache):
         """Test batch_cache_get utility function."""

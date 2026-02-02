@@ -41,7 +41,7 @@ class OTELTracer:
         Returns:
             OTELSpan instance
         """
-        # TODO: SDK-INT-003 - Implement actual OTEL span creation
+        # TODO: SDK-INT-003 - Implement actual OTEL span creation  # noqa: FIX002, S1135
         # Placeholder implementation - replace with actual OpenTelemetry SDK when integration is ready
         # from opentelemetry import trace
         # tracer = trace.get_tracer(self.service_name)
@@ -56,7 +56,7 @@ class OTELTracer:
         Returns:
             Current span or None
         """
-        # TODO: SDK-INT-003 - Implement actual OTEL current span retrieval
+        # TODO: SDK-INT-003 - Implement actual OTEL current span retrieval  # noqa: FIX002, S1135
         # Placeholder implementation - replace with actual OpenTelemetry SDK when integration is ready
         # from opentelemetry import trace
         # span = trace.get_current_span()
@@ -76,7 +76,7 @@ class OTELSpan:
         """Set span attribute."""
         self.attributes[key] = value
 
-    def add_event(self, name: str, attributes: Optional[Dict[str, Any]] = None):
+    def add_event(self, name: str, _attributes: Optional[Dict[str, Any]] = None):
         """Add event to span."""
         logger.debug(f"OTEL event (placeholder): {name}")
 

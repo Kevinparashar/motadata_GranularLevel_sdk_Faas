@@ -5,7 +5,7 @@ Tests agent creation, task execution, and communication.
 """
 
 # Standard library imports
-from unittest.mock import AsyncMock, MagicMock, Mock, patch
+from unittest.mock import Mock, patch
 
 # Third-party imports
 import pytest
@@ -14,13 +14,12 @@ import pytest
 from src.core.agno_agent_framework import (
     Agent,
     AgentManager,
-    AgentMessage,
     AgentStatus,
     AgentTask,
 )
 from src.core.agno_agent_framework.memory import AgentMemory, MemoryType
-from src.core.agno_agent_framework.session import AgentSession, SessionManager
-from src.core.agno_agent_framework.tools import Tool, ToolRegistry
+from src.core.agno_agent_framework.session import AgentSession
+from src.core.agno_agent_framework.tools import Tool, ToolExecutor, ToolRegistry
 
 
 class TestAgent:
@@ -117,18 +116,18 @@ class TestAgentSession:
 
     def test_create_session(self):
         """Test session creation."""
-        session = AgentSession(session_id="session-001", agent_id="agent-001", user_id="user-001")
+        session = AgentSession(session_id="session-001", agent_id="agent-001")
 
         assert session.session_id == "session-001"
         assert session.agent_id == "agent-001"
 
     def test_add_message(self):
         """Test adding message to session."""
-        session = AgentSession("session-001", "agent-001", "user-001")
+        session = AgentSession(session_id="session-001", agent_id="agent-001")
         session.add_message("user", "Hello")
         session.add_message("assistant", "Hi!")
 
-        messages = session.get_messages()
+        messages = session.get_conversation_history()
         assert len(messages) == 2
 
 
@@ -162,14 +161,14 @@ class TestToolRegistry:
             return x * 2
 
         tool = Tool(
+            tool_id="test_tool",
             name="test_tool",
             description="Test tool",
             function=test_function,
-            parameters={"x": {"type": "integer"}},
         )
 
         registry = ToolRegistry()
-        registry.register(tool)
+        registry.register_tool(tool)
 
         assert registry.get_tool("test_tool") == tool
 
@@ -181,16 +180,17 @@ class TestToolRegistry:
             return a + b
 
         tool = Tool(
+            tool_id="add",
             name="add",
             description="Add two numbers",
             function=add,
-            parameters={"a": {"type": "integer"}, "b": {"type": "integer"}},
         )
 
         registry = ToolRegistry()
-        registry.register(tool)
+        registry.register_tool(tool)
 
-        result = registry.execute("add", a=5, b=3)
+        executor = ToolExecutor(registry)
+        result = executor.execute_tool_call("add", {"a": 5, "b": 3})
         assert result == 8
 
     @patch("src.core.agno_agent_framework.agent.create_prompt_manager")

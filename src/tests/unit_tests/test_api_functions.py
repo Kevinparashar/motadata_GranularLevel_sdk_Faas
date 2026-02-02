@@ -56,12 +56,8 @@ class TestFactoryFunctions:
         app = create_api_app(enable_cors=False)
 
         assert isinstance(app, FastAPI)
-        # Verify no CORS middleware added
-        cors_middleware = any(
-            isinstance(middleware, type) and "CORS" in str(middleware)
-            for middleware in app.user_middleware
-        )
-        # Note: This is a simplified check
+        # Verify app is created successfully without CORS
+        # Note: CORS middleware check is simplified and not strictly validated
 
     def test_create_api_router(self):
         """Test create_api_router factory function."""
@@ -165,12 +161,12 @@ class TestConvenienceFunctions:
 
     def test_add_endpoint_none_handler(self, router):
         """Test add_endpoint with None handler."""
+        initial_routes = len(router.routes)
         add_endpoint(router, "/test", "GET", None)
 
-        # Should not add endpoint
-        initial_routes = len(router.routes)
-        # This is a no-op, so routes shouldn't change
-        assert True  # Just verify no exception
+        # Should not add endpoint - this is a no-op
+        # Verify no routes were added when handler is None
+        assert len(router.routes) == initial_routes
 
     @patch("src.core.api_backend_services.functions.quick_rag_query")
     @patch("src.core.api_backend_services.functions.ingest_document_simple")
@@ -247,19 +243,19 @@ class TestUtilityFunctions:
 
     def test_add_api_versioning(self, app):
         """Test add_api_versioning utility function."""
-        api_prefix = add_api_versioning(app, version="v1", prefix="/api")
+        api_prefix = add_api_versioning(version="v1", prefix="/api")
 
         assert api_prefix == "/api/v1"
 
     def test_add_api_versioning_defaults(self, app):
         """Test add_api_versioning with default parameters."""
-        api_prefix = add_api_versioning(app)
+        api_prefix = add_api_versioning()
 
         assert api_prefix == "/api/v1"
 
     def test_add_api_versioning_custom(self, app):
         """Test add_api_versioning with custom version and prefix."""
-        api_prefix = add_api_versioning(app, version="v2", prefix="/custom")
+        api_prefix = add_api_versioning(version="v2", prefix="/custom")
 
         assert api_prefix == "/custom/v2"
 
@@ -308,7 +304,6 @@ class TestUnifiedQueryEndpoint:
                 router=router,
                 agent_manager=mock_agent_manager,
                 rag_system=mock_rag_system,
-                gateway=mock_gateway,
                 prefix="/query",
             )
 
@@ -333,7 +328,6 @@ class TestUnifiedQueryEndpoint:
                 router=router,
                 agent_manager=mock_agent_manager,
                 rag_system=mock_rag_system,
-                gateway=mock_gateway,
             )
 
             app = create_api_app()
@@ -361,7 +355,6 @@ class TestUnifiedQueryEndpoint:
             router=router,
             agent_manager=mock_agent_manager,
             rag_system=mock_rag_system,
-            gateway=mock_gateway,
         )
 
         app = create_api_app()
@@ -401,7 +394,6 @@ class TestUnifiedQueryEndpoint:
                 router=router,
                 agent_manager=mock_agent_manager,
                 rag_system=mock_rag_system,
-                gateway=mock_gateway,
             )
 
             app = create_api_app()
@@ -432,7 +424,6 @@ class TestUnifiedQueryEndpoint:
                 router=router,
                 agent_manager=mock_agent_manager,
                 rag_system=mock_rag_system,
-                gateway=mock_gateway,
                 prefix="/api/v1/query",
             )
 

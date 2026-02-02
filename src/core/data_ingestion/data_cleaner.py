@@ -55,7 +55,7 @@ class DataCleaner:
 
         # Remove control characters
         if self.remove_control_chars:
-            content = re.sub(r"[\x00-\x1f\x7f-\x9f]", "", content)
+            content = str(re.sub(r"[\x00-\x1f\x7f-\x9f]", "", content))
 
         # Normalize unicode
         if self.normalize_unicode:
@@ -69,9 +69,9 @@ class DataCleaner:
         # Remove extra whitespace
         if self.remove_extra_whitespace:
             # Replace multiple spaces with single space
-            content = re.sub(r" +", " ", content)
+            content = str(re.sub(r" +", " ", content))
             # Replace multiple newlines with double newline
-            content = re.sub(r"\n{3,}", "\n\n", content)
+            content = str(re.sub(r"\n{3,}", "\n\n", content))
             # Strip leading/trailing whitespace
             content = content.strip()
 

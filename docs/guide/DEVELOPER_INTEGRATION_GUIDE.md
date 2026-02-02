@@ -4,18 +4,44 @@
 
 ---
 
+## 📄 Document Metadata
+
+| Property | Value |
+|----------|-------|
+| **Document Type** | Developer Guide / Integration Patterns |
+| **Audience** | SDK Contributors, Component Developers |
+| **Status** | ✅ Active (Updated: 2026-02-02) |
+| **Level** | Advanced |
+
+### What This Guide Covers
+
+- ✅ How to develop new SDK components
+- ✅ Standard API documentation patterns
+- ✅ Integration patterns between components
+- ✅ Testing strategies for integrations
+- ✅ Best practices and common pitfalls
+
+### What This Guide Does NOT Cover
+
+- ❌ **Using existing components** → See [Component Documentation](../components/)
+- ❌ **Quick start guides** → See [README](../../README.md)
+- ❌ **Architecture overview** → See [SDK Architecture](../architecture/SDK_ARCHITECTURE.md)
+
+---
+
 ## 📋 Table of Contents
 
 1. [Overview](#overview)
-2. [SDK Architecture Fundamentals](#sdk-architecture-fundamentals)
-3. [Component Development Guide](#component-development-guide)
-4. [Component Integration Patterns](#component-integration-patterns)
-5. [How Components Work Together](#how-components-work-together)
-6. [Development Workflows](#development-workflows)
-7. [Code Examples](#code-examples)
-8. [Testing Integration Points](#testing-integration-points)
-9. [Best Practices](#best-practices)
-10. [Troubleshooting Development Issues](#troubleshooting-development-issues)
+2. [API Documentation Standards](#api-documentation-standards) ← **CRITICAL - READ FIRST**
+3. [SDK Architecture Fundamentals](#sdk-architecture-fundamentals)
+4. [Component Development Guide](#component-development-guide)
+5. [Component Integration Patterns](#component-integration-patterns)
+6. [How Components Work Together](#how-components-work-together)
+7. [Development Workflows](#development-workflows)
+8. [Code Examples](#code-examples)
+9. [Testing Integration Points](#testing-integration-points)
+10. [Best Practices](#best-practices)
+11. [Troubleshooting Development Issues](#troubleshooting-development-issues)
 
 ---
 
@@ -31,16 +57,188 @@ This guide helps you:
 
 ### Prerequisites
 
-- Python 3.8+ knowledge
-- Understanding of async/await patterns
-- Familiarity with dependency injection
-- Basic knowledge of microservices architecture
+| Skill | Level Required | Reference |
+|-------|---------------|-----------|
+| **Python 3.8+** | Advanced | [Python Docs](https://docs.python.org) |
+| **Async/Await** | Intermediate | [Asyncio Guide](https://docs.python.org/3/library/asyncio.html) |
+| **Dependency Injection** | Intermediate | See [SDK Architecture](../architecture/SDK_ARCHITECTURE.md) |
+| **Type Hints** | Intermediate | [Typing Module](https://docs.python.org/3/library/typing.html) |
 
 ### Quick Navigation
 
 - **New to SDK?** Start with [Onboarding Guide](ONBOARDING_GUIDE.md)
 - **Need architecture details?** See [SDK Architecture](../architecture/SDK_ARCHITECTURE.md)
 - **Looking for usage examples?** Check [Examples](../../examples/)
+
+---
+
+## API Documentation Standards
+
+### ⚠️ CRITICAL: Standard API Documentation Format
+
+**ALL SDK APIs MUST follow this exact structure.** This section defines the mandatory format for documenting every public method, function, and class in the SDK.
+
+### Standard Method Documentation Template
+
+Every public API method MUST include:
+
+1. **Description** - What the method does
+2. **Parameters** - Table of all parameters
+3. **Returns** - What the method returns
+4. **Errors** - What exceptions can be raised
+5. **Example** - Working code example
+
+### Example: Correct API Documentation
+
+```python
+async def execute_task(
+    self,
+    task_type: str,
+    parameters: Dict[str, Any],
+    tenant_id: Optional[str] = None,
+    timeout: Optional[int] = None,
+) -> Dict[str, Any]:
+    """
+    Execute a task using the agent with LLM assistance.
+    
+    Sends the task parameters to the configured LLM gateway, processes
+    the response, and returns the result with metadata. Supports timeout
+    and tenant isolation.
+    
+    Parameters:
+        task_type (str): Type of task to execute (e.g., "analyze", "summarize")
+        parameters (Dict[str, Any]): Task-specific parameters and context
+        tenant_id (Optional[str]): Tenant ID for multi-tenant isolation.
+                                   Uses instance tenant_id if not provided.
+        timeout (Optional[int]): Maximum execution time in seconds.
+                                Defaults to 60 if not specified.
+    
+    Returns:
+        Dict[str, Any]: Task execution result containing:
+            - result (str): The generated response from the LLM
+            - metadata (Dict): Execution metadata including:
+                - task_type (str): The type of task executed
+                - model (str): LLM model used
+                - tokens (int): Total tokens consumed
+                - cost (float): Estimated cost in USD
+                - duration (float): Execution time in seconds
+    
+    Raises:
+        AgentExecutionError: If task execution fails due to LLM error
+        TimeoutError: If execution exceeds the specified timeout
+        ValueError: If task_type is empty or parameters are invalid
+        AuthenticationError: If tenant_id is invalid or unauthorized
+    
+    Example:
+        Basic task execution:
+        
+        >>> agent = create_agent("analyst", "Data Analyst", gateway)
+        >>> result = await agent.execute_task(
+        ...     task_type="analyze",
+        ...     parameters={"text": "Analyze this data..."},
+        ...     tenant_id="tenant_123"
+        ... )
+        >>> print(result["result"])
+        "Analysis: The data shows..."
+        >>> print(f"Cost: ${result['metadata']['cost']:.4f}")
+        Cost: $0.0023
+        
+        With timeout and error handling:
+        
+        >>> try:
+        ...     result = await agent.execute_task(
+        ...         task_type="summarize",
+        ...         parameters={"text": "Long document..."},
+        ...         timeout=30
+        ...     )
+        ... except TimeoutError:
+        ...     print("Task took too long")
+        ... except AgentExecutionError as e:
+        ...     print(f"Execution failed: {e}")
+    
+    See Also:
+        - create_agent(): Factory function to create agents
+        - AgentExecutionError: Exception details
+        - [Agent Framework Guide](../src/core/agno_agent_framework/README.md)
+    """
+    # Implementation...
+```
+
+### API Documentation Checklist
+
+When documenting any API, ensure:
+
+- [ ] **Description is clear** - Explains what, why, and how
+- [ ] **All parameters documented** - Type, purpose, default value
+- [ ] **Return value fully specified** - Type and structure
+- [ ] **All exceptions listed** - When they're raised
+- [ ] **At least one working example** - Copy-paste ready
+- [ ] **Cross-references included** - Links to related docs
+
+### Common Documentation Mistakes
+
+❌ **BAD - Missing parameter details:**
+```python
+def process_document(doc: str, options: dict) -> dict:
+    """Process a document."""
+    pass
+```
+
+✅ **GOOD - Complete documentation:**
+```python
+def process_document(
+    doc: str,
+    options: Optional[Dict[str, Any]] = None
+) -> Dict[str, Any]:
+    """
+    Process a document with configurable options.
+    
+    Parameters:
+        doc (str): Document content to process
+        options (Optional[Dict[str, Any]]): Processing options:
+            - chunk_size (int): Size of chunks (default: 1000)
+            - overlap (int): Overlap between chunks (default: 200)
+    
+    Returns:
+        Dict[str, Any]: Processing result with keys:
+            - chunks (List[str]): Processed document chunks
+            - metadata (Dict): Document metadata
+    
+    Raises:
+        ValueError: If doc is empty
+    
+    Example:
+        >>> result = process_document(
+        ...     "Long document...",
+        ...     {"chunk_size": 500}
+        ... )
+        >>> print(len(result["chunks"]))
+        10
+    """
+    pass
+```
+
+### Parameters Table Format (Alternative)
+
+For complex APIs, use a markdown table:
+
+**Parameters:**
+
+| Name | Type | Required | Default | Description |
+|------|------|----------|---------|-------------|
+| `task_type` | `str` | ✅ Yes | - | Type of task ("analyze", "summarize", etc.) |
+| `parameters` | `Dict[str, Any]` | ✅ Yes | - | Task-specific parameters and context |
+| `tenant_id` | `str` | ❌ Optional | instance value | Tenant ID for isolation |
+| `timeout` | `int` | ❌ Optional | 60 | Max execution time in seconds |
+
+**Returns:** `Dict[str, Any]`
+
+| Key | Type | Description |
+|-----|------|-------------|
+| `result` | `str` | Generated response from LLM |
+| `metadata` | `Dict` | Execution metadata (tokens, cost, duration) |
+
+---
 
 ---
 

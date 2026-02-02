@@ -4,6 +4,29 @@
 
 ---
 
+## 📄 Document Metadata
+
+
+**Prerequisites for using this reference:**
+- ✅ You've completed the [Quick Start](../../README.md#quick-start-5-minutes)
+- ✅ You understand basic SDK concepts
+- ✅ You have a working development environment
+
+**If you're new to the SDK:**
+1. Start with [README Quick Start](../../README.md#quick-start-5-minutes)
+2. Read [Onboarding Guide](ONBOARDING_GUIDE.md)
+3. Try [Examples](../../examples/)
+4. Then come back here for quick lookups
+
+### How to Use This Reference
+
+- 🔍 **Search (Ctrl+F)** for the task or API you need
+- 📖 **Click "Learn More" links** for detailed documentation
+- 📝 **Copy code snippets** directly into your project
+- 🔗 **Follow cross-references** for related information
+
+---
+
 ## 🚀 Quick Start
 
 ```python
@@ -21,6 +44,11 @@ gateway = create_gateway(api_keys={"openai": "sk-..."})
 from src.core.agno_agent_framework import create_agent
 agent = create_agent("agent1", "My Agent", gateway)
 ```
+
+**📖 Learn More:**
+- [Full Installation Guide](../../README.md#getting-started)
+- [Gateway Documentation](../../src/core/litellm_gateway/README.md)
+- [Agent Framework Documentation](../../src/core/agno_agent_framework/README.md)
 
 ---
 
@@ -84,6 +112,12 @@ agent = await create_agent_from_prompt(
 )
 ```
 
+**📖 Learn More:**
+- [Agent Framework Complete Guide](../../src/core/agno_agent_framework/README.md)
+- [Agent Framework Explanation](../components/agno_agent_framework_explanation.md)
+- [Agent Examples](../../examples/basic_usage/05_agent_basic.py)
+- [Agent Troubleshooting](../troubleshooting/agent_troubleshooting.md)
+
 ### Execute Task
 ```python
 result = await execute_task(
@@ -92,6 +126,10 @@ result = await execute_task(
     parameters={"text": "Analyze this document"}
 )
 ```
+
+**📖 Learn More:**
+- [Task Execution Guide](../../src/core/agno_agent_framework/README.md#executing-tasks)
+- [Available Task Types](../../src/core/agno_agent_framework/README.md#task-types)
 
 ### Chat with Agent
 ```python
@@ -103,6 +141,10 @@ response = await chat_with_agent(
     tenant_id="tenant_123"
 )
 ```
+
+**📖 Learn More:**
+- [Chat Patterns](../../src/core/agno_agent_framework/README.md#chat-interface)
+- [Session Management](../../src/core/agno_agent_framework/README.md#session-management)
 
 ---
 
@@ -488,5 +530,23 @@ async with httpx.AsyncClient() as client:
 
 ---
 
-**Last Updated:** 2025-01-XX
+## 📚 Remember: This is a Quick Reference, Not a Tutorial
+
+**This document provides fast lookups, but you should always refer to complete documentation for:**
+
+- ✅ **Detailed explanations** → [Component Documentation](../components/)
+- ✅ **Full API contracts** → [Developer Integration Guide](DEVELOPER_INTEGRATION_GUIDE.md)
+- ✅ **Integration patterns** → [Onboarding Guide](ONBOARDING_GUIDE.md)
+- ✅ **Troubleshooting** → [Troubleshooting Index](../troubleshooting/README.md)
+- ✅ **Working examples** → [Examples Directory](../../examples/)
+
+**Navigation:**
+- 🏠 [Main README](../../README.md) - Project home
+- 📖 [Documentation Index](DOCUMENTATION_INDEX.md) - Find any document
+- 🆘 [Troubleshooting](../troubleshooting/README.md) - Solve problems
+
+---
+
+**Last Updated:** 2026-02-02
+**SDK Version:** 0.1.0
 

@@ -1,6 +1,32 @@
 # MOTADATA - SDK DEPENDENCIES AND LIBRARIES
 
-**Comprehensive list of all libraries used in the SDK, their versions, and purposes.**
+**Comprehensive list of all libraries used in the SDK, their versions, purposes, and upgrade guidance.**
+
+---
+
+## 📖 How to Read This Document
+
+### Dependency Types
+
+| Type | Meaning | Example |
+|------|---------|---------|
+| **Direct** | SDK directly imports and uses | `litellm`, `pydantic` |
+| **Transitive** | Required by direct dependencies | `certifi` (via `httpx`) |
+| **Optional** | Needed only for specific features | `dragonfly` (caching backend) |
+
+### Upgrade Risk Levels
+
+| Risk | Meaning | Action |
+|------|---------|--------|
+| 🟢 **Low** | Patch updates safe, minor updates usually safe | Update freely |
+| 🟡 **Medium** | Minor updates may need testing | Test before production |
+| 🔴 **High** | Breaking changes likely | Read changelog, test thoroughly |
+
+### Version Notation
+
+- `>=1.0.0` - Minimum version required
+- `^2.0.0` - Compatible with 2.x.x (SemVer)
+- `~1.5.0` - Compatible with 1.5.x only
 
 ---
 
@@ -8,19 +34,19 @@
 
 ### LLM and AI
 
-| Library | Version | Purpose |
-|---------|---------|---------|
-| `litellm` | >=1.0.0 | Unified LLM interface for multiple providers |
-| `openai` | >=1.0.0 | OpenAI API client (via litellm) |
-| `anthropic` | >=0.18.0 | Anthropic API client (via litellm) |
+| Library | Version | Type | Purpose | Why We Need It | Upgrade Risk |
+|---------|---------|------|---------|----------------|--------------|
+| `litellm` | >=1.0.0 | **Direct** | Unified LLM interface for multiple providers | Core abstraction for all LLM operations; enables provider switching | 🟡 **Medium** - API changes affect all components |
+| `openai` | >=1.0.0 | **Transitive** | OpenAI API client (via litellm) | Accessed through litellm; enables OpenAI provider | 🟢 **Low** - Managed by litellm |
+| `anthropic` | >=0.18.0 | **Transitive** | Anthropic API client (via litellm) | Accessed through litellm; enables Anthropic/Claude provider | 🟢 **Low** - Managed by litellm |
 
 ### Data Validation and Configuration
 
-| Library | Version | Purpose |
-|---------|---------|---------|
-| `pydantic` | >=2.0.0 | Data validation and settings management |
-| `python-dotenv` | >=1.0.0 | Environment variable management |
-| `pyyaml` | >=6.0 | YAML configuration file parsing |
+| Library | Version | Type | Purpose | Why We Need It | Upgrade Risk |
+|---------|---------|------|---------|----------------|--------------|
+| `pydantic` | >=2.0.0 | **Direct** | Data validation and settings management | Core data modeling; ensures type safety across SDK | 🔴 **High** - v1 to v2 migration required careful testing |
+| `python-dotenv` | >=1.0.0 | **Direct** | Environment variable management | Loads `.env` files; simplifies configuration | 🟢 **Low** - Stable API |
+| `pyyaml` | >=6.0 | **Direct** | YAML configuration file parsing | Config file support; optional feature | 🟢 **Low** - Stable API |
 
 ### Database
 
@@ -231,7 +257,233 @@ The SDK is designed to allow swapping of certain libraries:
 - **mangum**: AWS Lambda deployment (optional, only for Lambda)
 - **uvicorn**: Local/container deployment (default)
 
+---
+
+## Dependency Management Best Practices
+
+### Understanding Transitive Dependencies
+
+**What are transitive dependencies?**
+- Dependencies required by your direct dependencies
+- Example: `litellm` requires `openai`, so `openai` is a transitive dependency
+
+**Why care about transitive dependencies?**
+- Security vulnerabilities can exist in transitive deps
+- Version conflicts can occur between transitive deps
+- Upgrade one direct dep can force upgrades of many transitive deps
+
+**View your transitive dependencies:**
+```bash
+# List all dependencies (direct + transitive)
+pip list
+
+# See dependency tree
+pip install pipdeptree
+pipdeptree
+
+# Check for vulnerabilities
+pip-audit
+```
+
+### Upgrade Strategy by Risk Level
+
+#### 🟢 Low Risk Libraries (Update Freely)
+
+**Examples:** `python-dotenv`, `cachetools`, `pyyaml`
+
+**Strategy:**
+1. Update to latest: `pip install --upgrade {library}`
+2. Run tests: `pytest`
+3. Deploy if tests pass
+
+**Frequency:** Monthly or quarterly
+
+#### 🟡 Medium Risk Libraries (Test Before Production)
+
+**Examples:** `litellm`, `fastapi`, `httpx`
+
+**Strategy:**
+1. Check changelog for breaking changes
+2. Update in development: `pip install --upgrade {library}`
+3. Run full test suite: `pytest src/tests/`
+4. Test in staging environment
+5. Deploy to production after validation
+
+**Frequency:** Quarterly or when security fixes released
+
+#### 🔴 High Risk Libraries (Careful Migration Required)
+
+**Examples:** `pydantic` (v1→v2), `sqlalchemy` (v1→v2)
+
+**Strategy:**
+1. Read migration guide thoroughly
+2. Create dedicated branch for upgrade
+3. Update code to new API patterns
+4. Run comprehensive tests
+5. Performance test in staging
+6. Plan rollback strategy
+7. Deploy with monitoring
+
+**Frequency:** Only when necessary (major features/security)
+
+### Common Upgrade Scenarios
+
+#### Scenario 1: Security Vulnerability in Direct Dependency
+
+```bash
+# Example: Critical vulnerability in httpx
+pip install --upgrade httpx==0.24.1  # Specific safe version
+pytest src/tests/  # Run tests
+pip-audit  # Verify fix
+```
+
+**Checklist:**
+- [ ] Check if vulnerability affects SDK usage
+- [ ] Update to patched version
+- [ ] Run full test suite
+- [ ] Deploy as hotfix if critical
+
+#### Scenario 2: Security Vulnerability in Transitive Dependency
+
+```bash
+# Example: Vulnerability in certifi (via httpx)
+pip install --upgrade certifi  # Update transitive dep
+pip check  # Verify no conflicts
+pytest  # Run tests
+```
+
+**Checklist:**
+- [ ] Identify which direct dep pulls it in
+- [ ] Check if updating direct dep fixes it
+- [ ] Otherwise, constrain transitive dep version
+- [ ] Add note in requirements.txt
+
+#### Scenario 3: Major Version Upgrade (Breaking Changes)
+
+```bash
+# Example: Upgrading pydantic 1.x → 2.x
+pip install pydantic>=2.0.0  # Upgrade
+# Fix breaking changes in code
+pytest src/tests/  # Will likely fail
+# Iterate until all tests pass
+```
+
+**Checklist:**
+- [ ] Read migration guide
+- [ ] Create feature branch
+- [ ] Update code incrementally
+- [ ] Add compatibility shims if needed
+- [ ] Update documentation
+- [ ] Test thoroughly in staging
+
+### Version Pinning Strategies
+
+#### Development (Flexible)
+```txt
+# requirements.txt
+litellm>=1.0.0
+pydantic>=2.0.0
+```
+**Pros:** Get latest features and fixes
+**Cons:** May break unexpectedly
+
+#### Production (Strict)
+```txt
+# requirements-prod.txt
+litellm==1.0.5
+pydantic==2.0.3
+```
+**Pros:** Reproducible builds
+**Cons:** Miss security fixes
+
+#### Recommended (Balanced)
+```txt
+# requirements.txt
+litellm>=1.0.0,<2.0.0  # Allow minor updates, block majors
+pydantic>=2.0.0,<3.0.0
+```
+**Pros:** Security fixes + stability
+**Cons:** Requires periodic testing
+
+### Monitoring Dependency Health
+
+**Tools to use:**
+
+1. **Security Scanning**
+   ```bash
+   pip-audit  # Check for known vulnerabilities
+   safety check  # Alternative security scanner
+   ```
+
+2. **Dependency Updates**
+   ```bash
+   pip list --outdated  # See what's available
+   pip-review --auto  # Interactive updater
+   ```
+
+3. **Compatibility Checking**
+   ```bash
+   pip check  # Verify dependency compatibility
+   pipdeptree  # Visualize dependency tree
+   ```
+
+**Frequency:**
+- 🔴 **Security scans:** Weekly (automated in CI)
+- 🟡 **Dependency updates:** Monthly review
+- 🟢 **Major upgrades:** Quarterly planning
+
+### Direct vs Transitive Dependency Summary
+
+**All SDK Dependencies (Categorized):**
+
+#### Direct Dependencies (SDK imports directly)
+```
+Core:
+- litellm, pydantic, httpx, psycopg2-binary
+- fastapi, uvicorn, asyncio, aiofiles
+
+Optional:
+- dragonfly, opentelemetry-api, structlog
+```
+
+#### Transitive Dependencies (Required by direct deps)
+```
+Via litellm:
+- openai, anthropic, google-generativeai
+
+Via httpx:
+- certifi, httpcore, h11, sniffio
+
+Via pydantic:
+- typing-extensions, annotated-types
+
+Via fastapi:
+- starlette, anyio
+```
+
+**To see your current dependency tree:**
+```bash
+pip install pipdeptree
+pipdeptree -p litellm  # Show litellm's dependencies
+pipdeptree --reverse  # Show what depends on what
+```
+
+---
+
 ## License Compatibility
 
 All libraries are compatible with the SDK's MIT license. Check individual library licenses for specific requirements.
+
+**License Summary:**
+- **MIT:** Most dependencies (litellm, pydantic, httpx, etc.)
+- **Apache 2.0:** OpenTelemetry libraries
+- **BSD:** PostgreSQL-related libraries
+- **PSF:** Python standard library modules
+
+**For production use:** Run `pip-licenses` to generate complete license report.
+
+---
+
+**Last Updated:** 2026-02-02
+**Next Review:** 2026-05-02
 

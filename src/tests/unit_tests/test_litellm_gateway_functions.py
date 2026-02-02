@@ -4,7 +4,7 @@ Unit Tests for LiteLLM Gateway Functions
 Tests factory functions, convenience functions, and utilities for LiteLLM Gateway.
 """
 
-from unittest.mock import AsyncMock, MagicMock, Mock, patch
+from unittest.mock import AsyncMock, Mock, patch
 
 import pytest
 
@@ -79,7 +79,7 @@ class TestFactoryFunctions:
         )
 
         assert isinstance(config, GatewayConfig)
-        assert config.timeout == 60.0
+        assert abs(config.timeout - 60.0) < 0.001
         assert config.max_retries == 3
 
 
@@ -94,7 +94,12 @@ class TestConvenienceFunctions:
         gateway.generate_async = AsyncMock(
             return_value=Mock(text="Async generated text", model="gpt-4")
         )
-        gateway.stream = Mock(return_value=[Mock(text="Hello "), Mock(text="World")])
+        
+        async def mock_stream(*args, **kwargs):
+            yield "Hello "
+            yield "World"
+        
+        gateway.stream = mock_stream
         gateway.generate_embeddings = Mock(
             return_value=Mock(embeddings=[[0.1] * 1536, [0.2] * 1536])
         )
@@ -125,16 +130,19 @@ class TestConvenienceFunctions:
             gateway=mock_gateway, prompt="What is AI?", model="gpt-4"
         )
 
-        assert result.text == "Async generated text"
+        assert result == "Async generated text"
         mock_gateway.generate_async.assert_called_once()
 
-    def test_stream_text(self, mock_gateway):
+    @pytest.mark.asyncio
+    async def test_stream_text(self, mock_gateway):
         """Test stream_text convenience function."""
-        chunks = list(stream_text(gateway=mock_gateway, prompt="Hello", model="gpt-4"))
+        chunks = []
+        async for chunk in stream_text(gateway=mock_gateway, prompt="Hello", model="gpt-4"):
+            chunks.append(chunk)
 
         assert len(chunks) == 2
-        assert chunks[0].text == "Hello "
-        assert chunks[1].text == "World"
+        assert chunks[0] == "Hello "
+        assert chunks[1] == "World"
 
     def test_generate_embeddings(self, mock_gateway):
         """Test generate_embeddings convenience function."""
@@ -168,46 +176,43 @@ class TestUtilityFunctions:
         """Create a mock gateway."""
         gateway = Mock(spec=LiteLLMGateway)
         gateway.generate_async = AsyncMock(
-            side_effect=[Mock(text="Response 1"), Mock(text="Response 2"), Mock(text="Response 3")]
+            side_effect=["Response 1", "Response 2", "Response 3"]
         )
         return gateway
 
-    @pytest.mark.asyncio
-    async def test_batch_generate(self, mock_gateway):
+    def test_batch_generate(self, mock_gateway):
         """Test batch_generate utility function."""
         prompts = ["Prompt 1", "Prompt 2", "Prompt 3"]
 
-        results = await batch_generate(gateway=mock_gateway, prompts=prompts, model="gpt-4")
+        results = batch_generate(gateway=mock_gateway, prompts=prompts, model="gpt-4")
 
         assert len(results) == 3
-        assert results[0].text == "Response 1"
-        assert results[1].text == "Response 2"
-        assert results[2].text == "Response 3"
+        assert results[0] == "Response 1"
+        assert results[1] == "Response 2"
+        assert results[2] == "Response 3"
         assert mock_gateway.generate_async.call_count == 3
 
-    @pytest.mark.asyncio
-    async def test_batch_generate_empty(self, mock_gateway):
+    def test_batch_generate_empty(self, mock_gateway):
         """Test batch_generate with empty prompt list."""
-        results = await batch_generate(gateway=mock_gateway, prompts=[], model="gpt-4")
+        results = batch_generate(gateway=mock_gateway, prompts=[], model="gpt-4")
 
         assert results == []
         mock_gateway.generate_async.assert_not_called()
 
-    @pytest.mark.asyncio
-    async def test_batch_generate_with_exceptions(self, mock_gateway):
+    def test_batch_generate_with_exceptions(self, mock_gateway):
         """Test batch_generate with exceptions."""
         mock_gateway.generate_async = AsyncMock(
-            side_effect=[Mock(text="Response 1"), Exception("Error"), Mock(text="Response 3")]
+            side_effect=["Response 1", Exception("Error"), "Response 3"]
         )
 
         prompts = ["Prompt 1", "Prompt 2", "Prompt 3"]
-        results = await batch_generate(gateway=mock_gateway, prompts=prompts, model="gpt-4")
+        results = batch_generate(gateway=mock_gateway, prompts=prompts, model="gpt-4")
 
         # Should handle exceptions gracefully
         assert len(results) == 3
-        assert isinstance(results[0], Mock)
+        assert results[0] == "Response 1"
         assert isinstance(results[1], Exception)
-        assert isinstance(results[2], Mock)
+        assert results[2] == "Response 3"
 
 
 if __name__ == "__main__":

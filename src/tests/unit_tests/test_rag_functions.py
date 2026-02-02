@@ -4,8 +4,8 @@ Unit Tests for RAG System Functions
 Tests factory functions, convenience functions, and utilities for RAG system.
 """
 
-from typing import Any, Dict, List
-from unittest.mock import AsyncMock, MagicMock, Mock, patch
+from typing import Any, Dict
+from unittest.mock import AsyncMock, Mock
 
 import pytest
 
@@ -72,13 +72,13 @@ class TestFactoryFunctions:
     def test_create_document_processor(self):
         """Test create_document_processor factory function."""
         processor = create_document_processor(
-            chunk_size=500, chunk_overlap=100, strategy="sentence"
+            chunk_size=500, chunk_overlap=100, chunking_strategy="sentence"
         )
 
         assert isinstance(processor, DocumentProcessor)
         assert processor.chunk_size == 500
         assert processor.chunk_overlap == 100
-        assert processor.strategy == "sentence"
+        assert processor.chunking_strategy == "sentence"
 
     def test_create_document_processor_defaults(self):
         """Test create_document_processor with default parameters."""
@@ -87,7 +87,7 @@ class TestFactoryFunctions:
         assert isinstance(processor, DocumentProcessor)
         assert processor.chunk_size == 1000
         assert processor.chunk_overlap == 200
-        assert processor.strategy == "fixed"
+        assert processor.chunking_strategy == "fixed"
 
 
 class TestConvenienceFunctions:
@@ -232,17 +232,20 @@ class TestUtilityFunctions:
 
     def test_batch_process_documents(self):
         """Test batch_process_documents utility function."""
+        import asyncio
+
         documents = [
             {"id": "doc1", "content": "Content 1"},
             {"id": "doc2", "content": "Content 2"},
             {"id": "doc3", "content": "Content 3"},
         ]
 
-        def process_func(doc: Dict[str, Any]) -> str:
+        async def process_func(doc: Dict[str, Any]) -> str:
+            await asyncio.sleep(0)  # Make function truly async
             return f"Processed: {doc['id']}"
 
         results = batch_process_documents(
-            documents=documents, processor_func=process_func, batch_size=2
+            documents=documents, processor=process_func, batch_size=2
         )
 
         assert len(results) == 3
@@ -252,19 +255,22 @@ class TestUtilityFunctions:
 
     def test_batch_process_documents_with_errors(self):
         """Test batch_process_documents with processing errors."""
+        import asyncio
+
         documents = [
             {"id": "doc1", "content": "Content 1"},
             {"id": "doc2", "content": "Content 2"},
             {"id": "doc3", "content": "Content 3"},
         ]
 
-        def process_func(doc: Dict[str, Any]) -> str:
+        async def process_func(doc: Dict[str, Any]) -> str:
+            await asyncio.sleep(0)  # Make function truly async
             if doc["id"] == "doc2":
-                raise Exception("Processing error")
+                raise RuntimeError("Processing error")  # noqa: TRY301
             return f"Processed: {doc['id']}"
 
         results = batch_process_documents(
-            documents=documents, processor_func=process_func, batch_size=2
+            documents=documents, processor=process_func, batch_size=2
         )
 
         # Should skip failed documents
@@ -274,11 +280,13 @@ class TestUtilityFunctions:
 
     def test_batch_process_documents_empty(self):
         """Test batch_process_documents with empty document list."""
+        import asyncio
 
-        def process_func(doc: Dict[str, Any]) -> str:
+        async def process_func(doc: Dict[str, Any]) -> str:
+            await asyncio.sleep(0)  # Make function truly async
             return "processed"
 
-        results = batch_process_documents(documents=[], processor_func=process_func, batch_size=10)
+        results = batch_process_documents(documents=[], processor=process_func, batch_size=10)
 
         assert results == []
 

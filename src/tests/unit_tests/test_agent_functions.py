@@ -4,12 +4,11 @@ Unit Tests for Agent Framework Functions
 Tests factory functions, convenience functions, and utilities for agent framework.
 """
 
-from typing import Any, Dict
-from unittest.mock import AsyncMock, MagicMock, Mock, patch
+from unittest.mock import AsyncMock, Mock, patch
 
 import pytest
 
-from src.core.agno_agent_framework.agent import Agent, AgentManager, AgentStatus, AgentTask
+from src.core.agno_agent_framework.agent import Agent, AgentManager, AgentStatus
 from src.core.agno_agent_framework.functions import (  # Factory functions; Convenience functions; Utility functions
     batch_process_agents,
     chat_with_agent,
@@ -25,7 +24,7 @@ from src.core.agno_agent_framework.functions import (  # Factory functions; Conv
     retry_on_failure,
     save_agent_state,
 )
-from src.core.agno_agent_framework.session import AgentSession, SessionManager
+from src.core.agno_agent_framework.session import SessionManager
 
 
 class TestFactoryFunctions:
@@ -207,10 +206,10 @@ class TestConvenienceFunctions:
         mock_agent.execute_task = AsyncMock(return_value={"result": "Hello! How can I help you?"})
 
         response = await chat_with_agent(
-            agent=mock_agent, message="Hello", session_manager=session_manager
+            agent=mock_agent, message="Hello", tenant_id="test_tenant"
         )
 
-        assert response == "Hello! How can I help you?"
+        assert response["result"] == "Hello! How can I help you?"
         mock_agent.execute_task.assert_called_once()
 
     @pytest.mark.asyncio
@@ -224,11 +223,11 @@ class TestConvenienceFunctions:
         response = await chat_with_agent(
             agent=mock_agent,
             message="Hello",
-            session_manager=session_manager,
+            tenant_id="test_tenant",
             session_id=session_id,
         )
 
-        assert response == "Response"
+        assert response["result"] == "Response"
 
     @pytest.mark.asyncio
     async def test_execute_task(self, mock_agent):
@@ -258,20 +257,19 @@ class TestConvenienceFunctions:
         agent2.agent_id = "agent2"
         agent2.execute_task = AsyncMock(return_value={"result": "Completed"})
 
-        manager = Mock()
-        manager.get_agent = Mock(return_value=agent2)
+        orchestrator = Mock()
+        orchestrator.delegate_task = AsyncMock(return_value={"result": "Completed"})
 
         result = await delegate_task(
-            from_agent=agent1,
+            orchestrator=orchestrator,
+            from_agent_id="agent1",
             to_agent_id="agent2",
-            agent_manager=manager,
             task_type="process",
             parameters={"data": "test"},
         )
 
         assert result == {"result": "Completed"}
-        manager.get_agent.assert_called_once_with("agent2")
-        agent2.execute_task.assert_called_once()
+        orchestrator.delegate_task.assert_called_once()
 
     @patch("src.core.agno_agent_framework.functions.create_prompt_manager")
     def test_create_agent_with_prompt_management_basic(self, mock_create_pm, mock_gateway):
@@ -306,7 +304,7 @@ class TestConvenienceFunctions:
         manager.list_agents = Mock(return_value=["agent1", "agent2"])
         manager.get_agent = Mock(side_effect=lambda x: agent1 if x == "agent1" else agent2)
 
-        agents = find_agents_by_capability(agent_manager=manager, capability_name="analysis")
+        agents = find_agents_by_capability(manager=manager, capability_name="analysis")
 
         assert len(agents) == 1
         assert agents[0].agent_id == "agent1"
@@ -315,8 +313,21 @@ class TestConvenienceFunctions:
 class TestUtilityFunctions:
     """Test utility functions."""
 
-    @pytest.mark.asyncio
-    async def test_batch_process_agents(self):
+    @pytest.fixture
+    def mock_gateway(self):
+        """Mock LiteLLM Gateway."""
+        return Mock()
+
+    @pytest.fixture
+    def mock_agent(self):
+        """Create a mock agent."""
+        agent = Mock(spec=Agent)
+        agent.agent_id = "agent1"
+        agent.name = "Test Agent"
+        agent.status = AgentStatus.IDLE
+        return agent
+
+    def test_batch_process_agents(self):
         """Test batch_process_agents utility function."""
         agent1 = Mock(spec=Agent)
         agent1.agent_id = "agent1"
@@ -326,7 +337,7 @@ class TestUtilityFunctions:
         agent2.agent_id = "agent2"
         agent2.execute_task = AsyncMock(return_value={"result": "Result 2"})
 
-        results = await batch_process_agents(
+        results = batch_process_agents(
             agents=[agent1, agent2], task_type="process", parameters={"data": "test"}
         )
 
@@ -336,10 +347,9 @@ class TestUtilityFunctions:
         agent1.execute_task.assert_called_once()
         agent2.execute_task.assert_called_once()
 
-    @pytest.mark.asyncio
-    async def test_batch_process_agents_empty_list(self):
+    def test_batch_process_agents_empty_list(self):
         """Test batch_process_agents with empty agent list."""
-        results = await batch_process_agents(agents=[], task_type="process", parameters={})
+        results = batch_process_agents(agents=[], task_type="process", parameters={})
 
         assert results == []
 
@@ -347,7 +357,7 @@ class TestUtilityFunctions:
     async def test_retry_on_failure_success(self):
         """Test retry_on_failure decorator with successful call."""
 
-        @retry_on_failure(max_retries=3, delay=0.1)
+        @retry_on_failure(max_retries=3, retry_delay=0.1)
         async def successful_function():
             return "success"
 
@@ -359,12 +369,12 @@ class TestUtilityFunctions:
         """Test retry_on_failure decorator with failures then success."""
         call_count = 0
 
-        @retry_on_failure(max_retries=3, delay=0.1)
+        @retry_on_failure(max_retries=3, retry_delay=0.1)
         async def flaky_function():
             nonlocal call_count
             call_count += 1
             if call_count < 2:
-                raise Exception("Temporary failure")
+                raise RuntimeError("Temporary failure")  # noqa: S112, TRY301
             return "success"
 
         result = await flaky_function()
@@ -375,11 +385,11 @@ class TestUtilityFunctions:
     async def test_retry_on_failure_max_retries_exceeded(self):
         """Test retry_on_failure decorator when max retries exceeded."""
 
-        @retry_on_failure(max_retries=2, delay=0.1)
+        @retry_on_failure(max_retries=2, retry_delay=0.1)
         async def always_fails():
-            raise Exception("Always fails")
+            raise RuntimeError("Always fails")  # noqa: S112, TRY301
 
-        with pytest.raises(Exception, match="Always fails"):
+        with pytest.raises(RuntimeError, match="Always fails"):
             await always_fails()
 
     def test_save_agent_state(self, mock_agent, tmp_path):

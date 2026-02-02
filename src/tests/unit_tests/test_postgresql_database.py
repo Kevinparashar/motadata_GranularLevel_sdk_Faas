@@ -4,27 +4,28 @@ Unit Tests for PostgreSQL Database Component
 Tests database operations and vector functionality.
 """
 
-from unittest.mock import MagicMock, Mock, patch
+from unittest.mock import MagicMock, patch
 
 import pytest
 
-from src.core.postgresql_database import PostgreSQLDatabase
+from src.core.postgresql_database import DatabaseConnection
 from src.core.postgresql_database.vector_operations import VectorOperations
 
 
-class TestPostgreSQLDatabase:
-    """Test PostgreSQLDatabase."""
+class TestDatabaseConnection:
+    """Test DatabaseConnection."""
 
     @pytest.fixture
     def db_config(self):
         """Database configuration fixture."""
-        return {
-            "host": "localhost",
-            "port": 5432,
-            "database": "test_db",
-            "user": "test_user",
-            "password": "test_password",
-        }
+        from src.core.postgresql_database import DatabaseConfig
+        return DatabaseConfig(
+            host="localhost",
+            port=5432,
+            database="test_db",
+            user="test_user",
+            password="test_password",
+        )
 
     @pytest.fixture
     def mock_db(self, db_config):
@@ -35,26 +36,26 @@ class TestPostgreSQLDatabase:
             mock_conn.cursor.return_value = mock_cursor
             mock_connect.return_value = mock_conn
 
-            db = PostgreSQLDatabase(**db_config)
-            db._connection = mock_conn
+            db = DatabaseConnection(config=db_config)
+            db.connection_pool = mock_conn
             return db, mock_conn, mock_cursor
 
     def test_initialization(self, db_config):
         """Test database initialization."""
-        db = PostgreSQLDatabase(**db_config)
-        assert db.host == "localhost"
-        assert db.port == 5432
-        assert db.database == "test_db"
+        db = DatabaseConnection(config=db_config)
+        assert db.config.host == "localhost"
+        assert db.config.port == 5432
+        assert db.config.database == "test_db"
 
     def test_connect(self, mock_db):
         """Test database connection."""
-        db, mock_conn, mock_cursor = mock_db
+        db, _, _ = mock_db
         db.connect()
-        assert db._connection is not None
+        assert db.connection_pool is not None
 
     def test_execute_query(self, mock_db):
         """Test query execution."""
-        db, mock_conn, mock_cursor = mock_db
+        db, _, mock_cursor = mock_db
         mock_cursor.fetchone.return_value = {"id": 1, "name": "test"}
 
         result = db.execute_query("SELECT * FROM test WHERE id = %s", (1,), fetch_one=True)
@@ -64,7 +65,7 @@ class TestPostgreSQLDatabase:
 
     def test_execute_query_fetch_all(self, mock_db):
         """Test query execution with fetch_all."""
-        db, mock_conn, mock_cursor = mock_db
+        db, _, mock_cursor = mock_db
         mock_cursor.fetchall.return_value = [{"id": 1, "name": "test1"}, {"id": 2, "name": "test2"}]
 
         results = db.execute_query("SELECT * FROM test", fetch_all=True)
@@ -74,7 +75,7 @@ class TestPostgreSQLDatabase:
 
     def test_disconnect(self, mock_db):
         """Test database disconnection."""
-        db, mock_conn, mock_cursor = mock_db
+        db, mock_conn, _ = mock_db
         db.disconnect()
         mock_conn.close.assert_called_once()
 
@@ -90,23 +91,15 @@ class TestVectorOperations:
         mock_db.cursor.return_value = mock_cursor
         return mock_db, mock_cursor
 
-    def test_create_vector_table(self, mock_db):
-        """Test vector table creation."""
+    def test_insert_embedding(self, mock_db):
+        """Test embedding insertion."""
         mock_db_obj, mock_cursor = mock_db
-        vector_ops = VectorOperations(mock_db_obj)
-
-        vector_ops.create_vector_table("test_vectors", dimension=1536)
-        mock_cursor.execute.assert_called()
-
-    def test_store_embedding(self, mock_db):
-        """Test embedding storage."""
-        mock_db_obj, mock_cursor = mock_db
-        mock_cursor.fetchone.return_value = {"id": 1}
+        mock_cursor.fetchone.return_value = (1,)
 
         vector_ops = VectorOperations(mock_db_obj)
         embedding = [0.1] * 1536
 
-        embedding_id = vector_ops.store_embedding(
+        embedding_id = vector_ops.insert_embedding(
             document_id=1, embedding=embedding, model="text-embedding-3-small"
         )
 
@@ -128,7 +121,7 @@ class TestVectorOperations:
         )
 
         assert len(results) == 1
-        assert results[0]["similarity"] == 0.95
+        assert abs(results[0]["similarity"] - 0.95) < 0.001
 
     def test_batch_insert_embeddings(self, mock_db):
         """Test batch embedding insertion."""

@@ -4,7 +4,7 @@ Unit Tests for RAG Component
 Tests document processing, retrieval, and generation.
 """
 
-from unittest.mock import MagicMock, Mock, patch
+from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
@@ -19,22 +19,20 @@ class TestDocumentProcessor:
 
     def test_chunk_document(self):
         """Test document chunking."""
-        processor = DocumentProcessor()
+        processor = DocumentProcessor(chunk_size=100)
 
         content = "This is a test document. " * 100
-        chunks = processor.chunk_document(content=content, document_id="doc-001", chunk_size=100)
+        chunks = processor.chunk_document(content=content, document_id="doc-001")
 
         assert len(chunks) > 0
         assert all(isinstance(chunk, DocumentChunk) for chunk in chunks)
 
     def test_chunk_with_overlap(self):
         """Test chunking with overlap."""
-        processor = DocumentProcessor()
+        processor = DocumentProcessor(chunk_size=50, chunk_overlap=10)
 
         content = "Test content " * 50
-        chunks = processor.chunk_document(
-            content=content, document_id="doc-001", chunk_size=50, overlap=10
-        )
+        chunks = processor.chunk_document(content=content, document_id="doc-001")
 
         assert len(chunks) > 0
 
@@ -66,12 +64,12 @@ class TestRetriever:
 
     def test_retrieve(self, mock_retriever):
         """Test document retrieval."""
-        retriever, mock_vector_ops, mock_gateway = mock_retriever
+        retriever, _, mock_gateway = mock_retriever
 
         results = retriever.retrieve(query="Test query", top_k=5, threshold=0.7)
 
         assert len(results) == 1
-        assert results[0]["similarity"] == 0.95
+        assert abs(results[0]["similarity"] - 0.95) < 0.001
         mock_gateway.embed.assert_called_once()
 
 
@@ -149,7 +147,7 @@ class TestRAGSystem:
 
     def test_query(self, mock_rag_system):
         """Test RAG query."""
-        rag, mock_db, mock_gateway = mock_rag_system
+        rag, _, _ = mock_rag_system
 
         # Mock vector operations
         with patch.object(rag.vector_ops, "similarity_search") as mock_search:
@@ -166,12 +164,12 @@ class TestRAGSystem:
     @pytest.mark.asyncio
     async def test_query_async(self, mock_rag_system):
         """Test async RAG query."""
-        rag, mock_db, mock_gateway = mock_rag_system
+        rag, _, mock_gateway = mock_rag_system
 
         # Mock async gateway
         mock_async_response = MagicMock()
         mock_async_response.text = "Async answer"
-        mock_gateway.generate_async = Mock(return_value=mock_async_response)
+        mock_gateway.generate_async = AsyncMock(return_value=mock_async_response)
 
         with patch.object(rag.vector_ops, "similarity_search") as mock_search:
             mock_search.return_value = [
@@ -214,7 +212,7 @@ class TestRAGSystem:
     @pytest.mark.asyncio
     async def test_query_with_memory_context(self):
         """Test RAG query with memory context retrieval."""
-        from src.core.agno_agent_framework.memory import AgentMemory
+        from src.core.agno_agent_framework.memory import MemoryType
 
         mock_db = MagicMock()
         mock_gateway = MagicMock()
@@ -230,7 +228,7 @@ class TestRAGSystem:
         # Store some memories
         rag.memory.store(
             content="Previous query about AI",
-            memory_type="episodic",
+            memory_type=MemoryType.EPISODIC,
             metadata={"query": "What is AI?"},
         )
 
@@ -262,8 +260,6 @@ class TestRAGSystem:
     @pytest.mark.asyncio
     async def test_memory_storage_after_query(self):
         """Test that query-answer pairs are stored in memory."""
-        from src.core.agno_agent_framework.memory import AgentMemory
-
         mock_db = MagicMock()
         mock_gateway = MagicMock()
 
@@ -274,7 +270,7 @@ class TestRAGSystem:
             memory_config={"max_episodic": 100},
         )
 
-        initial_memory_size = len(rag.memory.episodic_memory)
+        initial_memory_size = len(rag.memory._episodic)
 
         # Mock gateway responses
         mock_embedding_response = MagicMock()
@@ -297,7 +293,7 @@ class TestRAGSystem:
             )
 
             # Memory should have stored the query-answer pair
-            final_memory_size = len(rag.memory.episodic_memory)
+            final_memory_size = len(rag.memory._episodic)
             assert final_memory_size > initial_memory_size
 
 
