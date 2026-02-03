@@ -4,6 +4,7 @@ Drift Detection
 Detects data and model drift.
 """
 
+
 import logging
 from typing import Any, Dict, Optional
 
@@ -23,9 +24,9 @@ class DriftDetector:
     def __init__(self, tenant_id: Optional[str] = None):
         """
         Initialize drift detector.
-
+        
         Args:
-            tenant_id: Optional tenant ID
+            tenant_id (Optional[str]): Tenant identifier used for tenant isolation.
         """
         self.tenant_id = tenant_id
 
@@ -36,14 +37,14 @@ class DriftDetector:
     ) -> Dict[str, Any]:
         """
         Detect data drift using statistical tests.
-
+        
         Args:
-            reference_data: Reference dataset
-            current_data: Current dataset
-            threshold: P-value threshold for drift
-
+            reference_data (np.ndarray): Input parameter for this operation.
+            current_data (np.ndarray): Input parameter for this operation.
+            threshold (float): Input parameter for this operation.
+        
         Returns:
-            Drift detection results
+            Dict[str, Any]: Dictionary result of the operation.
         """
         try:
             from scipy import stats
@@ -71,14 +72,14 @@ class DriftDetector:
     ) -> Dict[str, Any]:
         """
         Detect model drift based on performance degradation.
-
+        
         Args:
-            reference_metrics: Reference performance metrics
-            current_metrics: Current performance metrics
-            threshold: Performance degradation threshold
-
+            reference_metrics (Dict[str, float]): Input parameter for this operation.
+            current_metrics (Dict[str, float]): Input parameter for this operation.
+            threshold (float): Input parameter for this operation.
+        
         Returns:
-            Model drift detection results
+            Dict[str, Any]: Dictionary result of the operation.
         """
         drift_detected = False
         degradation = {}
@@ -111,15 +112,15 @@ class DriftDetector:
     ) -> Dict[str, Any]:
         """
         Check for drift (data or model).
-
+        
         Args:
-            reference_data: Optional reference data
-            current_data: Optional current data
-            reference_metrics: Optional reference metrics
-            current_metrics: Optional current metrics
-
+            reference_data (Optional[np.ndarray]): Input parameter for this operation.
+            current_data (Optional[np.ndarray]): Input parameter for this operation.
+            reference_metrics (Optional[Dict[str, float]]): Input parameter for this operation.
+            current_metrics (Optional[Dict[str, float]]): Input parameter for this operation.
+        
         Returns:
-            Drift check results
+            Dict[str, Any]: Dictionary result of the operation.
         """
         results = {}
 

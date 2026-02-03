@@ -4,6 +4,7 @@ Unit Tests for PostgreSQL Database Component
 Tests database operations and vector functionality.
 """
 
+
 from unittest.mock import MagicMock, patch
 
 import pytest

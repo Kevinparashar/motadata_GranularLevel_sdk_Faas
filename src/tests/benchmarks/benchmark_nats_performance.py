@@ -4,6 +4,7 @@ Performance Benchmarks for NATS Integration
 Measures NATS messaging performance with AI SDK components.
 """
 
+
 import asyncio
 import time
 from typing import Dict, List

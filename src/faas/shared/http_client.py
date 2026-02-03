@@ -5,6 +5,7 @@ Provides retry logic, circuit breakers, and standardized HTTP client for
 inter-service communication in FaaS architecture.
 """
 
+
 import asyncio
 import logging
 from typing import Any, Dict, List, Optional
@@ -58,14 +59,14 @@ class ServiceHTTPClient:
     ):
         """
         Initialize service HTTP client.
-
+        
         Args:
-            service_name: Name of the target service (for logging/circuit breaker)
-            service_url: Base URL of the target service
-            config: Service configuration (optional)
-            timeout: Request timeout in seconds
-            max_retries: Maximum retry attempts
-            circuit_breaker_config: Circuit breaker configuration
+            service_name (str): Input parameter for this operation.
+            service_url (str): Input parameter for this operation.
+            config (Optional[ServiceConfig]): Configuration object or settings.
+            timeout (float): Input parameter for this operation.
+            max_retries (int): Input parameter for this operation.
+            circuit_breaker_config (Optional[CircuitBreakerConfig]): Input parameter for this operation.
         """
         self.service_name = service_name
         self.service_url = service_url.rstrip("/")
@@ -100,21 +101,21 @@ class ServiceHTTPClient:
     ) -> httpx.Response:
         """
         Make HTTP request with retry and circuit breaker.
-
+        
         Args:
-            method: HTTP method (GET, POST, PUT, DELETE)
-            endpoint: API endpoint (relative to base URL)
-            headers: Additional headers
-            json_data: JSON request body
-            params: Query parameters
-
+            method (str): Input parameter for this operation.
+            endpoint (str): Input parameter for this operation.
+            headers (Optional[Dict[str, Any]]): HTTP headers passed from the caller.
+            json_data (Optional[Dict[str, Any]]): Input parameter for this operation.
+            params (Optional[Dict[str, Any]]): Input parameter for this operation.
+        
         Returns:
-            HTTP response
-
+            httpx.Response: Result of the operation.
+        
         Raises:
-            ServiceUnavailableError: If circuit breaker is open
-            ServiceTimeoutError: If request times out
-            ServiceClientError: For other errors
+            ServiceClientError: Raised when this function detects an invalid state or when an underlying call fails.
+            ServiceTimeoutError: Raised when this function detects an invalid state or when an underlying call fails.
+            ServiceUnavailableError: Raised when this function detects an invalid state or when an underlying call fails.
         """
         # Prepare headers
         request_headers = headers or {}
@@ -163,14 +164,18 @@ class ServiceHTTPClient:
     ) -> Dict[str, Any]:
         """
         Make GET request with automatic retry.
-
+        
         Args:
-            endpoint: API endpoint
-            headers: Additional headers
-            params: Query parameters
-
+            endpoint (str): Input parameter for this operation.
+            headers (Optional[Dict[str, Any]]): HTTP headers passed from the caller.
+            params (Optional[Dict[str, Any]]): Input parameter for this operation.
+        
         Returns:
-            Response JSON as dictionary
+            Dict[str, Any]: Dictionary result of the operation.
+        
+        Raises:
+            ServiceClientError: Raised when this function detects an invalid state or when an underlying call fails.
+            last_error: Raised when this function detects an invalid state or when an underlying call fails.
         """
         # Retry logic is handled in _make_request via circuit breaker
         # Additional retry can be added here if needed
@@ -205,15 +210,19 @@ class ServiceHTTPClient:
     ) -> Dict[str, Any]:
         """
         Make POST request with automatic retry.
-
+        
         Args:
-            endpoint: API endpoint
-            json_data: JSON request body
-            headers: Additional headers
-            params: Query parameters
-
+            endpoint (str): Input parameter for this operation.
+            json_data (Optional[Dict[str, Any]]): Input parameter for this operation.
+            headers (Optional[Dict[str, Any]]): HTTP headers passed from the caller.
+            params (Optional[Dict[str, Any]]): Input parameter for this operation.
+        
         Returns:
-            Response JSON as dictionary
+            Dict[str, Any]: Dictionary result of the operation.
+        
+        Raises:
+            ServiceClientError: Raised when this function detects an invalid state or when an underlying call fails.
+            last_error: Raised when this function detects an invalid state or when an underlying call fails.
         """
         max_retries = self.max_retries
         last_error = None
@@ -248,15 +257,19 @@ class ServiceHTTPClient:
     ) -> Dict[str, Any]:
         """
         Make PUT request with automatic retry.
-
+        
         Args:
-            endpoint: API endpoint
-            json_data: JSON request body
-            headers: Additional headers
-            params: Query parameters
-
+            endpoint (str): Input parameter for this operation.
+            json_data (Optional[Dict[str, Any]]): Input parameter for this operation.
+            headers (Optional[Dict[str, Any]]): HTTP headers passed from the caller.
+            params (Optional[Dict[str, Any]]): Input parameter for this operation.
+        
         Returns:
-            Response JSON as dictionary
+            Dict[str, Any]: Dictionary result of the operation.
+        
+        Raises:
+            ServiceClientError: Raised when this function detects an invalid state or when an underlying call fails.
+            last_error: Raised when this function detects an invalid state or when an underlying call fails.
         """
         max_retries = self.max_retries
         last_error = None
@@ -290,14 +303,18 @@ class ServiceHTTPClient:
     ) -> Dict[str, Any]:
         """
         Make DELETE request with automatic retry.
-
+        
         Args:
-            endpoint: API endpoint
-            headers: Additional headers
-            params: Query parameters
-
+            endpoint (str): Input parameter for this operation.
+            headers (Optional[Dict[str, Any]]): HTTP headers passed from the caller.
+            params (Optional[Dict[str, Any]]): Input parameter for this operation.
+        
         Returns:
-            Response JSON as dictionary
+            Dict[str, Any]: Dictionary result of the operation.
+        
+        Raises:
+            ServiceClientError: Raised when this function detects an invalid state or when an underlying call fails.
+            last_error: Raised when this function detects an invalid state or when an underlying call fails.
         """
         max_retries = self.max_retries
         last_error = None
@@ -332,15 +349,15 @@ class ServiceHTTPClient:
     ) -> Dict[str, str]:
         """
         Get standard headers for service-to-service calls.
-
+        
         Args:
-            tenant_id: Tenant ID
-            user_id: User ID (optional)
-            correlation_id: Correlation ID (optional)
-            request_id: Request ID (optional)
-
+            tenant_id (str): Tenant identifier used for tenant isolation.
+            user_id (Optional[str]): User identifier (used for auditing or personalization).
+            correlation_id (Optional[str]): Input parameter for this operation.
+            request_id (Optional[str]): Input parameter for this operation.
+        
         Returns:
-            Dictionary of headers
+            Dict[str, str]: Dictionary result of the operation.
         """
         headers = {
             "X-Tenant-ID": tenant_id,
@@ -375,9 +392,9 @@ class ServiceClientManager:
     def __init__(self, config: ServiceConfig):
         """
         Initialize service client manager.
-
+        
         Args:
-            config: Service configuration with service URLs
+            config (ServiceConfig): Configuration object or settings.
         """
         self.config = config
         self._clients: Dict[str, ServiceHTTPClient] = {}
@@ -385,12 +402,12 @@ class ServiceClientManager:
     def get_client(self, service_name: str) -> Optional[ServiceHTTPClient]:
         """
         Get or create service client.
-
+        
         Args:
-            service_name: Name of the service (e.g., "gateway", "rag", "cache")
-
+            service_name (str): Input parameter for this operation.
+        
         Returns:
-            ServiceHTTPClient instance or None if service URL not configured
+            Optional[ServiceHTTPClient]: Result if available, else None.
         """
         if service_name in self._clients:
             return self._clients[service_name]

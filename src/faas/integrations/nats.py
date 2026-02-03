@@ -4,6 +4,7 @@ NATS Integration for FaaS services.
 Provides message bus functionality for service-to-service communication.
 """
 
+
 import asyncio
 import logging
 from typing import Callable, Optional
@@ -22,9 +23,9 @@ class NATSClient:
     def __init__(self, nats_url: str):
         """
         Initialize NATS client.
-
+        
         Args:
-            nats_url: NATS server URL (e.g., "nats://localhost:4222")
+            nats_url (str): Input parameter for this operation.
         """
         self.nats_url = nats_url
         self._connected = False
@@ -54,11 +55,11 @@ class NATSClient:
     async def publish(self, subject: str, payload: bytes, reply: Optional[str] = None):
         """
         Publish message to NATS subject.
-
+        
         Args:
-            subject: NATS subject (e.g., "gateway.generate.request")
-            payload: Message payload (bytes)
-            reply: Optional reply subject
+            subject (str): Input parameter for this operation.
+            payload (bytes): Input parameter for this operation.
+            reply (Optional[str]): Input parameter for this operation.
         """
         if not self._connected:
             await self.connect()
@@ -71,11 +72,11 @@ class NATSClient:
     async def subscribe(self, subject: str, _callback: Callable, queue: Optional[str] = None):
         """
         Subscribe to NATS subject.
-
+        
         Args:
-            subject: NATS subject (e.g., "gateway.generate.request")
-            callback: Callback function to handle messages
-            queue: Optional queue group name
+            subject (str): Input parameter for this operation.
+            _callback (Callable): Input parameter for this operation.
+            queue (Optional[str]): Input parameter for this operation.
         """
         if not self._connected:
             await self.connect()
@@ -88,14 +89,14 @@ class NATSClient:
     async def request(self, subject: str, payload: bytes, timeout: float = 5.0) -> bytes:  # noqa: S7483
         """
         Send request and wait for response.
-
+        
         Args:
-            subject: NATS subject
-            payload: Request payload (bytes)
-            timeout: Request timeout in seconds
-
+            subject (str): Input parameter for this operation.
+            payload (bytes): Input parameter for this operation.
+            timeout (float): Input parameter for this operation.
+        
         Returns:
-            Response payload (bytes)
+            bytes: Result of the operation.
         """
         if not self._connected:
             await self.connect()

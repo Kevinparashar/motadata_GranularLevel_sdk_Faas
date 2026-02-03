@@ -4,6 +4,7 @@ Integration tests for FaaS service interactions.
 Tests how services communicate with each other.
 """
 
+
 from unittest.mock import AsyncMock, Mock, patch
 
 import pytest

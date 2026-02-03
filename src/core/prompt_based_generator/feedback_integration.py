@@ -4,6 +4,7 @@ Feedback Integration
 Integration with feedback loop system for agent and tool feedback collection.
 """
 
+
 from datetime import datetime
 from typing import Any, Dict, Optional
 
@@ -50,9 +51,9 @@ class FeedbackCollector:
     def __init__(self, feedback_loop: Optional[FeedbackLoop] = None):
         """
         Initialize feedback collector.
-
+        
         Args:
-            feedback_loop: Optional FeedbackLoop instance
+            feedback_loop (Optional[FeedbackLoop]): Input parameter for this operation.
         """
         self.feedback_loop = feedback_loop
         self._agent_feedback: Dict[str, list] = {}  # {agent_id: [feedback]}
@@ -70,18 +71,18 @@ class FeedbackCollector:
     ) -> str:
         """
         Collect feedback for an agent.
-
+        
         Args:
-            agent_id: Agent ID
-            rating: Rating (1-5)
-            user_id: User ID
-            tenant_id: Tenant ID
-            feedback_text: Optional feedback text
-            effectiveness_score: Optional effectiveness score (0.0-1.0)
-            metadata: Optional metadata
-
+            agent_id (str): Input parameter for this operation.
+            rating (int): Input parameter for this operation.
+            user_id (str): User identifier (used for auditing or personalization).
+            tenant_id (str): Tenant identifier used for tenant isolation.
+            feedback_text (Optional[str]): Input parameter for this operation.
+            effectiveness_score (Optional[float]): Input parameter for this operation.
+            metadata (Optional[Dict[str, Any]]): Extra metadata for the operation.
+        
         Returns:
-            Feedback ID
+            str: Returned text value.
         """
         feedback = AgentFeedback(
             agent_id=agent_id,
@@ -128,18 +129,18 @@ class FeedbackCollector:
     ) -> str:
         """
         Collect feedback for a tool.
-
+        
         Args:
-            tool_id: Tool ID
-            rating: Rating (1-5)
-            user_id: User ID
-            tenant_id: Tenant ID
-            feedback_text: Optional feedback text
-            performance_score: Optional performance score (0.0-1.0)
-            metadata: Optional metadata
-
+            tool_id (str): Tool identifier.
+            rating (int): Input parameter for this operation.
+            user_id (str): User identifier (used for auditing or personalization).
+            tenant_id (str): Tenant identifier used for tenant isolation.
+            feedback_text (Optional[str]): Input parameter for this operation.
+            performance_score (Optional[float]): Input parameter for this operation.
+            metadata (Optional[Dict[str, Any]]): Extra metadata for the operation.
+        
         Returns:
-            Feedback ID
+            str: Returned text value.
         """
         feedback = ToolFeedback(
             tool_id=tool_id,
@@ -179,13 +180,13 @@ class FeedbackCollector:
     ) -> Dict[str, Any]:
         """
         Get feedback statistics for an agent.
-
+        
         Args:
-            agent_id: Agent ID
-            tenant_id: Optional tenant ID filter
-
+            agent_id (str): Input parameter for this operation.
+            tenant_id (Optional[str]): Tenant identifier used for tenant isolation.
+        
         Returns:
-            Dictionary with feedback statistics
+            Dict[str, Any]: Dictionary result of the operation.
         """
         if agent_id not in self._agent_feedback:
             return {"total_feedback": 0, "average_rating": 0.0, "average_effectiveness": 0.0}
@@ -220,13 +221,13 @@ class FeedbackCollector:
     ) -> Dict[str, Any]:
         """
         Get feedback statistics for a tool.
-
+        
         Args:
-            tool_id: Tool ID
-            tenant_id: Optional tenant ID filter
-
+            tool_id (str): Tool identifier.
+            tenant_id (Optional[str]): Tenant identifier used for tenant isolation.
+        
         Returns:
-            Dictionary with feedback statistics
+            Dict[str, Any]: Dictionary result of the operation.
         """
         if tool_id not in self._tool_feedback:
             return {"total_feedback": 0, "average_rating": 0.0, "average_performance": 0.0}

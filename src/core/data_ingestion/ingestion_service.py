@@ -5,6 +5,7 @@ Unified service for uploading, processing, and integrating data files
 with all AI components (RAG, Agents, Cache, etc.).
 """
 
+
 # Standard library imports
 import asyncio
 from pathlib import Path
@@ -46,17 +47,17 @@ class DataIngestionService:
     ):
         """
         Initialize data ingestion service.
-
+        
         Args:
-            rag_system: Optional RAG system for document ingestion
-            cache: Optional cache mechanism for processed data
-            gateway: Optional gateway (required if RAG not provided)
-            db: Optional database (required if RAG not provided)
-            enable_validation: Enable data validation
-            enable_cleansing: Enable data cleansing
-            enable_auto_ingest: Automatically ingest into RAG
-            enable_caching: Cache processed data
-            tenant_id: Optional tenant ID for multi-tenancy
+            rag_system (Optional[RAGSystem]): Input parameter for this operation.
+            cache (Optional[CacheMechanism]): Cache instance used to store and fetch cached results.
+            gateway (Optional[LiteLLMGateway]): Gateway client used for LLM calls.
+            db (Optional[DatabaseConnection]): Database connection/handle.
+            enable_validation (bool): Flag to enable or disable validation.
+            enable_cleansing (bool): Flag to enable or disable cleansing.
+            enable_auto_ingest (bool): Flag to enable or disable auto ingest.
+            enable_caching (bool): Flag to enable or disable caching.
+            tenant_id (Optional[str]): Tenant identifier used for tenant isolation.
         """
         self.rag_system = rag_system
         self.cache = cache
@@ -105,28 +106,32 @@ class DataIngestionService:
     ) -> Dict[str, Any]:
         """
         Upload and process a data file.
-
+        
         This is a one-stop method that:
-        1. Validates the file
-        2. Loads and processes content
-        3. Cleanses the data
-        4. Caches the result
-        5. Ingests into RAG (if enabled)
-
+                                                1. Validates the file
+                                                2. Loads and processes content
+                                                3. Cleanses the data
+                                                4. Caches the result
+                                                5. Ingests into RAG (if enabled)
+        
+                                                Example:
+                                                    >>> service = create_ingestion_service(rag=rag, cache=cache)
+                                                    >>> result = service.upload_and_process("document.pdf")
+                                                    >>> print(result["document_id"])  # RAG document ID
+                                                    >>> print(result["content_preview"])  # Processed content preview
+        
         Args:
-            file_path: Path to file
-            title: Optional document title (defaults to filename)
-            metadata: Optional metadata
-            auto_ingest: Override auto-ingest setting
-
+            file_path (str): Path of the input file.
+            title (Optional[str]): Input parameter for this operation.
+            metadata (Optional[Dict[str, Any]]): Extra metadata for the operation.
+            auto_ingest (Optional[bool]): Input parameter for this operation.
+        
         Returns:
-            Dictionary with processing results
-
-        Example:
-            >>> service = create_ingestion_service(rag=rag, cache=cache)
-            >>> result = service.upload_and_process("document.pdf")
-            >>> print(result["document_id"])  # RAG document ID
-            >>> print(result["content_preview"])  # Processed content preview
+            Dict[str, Any]: Dictionary result of the operation.
+        
+        Raises:
+            DataIngestionError: Raised when this function detects an invalid state or when an underlying call fails.
+            ValidationError: Raised when this function detects an invalid state or when an underlying call fails.
         """
         path = Path(file_path)
 
@@ -214,15 +219,15 @@ class DataIngestionService:
     ) -> Dict[str, Any]:
         """
         Asynchronously upload and process a data file.
-
+        
         Args:
-            file_path: Path to file
-            title: Optional document title
-            metadata: Optional metadata
-            auto_ingest: Override auto-ingest setting
-
+            file_path (str): Path of the input file.
+            title (Optional[str]): Input parameter for this operation.
+            metadata (Optional[Dict[str, Any]]): Extra metadata for the operation.
+            auto_ingest (Optional[bool]): Input parameter for this operation.
+        
         Returns:
-            Dictionary with processing results
+            Dict[str, Any]: Dictionary result of the operation.
         """
         # Run synchronous processing in executor
         loop = asyncio.get_event_loop()
@@ -238,14 +243,14 @@ class DataIngestionService:
     ) -> List[Dict[str, Any]]:
         """
         Batch upload and process multiple files.
-
+        
         Args:
-            file_paths: List of file paths
-            titles: Optional list of titles
-            metadata_list: Optional list of metadata dicts
-
+            file_paths (List[str]): Input parameter for this operation.
+            titles (Optional[List[str]]): Input parameter for this operation.
+            metadata_list (Optional[List[Dict[str, Any]]]): Input parameter for this operation.
+        
         Returns:
-            List of processing results
+            List[Dict[str, Any]]: Dictionary result of the operation.
         """
         results = []
         for i, file_path in enumerate(file_paths):
@@ -270,14 +275,14 @@ class DataIngestionService:
     ) -> List[Dict[str, Any]]:
         """
         Asynchronously batch upload and process multiple files.
-
+        
         Args:
-            file_paths: List of file paths
-            titles: Optional list of titles
-            metadata_list: Optional list of metadata dicts
-
+            file_paths (List[str]): Input parameter for this operation.
+            titles (Optional[List[str]]): Input parameter for this operation.
+            metadata_list (Optional[List[Dict[str, Any]]]): Input parameter for this operation.
+        
         Returns:
-            List of processing results
+            List[Dict[str, Any]]: Dictionary result of the operation.
         """
         tasks = []
         for i, file_path in enumerate(file_paths):

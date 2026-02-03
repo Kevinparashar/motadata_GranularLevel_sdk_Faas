@@ -4,6 +4,7 @@ RAG System Enhancements
 Advanced features: re-ranking, versioning, relevance scoring, incremental updates, validation, real-time sync.
 """
 
+
 import hashlib
 import json
 from dataclasses import dataclass, field
@@ -44,9 +45,9 @@ class DocumentReranker:
     def __init__(self, rerank_method: str = "cross_encoder"):
         """
         Initialize re-ranker.
-
+        
         Args:
-            rerank_method: Re-ranking method ("cross_encoder", "bm25", "hybrid")
+            rerank_method (str): Input parameter for this operation.
         """
         self.rerank_method = rerank_method
 
@@ -55,14 +56,14 @@ class DocumentReranker:
     ) -> List[Dict[str, Any]]:
         """
         Re-rank documents based on query relevance.
-
+        
         Args:
-            query: Search query
-            documents: List of retrieved documents with scores
-            top_k: Number of top documents to return
-
+            query (str): Input parameter for this operation.
+            documents (List[Dict[str, Any]]): Input parameter for this operation.
+            top_k (int): Input parameter for this operation.
+        
         Returns:
-            Re-ranked documents
+            List[Dict[str, Any]]: Dictionary result of the operation.
         """
         if not documents:
             return []
@@ -96,14 +97,14 @@ class DocumentReranker:
     ) -> List[Dict[str, Any]]:
         """
         Re-rank using cross-encoder model (requires sentence-transformers).
-
+        
         Args:
-            query: Search query
-            documents: List of retrieved documents
-            top_k: Number of top documents to return
-
+            query (str): Input parameter for this operation.
+            documents (List[Dict[str, Any]]): Input parameter for this operation.
+            top_k (int): Input parameter for this operation.
+        
         Returns:
-            Re-ranked documents
+            List[Dict[str, Any]]: Dictionary result of the operation.
         """
         try:
             from sentence_transformers import CrossEncoder  # type: ignore[import-not-found]
@@ -143,15 +144,20 @@ class DocumentVersioning:
     def __init__(self, db):
         """
         Initialize document versioning.
-
+        
         Args:
-            db: Database connection
+            db (Any): Database connection/handle.
         """
         self.db = db
         self._ensure_version_table()
 
     def _ensure_version_table(self) -> None:
-        """Ensure document_versions table exists."""
+        """
+        Ensure document_versions table exists.
+        
+        Returns:
+            None: Result of the operation.
+        """
         query = """
         CREATE TABLE IF NOT EXISTS document_versions (
             id SERIAL PRIMARY KEY,
@@ -178,15 +184,15 @@ class DocumentVersioning:
     ) -> DocumentVersion:
         """
         Create a new document version.
-
+        
         Args:
-            document_id: Document ID
-            content: Document content
-            tenant_id: Optional tenant ID
-            metadata: Optional metadata
-
+            document_id (str): Input parameter for this operation.
+            content (str): Content text.
+            tenant_id (Optional[str]): Tenant identifier used for tenant isolation.
+            metadata (Optional[Dict[str, Any]]): Extra metadata for the operation.
+        
         Returns:
-            DocumentVersion object
+            DocumentVersion: Result of the operation.
         """
         # Calculate content hash
         content_hash = hashlib.sha256(content.encode()).hexdigest()
@@ -226,13 +232,13 @@ class DocumentVersioning:
     ) -> List[DocumentVersion]:
         """
         Get all versions of a document.
-
+        
         Args:
-            document_id: Document ID
-            tenant_id: Optional tenant ID
-
+            document_id (str): Input parameter for this operation.
+            tenant_id (Optional[str]): Tenant identifier used for tenant isolation.
+        
         Returns:
-            List of DocumentVersion objects
+            List[DocumentVersion]: List result of the operation.
         """
         query = """
         SELECT version, content_hash, created_at, metadata
@@ -273,14 +279,14 @@ class RelevanceScorer:
     def score(self, query: str, document: Dict[str, Any], method: str = "hybrid") -> RelevanceScore:
         """
         Score document relevance to query.
-
+        
         Args:
-            query: Search query
-            document: Document to score
-            method: Scoring method ("similarity", "keyword", "hybrid")
-
+            query (str): Input parameter for this operation.
+            document (Dict[str, Any]): Input parameter for this operation.
+            method (str): Input parameter for this operation.
+        
         Returns:
-            RelevanceScore object
+            RelevanceScore: Result of the operation.
         """
         score = 0.0
         details = {}
@@ -321,10 +327,10 @@ class IncrementalUpdater:
     def __init__(self, db, vector_ops):
         """
         Initialize incremental updater.
-
+        
         Args:
-            db: Database connection
-            vector_ops: Vector operations instance
+            db (Any): Database connection/handle.
+            vector_ops (Any): Input parameter for this operation.
         """
         self.db = db
         self.vector_ops = vector_ops
@@ -334,14 +340,14 @@ class IncrementalUpdater:
     ) -> bool:
         """
         Check if document needs re-embedding.
-
+        
         Args:
-            document_id: Document ID
-            new_content: New document content
-            tenant_id: Optional tenant ID
-
+            document_id (str): Input parameter for this operation.
+            new_content (str): Input parameter for this operation.
+            tenant_id (Optional[str]): Tenant identifier used for tenant isolation.
+        
         Returns:
-            True if re-embedding needed, False otherwise
+            bool: True if the operation succeeds, else False.
         """
         # Get current content hash
         query = """
@@ -374,15 +380,15 @@ class IncrementalUpdater:
     ) -> bool:
         """
         Perform incremental update if needed.
-
+        
         Args:
-            document_id: Document ID
-            new_content: New document content
-            gateway: LiteLLM gateway
-            tenant_id: Optional tenant ID
-
+            document_id (str): Input parameter for this operation.
+            new_content (str): Input parameter for this operation.
+            gateway (Any): Gateway client used for LLM calls.
+            tenant_id (Optional[str]): Tenant identifier used for tenant isolation.
+        
         Returns:
-            True if update was performed, False otherwise
+            bool: True if the operation succeeds, else False.
         """
         if not self.should_reembed(document_id, new_content, tenant_id):
             # Only update metadata/content, no re-embedding needed
@@ -416,9 +422,12 @@ class DocumentValidator:
     def add_validation_rule(self, rule: Callable) -> None:
         """
         Add a validation rule.
-
+        
         Args:
-            rule: Validation function that returns (is_valid, error_message)
+            rule (Callable): Input parameter for this operation.
+        
+        Returns:
+            None: Result of the operation.
         """
         self.validation_rules.append(rule)
 
@@ -427,14 +436,14 @@ class DocumentValidator:
     ) -> Tuple[bool, List[str]]:
         """
         Validate a document.
-
+        
         Args:
-            title: Document title
-            content: Document content
-            metadata: Optional metadata
-
+            title (str): Input parameter for this operation.
+            content (str): Content text.
+            metadata (Optional[Dict[str, Any]]): Extra metadata for the operation.
+        
         Returns:
-            Tuple of (is_valid, list_of_errors)
+            Tuple[bool, List[str]]: True if the operation succeeds, else False.
         """
         errors = []
 
@@ -468,10 +477,10 @@ class RealTimeSync:
     def __init__(self, db, rag_system):
         """
         Initialize real-time sync.
-
+        
         Args:
-            db: Database connection
-            rag_system: RAG system instance
+            db (Any): Database connection/handle.
+            rag_system (Any): Input parameter for this operation.
         """
         self.db = db
         self.rag_system = rag_system
@@ -480,22 +489,25 @@ class RealTimeSync:
     def add_sync_callback(self, callback: Callable) -> None:
         """
         Add a callback for document sync events.
-
+        
         Args:
-            callback: Callback function to call on sync
+            callback (Callable): Input parameter for this operation.
+        
+        Returns:
+            None: Result of the operation.
         """
         self.sync_callbacks.append(callback)
 
     async def sync_document(self, document_id: str, tenant_id: Optional[str] = None) -> bool:
         """
         Synchronize a document (re-process and update).
-
+        
         Args:
-            document_id: Document ID
-            tenant_id: Optional tenant ID
-
+            document_id (str): Input parameter for this operation.
+            tenant_id (Optional[str]): Tenant identifier used for tenant isolation.
+        
         Returns:
-            True if sync successful
+            bool: True if the operation succeeds, else False.
         """
         # Get document
         query = """

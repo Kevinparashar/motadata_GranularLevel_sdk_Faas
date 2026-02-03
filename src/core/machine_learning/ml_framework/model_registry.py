@@ -4,6 +4,7 @@ Model Registry
 Model versioning and registry management.
 """
 
+
 import logging
 from datetime import datetime, timezone
 from typing import Any, Dict, List, Optional
@@ -25,10 +26,10 @@ class ModelRegistry:
     def __init__(self, db: DatabaseConnection, tenant_id: Optional[str] = None):
         """
         Initialize model registry.
-
+        
         Args:
-            db: Database connection
-            tenant_id: Optional tenant ID
+            db (DatabaseConnection): Database connection/handle.
+            tenant_id (Optional[str]): Tenant identifier used for tenant isolation.
         """
         self.db = db
         self.tenant_id = tenant_id
@@ -47,17 +48,17 @@ class ModelRegistry:
     ) -> str:
         """
         Register a new model version.
-
+        
         Args:
-            model_id: Model ID
-            version: Version string (e.g., '1.0.0')
-            model_path: Path to model file
-            metrics: Training/validation metrics
-            hyperparameters: Model hyperparameters
-            metadata: Additional metadata
-
+            model_id (str): Input parameter for this operation.
+            version (str): Input parameter for this operation.
+            model_path (str): Input parameter for this operation.
+            metrics (Optional[Dict[str, Any]]): Input parameter for this operation.
+            hyperparameters (Optional[Dict[str, Any]]): Input parameter for this operation.
+            metadata (Optional[Dict[str, Any]]): Extra metadata for the operation.
+        
         Returns:
-            Registered version ID
+            str: Returned text value.
         """
         import json
 
@@ -107,13 +108,13 @@ class ModelRegistry:
     ) -> Optional[Dict[str, Any]]:
         """
         Get specific model version.
-
+        
         Args:
-            model_id: Model ID
-            version: Optional version (returns latest if not specified)
-
+            model_id (str): Input parameter for this operation.
+            version (Optional[str]): Input parameter for this operation.
+        
         Returns:
-            Model version information or None if not found
+            Optional[Dict[str, Any]]: Dictionary result of the operation.
         """
         if version:
             query = """
@@ -136,13 +137,13 @@ class ModelRegistry:
     def list_versions(self, model_id: str, limit: int = 100) -> List[Dict[str, Any]]:
         """
         List all versions of a model.
-
+        
         Args:
-            model_id: Model ID
-            limit: Maximum number of results
-
+            model_id (str): Input parameter for this operation.
+            limit (int): Input parameter for this operation.
+        
         Returns:
-            List of version information dictionaries
+            List[Dict[str, Any]]: Dictionary result of the operation.
         """
         query = """
         SELECT * FROM ml_model_versions
@@ -157,11 +158,14 @@ class ModelRegistry:
     def promote_version(self, model_id: str, version: str, environment: str) -> None:
         """
         Promote model version to environment (dev, staging, prod).
-
+        
         Args:
-            model_id: Model ID
-            version: Version to promote
-            environment: Target environment
+            model_id (str): Input parameter for this operation.
+            version (str): Input parameter for this operation.
+            environment (str): Input parameter for this operation.
+        
+        Returns:
+            None: Result of the operation.
         """
         query = """
         UPDATE ml_model_versions
@@ -178,14 +182,17 @@ class ModelRegistry:
     def compare_versions(self, model_id: str, version1: str, version2: str) -> Dict[str, Any]:
         """
         Compare two model versions.
-
+        
         Args:
-            model_id: Model ID
-            version1: First version
-            version2: Second version
-
+            model_id (str): Input parameter for this operation.
+            version1 (str): Input parameter for this operation.
+            version2 (str): Input parameter for this operation.
+        
         Returns:
-            Comparison dictionary
+            Dict[str, Any]: Dictionary result of the operation.
+        
+        Raises:
+            ModelNotFoundError: Raised when this function detects an invalid state or when an underlying call fails.
         """
         v1 = self.get_model_version(model_id, version1)
         v2 = self.get_model_version(model_id, version2)
@@ -204,13 +211,13 @@ class ModelRegistry:
     def get_lineage(self, model_id: str, version: Optional[str] = None) -> Dict[str, Any]:
         """
         Get model lineage (training data, parent models, etc.).
-
+        
         Args:
-            model_id: Model ID
-            version: Optional version
-
+            model_id (str): Input parameter for this operation.
+            version (Optional[str]): Input parameter for this operation.
+        
         Returns:
-            Lineage information
+            Dict[str, Any]: Dictionary result of the operation.
         """
         version_info = self.get_model_version(model_id, version)
         if not version_info:
@@ -227,7 +234,16 @@ class ModelRegistry:
     def _compare_metrics(
         self, metrics1: Dict[str, Any], metrics2: Dict[str, Any]
     ) -> Dict[str, Any]:
-        """Compare metrics between two versions."""
+        """
+        Compare metrics between two versions.
+        
+        Args:
+            metrics1 (Dict[str, Any]): Input parameter for this operation.
+            metrics2 (Dict[str, Any]): Input parameter for this operation.
+        
+        Returns:
+            Dict[str, Any]: Dictionary result of the operation.
+        """
         diff = {}
         all_keys = set(metrics1.keys()) | set(metrics2.keys())
 
@@ -241,7 +257,12 @@ class ModelRegistry:
         return diff
 
     def _ensure_tables(self) -> None:
-        """Ensure required database tables exist."""
+        """
+        Ensure required database tables exist.
+        
+        Returns:
+            None: Result of the operation.
+        """
         query = """
         CREATE TABLE IF NOT EXISTS ml_model_versions (
             id SERIAL PRIMARY KEY,

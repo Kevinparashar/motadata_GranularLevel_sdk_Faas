@@ -4,6 +4,7 @@ Model Versioning
 Model version control and lineage tracking.
 """
 
+
 import logging
 from datetime import datetime, timezone
 from typing import Any, Dict, Optional
@@ -24,10 +25,10 @@ class ModelVersioning:
     def __init__(self, db: DatabaseConnection, tenant_id: Optional[str] = None):
         """
         Initialize model versioning.
-
+        
         Args:
-            db: Database connection
-            tenant_id: Optional tenant ID
+            db (DatabaseConnection): Database connection/handle.
+            tenant_id (Optional[str]): Tenant identifier used for tenant isolation.
         """
         self.db = db
         self.tenant_id = tenant_id
@@ -43,15 +44,15 @@ class ModelVersioning:
     ) -> str:
         """
         Version a model.
-
+        
         Args:
-            model_id: Model ID
-            version: Version string
-            model_path: Path to model file
-            metadata: Optional metadata
-
+            model_id (str): Input parameter for this operation.
+            version (str): Input parameter for this operation.
+            model_path (str): Input parameter for this operation.
+            metadata (Optional[Dict[str, Any]]): Extra metadata for the operation.
+        
         Returns:
-            Version ID
+            str: Returned text value.
         """
         import json
 
@@ -82,13 +83,13 @@ class ModelVersioning:
     def get_lineage(self, model_id: str, version: Optional[str] = None) -> Dict[str, Any]:
         """
         Get model lineage.
-
+        
         Args:
-            model_id: Model ID
-            version: Optional version
-
+            model_id (str): Input parameter for this operation.
+            version (Optional[str]): Input parameter for this operation.
+        
         Returns:
-            Lineage information
+            Dict[str, Any]: Dictionary result of the operation.
         """
         # Implementation would query lineage relationships
         return {"model_id": model_id, "version": version, "lineage": []}

@@ -4,6 +4,7 @@ Performance Benchmarks for CODEC Integration
 Measures CODEC serialization/deserialization performance.
 """
 
+
 import json
 import time
 from typing import Dict, List

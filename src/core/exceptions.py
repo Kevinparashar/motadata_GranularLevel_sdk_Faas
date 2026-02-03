@@ -4,6 +4,7 @@ Core SDK Exception Hierarchy
 Base exception class for all SDK errors.
 """
 
+
 from typing import Optional
 
 
@@ -22,17 +23,22 @@ class SDKError(Exception):
     def __init__(self, message: str, original_error: Optional[Exception] = None):
         """
         Initialize SDK error.
-
+        
         Args:
-            message: Error message
-            original_error: Original exception that caused this error
+            message (str): Input parameter for this operation.
+            original_error (Optional[Exception]): Input parameter for this operation.
         """
         super().__init__(message)
         self.message = message
         self.original_error = original_error
 
     def __str__(self) -> str:
-        """Return string representation of error."""
+        """
+        Return string representation of error.
+        
+        Returns:
+            str: Returned text value.
+        """
         if self.original_error:
             return f"{self.message} (Original: {str(self.original_error)})"
         return self.message

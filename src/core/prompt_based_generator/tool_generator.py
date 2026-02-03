@@ -4,6 +4,7 @@ Tool Generator
 Generates tools from natural language prompts using LLM interpretation.
 """
 
+
 import ast
 import uuid
 from datetime import datetime
@@ -32,11 +33,11 @@ class ToolGenerator:
     ):
         """
         Initialize tool generator.
-
+        
         Args:
-            gateway: LiteLLM Gateway instance
-            interpreter: Optional PromptInterpreter instance
-            cache: Optional GeneratorCache instance
+            gateway (GatewayProtocol): Gateway client used for LLM calls.
+            interpreter (Optional[PromptInterpreter]): Input parameter for this operation.
+            cache (Optional[GeneratorCache]): Cache instance used to store and fetch cached results.
         """
         self.gateway = gateway
         self.interpreter = interpreter or PromptInterpreter(gateway)
@@ -45,12 +46,12 @@ class ToolGenerator:
     def _validate_code(self, code: str) -> tuple[bool, list[str]]:
         """
         Validate generated code.
-
+        
         Args:
-            code: Python code to validate
-
+            code (str): Input parameter for this operation.
+        
         Returns:
-            Tuple of (is_valid, errors)
+            tuple[bool, list[str]]: True if the operation succeeds, else False.
         """
         errors = []
 
@@ -77,7 +78,19 @@ class ToolGenerator:
         return len(errors) == 0, errors
 
     def _validate_dangerous_imports(self, node: ast.AST, code: str) -> None:
-        """Validate that no dangerous imports are present."""
+        """
+        Validate that no dangerous imports are present.
+        
+        Args:
+            node (ast.AST): Input parameter for this operation.
+            code (str): Input parameter for this operation.
+        
+        Returns:
+            None: Result of the operation.
+        
+        Raises:
+            CodeValidationError: Raised when this function detects an invalid state or when an underlying call fails.
+        """
         if isinstance(node, (ast.Import, ast.ImportFrom)):
             for alias in (node.names if isinstance(node, ast.Import) else [node.module]):
                 module_name = alias.name if isinstance(alias, ast.alias) else alias
@@ -89,7 +102,19 @@ class ToolGenerator:
                     )
 
     def _validate_dangerous_calls(self, node: ast.AST, code: str) -> None:
-        """Validate that no dangerous function calls are present."""
+        """
+        Validate that no dangerous function calls are present.
+        
+        Args:
+            node (ast.AST): Input parameter for this operation.
+            code (str): Input parameter for this operation.
+        
+        Returns:
+            None: Result of the operation.
+        
+        Raises:
+            CodeValidationError: Raised when this function detects an invalid state or when an underlying call fails.
+        """
         if isinstance(node, ast.Call) and isinstance(node.func, ast.Name):
             if node.func.id in ['eval', 'exec', '__import__']:
                 raise CodeValidationError(
@@ -99,7 +124,12 @@ class ToolGenerator:
                 )
 
     def _create_safe_namespace(self) -> Dict[str, Any]:
-        """Create a restricted namespace with only safe builtins."""
+        """
+        Create a restricted namespace with only safe builtins.
+        
+        Returns:
+            Dict[str, Any]: Dictionary result of the operation.
+        """
         safe_builtins = {
             'abs', 'all', 'any', 'bool', 'dict', 'float', 'int', 'len', 'list',
             'max', 'min', 'range', 'round', 'str', 'sum', 'tuple', 'type', 'zip',
@@ -114,16 +144,16 @@ class ToolGenerator:
     def _create_function_from_code(self, code: str, function_name: str) -> Optional[Callable]:
         """
         Create a function from generated code using safe AST compilation.
-
+        
         Args:
-            code: Python code
-            function_name: Name of function to extract
-
+            code (str): Input parameter for this operation.
+            function_name (str): Input parameter for this operation.
+        
         Returns:
-            Function object or None
-
+            Optional[Callable]: Result if available, else None.
+        
         Raises:
-            CodeValidationError: If code compilation or execution fails
+            CodeValidationError: Raised when this function detects an invalid state or when an underlying call fails.
         """
         try:
             # Parse code into AST for validation
@@ -168,19 +198,19 @@ class ToolGenerator:
     ) -> Tool:
         """
         Generate a tool from a natural language prompt.
-
+        
         Args:
-            prompt: Natural language description of desired tool
-            tool_id: Optional tool ID (generated if not provided)
-            tenant_id: Optional tenant ID
-            **kwargs: Additional tool configuration
-
+            prompt (str): Prompt text sent to the model.
+            tool_id (Optional[str]): Tool identifier.
+            tenant_id (Optional[str]): Tenant identifier used for tenant isolation.
+            **kwargs (ConfigDict): Input parameter for this operation.
+        
         Returns:
-            Configured Tool instance
-
+            Tool: Result of the operation.
+        
         Raises:
-            ToolGenerationError: If generation fails
-            CodeValidationError: If generated code is invalid
+            CodeValidationError: Raised when this function detects an invalid state or when an underlying call fails.
+            ToolGenerationError: Raised when this function detects an invalid state or when an underlying call fails.
         """
         try:
             # Generate tool ID if not provided

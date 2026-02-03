@@ -4,6 +4,7 @@ Cache Enhancements
 Advanced cache features: warming, monitoring, sharding, auto-caching, validation, recovery.
 """
 
+
 import asyncio
 import hashlib
 import json
@@ -45,23 +46,40 @@ class CacheWarmer:
     def __init__(self, cache, config: Optional[CacheWarmingConfig] = None):
         """
         Initialize cache warmer.
-
+        
         Args:
-            cache: Cache mechanism instance
-            config: Warming configuration
+            cache (Any): Cache instance used to store and fetch cached results.
+            config (Optional[CacheWarmingConfig]): Configuration object or settings.
         """
         self.cache = cache
         self.config = config or CacheWarmingConfig()
         self.warmed_keys: set = set()
 
     async def _execute_function(self, func: Callable) -> Any:
-        """Execute a function, handling both sync and async."""
+        """
+        Execute a function, handling both sync and async.
+        
+        Args:
+            func (Callable): Input parameter for this operation.
+        
+        Returns:
+            Any: Result of the operation.
+        """
         if asyncio.iscoroutinefunction(func):
             return await func()
         return func()
 
     async def _warm_single_key(self, key: str, tenant_id: Optional[str]) -> None:
-        """Warm a single cache key."""
+        """
+        Warm a single cache key.
+        
+        Args:
+            key (str): Input parameter for this operation.
+            tenant_id (Optional[str]): Tenant identifier used for tenant isolation.
+        
+        Returns:
+            None: Result of the operation.
+        """
         if key in self.config.warm_functions:
             func = self.config.warm_functions[self.config.warm_keys.index(key)]
             try:
@@ -72,7 +90,16 @@ class CacheWarmer:
                 logger.warning(f"Failed to warm cache key {key}: {e}", exc_info=True)
 
     async def _warm_from_function(self, func: Callable, tenant_id: Optional[str]) -> None:
-        """Warm cache from a function that returns (key, value) tuple."""
+        """
+        Warm cache from a function that returns (key, value) tuple.
+        
+        Args:
+            func (Callable): Input parameter for this operation.
+            tenant_id (Optional[str]): Tenant identifier used for tenant isolation.
+        
+        Returns:
+            None: Result of the operation.
+        """
         try:
             result = await self._execute_function(func)
             if isinstance(result, tuple) and len(result) == 2:
@@ -85,9 +112,12 @@ class CacheWarmer:
     async def warm_cache(self, tenant_id: Optional[str] = None) -> None:
         """
         Warm the cache by pre-loading data.
-
+        
         Args:
-            tenant_id: Optional tenant ID
+            tenant_id (Optional[str]): Tenant identifier used for tenant isolation.
+        
+        Returns:
+            None: Result of the operation.
         """
         if not self.config.enabled:
             return
@@ -104,10 +134,13 @@ class CacheWarmer:
     def add_warm_key(self, key: str, warm_func: Optional[Callable] = None) -> None:
         """
         Add a key to warm.
-
+        
         Args:
-            key: Cache key to warm
-            warm_func: Optional function to generate value
+            key (str): Input parameter for this operation.
+            warm_func (Optional[Callable]): Input parameter for this operation.
+        
+        Returns:
+            None: Result of the operation.
         """
         if key not in self.config.warm_keys:
             self.config.warm_keys.append(key)
@@ -123,9 +156,9 @@ class CacheMonitor:
     def __init__(self, cache):
         """
         Initialize cache monitor.
-
+        
         Args:
-            cache: Cache mechanism instance
+            cache (Any): Cache instance used to store and fetch cached results.
         """
         self.cache = cache
         self.metrics: Dict[str, Any] = {
@@ -142,9 +175,9 @@ class CacheMonitor:
     def get_memory_usage(self) -> Dict[str, Any]:
         """
         Get current memory usage.
-
+        
         Returns:
-            Dictionary with memory usage information
+            Dict[str, Any]: Dictionary result of the operation.
         """
         process = psutil.Process(os.getpid())
         memory_info = process.memory_info()
@@ -169,19 +202,34 @@ class CacheMonitor:
         return self.metrics
 
     def record_hit(self) -> None:
-        """Record a cache hit."""
+        """
+        Record a cache hit.
+        
+        Returns:
+            None: Result of the operation.
+        """
         self.metrics["hits"] += 1
         self.metrics["total_requests"] += 1
         self._update_rates()
 
     def record_miss(self) -> None:
-        """Record a cache miss."""
+        """
+        Record a cache miss.
+        
+        Returns:
+            None: Result of the operation.
+        """
         self.metrics["misses"] += 1
         self.metrics["total_requests"] += 1
         self._update_rates()
 
     def _update_rates(self) -> None:
-        """Update hit and miss rates."""
+        """
+        Update hit and miss rates.
+        
+        Returns:
+            None: Result of the operation.
+        """
         total = self.metrics["total_requests"]
         if total > 0:
             self.metrics["hit_rate"] = self.metrics["hits"] / total
@@ -196,10 +244,10 @@ class CacheSharder:
     def __init__(self, cache, config: Optional[CacheShardingConfig] = None):
         """
         Initialize cache sharder.
-
+        
         Args:
-            cache: Cache mechanism instance
-            config: Sharding configuration
+            cache (Any): Cache instance used to store and fetch cached results.
+            config (Optional[CacheShardingConfig]): Configuration object or settings.
         """
         self.cache = cache
         self.config = config or CacheShardingConfig()
@@ -209,7 +257,12 @@ class CacheSharder:
             self._initialize_shards()
 
     def _initialize_shards(self) -> None:
-        """Initialize cache shards."""
+        """
+        Initialize cache shards.
+        
+        Returns:
+            None: Result of the operation.
+        """
         # Create shard instances (simplified - in production, these would be separate cache instances)
         for i in range(self.config.num_shards):
             # In a real implementation, each shard would be a separate cache instance
@@ -218,12 +271,12 @@ class CacheSharder:
     def _get_shard(self, key: str) -> int:
         """
         Get shard index for a key.
-
+        
         Args:
-            key: Cache key
-
+            key (str): Input parameter for this operation.
+        
         Returns:
-            Shard index
+            int: Result of the operation.
         """
         if self.config.shard_key_func:
             return self.config.shard_key_func(key) % self.config.num_shards
@@ -234,12 +287,12 @@ class CacheSharder:
     def get_sharded_key(self, key: str) -> str:
         """
         Get sharded key.
-
+        
         Args:
-            key: Original key
-
+            key (str): Input parameter for this operation.
+        
         Returns:
-            Sharded key
+            str: Returned text value.
         """
         if not self.config.enabled:
             return key
@@ -256,9 +309,9 @@ class CacheValidator:
     def __init__(self, cache):
         """
         Initialize cache validator.
-
+        
         Args:
-            cache: Cache mechanism instance
+            cache (Any): Cache instance used to store and fetch cached results.
         """
         self.cache = cache
         self.validation_checks: List[Callable] = []
@@ -266,23 +319,26 @@ class CacheValidator:
     def add_validation_check(self, check_func: Callable) -> None:
         """
         Add a validation check function.
-
+        
         Args:
-            check_func: Function that validates cache value
+            check_func (Callable): Input parameter for this operation.
+        
+        Returns:
+            None: Result of the operation.
         """
         self.validation_checks.append(check_func)
 
     def validate(self, key: str, value: Any, tenant_id: Optional[str] = None) -> bool:
         """
         Validate a cached value.
-
+        
         Args:
-            key: Cache key
-            value: Cached value
-            tenant_id: Optional tenant ID
-
+            key (str): Input parameter for this operation.
+            value (Any): Input parameter for this operation.
+            tenant_id (Optional[str]): Tenant identifier used for tenant isolation.
+        
         Returns:
-            True if valid, False otherwise
+            bool: True if the operation succeeds, else False.
         """
         for check_func in self.validation_checks:
             try:
@@ -295,13 +351,13 @@ class CacheValidator:
     def validate_and_get(self, key: str, tenant_id: Optional[str] = None) -> Optional[Any]:
         """
         Get and validate a cached value.
-
+        
         Args:
-            key: Cache key
-            tenant_id: Optional tenant ID
-
+            key (str): Input parameter for this operation.
+            tenant_id (Optional[str]): Tenant identifier used for tenant isolation.
+        
         Returns:
-            Validated value or None if invalid/not found
+            Optional[Any]: Result if available, else None.
         """
         value = self.cache.get(key, tenant_id=tenant_id)
         if value is None:
@@ -323,9 +379,9 @@ class CacheRecovery:
     def __init__(self, cache):
         """
         Initialize cache recovery.
-
+        
         Args:
-            cache: Cache mechanism instance
+            cache (Any): Cache instance used to store and fetch cached results.
         """
         self.cache = cache
         self.recovery_strategies: List[Callable] = []
@@ -335,18 +391,21 @@ class CacheRecovery:
     def add_recovery_strategy(self, strategy: Callable) -> None:
         """
         Add a recovery strategy.
-
+        
         Args:
-            strategy: Recovery strategy function
+            strategy (Callable): Input parameter for this operation.
+        
+        Returns:
+            None: Result of the operation.
         """
         self.recovery_strategies.append(strategy)
 
     async def recover(self) -> bool:
         """
         Attempt to recover from cache failure.
-
+        
         Returns:
-            True if recovery successful, False otherwise
+            bool: True if the operation succeeds, else False.
         """
         for strategy in self.recovery_strategies:
             try:
@@ -368,12 +427,22 @@ class CacheRecovery:
         return False
 
     def record_failure(self) -> None:
-        """Record a cache failure."""
+        """
+        Record a cache failure.
+        
+        Returns:
+            None: Result of the operation.
+        """
         self.failure_count += 1
         self.last_failure = datetime.now()
 
     def should_attempt_recovery(self) -> bool:
-        """Check if recovery should be attempted."""
+        """
+        Check if recovery should be attempted.
+        
+        Returns:
+            bool: True if the operation succeeds, else False.
+        """
         if self.failure_count == 0:
             return False
 

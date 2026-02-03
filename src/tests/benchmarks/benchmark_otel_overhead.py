@@ -4,6 +4,7 @@ Performance Benchmarks for OTEL Integration
 Measures OTEL observability overhead on AI SDK components.
 """
 
+
 import time
 from typing import Dict, List
 from unittest.mock import MagicMock, Mock

@@ -4,6 +4,7 @@ Model Manager
 Manages model lifecycle: create, update, delete, archive, and load models.
 """
 
+
 import logging
 import os
 from datetime import datetime, timezone
@@ -32,11 +33,11 @@ class ModelManager:
     ):
         """
         Initialize model manager.
-
+        
         Args:
-            db: Database connection for metadata
-            storage_path: Base path for model storage
-            tenant_id: Optional tenant ID for multi-tenant support
+            db (DatabaseConnection): Database connection/handle.
+            storage_path (str): Input parameter for this operation.
+            tenant_id (Optional[str]): Tenant identifier used for tenant isolation.
         """
         self.db = db
         self.tenant_id = tenant_id
@@ -58,16 +59,16 @@ class ModelManager:
     ) -> str:
         """
         Register a new model.
-
+        
         Args:
-            model_id: Unique model identifier
-            model_type: Type of model (classification, regression, etc.)
-            model_path: Path to model file
-            metadata: Optional model metadata
-            version: Model version
-
+            model_id (str): Input parameter for this operation.
+            model_type (str): Input parameter for this operation.
+            model_path (str): Input parameter for this operation.
+            metadata (Optional[Dict[str, Any]]): Extra metadata for the operation.
+            version (str): Input parameter for this operation.
+        
         Returns:
-            Registered model ID
+            str: Returned text value.
         """
         query = """
         INSERT INTO ml_models (model_id, model_type, model_path, metadata, version, tenant_id, created_at)
@@ -96,16 +97,16 @@ class ModelManager:
     def get_model(self, model_id: str, version: Optional[str] = None) -> Dict[str, Any]:
         """
         Get model information.
-
+        
         Args:
-            model_id: Model ID
-            version: Optional version (uses latest if not specified)
-
+            model_id (str): Input parameter for this operation.
+            version (Optional[str]): Input parameter for this operation.
+        
         Returns:
-            Model information dictionary
-
+            Dict[str, Any]: Dictionary result of the operation.
+        
         Raises:
-            ModelNotFoundError: If model not found
+            ModelNotFoundError: Raised when this function detects an invalid state or when an underlying call fails.
         """
         if version:
             query = """
@@ -138,13 +139,13 @@ class ModelManager:
     ) -> List[Dict[str, Any]]:
         """
         List all models.
-
+        
         Args:
-            model_type: Optional filter by model type
-            limit: Maximum number of results
-
+            model_type (Optional[str]): Input parameter for this operation.
+            limit (int): Input parameter for this operation.
+        
         Returns:
-            List of model information dictionaries
+            List[Dict[str, Any]]: Dictionary result of the operation.
         """
         if model_type:
             query = """
@@ -174,11 +175,14 @@ class ModelManager:
     ) -> None:
         """
         Update model metadata.
-
+        
         Args:
-            model_id: Model ID
-            metadata: Updated metadata
-            version: Optional version
+            model_id (str): Input parameter for this operation.
+            metadata (Optional[Dict[str, Any]]): Extra metadata for the operation.
+            version (Optional[str]): Input parameter for this operation.
+        
+        Returns:
+            None: Result of the operation.
         """
         import json
 
@@ -207,10 +211,13 @@ class ModelManager:
     def delete_model(self, model_id: str, version: Optional[str] = None) -> None:
         """
         Delete a model.
-
+        
         Args:
-            model_id: Model ID
-            version: Optional version (deletes all versions if not specified)
+            model_id (str): Input parameter for this operation.
+            version (Optional[str]): Input parameter for this operation.
+        
+        Returns:
+            None: Result of the operation.
         """
         if version:
             query = """
@@ -231,10 +238,13 @@ class ModelManager:
     def archive_model(self, model_id: str, version: Optional[str] = None) -> None:
         """
         Archive a model (soft delete).
-
+        
         Args:
-            model_id: Model ID
-            version: Optional version
+            model_id (str): Input parameter for this operation.
+            version (Optional[str]): Input parameter for this operation.
+        
+        Returns:
+            None: Result of the operation.
         """
         query = """
         UPDATE ml_models
@@ -255,16 +265,16 @@ class ModelManager:
     def load_model(self, model_id: str, version: Optional[str] = None) -> Any:
         """
         Load model from storage.
-
+        
         Args:
-            model_id: Model ID
-            version: Optional version
-
+            model_id (str): Input parameter for this operation.
+            version (Optional[str]): Input parameter for this operation.
+        
         Returns:
-            Loaded model object
-
+            Any: Result of the operation.
+        
         Raises:
-            ModelLoadError: If loading fails
+            ModelLoadError: Raised when this function detects an invalid state or when an underlying call fails.
         """
         try:
             model_info = self.get_model(model_id, version)
@@ -298,17 +308,17 @@ class ModelManager:
     def save_model(self, model: Any, model_id: str, version: str = "1.0.0") -> str:
         """
         Save model to storage.
-
+        
         Args:
-            model: Model object to save
-            model_id: Model ID
-            version: Model version
-
+            model (Any): Model name or identifier to use.
+            model_id (str): Input parameter for this operation.
+            version (str): Input parameter for this operation.
+        
         Returns:
-            Path to saved model file
-
+            str: Returned text value.
+        
         Raises:
-            ModelSaveError: If saving fails
+            ModelSaveError: Raised when this function detects an invalid state or when an underlying call fails.
         """
         try:
             import joblib
@@ -328,7 +338,12 @@ class ModelManager:
             )
 
     def _ensure_tables(self) -> None:
-        """Ensure required database tables exist."""
+        """
+        Ensure required database tables exist.
+        
+        Returns:
+            None: Result of the operation.
+        """
         query = """
         CREATE TABLE IF NOT EXISTS ml_models (
             id SERIAL PRIMARY KEY,

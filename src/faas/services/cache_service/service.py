@@ -4,6 +4,7 @@ Cache Service - Main service implementation.
 Provides distributed caching operations.
 """
 
+
 import logging
 from typing import Any, Dict, Optional
 
@@ -42,12 +43,12 @@ class CacheService:
     ):
         """
         Initialize Cache Service.
-
+        
         Args:
-            config: Service configuration
-            nats_client: NATS client (optional)
-            otel_tracer: OTEL tracer (optional)
-            codec_manager: Codec manager (optional)
+            config (ServiceConfig): Configuration object or settings.
+            nats_client (Optional[Any]): Input parameter for this operation.
+            otel_tracer (Optional[Any]): Input parameter for this operation.
+            codec_manager (Optional[Any]): Input parameter for this operation.
         """
         self.config = config
         self.nats_client = nats_client
@@ -73,12 +74,12 @@ class CacheService:
     def _get_cache(self, tenant_id: str) -> CacheMechanism:
         """
         Create cache for tenant (stateless - created on-demand).
-
+        
         Args:
-            tenant_id: Tenant ID
-
+            tenant_id (str): Tenant identifier used for tenant isolation.
+        
         Returns:
-            CacheMechanism instance
+            CacheMechanism: Result of the operation.
         """
         # Create cache on-demand (stateless)
         # CacheMechanism uses Redis/memory backend, so instances are lightweight
@@ -114,7 +115,19 @@ class CacheService:
         self.app.get("/health")(self._handle_health_check)
 
     async def _handle_get_cache(self, key: str, headers: dict = Header(...)):  # noqa: S7503
-        """Get cached value. Async required for FastAPI route handler."""
+        """
+        Get cached value. Async required for FastAPI route handler.
+        
+        Args:
+            key (str): Input parameter for this operation.
+            headers (dict): HTTP headers passed from the caller.
+        
+        Returns:
+            Any: Result of the operation.
+        
+        Raises:
+            HTTPException: Raised when this function detects an invalid state or when an underlying call fails.
+        """
         standard_headers = extract_headers(**headers)
 
         span = None
@@ -155,7 +168,19 @@ class CacheService:
                 span.end()
 
     async def _handle_set_cache(self, request: SetCacheRequest, headers: dict = Header(...)):
-        """Set cached value."""
+        """
+        Set cached value.
+        
+        Args:
+            request (SetCacheRequest): Request payload object.
+            headers (dict): HTTP headers passed from the caller.
+        
+        Returns:
+            Any: Result of the operation.
+        
+        Raises:
+            HTTPException: Raised when this function detects an invalid state or when an underlying call fails.
+        """
         standard_headers = extract_headers(**headers)
 
         span = None
@@ -206,7 +231,19 @@ class CacheService:
                 span.end()
 
     async def _handle_delete_cache(self, key: str, headers: dict = Header(...)):  # noqa: S7503
-        """Delete cached value. Async required for FastAPI route handler."""
+        """
+        Delete cached value. Async required for FastAPI route handler.
+        
+        Args:
+            key (str): Input parameter for this operation.
+            headers (dict): HTTP headers passed from the caller.
+        
+        Returns:
+            Any: Result of the operation.
+        
+        Raises:
+            HTTPException: Raised when this function detects an invalid state or when an underlying call fails.
+        """
         standard_headers = extract_headers(**headers)
 
         try:
@@ -227,7 +264,19 @@ class CacheService:
     async def _handle_invalidate_cache(  # noqa: S7503
         self, request: InvalidateCacheRequest, headers: dict = Header(...)
     ):
-        """Invalidate cache by pattern. Async required for FastAPI route handler."""
+        """
+        Invalidate cache by pattern. Async required for FastAPI route handler.
+        
+        Args:
+            request (InvalidateCacheRequest): Request payload object.
+            headers (dict): HTTP headers passed from the caller.
+        
+        Returns:
+            Any: Result of the operation.
+        
+        Raises:
+            HTTPException: Raised when this function detects an invalid state or when an underlying call fails.
+        """
         standard_headers = extract_headers(**headers)
 
         try:
@@ -259,7 +308,19 @@ class CacheService:
     async def _handle_clear_tenant_cache(  # noqa: S7503
         self, tenant_id: str, headers: dict = Header(...)
     ):
-        """Clear all cache for a tenant. Async required for FastAPI route handler."""
+        """
+        Clear all cache for a tenant. Async required for FastAPI route handler.
+        
+        Args:
+            tenant_id (str): Tenant identifier used for tenant isolation.
+            headers (dict): HTTP headers passed from the caller.
+        
+        Returns:
+            Any: Result of the operation.
+        
+        Raises:
+            HTTPException: Raised when this function detects an invalid state or when an underlying call fails.
+        """
         extract_headers(**headers)  # Extract headers for validation
 
         try:
@@ -278,7 +339,12 @@ class CacheService:
             )
 
     async def _handle_health_check(self):  # noqa: S7503
-        """Health check endpoint. Async required for FastAPI route handler."""
+        """
+        Health check endpoint. Async required for FastAPI route handler.
+        
+        Returns:
+            Any: Result of the operation.
+        """
         return {"status": "healthy", "service": "cache-service"}
 
 

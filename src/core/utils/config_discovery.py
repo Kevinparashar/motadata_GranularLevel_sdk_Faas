@@ -4,6 +4,7 @@ Configuration Discovery Utilities
 Helps users discover available configuration options for SDK components.
 """
 
+
 from typing import Any, Dict, Optional
 
 from .config_validator import ConfigHelper
@@ -220,7 +221,15 @@ def get_rag_config_options() -> Dict[str, Any]:
 
 
 def _print_required_options(options: Dict[str, Any]) -> None:
-    """Print required configuration options."""
+    """
+    Print required configuration options.
+    
+    Args:
+        options (Dict[str, Any]): Input parameter for this operation.
+    
+    Returns:
+        None: Result of the operation.
+    """
     if "required" not in options:
         return
     
@@ -235,7 +244,15 @@ def _print_required_options(options: Dict[str, Any]) -> None:
 
 
 def _print_optional_options(options: Dict[str, Any]) -> None:
-    """Print optional configuration options."""
+    """
+    Print optional configuration options.
+    
+    Args:
+        options (Dict[str, Any]): Input parameter for this operation.
+    
+    Returns:
+        None: Result of the operation.
+    """
     if "optional" not in options:
         return
     
@@ -256,7 +273,15 @@ def _print_optional_options(options: Dict[str, Any]) -> None:
 
 
 def _print_example_config(options: Dict[str, Any]) -> None:
-    """Print example configuration."""
+    """
+    Print example configuration.
+    
+    Args:
+        options (Dict[str, Any]): Input parameter for this operation.
+    
+    Returns:
+        None: Result of the operation.
+    """
     if "example" not in options or not options["example"]:
         return
     
@@ -270,9 +295,12 @@ def _print_example_config(options: Dict[str, Any]) -> None:
 def print_config_options(component_name: str) -> None:
     """
     Print available configuration options for a component.
-
+    
     Args:
-        component_name: Name of the component ('agent', 'gateway', 'rag', 'tool')
+        component_name (str): Input parameter for this operation.
+    
+    Returns:
+        None: Result of the operation.
     """
     options_map = {
         "agent": get_agent_config_options,

@@ -4,6 +4,7 @@ ML System
 Main ML system orchestrator providing unified interface for ML operations.
 """
 
+
 import asyncio
 import logging
 from typing import Any, Dict, List, Optional
@@ -39,13 +40,13 @@ class MLSystem:
     ):
         """
         Initialize ML system.
-
+        
         Args:
-            db: Database connection for model metadata storage
-            cache: Optional cache mechanism for predictions
-            cache_config: Optional cache configuration
-            max_memory_mb: Maximum memory limit for loaded models (MB)
-            tenant_id: Optional tenant ID for multi-tenant support
+            db (DatabaseConnection): Database connection/handle.
+            cache (Optional[CacheMechanism]): Cache instance used to store and fetch cached results.
+            cache_config (Optional[CacheConfig]): Input parameter for this operation.
+            max_memory_mb (int): Input parameter for this operation.
+            tenant_id (Optional[str]): Tenant identifier used for tenant isolation.
         """
         self.db = db
         self.tenant_id = tenant_id
@@ -78,20 +79,20 @@ class MLSystem:
     ) -> Dict[str, Any]:
         """
         Train a new model.
-
+        
         Args:
-            model_id: Unique identifier for the model
-            model_type: Type of model (e.g., 'classification', 'regression')
-            training_data: Training dataset
-            hyperparameters: Optional hyperparameters
-            validation_data: Optional validation dataset
-            **kwargs: Additional training parameters
-
+            model_id (str): Input parameter for this operation.
+            model_type (str): Input parameter for this operation.
+            training_data (Any): Input parameter for this operation.
+            hyperparameters (Optional[Dict[str, Any]]): Input parameter for this operation.
+            validation_data (Optional[Any]): Input parameter for this operation.
+            **kwargs (Any): Input parameter for this operation.
+        
         Returns:
-            Dictionary with training results (metrics, model_path, etc.)
-
+            Dict[str, Any]: Dictionary result of the operation.
+        
         Raises:
-            TrainingError: If training fails
+            TrainingError: Raised when this function detects an invalid state or when an underlying call fails.
         """
         try:
             logger.info(f"Starting training for model: {model_id}")
@@ -148,19 +149,18 @@ class MLSystem:
     ) -> Any:
         """
         Make a single prediction.
-
+        
         Args:
-            model_id: ID of the model
-            input_data: Input data for prediction
-            version: Optional model version (uses latest if not specified)
-            use_cache: Whether to use prediction cache
-
+            model_id (str): Input parameter for this operation.
+            input_data (Any): Input parameter for this operation.
+            version (Optional[str]): Input parameter for this operation.
+            use_cache (bool): Input parameter for this operation.
+        
         Returns:
-            Prediction result
-
+            Any: Result of the operation.
+        
         Raises:
-            PredictionError: If prediction fails
-            ModelNotFoundError: If model is not found
+            PredictionError: Raised when this function detects an invalid state or when an underlying call fails.
         """
         try:
             # Check cache
@@ -214,15 +214,18 @@ class MLSystem:
     ) -> List[Any]:
         """
         Make batch predictions.
-
+        
         Args:
-            model_id: ID of the model
-            input_batch: List of input data
-            version: Optional model version
-            batch_size: Batch size for processing
-
+            model_id (str): Input parameter for this operation.
+            input_batch (List[Any]): Input parameter for this operation.
+            version (Optional[str]): Input parameter for this operation.
+            batch_size (int): Input parameter for this operation.
+        
         Returns:
-            List of prediction results
+            List[Any]: List result of the operation.
+        
+        Raises:
+            PredictionError: Raised when this function detects an invalid state or when an underlying call fails.
         """
         try:
             # Load model if not loaded
@@ -264,14 +267,14 @@ class MLSystem:
     ) -> Any:
         """
         Make async prediction.
-
+        
         Args:
-            model_id: ID of the model
-            input_data: Input data for prediction
-            version: Optional model version
-
+            model_id (str): Input parameter for this operation.
+            input_data (Any): Input parameter for this operation.
+            version (Optional[str]): Input parameter for this operation.
+        
         Returns:
-            Prediction result
+            Any: Result of the operation.
         """
         loop = asyncio.get_event_loop()
         return await loop.run_in_executor(None, self.predict, model_id, input_data, version)
@@ -279,22 +282,25 @@ class MLSystem:
     def load_model(self, model_id: str, version: Optional[str] = None) -> None:
         """
         Load model into memory.
-
+        
         Args:
-            model_id: ID of the model
-            version: Optional model version
-
-        Raises:
-            ModelNotFoundError: If model is not found
+            model_id (str): Input parameter for this operation.
+            version (Optional[str]): Input parameter for this operation.
+        
+        Returns:
+            None: Result of the operation.
         """
         self._load_model(model_id, version)
 
     def unload_model(self, model_id: str) -> None:
         """
         Unload model from memory.
-
+        
         Args:
-            model_id: ID of the model
+            model_id (str): Input parameter for this operation.
+        
+        Returns:
+            None: Result of the operation.
         """
         if model_id in self._loaded_models:
             del self._loaded_models[model_id]
@@ -305,13 +311,16 @@ class MLSystem:
     def get_model_info(self, model_id: str, version: Optional[str] = None) -> Dict[str, Any]:
         """
         Get model metadata and information.
-
+        
         Args:
-            model_id: ID of the model
-            version: Optional model version
-
+            model_id (str): Input parameter for this operation.
+            version (Optional[str]): Input parameter for this operation.
+        
         Returns:
-            Dictionary with model information
+            Dict[str, Any]: Dictionary result of the operation.
+        
+        Raises:
+            ModelNotFoundError: Raised when this function detects an invalid state or when an underlying call fails.
         """
         result = self.model_registry.get_model_version(model_id, version)
         if result is None:
@@ -319,7 +328,19 @@ class MLSystem:
         return result
 
     def _load_model(self, model_id: str, version: Optional[str] = None) -> None:
-        """Internal method to load model with memory management."""
+        """
+        Internal method to load model with memory management.
+        
+        Args:
+            model_id (str): Input parameter for this operation.
+            version (Optional[str]): Input parameter for this operation.
+        
+        Returns:
+            None: Result of the operation.
+        
+        Raises:
+            ModelNotFoundError: Raised when this function detects an invalid state or when an underlying call fails.
+        """
         # Check if already loaded
         if model_id in self._loaded_models:
             return

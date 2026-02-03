@@ -4,6 +4,7 @@ Retriever
 Handles document retrieval using vector similarity search.
 """
 
+
 from typing import Any, Dict, List, Optional
 
 from ..litellm_gateway import LiteLLMGateway
@@ -26,11 +27,11 @@ class Retriever:
     ):
         """
         Initialize retriever.
-
+        
         Args:
-            vector_ops: Vector operations instance
-            gateway: Optional LiteLLM gateway for embedding generation
-            embedding_model: Model to use for embeddings
+            vector_ops (VectorOperations): Input parameter for this operation.
+            gateway (Optional[LiteLLMGateway]): Gateway client used for LLM calls.
+            embedding_model (str): Input parameter for this operation.
         """
         self.vector_ops = vector_ops
         self.gateway = gateway
@@ -48,16 +49,16 @@ class Retriever:
     ) -> List[Dict[str, Any]]:
         """
         Retrieve relevant documents for a query.
-
+        
         Args:
-            query: Query text
-            tenant_id: Optional tenant ID for multi-tenant SaaS (filters documents by tenant)
-            top_k: Number of results to return
-            threshold: Minimum similarity threshold
-            filters: Optional metadata filters
-
+            query (str): Input parameter for this operation.
+            tenant_id (Optional[str]): Tenant identifier used for tenant isolation.
+            top_k (int): Input parameter for this operation.
+            threshold (float): Input parameter for this operation.
+            filters (Optional[Dict[str, Any]]): Input parameter for this operation.
+        
         Returns:
-            List of relevant documents with similarity scores
+            List[Dict[str, Any]]: Dictionary result of the operation.
         """
         # Generate query embedding
         query_embedding = self._get_embedding(query)
@@ -85,12 +86,15 @@ class Retriever:
     def _get_embedding(self, text: str) -> List[float]:
         """
         Get embedding for text.
-
+        
         Args:
-            text: Text to embed
-
+            text (str): Input parameter for this operation.
+        
         Returns:
-            Embedding vector
+            List[float]: List result of the operation.
+        
+        Raises:
+            EmbeddingError: Raised when this function detects an invalid state or when an underlying call fails.
         """
         if not self.gateway:
             raise EmbeddingError(
@@ -120,18 +124,18 @@ class Retriever:
     ) -> List[Dict[str, Any]]:
         """
         Hybrid retrieval combining vector similarity and keyword search.
-
+        
         Args:
-            query: Query text
-            tenant_id: Optional tenant ID for multi-tenant SaaS (filters documents by tenant)
-            top_k: Number of results to return
-            threshold: Minimum similarity threshold
-            filters: Optional metadata filters
-            vector_weight: Weight for vector similarity (0-1)
-            keyword_weight: Weight for keyword matching (0-1)
-
+            query (str): Input parameter for this operation.
+            tenant_id (Optional[str]): Tenant identifier used for tenant isolation.
+            top_k (int): Input parameter for this operation.
+            threshold (float): Input parameter for this operation.
+            filters (Optional[Dict[str, Any]]): Input parameter for this operation.
+            vector_weight (float): Input parameter for this operation.
+            keyword_weight (float): Input parameter for this operation.
+        
         Returns:
-            List of relevant documents with combined scores
+            List[Dict[str, Any]]: Dictionary result of the operation.
         """
         # Add tenant_id to filters for tenant isolation
         if tenant_id:
@@ -168,14 +172,14 @@ class Retriever:
     ) -> List[Dict[str, Any]]:
         """
         Perform keyword-based search on document content.
-
+        
         Args:
-            query: Query text
-            tenant_id: Optional tenant ID for multi-tenant SaaS (filters documents by tenant)
-            top_k: Maximum number of results
-
+            query (str): Input parameter for this operation.
+            tenant_id (Optional[str]): Tenant identifier used for tenant isolation.
+            top_k (int): Input parameter for this operation.
+        
         Returns:
-            List of documents matching keywords
+            List[Dict[str, Any]]: Dictionary result of the operation.
         """
         # Extract keywords from query
         keywords = query.lower().split()
@@ -258,15 +262,15 @@ class Retriever:
     ) -> List[Dict[str, Any]]:
         """
         Combine and re-rank vector and keyword results.
-
+        
         Args:
-            vector_results: Vector similarity results
-            keyword_results: Keyword search results
-            vector_weight: Weight for vector scores
-            keyword_weight: Weight for keyword scores
-
+            vector_results (List[Dict[str, Any]]): Input parameter for this operation.
+            keyword_results (List[Dict[str, Any]]): Input parameter for this operation.
+            vector_weight (float): Input parameter for this operation.
+            keyword_weight (float): Input parameter for this operation.
+        
         Returns:
-            Combined and re-ranked results
+            List[Dict[str, Any]]: Dictionary result of the operation.
         """
         # Create a map of document_id -> result
         combined_map = {}
@@ -316,13 +320,13 @@ class Retriever:
     ) -> List[Dict[str, Any]]:
         """
         Apply metadata filters to results.
-
+        
         Args:
-            results: Search results
-            filters: Filter criteria
-
+            results (List[Dict[str, Any]]): Input parameter for this operation.
+            filters (Dict[str, Any]): Input parameter for this operation.
+        
         Returns:
-            Filtered results
+            List[Dict[str, Any]]: Dictionary result of the operation.
         """
         filtered = []
 

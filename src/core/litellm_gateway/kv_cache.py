@@ -5,6 +5,7 @@ Provides key-value cache management for LLM generation to optimize
 attention computation and reduce latency for long contexts.
 """
 
+
 # Standard library imports
 import hashlib
 import json
@@ -29,12 +30,12 @@ class KVCacheEntry:
     ):
         """
         Initialize KV cache entry.
-
+        
         Args:
-            cache_key: Unique cache key
-            keys: Attention keys (list of layers, each layer is list of key vectors)
-            values: Attention values (list of layers, each layer is list of value vectors)
-            metadata: Optional metadata (model, prompt_hash, etc.)
+            cache_key (str): Input parameter for this operation.
+            keys (List[List[float]]): Input parameter for this operation.
+            values (List[List[float]]): Input parameter for this operation.
+            metadata (Optional[Dict[str, Any]]): Extra metadata for the operation.
         """
         self.cache_key = cache_key
         self.keys = keys
@@ -42,7 +43,12 @@ class KVCacheEntry:
         self.metadata = metadata or {}
 
     def to_dict(self) -> Dict[str, Any]:
-        """Convert to dictionary for storage."""
+        """
+        Convert to dictionary for storage.
+        
+        Returns:
+            Dict[str, Any]: Dictionary result of the operation.
+        """
         return {
             "cache_key": self.cache_key,
             "keys": self.keys,
@@ -52,7 +58,15 @@ class KVCacheEntry:
 
     @classmethod
     def from_dict(cls, data: Dict[str, Any]) -> "KVCacheEntry":
-        """Create from dictionary."""
+        """
+        Create from dictionary.
+        
+        Args:
+            data (Dict[str, Any]): Input parameter for this operation.
+        
+        Returns:
+            'KVCacheEntry': Builder instance (returned for call chaining).
+        """
         return cls(
             cache_key=data["cache_key"],
             keys=data["keys"],
@@ -78,12 +92,12 @@ class KVCacheManager:
     ):
         """
         Initialize KV cache manager.
-
+        
         Args:
-            cache: Cache mechanism instance (if None, uses in-memory cache)
-            enable_kv_cache: Whether to enable KV caching
-            kv_cache_ttl: TTL for KV cache entries in seconds
-            max_cache_size_mb: Maximum cache size in MB
+            cache (Optional[CacheMechanism]): Cache instance used to store and fetch cached results.
+            enable_kv_cache (bool): Flag to enable or disable kv cache.
+            kv_cache_ttl (int): Input parameter for this operation.
+            max_cache_size_mb (int): Input parameter for this operation.
         """
         self.cache = cache
         self.enable_kv_cache = enable_kv_cache
@@ -102,15 +116,15 @@ class KVCacheManager:
     ) -> str:
         """
         Generate cache key for a prompt/context.
-
+        
         Args:
-            prompt: Input prompt
-            model: Model identifier
-            messages: Optional message history
-            prefix_length: Optional prefix length for partial caching
-
+            prompt (str): Prompt text sent to the model.
+            model (str): Model name or identifier to use.
+            messages (Optional[List[Dict[str, Any]]]): Chat messages in role/content format.
+            prefix_length (Optional[int]): Input parameter for this operation.
+        
         Returns:
-            Cache key string
+            str: Returned text value.
         """
         # Create hash of prompt/model combination
         if messages:
@@ -132,13 +146,13 @@ class KVCacheManager:
     ) -> Optional[KVCacheEntry]:
         """
         Retrieve KV cache entry.
-
+        
         Args:
-            cache_key: Cache key
-            tenant_id: Optional tenant ID
-
+            cache_key (str): Input parameter for this operation.
+            tenant_id (Optional[str]): Tenant identifier used for tenant isolation.
+        
         Returns:
-            KV cache entry or None if not found
+            Optional[KVCacheEntry]: Result if available, else None.
         """
         if not self.enable_kv_cache:
             return None
@@ -167,13 +181,13 @@ class KVCacheManager:
     def set_kv_cache(self, entry: KVCacheEntry, tenant_id: Optional[str] = None) -> bool:
         """
         Store KV cache entry.
-
+        
         Args:
-            entry: KV cache entry
-            tenant_id: Optional tenant ID
-
+            entry (KVCacheEntry): Input parameter for this operation.
+            tenant_id (Optional[str]): Tenant identifier used for tenant isolation.
+        
         Returns:
-            True if stored successfully
+            bool: True if the operation succeeds, else False.
         """
         if not self.enable_kv_cache:
             return False
@@ -196,7 +210,16 @@ class KVCacheManager:
         return True
 
     def _invalidate_specific_key(self, cache_key: str, tenant_id: Optional[str]) -> int:
-        """Invalidate a specific cache key."""
+        """
+        Invalidate a specific cache key.
+        
+        Args:
+            cache_key (str): Input parameter for this operation.
+            tenant_id (Optional[str]): Tenant identifier used for tenant isolation.
+        
+        Returns:
+            int: Result of the operation.
+        """
         count = 0
         if cache_key in self._memory_cache:
             del self._memory_cache[cache_key]
@@ -212,7 +235,15 @@ class KVCacheManager:
         return count
 
     def _get_keys_to_invalidate(self, model: Optional[str]) -> List[str]:
-        """Get list of keys that match the model filter."""
+        """
+        Get list of keys that match the model filter.
+        
+        Args:
+            model (Optional[str]): Model name or identifier to use.
+        
+        Returns:
+            List[str]: List result of the operation.
+        """
         keys_to_delete = []
         for key in self._memory_cache.keys():
             if model and not key.startswith(f"kv_cache:{model}:"):
@@ -221,7 +252,15 @@ class KVCacheManager:
         return keys_to_delete
 
     def _invalidate_memory_keys(self, keys_to_delete: List[str]) -> int:
-        """Invalidate keys from memory cache."""
+        """
+        Invalidate keys from memory cache.
+        
+        Args:
+            keys_to_delete (List[str]): Input parameter for this operation.
+        
+        Returns:
+            int: Result of the operation.
+        """
         for key in keys_to_delete:
             del self._memory_cache[key]
         return len(keys_to_delete)
@@ -234,14 +273,14 @@ class KVCacheManager:
     ) -> int:
         """
         Invalidate KV cache entries.
-
+        
         Args:
-            cache_key: Specific cache key to invalidate (if None, invalidates all)
-            model: Optional model filter
-            tenant_id: Optional tenant ID filter
-
+            cache_key (Optional[str]): Input parameter for this operation.
+            model (Optional[str]): Model name or identifier to use.
+            tenant_id (Optional[str]): Tenant identifier used for tenant isolation.
+        
         Returns:
-            Number of entries invalidated
+            int: Result of the operation.
         """
         if cache_key:
             return self._invalidate_specific_key(cache_key, tenant_id)
@@ -259,9 +298,9 @@ class KVCacheManager:
     def get_cache_stats(self) -> Dict[str, Any]:
         """
         Get KV cache statistics.
-
+        
         Returns:
-            Dictionary with cache statistics
+            Dict[str, Any]: Dictionary result of the operation.
         """
         memory_count = len(self._memory_cache)
 
@@ -297,9 +336,9 @@ class KVCacheManager:
     def clear_cache(self) -> int:
         """
         Clear all KV cache entries.
-
+        
         Returns:
-            Number of entries cleared
+            int: Result of the operation.
         """
         count = len(self._memory_cache)
         self._memory_cache.clear()

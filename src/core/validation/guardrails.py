@@ -4,6 +4,7 @@ Validation and Guardrails Framework
 Ensures LLM outputs are safe, relevant, and compliant with ITSM requirements.
 """
 
+
 import re
 from datetime import datetime
 from enum import Enum
@@ -47,12 +48,12 @@ class Guardrail:
     ):
         """
         Initialize guardrail.
-
+        
         Args:
-            level: Validation level
-            enable_content_filter: Enable content filtering
-            enable_format_validation: Enable format validation
-            enable_compliance_check: Enable compliance checking
+            level (ValidationLevel): Input parameter for this operation.
+            enable_content_filter (bool): Flag to enable or disable content filter.
+            enable_format_validation (bool): Flag to enable or disable format validation.
+            enable_compliance_check (bool): Flag to enable or disable compliance check.
         """
         self.level = level
         self.enable_content_filter = enable_content_filter
@@ -78,7 +79,18 @@ class Guardrail:
     def _apply_content_validation(
         self, output: str, errors: List[str], warnings: List[str], score: float
     ) -> float:
-        """Apply content filtering validation."""
+        """
+        Apply content filtering validation.
+        
+        Args:
+            output (str): Input parameter for this operation.
+            errors (List[str]): Input parameter for this operation.
+            warnings (List[str]): Input parameter for this operation.
+            score (float): Input parameter for this operation.
+        
+        Returns:
+            float: Result of the operation.
+        """
         if not self.enable_content_filter:
             return score
 
@@ -92,7 +104,19 @@ class Guardrail:
     def _apply_format_validation(
         self, output: str, output_type: Optional[str], errors: List[str], warnings: List[str], score: float
     ) -> float:
-        """Apply format validation."""
+        """
+        Apply format validation.
+        
+        Args:
+            output (str): Input parameter for this operation.
+            output_type (Optional[str]): Input parameter for this operation.
+            errors (List[str]): Input parameter for this operation.
+            warnings (List[str]): Input parameter for this operation.
+            score (float): Input parameter for this operation.
+        
+        Returns:
+            float: Result of the operation.
+        """
         if not self.enable_format_validation or not output_type:
             return score
 
@@ -106,7 +130,19 @@ class Guardrail:
     def _apply_compliance_validation(
         self, output: str, context: Optional[Dict[str, Any]], errors: List[str], warnings: List[str], score: float
     ) -> float:
-        """Apply compliance check validation."""
+        """
+        Apply compliance check validation.
+        
+        Args:
+            output (str): Input parameter for this operation.
+            context (Optional[Dict[str, Any]]): Input parameter for this operation.
+            errors (List[str]): Input parameter for this operation.
+            warnings (List[str]): Input parameter for this operation.
+            score (float): Input parameter for this operation.
+        
+        Returns:
+            float: Result of the operation.
+        """
         if not self.enable_compliance_check:
             return score
 
@@ -120,7 +156,18 @@ class Guardrail:
     def _apply_custom_validators(
         self, output: str, errors: List[str], warnings: List[str], score: float
     ) -> float:
-        """Apply custom validators."""
+        """
+        Apply custom validators.
+        
+        Args:
+            output (str): Input parameter for this operation.
+            errors (List[str]): Input parameter for this operation.
+            warnings (List[str]): Input parameter for this operation.
+            score (float): Input parameter for this operation.
+        
+        Returns:
+            float: Result of the operation.
+        """
         import logging
         logger = logging.getLogger(__name__)
 
@@ -138,7 +185,16 @@ class Guardrail:
         return score
 
     def _adjust_score_by_level(self, score: float, errors: List[str]) -> float:
-        """Adjust validation score based on validation level."""
+        """
+        Adjust validation score based on validation level.
+        
+        Args:
+            score (float): Input parameter for this operation.
+            errors (List[str]): Input parameter for this operation.
+        
+        Returns:
+            float: Result of the operation.
+        """
         if self.level == ValidationLevel.LENIENT:
             return min(1.0, score + 0.2)
         elif self.level == ValidationLevel.STRICT and errors:
@@ -153,14 +209,14 @@ class Guardrail:
     ) -> ValidationResult:
         """
         Validate LLM output.
-
+        
         Args:
-            output: LLM output to validate
-            context: Optional context
-            output_type: Optional output type (e.g., "incident", "ticket", "response")
-
+            output (str): Input parameter for this operation.
+            context (Optional[Dict[str, Any]]): Input parameter for this operation.
+            output_type (Optional[str]): Input parameter for this operation.
+        
         Returns:
-            ValidationResult
+            ValidationResult: Result of the operation.
         """
         errors: List[str] = []
         warnings: List[str] = []
@@ -188,7 +244,15 @@ class Guardrail:
         )
 
     def _validate_content(self, output: str) -> Dict[str, Any]:
-        """Validate content for safety."""
+        """
+        Validate content for safety.
+        
+        Args:
+            output (str): Input parameter for this operation.
+        
+        Returns:
+            Dict[str, Any]: Dictionary result of the operation.
+        """
         errors = []
         warnings = []
 
@@ -218,7 +282,16 @@ class Guardrail:
         return {"is_valid": len(errors) == 0, "errors": errors, "warnings": warnings}
 
     def _validate_format(self, output: str, output_type: str) -> Dict[str, Any]:
-        """Validate output format."""
+        """
+        Validate output format.
+        
+        Args:
+            output (str): Input parameter for this operation.
+            output_type (str): Input parameter for this operation.
+        
+        Returns:
+            Dict[str, Any]: Dictionary result of the operation.
+        """
         errors = []
         warnings = []
 
@@ -244,7 +317,15 @@ class Guardrail:
         return {"is_valid": len(errors) == 0, "errors": errors, "warnings": warnings}
 
     def _check_pii_patterns(self, output: str) -> List[str]:
-        """Check for PII patterns in output."""
+        """
+        Check for PII patterns in output.
+        
+        Args:
+            output (str): Input parameter for this operation.
+        
+        Returns:
+            List[str]: List result of the operation.
+        """
         warnings = []
         pii_patterns = [
             r"\b\d{3}-\d{2}-\d{4}\b",  # SSN
@@ -259,7 +340,15 @@ class Guardrail:
         return warnings
 
     def _check_itil_compliance(self, output: str) -> List[str]:
-        """Check ITIL compliance requirements."""
+        """
+        Check ITIL compliance requirements.
+        
+        Args:
+            output (str): Input parameter for this operation.
+        
+        Returns:
+            List[str]: List result of the operation.
+        """
         warnings = []
         output_lower = output.lower()
         
@@ -272,7 +361,16 @@ class Guardrail:
     def _validate_compliance(
         self, output: str, context: Optional[Dict[str, Any]]
     ) -> Dict[str, Any]:
-        """Validate compliance with ITSM requirements."""
+        """
+        Validate compliance with ITSM requirements.
+        
+        Args:
+            output (str): Input parameter for this operation.
+            context (Optional[Dict[str, Any]]): Input parameter for this operation.
+        
+        Returns:
+            Dict[str, Any]: Dictionary result of the operation.
+        """
         errors: List[str] = []
         warnings: List[str] = []
 
@@ -289,18 +387,24 @@ class Guardrail:
     def add_validator(self, validator: Callable[[str], Tuple[bool, str]]) -> None:
         """
         Add custom validator.
-
+        
         Args:
-            validator: Function that takes output and returns (is_valid, message)
+            validator (Callable[[str], Tuple[bool, str]]): Input parameter for this operation.
+        
+        Returns:
+            None: Result of the operation.
         """
         self.custom_validators.append(validator)
 
     def add_blocked_pattern(self, pattern: str) -> None:
         """
         Add blocked pattern.
-
+        
         Args:
-            pattern: Regex pattern to block
+            pattern (str): Input parameter for this operation.
+        
+        Returns:
+            None: Result of the operation.
         """
         self.blocked_patterns.append(pattern)
 
@@ -313,9 +417,9 @@ class ValidationManager:
     def __init__(self, default_level: ValidationLevel = ValidationLevel.MODERATE):
         """
         Initialize validation manager.
-
+        
         Args:
-            default_level: Default validation level
+            default_level (ValidationLevel): Input parameter for this operation.
         """
         self.default_level = default_level
         self.guardrails: Dict[str, Guardrail] = {}
@@ -326,13 +430,13 @@ class ValidationManager:
     ) -> Guardrail:
         """
         Get guardrail instance.
-
+        
         Args:
-            name: Optional guardrail name
-            level: Optional validation level
-
+            name (Optional[str]): Name value.
+            level (Optional[ValidationLevel]): Input parameter for this operation.
+        
         Returns:
-            Guardrail instance
+            Guardrail: Result of the operation.
         """
         if name and name in self.guardrails:
             return self.guardrails[name]
@@ -345,10 +449,13 @@ class ValidationManager:
     def register_guardrail(self, name: str, guardrail: Guardrail) -> None:
         """
         Register a named guardrail.
-
+        
         Args:
-            name: Guardrail name
-            guardrail: Guardrail instance
+            name (str): Name value.
+            guardrail (Guardrail): Input parameter for this operation.
+        
+        Returns:
+            None: Result of the operation.
         """
         self.guardrails[name] = guardrail
 
@@ -361,15 +468,15 @@ class ValidationManager:
     ) -> ValidationResult:
         """
         Validate output using appropriate guardrail.
-
+        
         Args:
-            output: Output to validate
-            context: Optional context
-            output_type: Optional output type
-            guardrail_name: Optional guardrail name
-
+            output (str): Input parameter for this operation.
+            context (Optional[Dict[str, Any]]): Input parameter for this operation.
+            output_type (Optional[str]): Input parameter for this operation.
+            guardrail_name (Optional[str]): Input parameter for this operation.
+        
         Returns:
-            ValidationResult
+            ValidationResult: Result of the operation.
         """
         guardrail = self.get_guardrail(name=guardrail_name)
         return guardrail.validate(output, context, output_type)

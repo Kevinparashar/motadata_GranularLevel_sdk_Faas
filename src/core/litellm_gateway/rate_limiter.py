@@ -4,6 +4,7 @@ Rate Limiter and Request Queue
 Advanced rate limiting with queuing for LiteLLM Gateway.
 """
 
+
 import asyncio
 import hashlib
 import json
@@ -36,10 +37,10 @@ class RateLimiter:
     def __init__(self, config: Optional[RateLimitConfig] = None, tenant_id: Optional[str] = None):
         """
         Initialize rate limiter.
-
+        
         Args:
-            config: Rate limit configuration
-            tenant_id: Optional tenant ID for per-tenant rate limiting
+            config (Optional[RateLimitConfig]): Configuration object or settings.
+            tenant_id (Optional[str]): Tenant identifier used for tenant isolation.
         """
         self.config = config or RateLimitConfig()
         self.tenant_id = tenant_id
@@ -60,11 +61,14 @@ class RateLimiter:
     async def acquire(self) -> None:
         """
         Acquire a rate limit token.
-
+        
         Waits in queue if necessary until token is available.
-
+        
+        Returns:
+            None: Result of the operation.
+        
         Raises:
-            TimeoutError: If queue timeout is exceeded
+            create_error_with_suggestion: Raised when this function detects an invalid state or when an underlying call fails.
         """
         # Refill tokens
         await self._refill_tokens()
@@ -105,7 +109,12 @@ class RateLimiter:
             )
 
     async def _refill_tokens(self) -> None:
-        """Refill tokens based on elapsed time."""
+        """
+        Refill tokens based on elapsed time.
+        
+        Returns:
+            None: Result of the operation.
+        """
         now = datetime.now()
         elapsed = (now - self.last_refill).total_seconds()
 
@@ -119,7 +128,12 @@ class RateLimiter:
             await self._process_queue()
 
     async def _process_queue(self) -> None:
-        """Process queued requests."""
+        """
+        Process queued requests.
+        
+        Returns:
+            None: Result of the operation.
+        """
         async with self.queue_lock:
             while self.queue and self.tokens >= 1.0:
                 future, _ = self.queue.popleft()
@@ -129,7 +143,12 @@ class RateLimiter:
                     future.set_result(None)
 
     def _record_request(self) -> None:
-        """Record a request for tracking."""
+        """
+        Record a request for tracking.
+        
+        Returns:
+            None: Result of the operation.
+        """
         now = datetime.now()
         self.request_times.append(now)
 
@@ -143,7 +162,12 @@ class RateLimiter:
             self.hourly_requests.popleft()
 
     def get_stats(self) -> Dict[str, Any]:
-        """Get rate limiter statistics."""
+        """
+        Get rate limiter statistics.
+        
+        Returns:
+            Dict[str, Any]: Dictionary result of the operation.
+        """
         return {
             "tenant_id": self.tenant_id,
             "tokens_available": self.tokens,
@@ -168,16 +192,24 @@ class RequestDeduplicator:
     def __init__(self, ttl: float = 300.0):
         """
         Initialize deduplicator.
-
+        
         Args:
-            ttl: Time-to-live for cached results in seconds
+            ttl (float): Input parameter for this operation.
         """
         self.ttl = ttl
         self.cache: Dict[str, tuple[Any, datetime]] = {}
         self.lock = asyncio.Lock()
 
     def _hash_request(self, **kwargs: Any) -> str:
-        """Generate hash for request."""
+        """
+        Generate hash for request.
+        
+        Args:
+            **kwargs (Any): Input parameter for this operation.
+        
+        Returns:
+            str: Returned text value.
+        """
         # Create deterministic hash from request parameters
         request_data = json.dumps(kwargs, sort_keys=True, default=str)
         return hashlib.sha256(request_data.encode()).hexdigest()
@@ -185,13 +217,13 @@ class RequestDeduplicator:
     async def get_or_execute(self, func: Callable, **kwargs: Any) -> Any:
         """
         Execute function or return cached result if duplicate.
-
+        
         Args:
-            func: Function to execute
-            **kwargs: Function arguments
-
+            func (Callable): Input parameter for this operation.
+            **kwargs (Any): Input parameter for this operation.
+        
         Returns:
-            Function result (from cache if duplicate)
+            Any: Result of the operation.
         """
         request_hash = self._hash_request(**kwargs)
 
@@ -219,7 +251,12 @@ class RequestDeduplicator:
         return result
 
     def clear_cache(self) -> None:
-        """Clear deduplication cache."""
+        """
+        Clear deduplication cache.
+        
+        Returns:
+            None: Result of the operation.
+        """
         self.cache.clear()
 
 
@@ -233,10 +270,10 @@ class RequestBatcher:
     def __init__(self, batch_size: int = 10, batch_timeout: float = 0.5):
         """
         Initialize batcher.
-
+        
         Args:
-            batch_size: Maximum batch size
-            batch_timeout: Maximum time to wait for batch in seconds
+            batch_size (int): Input parameter for this operation.
+            batch_timeout (float): Input parameter for this operation.
         """
         self.batch_size = batch_size
         self.batch_timeout = batch_timeout
@@ -247,15 +284,15 @@ class RequestBatcher:
     async def batch_execute(self, batch_key: str, func: Callable, *args: Any, **kwargs: Any) -> Any:
         """
         Execute function in batch.
-
+        
         Args:
-            batch_key: Key to group requests into same batch
-            func: Function to execute
-            *args: Function arguments
-            **kwargs: Function keyword arguments
-
+            batch_key (str): Input parameter for this operation.
+            func (Callable): Input parameter for this operation.
+            *args (Any): Input parameter for this operation.
+            **kwargs (Any): Input parameter for this operation.
+        
         Returns:
-            Function result
+            Any: Result of the operation.
         """
         future: asyncio.Future[Any] = asyncio.Future()
 
@@ -279,12 +316,30 @@ class RequestBatcher:
         return await future
 
     async def _execute_async_batch(self, batch: List[Tuple], func: Callable) -> List[Any]:
-        """Execute batch of async function calls."""
+        """
+        Execute batch of async function calls.
+        
+        Args:
+            batch (List[Tuple]): Input parameter for this operation.
+            func (Callable): Input parameter for this operation.
+        
+        Returns:
+            List[Any]: List result of the operation.
+        """
         tasks = [func(*args, **kwargs) for _, args, kwargs in batch]
         return await asyncio.gather(*tasks, return_exceptions=True)
 
     def _execute_sync_batch(self, batch: List[Tuple], func: Callable) -> List[Any]:
-        """Execute batch of sync function calls."""
+        """
+        Execute batch of sync function calls.
+        
+        Args:
+            batch (List[Tuple]): Input parameter for this operation.
+            func (Callable): Input parameter for this operation.
+        
+        Returns:
+            List[Any]: List result of the operation.
+        """
         results = []
         for _, args, kwargs in batch:
             try:
@@ -295,7 +350,16 @@ class RequestBatcher:
         return results
 
     def _set_batch_results(self, batch: List[Tuple], results: List[Any]) -> None:
-        """Set results for all futures in batch."""
+        """
+        Set results for all futures in batch.
+        
+        Args:
+            batch (List[Tuple]): Input parameter for this operation.
+            results (List[Any]): Input parameter for this operation.
+        
+        Returns:
+            None: Result of the operation.
+        """
         for (future, _, _), result in zip(batch, results):
             if not future.done():
                 if isinstance(result, Exception):
@@ -304,7 +368,16 @@ class RequestBatcher:
                     future.set_result(result)
 
     async def _process_batch(self, batch_key: str, func: Callable) -> None:
-        """Process a batch of requests."""
+        """
+        Process a batch of requests.
+        
+        Args:
+            batch_key (str): Input parameter for this operation.
+            func (Callable): Input parameter for this operation.
+        
+        Returns:
+            None: Result of the operation.
+        """
         try:
             # Wait for batch timeout or batch size
             await asyncio.sleep(self.batch_timeout)

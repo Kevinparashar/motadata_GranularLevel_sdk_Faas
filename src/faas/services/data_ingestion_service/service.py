@@ -4,6 +4,7 @@ Data Ingestion Service - Main service implementation.
 Handles file upload and multi-modal data processing.
 """
 
+
 import asyncio
 import json
 import logging
@@ -50,13 +51,13 @@ class DataIngestionService:
     ):
         """
         Initialize Data Ingestion Service.
-
+        
         Args:
-            config: Service configuration
-            db_connection: Database connection
-            nats_client: NATS client (optional)
-            otel_tracer: OTEL tracer (optional)
-            codec_manager: Codec manager (optional)
+            config (ServiceConfig): Configuration object or settings.
+            db_connection (Any): Input parameter for this operation.
+            nats_client (Optional[Any]): Input parameter for this operation.
+            otel_tracer (Optional[Any]): Input parameter for this operation.
+            codec_manager (Optional[Any]): Input parameter for this operation.
         """
         self.config = config
         self.db = db_connection
@@ -84,12 +85,12 @@ class DataIngestionService:
     def _get_ingestion_service(self, tenant_id: str) -> CoreDataIngestionService:
         """
         Get or create ingestion service for tenant.
-
+        
         Args:
-            tenant_id: Tenant ID
-
+            tenant_id (str): Tenant identifier used for tenant isolation.
+        
         Returns:
-            DataIngestionService instance
+            CoreDataIngestionService: Builder instance (returned for call chaining).
         """
         if tenant_id not in self._ingestion_services:
             # Create ingestion service on-demand (stateless)
@@ -129,7 +130,22 @@ class DataIngestionService:
         auto_ingest: bool = True,
         headers: dict = Header(...),
     ):
-        """Upload and process a file."""
+        """
+        Upload and process a file.
+        
+        Args:
+            file (UploadFile): Input parameter for this operation.
+            title (Optional[str]): Input parameter for this operation.
+            metadata (Optional[str]): Extra metadata for the operation.
+            auto_ingest (bool): Input parameter for this operation.
+            headers (dict): HTTP headers passed from the caller.
+        
+        Returns:
+            Any: Result of the operation.
+        
+        Raises:
+            HTTPException: Raised when this function detects an invalid state or when an underlying call fails.
+        """
         standard_headers = extract_headers(**headers)
 
         span = None
@@ -197,12 +213,29 @@ class DataIngestionService:
 
     @staticmethod
     def _write_file(file_path: str, content: bytes) -> None:
-        """Write file content to disk (synchronous helper for thread pool)."""
+        """
+        Write file content to disk (synchronous helper for thread pool).
+        
+        Args:
+            file_path (str): Path of the input file.
+            content (bytes): Content text.
+        
+        Returns:
+            None: Result of the operation.
+        """
         with open(file_path, "wb") as f:
             f.write(content)
 
     def _parse_metadata(self, metadata: Optional[str]) -> Optional[Dict[str, Any]]:
-        """Parse metadata from JSON string if provided."""
+        """
+        Parse metadata from JSON string if provided.
+        
+        Args:
+            metadata (Optional[str]): Extra metadata for the operation.
+        
+        Returns:
+            Optional[Dict[str, Any]]: Dictionary result of the operation.
+        """
         if not metadata:
             return None
 
@@ -219,7 +252,18 @@ class DataIngestionService:
         metadata: Optional[Dict[str, Any]],
         tenant_id: str,
     ) -> None:
-        """Send file to RAG service for auto-ingestion."""
+        """
+        Send file to RAG service for auto-ingestion.
+        
+        Args:
+            file_path (str): Path of the input file.
+            title (str): Input parameter for this operation.
+            metadata (Optional[Dict[str, Any]]): Extra metadata for the operation.
+            tenant_id (str): Tenant identifier used for tenant isolation.
+        
+        Returns:
+            None: Result of the operation.
+        """
         async with httpx.AsyncClient() as client:
             await client.post(
                 f"{self.config.rag_service_url}/api/v1/rag/documents",
@@ -232,7 +276,17 @@ class DataIngestionService:
             )
 
     async def _publish_upload_event(self, file_id: str, file_name: str, tenant_id: str) -> None:
-        """Publish file upload event via NATS."""
+        """
+        Publish file upload event via NATS.
+        
+        Args:
+            file_id (str): Input parameter for this operation.
+            file_name (str): Input parameter for this operation.
+            tenant_id (str): Tenant identifier used for tenant isolation.
+        
+        Returns:
+            None: Result of the operation.
+        """
         event = {
             "event_type": "ingestion.file.uploaded",
             "file_id": file_id,
@@ -245,7 +299,16 @@ class DataIngestionService:
         )
 
     async def _handle_get_file(self, file_id: str, headers: dict = Header(...)):  # noqa: S7503
-        """Get file status. Async required for FastAPI route handler."""
+        """
+        Get file status. Async required for FastAPI route handler.
+        
+        Args:
+            file_id (str): Input parameter for this operation.
+            headers (dict): HTTP headers passed from the caller.
+        
+        Returns:
+            Any: Result of the operation.
+        """
         standard_headers = extract_headers(**headers)
 
         # File status retrieval from database - to be implemented
@@ -260,7 +323,20 @@ class DataIngestionService:
     async def _handle_process_file(  # noqa: S7503
         self, file_id: str, request: ProcessFileRequest, headers: dict = Header(...)
     ):
-        """Process a file. Async required for FastAPI route handler."""
+        """
+        Process a file. Async required for FastAPI route handler.
+        
+        Args:
+            file_id (str): Input parameter for this operation.
+            request (ProcessFileRequest): Request payload object.
+            headers (dict): HTTP headers passed from the caller.
+        
+        Returns:
+            Any: Result of the operation.
+        
+        Raises:
+            HTTPException: Raised when this function detects an invalid state or when an underlying call fails.
+        """
         standard_headers = extract_headers(**headers)
 
         try:
@@ -286,7 +362,12 @@ class DataIngestionService:
             )
 
     async def _handle_health_check(self):  # noqa: S7503
-        """Health check endpoint. Async required for FastAPI route handler."""
+        """
+        Health check endpoint. Async required for FastAPI route handler.
+        
+        Returns:
+            Any: Result of the operation.
+        """
         return {"status": "healthy", "service": "data-ingestion-service"}
 
 

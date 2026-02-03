@@ -4,6 +4,7 @@ Shared Error Handling Utilities
 Provides consistent error handling patterns across all SDK components.
 """
 
+
 import logging
 from functools import wraps
 from typing import Any, Callable, Optional, Type, TypeVar
@@ -17,20 +18,50 @@ E = TypeVar("E", bound=Exception)
 
 
 def _log_retry_attempt(func_name: str, attempt: int, max_retries: int, exception: Exception) -> None:
-    """Log retry attempt."""
+    """
+    Log retry attempt.
+    
+    Args:
+        func_name (str): Input parameter for this operation.
+        attempt (int): Input parameter for this operation.
+        max_retries (int): Input parameter for this operation.
+        exception (Exception): Input parameter for this operation.
+    
+    Returns:
+        None: Result of the operation.
+    """
     logger.warning(
         f"Attempt {attempt}/{max_retries} failed for {func_name}: {str(exception)}. Retrying..."
     )
 
 
 def _handle_retry_delay(attempt: int, retry_delay: float) -> None:
-    """Handle retry delay with exponential backoff."""
+    """
+    Handle retry delay with exponential backoff.
+    
+    Args:
+        attempt (int): Input parameter for this operation.
+        retry_delay (float): Input parameter for this operation.
+    
+    Returns:
+        None: Result of the operation.
+    """
     import time
     time.sleep(retry_delay * attempt)
 
 
 def _handle_max_retries_exceeded(func_name: str, max_retries: int, exception: Exception) -> None:
-    """Log when max retries exceeded."""
+    """
+    Log when max retries exceeded.
+    
+    Args:
+        func_name (str): Input parameter for this operation.
+        max_retries (int): Input parameter for this operation.
+        exception (Exception): Input parameter for this operation.
+    
+    Returns:
+        None: Result of the operation.
+    """
     logger.error(f"All {max_retries} attempts failed for {func_name}: {str(exception)}")
 
 
@@ -43,7 +74,25 @@ def _execute_with_retry(
     retryable_exceptions: tuple[Type[Exception], ...],
     on_retry: Optional[Callable[[int, Exception], None]],
 ) -> T:
-    """Execute function with retry logic."""
+    """
+    Execute function with retry logic.
+    
+    Args:
+        func (Callable[..., T]): Input parameter for this operation.
+        args (tuple): Input parameter for this operation.
+        kwargs (dict): Input parameter for this operation.
+        max_retries (int): Input parameter for this operation.
+        retry_delay (float): Input parameter for this operation.
+        retryable_exceptions (tuple[Type[Exception], ...]): Input parameter for this operation.
+        on_retry (Optional[Callable[[int, Exception], None]]): Input parameter for this operation.
+    
+    Returns:
+        T: Result of the operation.
+    
+    Raises:
+        RuntimeError: Raised when this function detects an invalid state or when an underlying call fails.
+        last_exception: Raised when this function detects an invalid state or when an underlying call fails.
+    """
     last_exception: Optional[Exception] = None
     for attempt in range(max_retries):
         try:
@@ -85,16 +134,16 @@ class ErrorHandler:
     ) -> Callable[..., T]:
         """
         Decorator for retry logic with consistent error handling.
-
+        
         Args:
-            func: Function to wrap
-            max_retries: Maximum retry attempts
-            retry_delay: Delay between retries (seconds)
-            retryable_exceptions: Exceptions that should trigger retry
-            on_retry: Optional callback on retry (receives attempt number and exception)
-
+            func (Callable[..., T]): Input parameter for this operation.
+            max_retries (int): Input parameter for this operation.
+            retry_delay (float): Input parameter for this operation.
+            retryable_exceptions (tuple[Type[Exception], ...]): Input parameter for this operation.
+            on_retry (Optional[Callable[[int, Exception], None]]): Input parameter for this operation.
+        
         Returns:
-            Wrapped function with retry logic
+            Callable[..., T]: Result of the operation.
         """
 
         @wraps(func)
@@ -114,15 +163,15 @@ class ErrorHandler:
     ) -> Callable[..., T]:
         """
         Decorator for fallback value on error.
-
+        
         Args:
-            func: Function to wrap
-            fallback_value: Value to return on error
-            fallback_exceptions: Exceptions that should trigger fallback
-            log_error: Whether to log errors
-
+            func (Callable[..., T]): Input parameter for this operation.
+            fallback_value (T): Input parameter for this operation.
+            fallback_exceptions (tuple[Type[Exception], ...]): Input parameter for this operation.
+            log_error (bool): Input parameter for this operation.
+        
         Returns:
-            Wrapped function with fallback logic
+            Callable[..., T]: Result of the operation.
         """
 
         @wraps(func)
@@ -142,15 +191,18 @@ class ErrorHandler:
     ) -> Callable[..., T]:
         """
         Wrap exceptions in SDK error hierarchy.
-
+        
         Args:
-            func: Function to wrap
-            error_class: SDK error class to raise
-            error_message: Base error message
-            **error_kwargs: Additional error attributes
-
+            func (Callable[..., T]): Input parameter for this operation.
+            error_class (Type[SDKError]): Input parameter for this operation.
+            error_message (str): Input parameter for this operation.
+            **error_kwargs (Any): Input parameter for this operation.
+        
         Returns:
-            Wrapped function that raises SDK errors
+            Callable[..., T]: Result of the operation.
+        
+        Raises:
+            error_class: Raised when this function detects an invalid state or when an underlying call fails.
         """
 
         @wraps(func)

@@ -4,6 +4,7 @@ Agent Storage for Stateless FaaS Services
 Provides database-backed agent storage to replace in-memory state.
 """
 
+
 import json
 import logging
 from typing import Any, Dict, Optional
@@ -25,9 +26,9 @@ class AgentStorage:
     def __init__(self, db_connection: Any):
         """
         Initialize agent storage.
-
+        
         Args:
-            db_connection: Database connection (DatabaseConnection instance)
+            db_connection (Any): Input parameter for this operation.
         """
         self.db = db_connection
         self._ensure_table()
@@ -69,10 +70,13 @@ class AgentStorage:
     ) -> None:
         """
         Save agent to database.
-
+        
         Args:
-            agent: Agent instance
-            tenant_id: Tenant ID
+            agent (Agent): Input parameter for this operation.
+            tenant_id (str): Tenant identifier used for tenant isolation.
+        
+        Returns:
+            None: Result of the operation.
         """
         with self.db.get_cursor() as cursor:
             cursor.execute(
@@ -115,14 +119,14 @@ class AgentStorage:
     ) -> Optional[Agent]:
         """
         Load agent from database and recreate Agent instance.
-
+        
         Args:
-            agent_id: Agent ID
-            tenant_id: Tenant ID
-            gateway: LiteLLM Gateway instance
-
+            agent_id (str): Input parameter for this operation.
+            tenant_id (str): Tenant identifier used for tenant isolation.
+            gateway (LiteLLMGateway): Gateway client used for LLM calls.
+        
         Returns:
-            Agent instance or None if not found
+            Optional[Agent]: Result if available, else None.
         """
         with self.db.get_cursor() as cursor:
             cursor.execute(
@@ -173,14 +177,14 @@ class AgentStorage:
     ) -> list[Dict[str, Any]]:
         """
         List agents for a tenant.
-
+        
         Args:
-            tenant_id: Tenant ID
-            limit: Maximum number of agents
-            offset: Offset for pagination
-
+            tenant_id (str): Tenant identifier used for tenant isolation.
+            limit (int): Input parameter for this operation.
+            offset (int): Input parameter for this operation.
+        
         Returns:
-            List of agent dictionaries
+            list[Dict[str, Any]]: Dictionary result of the operation.
         """
         with self.db.get_cursor() as cursor:
             cursor.execute(
@@ -206,13 +210,13 @@ class AgentStorage:
     ) -> bool:
         """
         Delete agent from database.
-
+        
         Args:
-            agent_id: Agent ID
-            tenant_id: Tenant ID
-
+            agent_id (str): Input parameter for this operation.
+            tenant_id (str): Tenant identifier used for tenant isolation.
+        
         Returns:
-            True if deleted, False if not found
+            bool: True if the operation succeeds, else False.
         """
         with self.db.get_cursor() as cursor:
             cursor.execute(
@@ -232,13 +236,13 @@ class AgentStorage:
     ) -> bool:
         """
         Check if agent exists.
-
+        
         Args:
-            agent_id: Agent ID
-            tenant_id: Tenant ID
-
+            agent_id (str): Input parameter for this operation.
+            tenant_id (str): Tenant identifier used for tenant isolation.
+        
         Returns:
-            True if exists, False otherwise
+            bool: True if the operation succeeds, else False.
         """
         with self.db.get_cursor() as cursor:
             cursor.execute(

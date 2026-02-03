@@ -4,6 +4,7 @@ Feedback Loop System
 Implements feedback mechanisms for continuous learning and improvement in AI systems.
 """
 
+
 import json
 from dataclasses import dataclass, field
 from datetime import datetime
@@ -59,10 +60,10 @@ class FeedbackLoop:
     def __init__(self, storage_path: Optional[str] = None, auto_process: bool = True):
         """
         Initialize feedback loop.
-
+        
         Args:
-            storage_path: Optional path for persistent storage
-            auto_process: Whether to automatically process feedback
+            storage_path (Optional[str]): Input parameter for this operation.
+            auto_process (bool): Input parameter for this operation.
         """
         self.storage_path = Path(storage_path) if storage_path else None
         self.auto_process = auto_process
@@ -91,18 +92,18 @@ class FeedbackLoop:
     ) -> str:
         """
         Record user feedback.
-
+        
         Args:
-            query: Original query
-            response: System response
-            feedback_type: Type of feedback
-            content: Feedback content (correction, rating, etc.)
-            tenant_id: Optional tenant ID
-            agent_id: Optional agent ID
-            metadata: Optional metadata
-
+            query (str): Input parameter for this operation.
+            response (str): Input parameter for this operation.
+            feedback_type (FeedbackType): Input parameter for this operation.
+            content (str): Content text.
+            tenant_id (Optional[str]): Tenant identifier used for tenant isolation.
+            agent_id (Optional[str]): Input parameter for this operation.
+            metadata (Optional[Dict[str, Any]]): Extra metadata for the operation.
+        
         Returns:
-            Feedback ID
+            str: Returned text value.
         """
         import uuid
 
@@ -130,12 +131,12 @@ class FeedbackLoop:
     def process_feedback(self, feedback_id: str) -> bool:
         """
         Process a feedback item.
-
+        
         Args:
-            feedback_id: Feedback ID to process
-
+            feedback_id (str): Input parameter for this operation.
+        
         Returns:
-            True if processed successfully
+            bool: True if the operation succeeds, else False.
         """
         feedback = next((f for f in self.feedback_queue if f.feedback_id == feedback_id), None)
 
@@ -164,10 +165,13 @@ class FeedbackLoop:
     ) -> None:
         """
         Register a callback for specific feedback type.
-
+        
         Args:
-            feedback_type: Type of feedback
-            callback: Callback function
+            feedback_type (FeedbackType): Input parameter for this operation.
+            callback (Callable[[FeedbackItem], None]): Input parameter for this operation.
+        
+        Returns:
+            None: Result of the operation.
         """
         if feedback_type not in self.callbacks:
             self.callbacks[feedback_type] = []
@@ -176,12 +180,12 @@ class FeedbackLoop:
     def get_feedback_stats(self, tenant_id: Optional[str] = None) -> Dict[str, Any]:
         """
         Get feedback statistics.
-
+        
         Args:
-            tenant_id: Optional tenant ID filter
-
+            tenant_id (Optional[str]): Tenant identifier used for tenant isolation.
+        
         Returns:
-            Dictionary with feedback statistics
+            Dict[str, Any]: Dictionary result of the operation.
         """
         all_feedback = self.feedback_queue + self.processed_feedback
 
@@ -209,12 +213,12 @@ class FeedbackLoop:
     def get_learning_insights(self, tenant_id: Optional[str] = None) -> Dict[str, Any]:
         """
         Extract learning insights from feedback.
-
+        
         Args:
-            tenant_id: Optional tenant ID filter
-
+            tenant_id (Optional[str]): Tenant identifier used for tenant isolation.
+        
         Returns:
-            Dictionary with learning insights
+            Dict[str, Any]: Dictionary result of the operation.
         """
         processed = self.processed_feedback
 
@@ -270,7 +274,12 @@ class FeedbackLoop:
         return insights
 
     def _persist(self) -> None:
-        """Persist feedback to disk."""
+        """
+        Persist feedback to disk.
+        
+        Returns:
+            None: Result of the operation.
+        """
         if not self.storage_path:
             return
 
@@ -319,7 +328,12 @@ class FeedbackLoop:
             logger.warning(f"Failed to persist feedback to {self.storage_path}: {e}", exc_info=True)
 
     def _load(self) -> None:
-        """Load feedback from disk."""
+        """
+        Load feedback from disk.
+        
+        Returns:
+            None: Result of the operation.
+        """
         if not self.storage_path or not self.storage_path.exists():
             return
 

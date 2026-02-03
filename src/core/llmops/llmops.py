@@ -4,6 +4,7 @@ LLMOps - LLM Operations and Monitoring
 Comprehensive logging, monitoring, and operational management for LLM operations.
 """
 
+
 import json
 from dataclasses import dataclass, field
 from datetime import datetime
@@ -68,11 +69,11 @@ class LLMOps:
     ):
         """
         Initialize LLMOps.
-
+        
         Args:
-            storage_path: Optional path for persistent storage
-            enable_logging: Whether to enable operation logging
-            enable_cost_tracking: Whether to track costs
+            storage_path (Optional[str]): Input parameter for this operation.
+            enable_logging (bool): Flag to enable or disable logging.
+            enable_cost_tracking (bool): Flag to enable or disable cost tracking.
         """
         self.storage_path = Path(storage_path) if storage_path else None
         self.enable_logging = enable_logging
@@ -109,21 +110,21 @@ class LLMOps:
     ) -> str:
         """
         Log an LLM operation.
-
+        
         Args:
-            operation_type: Type of operation
-            model: Model used
-            prompt_tokens: Number of prompt tokens
-            completion_tokens: Number of completion tokens
-            latency_ms: Operation latency in milliseconds
-            status: Operation status
-            error_message: Optional error message
-            tenant_id: Optional tenant ID
-            agent_id: Optional agent ID
-            metadata: Optional metadata
-
+            operation_type (LLMOperationType): Input parameter for this operation.
+            model (str): Model name or identifier to use.
+            prompt_tokens (int): Input parameter for this operation.
+            completion_tokens (int): Input parameter for this operation.
+            latency_ms (float): Input parameter for this operation.
+            status (LLMOperationStatus): Input parameter for this operation.
+            error_message (Optional[str]): Input parameter for this operation.
+            tenant_id (Optional[str]): Tenant identifier used for tenant isolation.
+            agent_id (Optional[str]): Input parameter for this operation.
+            metadata (Optional[Dict[str, Any]]): Extra metadata for the operation.
+        
         Returns:
-            Operation ID
+            str: Returned text value.
         """
         if not self.enable_logging:
             return ""
@@ -176,14 +177,14 @@ class LLMOps:
     ) -> Dict[str, Any]:
         """
         Get LLM operation metrics.
-
+        
         Args:
-            tenant_id: Optional tenant ID filter
-            agent_id: Optional agent ID filter
-            time_range_hours: Time range in hours (default: 24)
-
+            tenant_id (Optional[str]): Tenant identifier used for tenant isolation.
+            agent_id (Optional[str]): Input parameter for this operation.
+            time_range_hours (Optional[int]): Input parameter for this operation.
+        
         Returns:
-            Dictionary with metrics
+            Dict[str, Any]: Dictionary result of the operation.
         """
         cutoff = datetime.now()
         if time_range_hours:
@@ -265,13 +266,13 @@ class LLMOps:
     ) -> Dict[str, Any]:
         """
         Get cost summary.
-
+        
         Args:
-            tenant_id: Optional tenant ID filter
-            time_range_hours: Time range in hours
-
+            tenant_id (Optional[str]): Tenant identifier used for tenant isolation.
+            time_range_hours (Optional[int]): Input parameter for this operation.
+        
         Returns:
-            Dictionary with cost summary
+            Dict[str, Any]: Dictionary result of the operation.
         """
         metrics = self.get_metrics(tenant_id=tenant_id, time_range_hours=time_range_hours)
 
@@ -297,7 +298,12 @@ class LLMOps:
         }
 
     def _persist(self) -> None:
-        """Persist operations to disk."""
+        """
+        Persist operations to disk.
+        
+        Returns:
+            None: Result of the operation.
+        """
         if not self.storage_path:
             return
 
@@ -335,7 +341,12 @@ class LLMOps:
             pass
 
     def _load(self) -> None:
-        """Load operations from disk."""
+        """
+        Load operations from disk.
+        
+        Returns:
+            None: Result of the operation.
+        """
         if not self.storage_path or not self.storage_path.exists():
             return
 

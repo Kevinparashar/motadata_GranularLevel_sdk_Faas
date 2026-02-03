@@ -4,6 +4,7 @@ Agent Service - Main service implementation.
 Handles agent management, task execution, chat interactions, and memory management.
 """
 
+
 import logging
 import os
 from typing import Any, Dict, Optional
@@ -48,13 +49,13 @@ class AgentService:
     ):
         """
         Initialize Agent Service.
-
+        
         Args:
-            config: Service configuration
-            db_connection: Database connection
-            nats_client: NATS client (optional)
-            otel_tracer: OTEL tracer (optional)
-            codec_manager: Codec manager (optional)
+            config (ServiceConfig): Configuration object or settings.
+            db_connection (Any): Input parameter for this operation.
+            nats_client (Optional[Any]): Input parameter for this operation.
+            otel_tracer (Optional[Any]): Input parameter for this operation.
+            codec_manager (Optional[Any]): Input parameter for this operation.
         """
         self.config = config
         self.db = db_connection
@@ -108,7 +109,19 @@ class AgentService:
     async def _handle_create_agent(
         self, request: CreateAgentRequest, headers: dict = Header(...)
     ):
-        """Create a new agent."""
+        """
+        Create a new agent.
+        
+        Args:
+            request (CreateAgentRequest): Request payload object.
+            headers (dict): HTTP headers passed from the caller.
+        
+        Returns:
+            Any: Result of the operation.
+        
+        Raises:
+            HTTPException: Raised when this function detects an invalid state or when an underlying call fails.
+        """
         standard_headers = extract_headers(**headers)
 
         # Start OTEL span
@@ -179,7 +192,19 @@ class AgentService:
                 span.end()
 
     async def _handle_get_agent(self, agent_id: str, headers: dict = Header(...)):  # noqa: S7503
-        """Get agent by ID. Async required for FastAPI route handler."""
+        """
+        Get agent by ID. Async required for FastAPI route handler.
+        
+        Args:
+            agent_id (str): Input parameter for this operation.
+            headers (dict): HTTP headers passed from the caller.
+        
+        Returns:
+            Any: Result of the operation.
+        
+        Raises:
+            NotFoundError: Raised when this function detects an invalid state or when an underlying call fails.
+        """
         standard_headers = extract_headers(**headers)
 
         # Load agent from database (stateless)
@@ -204,7 +229,21 @@ class AgentService:
     async def _handle_execute_task(
         self, agent_id: str, request: ExecuteTaskRequest, headers: dict = Header(...)
     ):
-        """Execute a task with an agent."""
+        """
+        Execute a task with an agent.
+        
+        Args:
+            agent_id (str): Input parameter for this operation.
+            request (ExecuteTaskRequest): Request payload object.
+            headers (dict): HTTP headers passed from the caller.
+        
+        Returns:
+            Any: Result of the operation.
+        
+        Raises:
+            HTTPException: Raised when this function detects an invalid state or when an underlying call fails.
+            NotFoundError: Raised when this function detects an invalid state or when an underlying call fails.
+        """
         standard_headers = extract_headers(**headers)
 
         # Load agent from database (stateless)
@@ -243,7 +282,21 @@ class AgentService:
             )
 
     async def _handle_chat(self, agent_id: str, request: ChatRequest, headers: dict = Header(...)):
-        """Chat with an agent."""
+        """
+        Chat with an agent.
+        
+        Args:
+            agent_id (str): Input parameter for this operation.
+            request (ChatRequest): Request payload object.
+            headers (dict): HTTP headers passed from the caller.
+        
+        Returns:
+            Any: Result of the operation.
+        
+        Raises:
+            HTTPException: Raised when this function detects an invalid state or when an underlying call fails.
+            NotFoundError: Raised when this function detects an invalid state or when an underlying call fails.
+        """
         standard_headers = extract_headers(**headers)
 
         # Load agent from database (stateless)
@@ -281,7 +334,17 @@ class AgentService:
     async def _handle_list_agents(  # noqa: S7503
         self, headers: dict = Header(...), limit: int = 100, offset: int = 0
     ):
-        """List all agents. Async required for FastAPI route handler."""
+        """
+        List all agents. Async required for FastAPI route handler.
+        
+        Args:
+            headers (dict): HTTP headers passed from the caller.
+            limit (int): Input parameter for this operation.
+            offset (int): Input parameter for this operation.
+        
+        Returns:
+            Any: Result of the operation.
+        """
         standard_headers = extract_headers(**headers)
 
         # Load agents from database (stateless)
@@ -300,20 +363,25 @@ class AgentService:
         )
 
     async def _handle_health_check(self):  # noqa: S7503
-        """Health check endpoint. Async required for FastAPI route handler."""
+        """
+        Health check endpoint. Async required for FastAPI route handler.
+        
+        Returns:
+            Any: Result of the operation.
+        """
         return {"status": "healthy", "service": "agent-service"}
 
     def _get_gateway_client(self, tenant_id: str):  # noqa: S1172
         """
         Get gateway client for LLM calls.
-
+        
         Uses Gateway Service via HTTP if configured, otherwise falls back to direct SDK.
-
+        
         Args:
-            tenant_id: Tenant ID (reserved for future multi-tenant API key resolution)
-
+            tenant_id (str): Tenant identifier used for tenant isolation.
+        
         Returns:
-            Gateway client instance (LiteLLMGateway or ServiceHTTPClient wrapper)
+            Any: Result of the operation.
         """
         # Try to use Gateway Service via HTTP if configured
         gateway_client = self.service_clients.get_client("gateway")

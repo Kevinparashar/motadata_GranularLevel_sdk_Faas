@@ -4,6 +4,7 @@ Integration Tests for OTEL Integration
 Tests OpenTelemetry observability integration with AI SDK components.
 """
 
+
 from unittest.mock import MagicMock, Mock
 
 import pytest

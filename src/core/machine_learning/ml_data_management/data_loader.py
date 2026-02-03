@@ -4,6 +4,7 @@ Data Loader
 Loads data from various sources.
 """
 
+
 import logging
 from typing import Any, Optional
 
@@ -23,7 +24,18 @@ class DataLoader:
 
     @staticmethod
     def load_from_csv(filepath: str) -> Any:
-        """Load data from CSV file."""
+        """
+        Load data from CSV file.
+        
+        Args:
+            filepath (str): Input parameter for this operation.
+        
+        Returns:
+            Any: Result of the operation.
+        
+        Raises:
+            ImportError: Raised when this function detects an invalid state or when an underlying call fails.
+        """
         if not _pandas_available:
             raise ImportError(
                 "pandas is required for CSV loading. "
@@ -34,7 +46,15 @@ class DataLoader:
 
     @staticmethod
     def load_from_json(filepath: str) -> Any:
-        """Load data from JSON file."""
+        """
+        Load data from JSON file.
+        
+        Args:
+            filepath (str): Input parameter for this operation.
+        
+        Returns:
+            Any: Result of the operation.
+        """
         import json
 
         with open(filepath, "r") as f:
@@ -42,7 +62,20 @@ class DataLoader:
 
     @staticmethod
     def load_from_database(db: Any, query: str, params: Optional[tuple] = None) -> Any:
-        """Load data from database."""
+        """
+        Load data from database.
+        
+        Args:
+            db (Any): Database connection/handle.
+            query (str): Input parameter for this operation.
+            params (Optional[tuple]): Input parameter for this operation.
+        
+        Returns:
+            Any: Result of the operation.
+        
+        Raises:
+            ImportError: Raised when this function detects an invalid state or when an underlying call fails.
+        """
         if not _pandas_available:
             raise ImportError(
                 "pandas is required for database loading. "

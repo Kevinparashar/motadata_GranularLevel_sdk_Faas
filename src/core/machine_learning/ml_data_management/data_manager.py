@@ -4,6 +4,7 @@ Data Manager
 Manages data lifecycle for ML operations.
 """
 
+
 import logging
 from datetime import datetime, timezone
 from typing import Any, Dict, Optional
@@ -23,10 +24,10 @@ class DataManager:
     def __init__(self, db: DatabaseConnection, tenant_id: Optional[str] = None):
         """
         Initialize data manager.
-
+        
         Args:
-            db: Database connection
-            tenant_id: Optional tenant ID
+            db (DatabaseConnection): Database connection/handle.
+            tenant_id (Optional[str]): Tenant identifier used for tenant isolation.
         """
         self.db = db
         self.tenant_id = tenant_id
@@ -38,13 +39,13 @@ class DataManager:
     ) -> str:
         """
         Ingest new data.
-
+        
         Args:
-            dataset_name: Name of dataset
-            metadata: Optional metadata
-
+            dataset_name (str): Input parameter for this operation.
+            metadata (Optional[Dict[str, Any]]): Extra metadata for the operation.
+        
         Returns:
-            Dataset ID
+            str: Returned text value.
         """
         import json
 
@@ -66,13 +67,13 @@ class DataManager:
     def validate_data(self, data: Any, schema: Optional[Dict[str, Any]] = None) -> bool:
         """
         Validate data quality.
-
+        
         Args:
-            data: Data to validate
-            schema: Optional data schema
-
+            data (Any): Input parameter for this operation.
+            schema (Optional[Dict[str, Any]]): Input parameter for this operation.
+        
         Returns:
-            True if valid
+            bool: True if the operation succeeds, else False.
         """
         # Basic validation logic
         return True
@@ -80,9 +81,12 @@ class DataManager:
     def archive_data(self, dataset_id: str) -> None:
         """
         Archive old data.
-
+        
         Args:
-            dataset_id: Dataset ID
+            dataset_id (str): Input parameter for this operation.
+        
+        Returns:
+            None: Result of the operation.
         """
         query = """
         UPDATE ml_datasets

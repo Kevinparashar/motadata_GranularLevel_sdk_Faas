@@ -4,6 +4,7 @@ Integration Tests for CODEC Integration
 Tests message encoding/decoding integration with AI SDK components.
 """
 
+
 from datetime import datetime
 from unittest.mock import Mock
 

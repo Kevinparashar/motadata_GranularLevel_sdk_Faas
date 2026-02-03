@@ -4,6 +4,7 @@ Model Configuration
 Configuration classes for ML models.
 """
 
+
 import logging
 from dataclasses import dataclass, field
 from typing import Any, Dict, Optional
@@ -27,16 +28,21 @@ class ModelConfig:
     version: str = "1.0.0"
 
     def __post_init__(self):
-        """Validate configuration after initialization."""
+        """
+        Validate configuration after initialization.
+        
+        Raises:
+            ValueError: Raised when this function detects an invalid state or when an underlying call fails.
+        """
         if not self.model_type:
             raise ValueError("model_type is required")
 
     def to_dict(self) -> Dict[str, Any]:
         """
         Convert configuration to dictionary.
-
+        
         Returns:
-            Configuration as dictionary
+            Dict[str, Any]: Dictionary result of the operation.
         """
         return {
             "model_type": self.model_type,
@@ -50,12 +56,12 @@ class ModelConfig:
     def from_dict(cls, config_dict: Dict[str, Any]) -> "ModelConfig":
         """
         Create configuration from dictionary.
-
+        
         Args:
-            config_dict: Configuration dictionary
-
+            config_dict (Dict[str, Any]): Input parameter for this operation.
+        
         Returns:
-            ModelConfig instance
+            'ModelConfig': Builder instance (returned for call chaining).
         """
         return cls(
             model_type=config_dict.get("model_type") or "unknown",
@@ -68,21 +74,24 @@ class ModelConfig:
     def update_hyperparameters(self, **kwargs) -> None:
         """
         Update hyperparameters.
-
+        
         Args:
-            **kwargs: Hyperparameters to update
+            **kwargs (Any): Input parameter for this operation.
+        
+        Returns:
+            None: Result of the operation.
         """
         self.hyperparameters.update(kwargs)
 
     def get_hyperparameter(self, key: str, default: Any = None) -> Any:
         """
         Get a hyperparameter value.
-
+        
         Args:
-            key: Hyperparameter key
-            default: Default value if not found
-
+            key (str): Input parameter for this operation.
+            default (Any): Input parameter for this operation.
+        
         Returns:
-            Hyperparameter value
+            Any: Result of the operation.
         """
         return self.hyperparameters.get(key, default)

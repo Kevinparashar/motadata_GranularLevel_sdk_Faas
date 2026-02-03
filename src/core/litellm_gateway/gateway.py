@@ -5,6 +5,7 @@ Provides a unified interface for interacting with multiple LLM providers
 through LiteLLM, with support for streaming, function calling, and embeddings.
 """
 
+
 # Standard library imports
 import hashlib
 import json
@@ -101,7 +102,15 @@ class LiteLLMGateway:
     """
 
     def _initialize_router(self, router: Optional[Router]) -> None:
-        """Initialize LiteLLM router."""
+        """
+        Initialize LiteLLM router.
+        
+        Args:
+            router (Optional[Router]): Input parameter for this operation.
+        
+        Returns:
+            None: Result of the operation.
+        """
         if router is not None:
             self.router = router
             return
@@ -117,7 +126,12 @@ class LiteLLMGateway:
             self.router = Router(**router_kwargs)
 
     def _initialize_circuit_breaker(self) -> None:
-        """Initialize circuit breaker if enabled."""
+        """
+        Initialize circuit breaker if enabled.
+        
+        Returns:
+            None: Result of the operation.
+        """
         if not self.config.enable_circuit_breaker:
             self.circuit_breaker = None
             return
@@ -129,18 +143,33 @@ class LiteLLMGateway:
         )
 
     def _initialize_rate_limiter(self) -> None:
-        """Initialize rate limiter (per-tenant)."""
+        """
+        Initialize rate limiter (per-tenant).
+        
+        Returns:
+            None: Result of the operation.
+        """
         self.rate_limiters: Dict[str, RateLimiter] = {}
 
     def _initialize_deduplicator(self) -> None:
-        """Initialize request deduplicator if enabled."""
+        """
+        Initialize request deduplicator if enabled.
+        
+        Returns:
+            None: Result of the operation.
+        """
         if self.config.enable_request_deduplication:
             self.deduplicator = RequestDeduplicator(ttl=300.0)
         else:
             self.deduplicator = None
 
     def _initialize_batcher(self) -> None:
-        """Initialize request batcher if enabled."""
+        """
+        Initialize request batcher if enabled.
+        
+        Returns:
+            None: Result of the operation.
+        """
         if self.config.enable_request_batching:
             self.batcher = RequestBatcher(
                 batch_size=self.config.batch_size or 10,
@@ -150,7 +179,12 @@ class LiteLLMGateway:
             self.batcher = None
 
     def _initialize_kv_cache(self) -> None:
-        """Initialize KV cache manager if enabled."""
+        """
+        Initialize KV cache manager if enabled.
+        
+        Returns:
+            None: Result of the operation.
+        """
         if self.config.enable_kv_cache:
             self.kv_cache = create_kv_cache_manager(
                 cache=self.cache,
@@ -161,7 +195,12 @@ class LiteLLMGateway:
             self.kv_cache = None
 
     def _initialize_health_check(self) -> None:
-        """Initialize health check if enabled."""
+        """
+        Initialize health check if enabled.
+        
+        Returns:
+            None: Result of the operation.
+        """
         if self.config.enable_health_monitoring:
             self.health_check = HealthCheck(name="litellm_gateway")
             self._setup_health_checks()
@@ -169,7 +208,12 @@ class LiteLLMGateway:
             self.health_check = None
 
     def _initialize_llmops(self) -> None:
-        """Initialize LLMOps if enabled."""
+        """
+        Initialize LLMOps if enabled.
+        
+        Returns:
+            None: Result of the operation.
+        """
         if self.config.enable_llmops:
             self.llmops = LLMOps(
                 storage_path=str(self.storage_path / "llmops.json"),
@@ -180,14 +224,24 @@ class LiteLLMGateway:
             self.llmops = None
 
     def _initialize_validation_manager(self) -> None:
-        """Initialize validation manager if enabled."""
+        """
+        Initialize validation manager if enabled.
+        
+        Returns:
+            None: Result of the operation.
+        """
         if self.config.enable_validation:
             self.validation_manager = ValidationManager(default_level=self.config.validation_level)
         else:
             self.validation_manager = None
 
     def _initialize_feedback_loop(self) -> None:
-        """Initialize feedback loop if enabled."""
+        """
+        Initialize feedback loop if enabled.
+        
+        Returns:
+            None: Result of the operation.
+        """
         if self.config.enable_feedback_loop:
             self.feedback_loop = FeedbackLoop(
                 storage_path=str(self.storage_path / "feedback.json"), auto_process=True
@@ -196,7 +250,12 @@ class LiteLLMGateway:
             self.feedback_loop = None
 
     def _initialize_cache(self) -> None:
-        """Initialize cache mechanism if enabled."""
+        """
+        Initialize cache mechanism if enabled.
+        
+        Returns:
+            None: Result of the operation.
+        """
         if self.config.enable_caching:
             self.cache = self.config.cache or CacheMechanism(
                 self.config.cache_config or CacheConfig()
@@ -207,10 +266,10 @@ class LiteLLMGateway:
     def __init__(self, config: Optional[GatewayConfig] = None, router: Optional[Router] = None):
         """
         Initialize LiteLLM Gateway.
-
+        
         Args:
-            config: Gateway configuration
-            router: Optional pre-configured LiteLLM Router
+            config (Optional[GatewayConfig]): Configuration object or settings.
+            router (Optional[Router]): Input parameter for this operation.
         """
         self.config = config or GatewayConfig()
         self.provider_health: Dict[str, Dict[str, Any]] = {}
@@ -229,7 +288,12 @@ class LiteLLMGateway:
         self._initialize_cache()
 
     def _setup_health_checks(self) -> None:
-        """Setup health check functions."""
+        """
+        Setup health check functions.
+        
+        Returns:
+            None: Result of the operation.
+        """
         if not self.health_check:
             return
 
@@ -288,7 +352,15 @@ class LiteLLMGateway:
         self.health_check.add_check(check_provider_health)
 
     def _get_rate_limiter(self, tenant_id: Optional[str] = None) -> Optional[RateLimiter]:
-        """Get or create rate limiter for tenant."""
+        """
+        Get or create rate limiter for tenant.
+        
+        Args:
+            tenant_id (Optional[str]): Tenant identifier used for tenant isolation.
+        
+        Returns:
+            Optional[RateLimiter]: Result if available, else None.
+        """
         if not self.config.enable_rate_limiting:
             return None
 
@@ -302,12 +374,12 @@ class LiteLLMGateway:
     def _classify_error(self, error: Exception) -> Dict[str, Any]:
         """
         Classify error for advanced error handling.
-
+        
         Args:
-            error: Exception to classify
-
+            error (Exception): Input parameter for this operation.
+        
         Returns:
-            Dictionary with error classification
+            Dict[str, Any]: Dictionary result of the operation.
         """
         error_type = type(error).__name__
         error_message = str(error)
@@ -352,7 +424,12 @@ class LiteLLMGateway:
         return classification
 
     async def get_health(self) -> Dict[str, Any]:
-        """Get gateway health status."""
+        """
+        Get gateway health status.
+        
+        Returns:
+            Dict[str, Any]: Dictionary result of the operation.
+        """
         if not self.health_check:
             return {"status": "health_monitoring_disabled"}
 
@@ -388,20 +465,20 @@ class LiteLLMGateway:
     ) -> str:
         """
         Generate cache key for LLM request.
-
+        
         This creates a deterministic cache key based on request parameters.
-        Identical requests (same prompt, model, tenant) will have the same key,
-        enabling cache hits and cost savings.
-
+                                Identical requests (same prompt, model, tenant) will have the same key,
+                                enabling cache hits and cost savings.
+        
         Args:
-            prompt: Input prompt
-            model: Model identifier
-            messages: Optional messages list
-            tenant_id: Optional tenant ID (ensures tenant isolation in cache)
-            **kwargs: Additional parameters
-
+            prompt (str): Prompt text sent to the model.
+            model (str): Model name or identifier to use.
+            messages (Optional[List[Dict[str, Any]]]): Chat messages in role/content format.
+            tenant_id (Optional[str]): Tenant identifier used for tenant isolation.
+            **kwargs (Any): Input parameter for this operation.
+        
         Returns:
-            Cache key string (format: "gateway:generate:{model}:{hash}")
+            str: Returned text value.
         """
         # Create deterministic key from request parameters
         # All parameters are included to ensure cache key uniqueness
@@ -431,16 +508,16 @@ class LiteLLMGateway:
     ) -> Optional[str]:
         """
         Record feedback for continuous learning.
-
+        
         Args:
-            query: Original query
-            response: System response
-            feedback_type: Type of feedback
-            content: Feedback content
-            tenant_id: Optional tenant ID
-
+            query (str): Input parameter for this operation.
+            response (str): Input parameter for this operation.
+            feedback_type (FeedbackType): Input parameter for this operation.
+            content (str): Content text.
+            tenant_id (Optional[str]): Tenant identifier used for tenant isolation.
+        
         Returns:
-            Feedback ID or None if feedback loop not enabled
+            Optional[str]: Returned text value.
         """
         if not self.feedback_loop:
             return None
@@ -458,13 +535,13 @@ class LiteLLMGateway:
     ) -> Dict[str, Any]:
         """
         Get LLM operations metrics.
-
+        
         Args:
-            tenant_id: Optional tenant ID filter
-            time_range_hours: Time range in hours
-
+            tenant_id (Optional[str]): Tenant identifier used for tenant isolation.
+            time_range_hours (int): Input parameter for this operation.
+        
         Returns:
-            Dictionary with metrics
+            Dict[str, Any]: Dictionary result of the operation.
         """
         if not self.llmops:
             return {"error": "LLMOps not enabled"}
@@ -476,13 +553,13 @@ class LiteLLMGateway:
     ) -> Dict[str, Any]:
         """
         Get cost summary.
-
+        
         Args:
-            tenant_id: Optional tenant ID filter
-            time_range_hours: Time range in hours
-
+            tenant_id (Optional[str]): Tenant identifier used for tenant isolation.
+            time_range_hours (int): Input parameter for this operation.
+        
         Returns:
-            Dictionary with cost summary
+            Dict[str, Any]: Dictionary result of the operation.
         """
         if not self.llmops:
             return {"error": "LLMOps not enabled"}
@@ -496,7 +573,18 @@ class LiteLLMGateway:
         stream: bool,
         **kwargs: Any,
     ) -> Any:
-        """Execute synchronous LLM generation call."""
+        """
+        Execute synchronous LLM generation call.
+        
+        Args:
+            model (str): Model name or identifier to use.
+            messages (List[Dict[str, Any]]): Chat messages in role/content format.
+            stream (bool): Input parameter for this operation.
+            **kwargs (Any): Input parameter for this operation.
+        
+        Returns:
+            Any: Result of the operation.
+        """
         if self.router:
             return self.router.completion(
                 model=model, messages=messages, stream=stream, **kwargs
@@ -515,16 +603,17 @@ class LiteLLMGateway:
     ) -> GenerateResponse:
         """
         Generate text completion.
-
+        
         Args:
-            prompt: Input prompt
-            model: Model identifier
-            messages: Optional list of messages
-            stream: Whether to stream the response
-            **kwargs: Additional parameters
-
+            prompt (str): Prompt text sent to the model.
+            model (str): Model name or identifier to use.
+            tenant_id (Optional[str]): Tenant identifier used for tenant isolation.
+            messages (Optional[List[Dict[str, Any]]]): Chat messages in role/content format.
+            stream (bool): Input parameter for this operation.
+            **kwargs (Any): Input parameter for this operation.
+        
         Returns:
-            GenerateResponse with generated text
+            GenerateResponse: Result of the operation.
         """
         if messages is None:
             messages = [{"role": "user", "content": prompt}]
@@ -562,7 +651,18 @@ class LiteLLMGateway:
     def _check_kv_cache(
         self, prompt: str, model: str, messages: List[Dict[str, Any]], tenant_id: Optional[str]
     ) -> Optional[str]:
-        """Check KV cache for prompt context."""
+        """
+        Check KV cache for prompt context.
+        
+        Args:
+            prompt (str): Prompt text sent to the model.
+            model (str): Model name or identifier to use.
+            messages (List[Dict[str, Any]]): Chat messages in role/content format.
+            tenant_id (Optional[str]): Tenant identifier used for tenant isolation.
+        
+        Returns:
+            Optional[str]: Returned text value.
+        """
         if not self.kv_cache:
             return None
         
@@ -583,7 +683,20 @@ class LiteLLMGateway:
         stream: bool,
         **kwargs: Any,
     ) -> Optional[GenerateResponse]:
-        """Check cache for existing response."""
+        """
+        Check cache for existing response.
+        
+        Args:
+            prompt (str): Prompt text sent to the model.
+            model (str): Model name or identifier to use.
+            messages (List[Dict[str, Any]]): Chat messages in role/content format.
+            tenant_id (Optional[str]): Tenant identifier used for tenant isolation.
+            stream (bool): Input parameter for this operation.
+            **kwargs (Any): Input parameter for this operation.
+        
+        Returns:
+            Optional[GenerateResponse]: Result if available, else None.
+        """
         if not self.cache or stream or not self.config.enable_caching:
             return None
         
@@ -605,13 +718,31 @@ class LiteLLMGateway:
         return cached_response
 
     def _extract_token_usage(self, response: Any, prompt_tokens: List[int], completion_tokens: List[int]) -> None:
-        """Extract token usage from response."""
+        """
+        Extract token usage from response.
+        
+        Args:
+            response (Any): Input parameter for this operation.
+            prompt_tokens (List[int]): Input parameter for this operation.
+            completion_tokens (List[int]): Input parameter for this operation.
+        
+        Returns:
+            None: Result of the operation.
+        """
         if hasattr(response, "usage") and response.usage:
             prompt_tokens[0] = getattr(response.usage, "prompt_tokens", 0) or 0
             completion_tokens[0] = getattr(response.usage, "completion_tokens", 0) or 0
 
     def _update_provider_health_success(self, model: str) -> None:
-        """Update provider health after successful generation."""
+        """
+        Update provider health after successful generation.
+        
+        Args:
+            model (str): Model name or identifier to use.
+        
+        Returns:
+            None: Result of the operation.
+        """
         provider_name = model.split("/")[0] if "/" in model else "default"
         self.provider_health[provider_name] = {
             "status": "healthy",
@@ -622,7 +753,17 @@ class LiteLLMGateway:
     def _update_provider_health_error(
         self, model: str, error_msg: str, error_classification: Dict[str, Any]
     ) -> None:
-        """Update provider health after error."""
+        """
+        Update provider health after error.
+        
+        Args:
+            model (str): Model name or identifier to use.
+            error_msg (str): Input parameter for this operation.
+            error_classification (Dict[str, Any]): Input parameter for this operation.
+        
+        Returns:
+            None: Result of the operation.
+        """
         provider_name = model.split("/")[0] if "/" in model else "default"
         self.provider_health[provider_name] = {
             "status": "unhealthy" if not error_classification["retryable"] else "degraded",
@@ -632,7 +773,15 @@ class LiteLLMGateway:
         }
 
     def _determine_error_status(self, error_msg: str) -> LLMOperationStatus:
-        """Determine operation status from error message."""
+        """
+        Determine operation status from error message.
+        
+        Args:
+            error_msg (str): Input parameter for this operation.
+        
+        Returns:
+            LLMOperationStatus: Result of the operation.
+        """
         if "rate limit" in error_msg.lower() or "429" in error_msg:
             return LLMOperationStatus.RATE_LIMITED
         elif "timeout" in error_msg.lower():
@@ -651,7 +800,22 @@ class LiteLLMGateway:
         status: List[LLMOperationStatus],
         **kwargs: Any,
     ) -> Any:
-        """Execute the actual LLM generation call."""
+        """
+        Execute the actual LLM generation call.
+        
+        Args:
+            model (str): Model name or identifier to use.
+            messages (List[Dict[str, Any]]): Chat messages in role/content format.
+            stream (bool): Input parameter for this operation.
+            prompt_tokens (List[int]): Input parameter for this operation.
+            completion_tokens (List[int]): Input parameter for this operation.
+            error_message (List[Optional[str]]): Input parameter for this operation.
+            status (List[LLMOperationStatus]): Input parameter for this operation.
+            **kwargs (Any): Input parameter for this operation.
+        
+        Returns:
+            Any: Result of the operation.
+        """
         try:
             if self.router:
                 response = await self.router.acompletion(
@@ -676,7 +840,16 @@ class LiteLLMGateway:
     def _extract_response_data(
         self, response: Any, model: str
     ) -> tuple[str, str, Optional[Dict[str, Any]], Optional[str], Any]:
-        """Extract text, model, usage, finish_reason, and raw_response from response."""
+        """
+        Extract text, model, usage, finish_reason, and raw_response from response.
+        
+        Args:
+            response (Any): Input parameter for this operation.
+            model (str): Model name or identifier to use.
+        
+        Returns:
+            tuple[str, str, Optional[Dict[str, Any]], Optional[str], Any]: Dictionary result of the operation.
+        """
         if hasattr(response, "choices") and len(response.choices) > 0:
             text = response.choices[0].message.content
             model_name = response.model if hasattr(response, "model") else model
@@ -705,7 +878,18 @@ class LiteLLMGateway:
     def _store_kv_cache(
         self, kv_cache_key: str, prompt: str, model: str, tenant_id: Optional[str]
     ) -> None:
-        """Store KV cache entry."""
+        """
+        Store KV cache entry.
+        
+        Args:
+            kv_cache_key (str): Input parameter for this operation.
+            prompt (str): Prompt text sent to the model.
+            model (str): Model name or identifier to use.
+            tenant_id (Optional[str]): Tenant identifier used for tenant isolation.
+        
+        Returns:
+            None: Result of the operation.
+        """
         if not self.kv_cache:
             return
         
@@ -740,7 +924,25 @@ class LiteLLMGateway:
         status: LLMOperationStatus,
         **kwargs: Any,
     ) -> None:
-        """Store response in cache."""
+        """
+        Store response in cache.
+        
+        Args:
+            prompt (str): Prompt text sent to the model.
+            model (str): Model name or identifier to use.
+            messages (List[Dict[str, Any]]): Chat messages in role/content format.
+            tenant_id (Optional[str]): Tenant identifier used for tenant isolation.
+            text (str): Input parameter for this operation.
+            model_name (str): Input parameter for this operation.
+            usage (Optional[Dict[str, Any]]): Input parameter for this operation.
+            finish_reason (Optional[str]): Input parameter for this operation.
+            raw_response (Any): Input parameter for this operation.
+            status (LLMOperationStatus): Input parameter for this operation.
+            **kwargs (Any): Input parameter for this operation.
+        
+        Returns:
+            None: Result of the operation.
+        """
         if (
             not self.cache
             or not self.config.enable_caching
@@ -776,17 +978,17 @@ class LiteLLMGateway:
     ) -> GenerateResponse:
         """
         Generate text completion asynchronously with advanced features.
-
+        
         Args:
-            prompt: Input prompt
-            model: Model identifier
-            tenant_id: Optional tenant ID for rate limiting and tracking
-            messages: Optional list of messages
-            stream: Whether to stream the response
-            **kwargs: Additional parameters
-
+            prompt (str): Prompt text sent to the model.
+            model (str): Model name or identifier to use.
+            tenant_id (Optional[str]): Tenant identifier used for tenant isolation.
+            messages (Optional[List[Dict[str, Any]]]): Chat messages in role/content format.
+            stream (bool): Input parameter for this operation.
+            **kwargs (Any): Input parameter for this operation.
+        
         Returns:
-            GenerateResponse with generated text
+            GenerateResponse: Result of the operation.
         """
         if messages is None:
             messages = [{"role": "user", "content": prompt}]
@@ -905,14 +1107,14 @@ class LiteLLMGateway:
     ) -> EmbedResponse:
         """
         Generate embeddings.
-
+        
         Args:
-            texts: List of texts to embed
-            model: Embedding model identifier
-            **kwargs: Additional parameters
-
+            texts (List[str]): Input parameter for this operation.
+            model (str): Model name or identifier to use.
+            **kwargs (Any): Input parameter for this operation.
+        
         Returns:
-            EmbedResponse with embeddings
+            EmbedResponse: Result of the operation.
         """
         if self.router:
             response = self.router.embedding(model=model, input=texts, **kwargs)
@@ -938,7 +1140,16 @@ class LiteLLMGateway:
     def _extract_embeddings_from_object(
         self, response: Any, model: str
     ) -> tuple[List[List[float]], str, Optional[Dict[str, Any]]]:
-        """Extract embeddings from response object with attributes."""
+        """
+        Extract embeddings from response object with attributes.
+        
+        Args:
+            response (Any): Input parameter for this operation.
+            model (str): Model name or identifier to use.
+        
+        Returns:
+            tuple[List[List[float]], str, Optional[Dict[str, Any]]]: Dictionary result of the operation.
+        """
         embeddings: List[List[float]] = []
         model_name: str = model
         usage: Optional[Dict[str, Any]] = None
@@ -956,7 +1167,16 @@ class LiteLLMGateway:
     def _extract_embeddings_from_dict(
         self, response: dict, model: str
     ) -> tuple[List[List[float]], str, Optional[Dict[str, Any]]]:
-        """Extract embeddings from dict response."""
+        """
+        Extract embeddings from dict response.
+        
+        Args:
+            response (dict): Input parameter for this operation.
+            model (str): Model name or identifier to use.
+        
+        Returns:
+            tuple[List[List[float]], str, Optional[Dict[str, Any]]]: Dictionary result of the operation.
+        """
         embeddings: List[List[float]] = []
         data = response.get("data", [])
         if data and isinstance(data, list):
@@ -970,14 +1190,14 @@ class LiteLLMGateway:
     ) -> EmbedResponse:
         """
         Generate embeddings asynchronously.
-
+        
         Args:
-            texts: List of texts to embed
-            model: Embedding model identifier
-            **kwargs: Additional parameters
-
+            texts (List[str]): Input parameter for this operation.
+            model (str): Model name or identifier to use.
+            **kwargs (Any): Input parameter for this operation.
+        
         Returns:
-            EmbedResponse with embeddings
+            EmbedResponse: Result of the operation.
         """
         if self.router:
             response = await self.router.aembedding(model=model, input=texts, **kwargs)

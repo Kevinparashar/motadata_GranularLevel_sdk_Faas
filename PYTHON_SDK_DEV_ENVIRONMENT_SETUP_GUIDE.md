@@ -41,6 +41,7 @@ This guide focuses **exclusively on local development setup**. For other topics,
 
 ### Getting Started
 1. [Prerequisites](#1-prerequisites-mandatory)
+    - [1.5 Infrastructure Requirements Summary](#15-infrastructure-requirements-summary)
 2. [Quick Setup (Experienced Developers)](#2-quick-setup-for-experienced-developers)
 3. [Setup Overview](#3-setup-overview)
 
@@ -162,6 +163,157 @@ python3.11 --version
 | **make** | Any | Build automation | `make --version` |
 
 **All commands in this guide assume Python 3.11 is installed and available as `python3.11`**
+
+---
+
+### 1.5 Infrastructure Requirements Summary
+
+> **📌 Important:** This section provides an overview of external services and infrastructure components you may need based on which SDK components you're developing. Most services can run locally via Docker.
+
+#### 1.5.1 Service Requirements by Development Path
+
+**Understanding what you need:**
+
+| Development Path | Required Services | Optional Services | Setup Time |
+|-----------------|-------------------|-------------------|------------|
+| **Basic LLM Development** | None (just LLM API key) | None | 0 minutes |
+| **Agent/RAG Development** | Dragonfly (cache) | OpenTelemetry | 5 minutes |
+| **FaaS Services Development** | Dragonfly + NATS | OpenTelemetry | 10 minutes |
+| **Full Stack Development** | All above | OpenTelemetry Collector | 15 minutes |
+
+#### 1.5.2 Service Details
+
+**Dragonfly (Cache Service)**
+- **Purpose:** High-performance in-memory cache for Agent memory, RAG embeddings, and general caching
+- **When Required:** Agent Framework, RAG System, Cache Mechanism development
+- **Port:** 6379 (default)
+- **Setup:** Docker container (recommended) or binary installation
+- **Resource Usage:** ~100-500 MB RAM
+- **Cost:** Free (open-source, runs locally)
+- **See:** [Section 12.1](#121-dragonfly-cache-recommended-for-cache-development) for installation
+
+**NATS (Message Broker)**
+- **Purpose:** Inter-service communication for FaaS architecture
+- **When Required:** FaaS Services development only
+- **Ports:** 4222 (client), 8222 (monitoring)
+- **Setup:** Docker container (recommended) or binary installation
+- **Resource Usage:** ~50-200 MB RAM
+- **Cost:** Free (open-source, runs locally)
+- **See:** [Section 12.2](#122-nats-messaging-for-faas-services-development) for installation
+
+**OpenTelemetry Collector (Observability)**
+- **Purpose:** Telemetry data collection for monitoring and tracing
+- **When Required:** Performance debugging, production monitoring
+- **Ports:** 4317 (gRPC), 4318 (HTTP)
+- **Setup:** Docker container (recommended)
+- **Resource Usage:** ~100-300 MB RAM
+- **Cost:** Free (open-source, runs locally)
+- **See:** [Section 12.3](#123-opentelemetry-collector-for-observability-development) for installation
+
+**LLM API (External Service)**
+- **Purpose:** Language model API calls (OpenAI, Anthropic, etc.)
+- **When Required:** All SDK components that use LLM functionality
+- **Setup:** API key from provider (OpenAI, Anthropic, etc.)
+- **Resource Usage:** Network bandwidth only
+- **Cost:** Pay-per-use (varies by provider and model)
+- **See:** [Section 7.2](#72-required-vs-optional-variables) for configuration
+
+#### 1.5.3 Quick Decision Matrix
+
+**"What services do I need to start?"**
+
+```
+Are you developing...
+├─ Just LLM Gateway features?
+│  └─> No services needed (just API key) ✅
+│
+├─ Agent or RAG features?
+│  └─> Start Dragonfly (5 min) ✅
+│
+├─ FaaS Services?
+│  └─> Start Dragonfly + NATS (10 min) ✅
+│
+└─ Performance debugging?
+   └─> Add OpenTelemetry Collector (15 min) ✅
+```
+
+#### 1.5.4 Infrastructure Setup Time Estimates
+
+**Per Developer Role:**
+
+| Role | Services Needed | Setup Time | Total Time (with basic setup) |
+|------|----------------|------------|-------------------------------|
+| **New Developer (Basic)** | None | 0 min | 60 min (basic setup only) |
+| **Agent/RAG Developer** | Dragonfly | 5 min | 65 min |
+| **FaaS Developer** | Dragonfly + NATS | 10 min | 70 min |
+| **Full Stack Developer** | All services | 15 min | 75 min |
+
+**Note:** These times assume Docker is already installed. Add 10-15 minutes if Docker installation is needed.
+
+#### 1.5.5 Resource Requirements Summary
+
+**Minimum System Resources (with all services running):**
+
+| Resource | Basic Development | Full Stack Development |
+|----------|------------------|----------------------|
+| **RAM** | 4 GB | 8-12 GB (with all Docker containers) |
+| **Disk** | 2 GB | 5-10 GB (Docker images + data) |
+| **CPU** | 2 cores | 4+ cores (for concurrent services) |
+| **Network** | Stable internet | Stable internet + bandwidth for LLM calls |
+
+**Docker Container Resource Usage (approximate):**
+- Dragonfly: ~200-500 MB RAM, ~500 MB disk
+- NATS: ~50-200 MB RAM, ~100 MB disk
+- OpenTelemetry Collector: ~100-300 MB RAM, ~200 MB disk
+- **Total (all services):** ~350-1000 MB RAM, ~800 MB disk
+
+#### 1.5.6 Cost Implications
+
+**Local Development (Free):**
+- All services run locally via Docker
+- No cloud costs for infrastructure
+- Only cost: LLM API usage (pay-per-use)
+
+**Production Deployment (Costs Vary):**
+- Dragonfly: Managed service or self-hosted (costs vary)
+- NATS: Managed service or self-hosted (costs vary)
+- OpenTelemetry: Managed service or self-hosted (costs vary)
+- LLM API: Pay-per-use (varies by provider and model)
+
+> **💡 Tip:** For local development, all infrastructure services are free and run in Docker containers. Only LLM API calls incur costs.
+
+#### 1.5.7 All-in-One Setup (Docker Compose)
+
+**For convenience, start all services at once:**
+
+```bash
+# See Section 12.4 for complete docker-compose setup
+docker compose -f docker-compose.dev.yml up -d
+```
+
+This starts:
+- ✅ Dragonfly (port 6379)
+- ✅ NATS (ports 4222, 8222)
+- ✅ OpenTelemetry Collector (ports 4317, 4318)
+
+**See:** [Section 12.4](#124-quick-all-in-one-setup-docker-compose) for complete setup instructions.
+
+#### 1.5.8 Verification Checklist
+
+**After setting up services, verify they're running:**
+
+```bash
+# Check Dragonfly
+redis-cli ping  # Should return: PONG
+
+# Check NATS
+curl http://localhost:8222/varz  # Should return JSON
+
+# Check OpenTelemetry (if configured)
+curl http://localhost:4318/  # Should connect
+```
+
+**See:** [Section 14.2](#142-component-specific-validation) for detailed validation scripts.
 
 ---
 

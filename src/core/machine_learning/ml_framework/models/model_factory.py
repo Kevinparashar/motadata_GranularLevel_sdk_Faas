@@ -4,6 +4,7 @@ Model Factory
 Factory for creating ML models based on type and configuration.
 """
 
+
 # Standard library imports
 import logging
 from typing import Any, Dict, Optional
@@ -23,16 +24,16 @@ class ModelFactory:
     def create_model(model_type: str, hyperparameters: Optional[Dict[str, Any]] = None) -> Any:
         """
         Create a model instance.
-
+        
         Args:
-            model_type: Type of model to create
-            hyperparameters: Optional hyperparameters
-
+            model_type (str): Input parameter for this operation.
+            hyperparameters (Optional[Dict[str, Any]]): Input parameter for this operation.
+        
         Returns:
-            Model instance
-
+            Any: Result of the operation.
+        
         Raises:
-            ValueError: If model type is not supported
+            ValueError: Raised when this function detects an invalid state or when an underlying call fails.
         """
         hyperparameters = hyperparameters or {}
 
@@ -103,9 +104,9 @@ class ModelFactory:
     def get_available_models() -> Dict[str, list]:
         """
         Get list of available model types.
-
+        
         Returns:
-            Dictionary with categories and available models
+            Dict[str, list]: Dictionary result of the operation.
         """
         return {
             "classification": ["classification", "logistic_regression", "svm_classification"],
@@ -119,13 +120,13 @@ class ModelFactory:
     ) -> Any:
         """
         Create a model wrapped in BaseModelWrapper.
-
+        
         Args:
-            model_type: Type of model
-            hyperparameters: Optional hyperparameters
-
+            model_type (str): Input parameter for this operation.
+            hyperparameters (Optional[Dict[str, Any]]): Input parameter for this operation.
+        
         Returns:
-            Wrapped model instance
+            Any: Result of the operation.
         """
         from .base_model_wrapper import BaseModelWrapper
 

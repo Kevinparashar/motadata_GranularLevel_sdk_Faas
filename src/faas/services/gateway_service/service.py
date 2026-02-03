@@ -4,6 +4,7 @@ Gateway Service - Main service implementation.
 Provides unified LLM access via LiteLLM with rate limiting, caching, and provider management.
 """
 
+
 import logging
 import os
 from typing import Any, Dict, Optional
@@ -46,13 +47,13 @@ class GatewayService:
     ):
         """
         Initialize Gateway Service.
-
+        
         Args:
-            config: Service configuration
-            db_connection: Database connection (optional, for caching)
-            nats_client: NATS client (optional)
-            otel_tracer: OTEL tracer (optional)
-            codec_manager: Codec manager (optional)
+            config (ServiceConfig): Configuration object or settings.
+            db_connection (Optional[Any]): Input parameter for this operation.
+            nats_client (Optional[Any]): Input parameter for this operation.
+            otel_tracer (Optional[Any]): Input parameter for this operation.
+            codec_manager (Optional[Any]): Input parameter for this operation.
         """
         self.config = config
         self.db = db_connection
@@ -79,12 +80,12 @@ class GatewayService:
     def _get_gateway(self, tenant_id: str) -> LiteLLMGateway:  # noqa: S1172
         """
         Create gateway for tenant (stateless - created on-demand).
-
+        
         Args:
-            tenant_id: Tenant ID (reserved for future multi-tenant API key resolution)
-
+            tenant_id (str): Tenant identifier used for tenant isolation.
+        
         Returns:
-            LiteLLMGateway instance
+            LiteLLMGateway: Result of the operation.
         """
         # Create gateway on-demand (stateless)
         # Get API key from environment variable
@@ -119,7 +120,19 @@ class GatewayService:
         self.app.get("/health")(self._handle_health_check)
 
     async def _handle_generate(self, request: GenerateRequest, headers: dict = Header(...)):
-        """Generate text using LLM."""
+        """
+        Generate text using LLM.
+        
+        Args:
+            request (GenerateRequest): Request payload object.
+            headers (dict): HTTP headers passed from the caller.
+        
+        Returns:
+            Any: Result of the operation.
+        
+        Raises:
+            HTTPException: Raised when this function detects an invalid state or when an underlying call fails.
+        """
         standard_headers = extract_headers(**headers)
 
         span = None
@@ -171,7 +184,16 @@ class GatewayService:
                 span.end()
 
     async def _publish_generate_event(self, result: Any, tenant_id: str) -> None:
-        """Publish generation event via NATS."""
+        """
+        Publish generation event via NATS.
+        
+        Args:
+            result (Any): Input parameter for this operation.
+            tenant_id (str): Tenant identifier used for tenant isolation.
+        
+        Returns:
+            None: Result of the operation.
+        """
         event = {
             "event_type": "gateway.generate.completed",
             "model": result.model,
@@ -186,7 +208,19 @@ class GatewayService:
     async def _handle_generate_stream(  # noqa: S7503
         self, request: GenerateStreamRequest, headers: dict = Header(...)
     ):
-        """Generate text with streaming response. Async required for FastAPI route handler."""
+        """
+        Generate text with streaming response. Async required for FastAPI route handler.
+        
+        Args:
+            request (GenerateStreamRequest): Request payload object.
+            headers (dict): HTTP headers passed from the caller.
+        
+        Returns:
+            Any: Result of the operation.
+        
+        Raises:
+            HTTPException: Raised when this function detects an invalid state or when an underlying call fails.
+        """
         standard_headers = extract_headers(**headers)
 
         try:
@@ -226,7 +260,19 @@ class GatewayService:
             )
 
     async def _handle_embed(self, request: EmbedRequest, headers: dict = Header(...)):
-        """Generate embeddings."""
+        """
+        Generate embeddings.
+        
+        Args:
+            request (EmbedRequest): Request payload object.
+            headers (dict): HTTP headers passed from the caller.
+        
+        Returns:
+            Any: Result of the operation.
+        
+        Raises:
+            HTTPException: Raised when this function detects an invalid state or when an underlying call fails.
+        """
         standard_headers = extract_headers(**headers)
 
         span = None
@@ -267,7 +313,15 @@ class GatewayService:
                 span.end()
 
     async def _handle_get_providers(self, headers: dict = Header(...)):  # noqa: S7503
-        """Get available LLM providers. Async required for FastAPI route handler."""
+        """
+        Get available LLM providers. Async required for FastAPI route handler.
+        
+        Args:
+            headers (dict): HTTP headers passed from the caller.
+        
+        Returns:
+            Any: Result of the operation.
+        """
         standard_headers = extract_headers(**headers)
 
         # Return available providers
@@ -281,7 +335,15 @@ class GatewayService:
         )
 
     async def _handle_get_rate_limits(self, headers: dict = Header(...)):  # noqa: S7503
-        """Get rate limit information. Async required for FastAPI route handler."""
+        """
+        Get rate limit information. Async required for FastAPI route handler.
+        
+        Args:
+            headers (dict): HTTP headers passed from the caller.
+        
+        Returns:
+            Any: Result of the operation.
+        """
         standard_headers = extract_headers(**headers)
 
         # Rate limit retrieval - to be implemented
@@ -294,7 +356,12 @@ class GatewayService:
         )
 
     async def _handle_health_check(self):  # noqa: S7503
-        """Health check endpoint. Async required for FastAPI route handler."""
+        """
+        Health check endpoint. Async required for FastAPI route handler.
+        
+        Returns:
+            Any: Result of the operation.
+        """
         return {"status": "healthy", "service": "gateway-service"}
 
 

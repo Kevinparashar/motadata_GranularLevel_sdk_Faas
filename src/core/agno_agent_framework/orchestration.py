@@ -6,6 +6,7 @@ for complex multi-agent workflows.
 """
 
 
+
 # Standard library imports
 import asyncio
 import uuid
@@ -57,6 +58,19 @@ class WorkflowStep:
         retry_count: int = 0,
         timeout: Optional[float] = None,
     ):
+        """
+        __init__.
+        
+        Args:
+            step_id (str): Input parameter for this operation.
+            agent_id (str): Input parameter for this operation.
+            task_type (str): Input parameter for this operation.
+            parameters (Dict[str, Any]): Input parameter for this operation.
+            depends_on (Optional[List[str]]): Input parameter for this operation.
+            condition (Optional[Callable[[Dict[str, Any]], bool]]): Input parameter for this operation.
+            retry_count (int): Input parameter for this operation.
+            timeout (Optional[float]): Input parameter for this operation.
+        """
         self.step_id = step_id
         self.agent_id = agent_id
         self.task_type = task_type
@@ -99,6 +113,14 @@ class WorkflowPipeline:
     def __init__(
         self, pipeline_id: Optional[str] = None, name: str = "workflow", description: str = ""
     ):
+        """
+        __init__.
+        
+        Args:
+            pipeline_id (Optional[str]): Input parameter for this operation.
+            name (str): Name value.
+            description (str): Human-readable description text.
+        """
         self.pipeline_id = pipeline_id or str(uuid.uuid4())
         self.name = name
         self.description = description
@@ -118,19 +140,19 @@ class WorkflowPipeline:
     ) -> str:
         """
         Add a step to the workflow.
-
+        
         Args:
-            agent_id: Agent to execute the step
-            task_type: Type of task
-            parameters: Task parameters
-            step_id: Optional step ID (auto-generated if not provided)
-            depends_on: List of step IDs this step depends on
-            condition: Optional condition function to check before execution
-            retry_count: Number of retries on failure
-            timeout: Optional timeout in seconds
-
+            agent_id (str): Input parameter for this operation.
+            task_type (str): Input parameter for this operation.
+            parameters (Dict[str, Any]): Input parameter for this operation.
+            step_id (Optional[str]): Input parameter for this operation.
+            depends_on (Optional[List[str]]): Input parameter for this operation.
+            condition (Optional[Callable[[Dict[str, Any]], bool]]): Input parameter for this operation.
+            retry_count (int): Input parameter for this operation.
+            timeout (Optional[float]): Input parameter for this operation.
+        
         Returns:
-            Step ID
+            str: Returned text value.
         """
         step_id = step_id or f"step_{len(self.steps) + 1}"
         step = WorkflowStep(
@@ -147,7 +169,12 @@ class WorkflowPipeline:
         return step_id
 
     def _get_ready_steps(self) -> List[WorkflowStep]:
-        """Get steps that are ready to execute (dependencies satisfied)."""
+        """
+        Get steps that are ready to execute (dependencies satisfied).
+        
+        Returns:
+            List[WorkflowStep]: List result of the operation.
+        """
         ready = []
         for step in self.steps:
             if step.status != WorkflowStatus.PENDING:
@@ -165,13 +192,13 @@ class WorkflowPipeline:
     ) -> Dict[str, Any]:
         """
         Execute the workflow pipeline.
-
+        
         Args:
-            agent_manager: AgentManager instance
-            context: Optional initial context
-
+            agent_manager ('AgentManager'): Input parameter for this operation.
+            context (Optional[Dict[str, Any]]): Input parameter for this operation.
+        
         Returns:
-            Final workflow result
+            Dict[str, Any]: Dictionary result of the operation.
         """
         self.state.status = WorkflowStatus.RUNNING
         self.state.started_at = datetime.now()
@@ -217,7 +244,16 @@ class WorkflowPipeline:
         }
 
     async def _execute_step(self, step: WorkflowStep, agent_manager: "AgentManager") -> None:
-        """Execute a single workflow step."""
+        """
+        Execute a single workflow step.
+        
+        Args:
+            step (WorkflowStep): Input parameter for this operation.
+            agent_manager ('AgentManager'): Input parameter for this operation.
+        
+        Returns:
+            None: Result of the operation.
+        """
         agent = agent_manager.get_agent(step.agent_id)
         if not agent:
             step.status = WorkflowStatus.FAILED
@@ -272,7 +308,12 @@ class WorkflowPipeline:
                 await asyncio.sleep(0.1 * attempt)  # Exponential backoff
 
     def get_status(self) -> Dict[str, Any]:
-        """Get workflow status."""
+        """
+        Get workflow status.
+        
+        Returns:
+            Dict[str, Any]: Dictionary result of the operation.
+        """
         return {
             "pipeline_id": self.pipeline_id,
             "name": self.name,
@@ -301,6 +342,12 @@ class AgentOrchestrator:
     """
 
     def __init__(self, agent_manager: "AgentManager"):
+        """
+        __init__.
+        
+        Args:
+            agent_manager ('AgentManager'): Input parameter for this operation.
+        """
         self.agent_manager = agent_manager
         self.workflows: Dict[str, WorkflowPipeline] = {}
         self.active_workflows: Set[str] = set()
@@ -308,13 +355,13 @@ class AgentOrchestrator:
     def create_workflow(self, name: str = "workflow", description: str = "") -> WorkflowPipeline:
         """
         Create a new workflow pipeline.
-
+        
         Args:
-            name: Workflow name
-            description: Workflow description
-
+            name (str): Name value.
+            description (str): Human-readable description text.
+        
         Returns:
-            WorkflowPipeline instance
+            WorkflowPipeline: Result of the operation.
         """
         pipeline = WorkflowPipeline(name=name, description=description)
         self.workflows[pipeline.pipeline_id] = pipeline
@@ -325,13 +372,16 @@ class AgentOrchestrator:
     ) -> Dict[str, Any]:
         """
         Execute a workflow.
-
+        
         Args:
-            workflow_id: Workflow ID
-            context: Optional initial context
-
+            workflow_id (str): Input parameter for this operation.
+            context (Optional[Dict[str, Any]]): Input parameter for this operation.
+        
         Returns:
-            Workflow result
+            Dict[str, Any]: Dictionary result of the operation.
+        
+        Raises:
+            WorkflowNotFoundError: Raised when this function detects an invalid state or when an underlying call fails.
         """
         workflow = self.workflows.get(workflow_id)
         if not workflow:
@@ -354,16 +404,19 @@ class AgentOrchestrator:
     ) -> Any:
         """
         Delegate a task from one agent to another.
-
+        
         Args:
-            from_agent_id: Source agent ID
-            to_agent_id: Target agent ID
-            task_type: Type of task
-            parameters: Task parameters
-            priority: Task priority
-
+            from_agent_id (str): Input parameter for this operation.
+            to_agent_id (str): Input parameter for this operation.
+            task_type (str): Input parameter for this operation.
+            parameters (Dict[str, Any]): Input parameter for this operation.
+            priority (int): Input parameter for this operation.
+        
         Returns:
-            Task result
+            Any: Result of the operation.
+        
+        Raises:
+            AgentNotFoundError: Raised when this function detects an invalid state or when an underlying call fails.
         """
         target_agent = self.agent_manager.get_agent(to_agent_id)
         if not target_agent:
@@ -390,15 +443,18 @@ class AgentOrchestrator:
     ) -> List[Any]:
         """
         Chain tasks across multiple agents sequentially.
-
+        
         Args:
-            agent_chain: List of agent IDs in execution order
-            task_type: Type of task
-            initial_parameters: Initial task parameters
-            transform_result: Optional function to transform result for next agent
-
+            agent_chain (List[str]): Input parameter for this operation.
+            task_type (str): Input parameter for this operation.
+            initial_parameters (Dict[str, Any]): Input parameter for this operation.
+            transform_result (Optional[Callable[[Any, int], Dict[str, Any]]]): Input parameter for this operation.
+        
         Returns:
-            List of results from each agent
+            List[Any]: List result of the operation.
+        
+        Raises:
+            AgentNotFoundError: Raised when this function detects an invalid state or when an underlying call fails.
         """
         results = []
         current_params = initial_parameters
@@ -436,19 +492,22 @@ class AgentOrchestrator:
     ) -> Dict[str, Any]:
         """
         Coordinate agents using leader-follower pattern.
-
+        
         Leader executes first, then followers execute in parallel,
-        results are aggregated.
-
+                                                results are aggregated.
+        
         Args:
-            leader_id: Leader agent ID
-            follower_ids: List of follower agent IDs
-            leader_task: Leader task definition
-            follower_task_template: Template for follower tasks
-            aggregation_func: Optional function to aggregate follower results
-
+            leader_id (str): Input parameter for this operation.
+            follower_ids (List[str]): Input parameter for this operation.
+            leader_task (Dict[str, Any]): Input parameter for this operation.
+            follower_task_template (Dict[str, Any]): Input parameter for this operation.
+            aggregation_func (Optional[Callable[[List[Any]], Any]]): Input parameter for this operation.
+        
         Returns:
-            Coordination result
+            Dict[str, Any]: Dictionary result of the operation.
+        
+        Raises:
+            AgentNotFoundError: Raised when this function detects an invalid state or when an underlying call fails.
         """
         leader = self.agent_manager.get_agent(leader_id)
         if not leader:
@@ -502,16 +561,16 @@ class AgentOrchestrator:
     ) -> Dict[str, Any]:
         """
         Coordinate agents using peer-to-peer pattern.
-
+        
         All agents execute in parallel, results are coordinated.
-
+        
         Args:
-            agent_ids: List of agent IDs
-            task_template: Task template for all agents
-            coordination_func: Optional function to coordinate results
-
+            agent_ids (List[str]): Input parameter for this operation.
+            task_template (Dict[str, Any]): Input parameter for this operation.
+            coordination_func (Optional[Callable[[List[Any]], Any]]): Input parameter for this operation.
+        
         Returns:
-            Coordination result
+            Dict[str, Any]: Dictionary result of the operation.
         """
         tasks = []
         for agent_id in agent_ids:
@@ -536,15 +595,33 @@ class AgentOrchestrator:
         return {"agent_results": dict(zip(agent_ids, results)), "coordinated": coordinated}
 
     def get_workflow(self, workflow_id: str) -> Optional[WorkflowPipeline]:
-        """Get a workflow by ID."""
+        """
+        Get a workflow by ID.
+        
+        Args:
+            workflow_id (str): Input parameter for this operation.
+        
+        Returns:
+            Optional[WorkflowPipeline]: Result if available, else None.
+        """
         return self.workflows.get(workflow_id)
 
     def list_workflows(self) -> List[str]:
-        """List all workflow IDs."""
+        """
+        List all workflow IDs.
+        
+        Returns:
+            List[str]: List result of the operation.
+        """
         return list(self.workflows.keys())
 
     def get_orchestration_status(self) -> Dict[str, Any]:
-        """Get orchestrator status."""
+        """
+        Get orchestrator status.
+        
+        Returns:
+            Dict[str, Any]: Dictionary result of the operation.
+        """
         return {
             "total_workflows": len(self.workflows),
             "active_workflows": len(self.active_workflows),

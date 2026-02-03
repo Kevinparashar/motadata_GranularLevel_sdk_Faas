@@ -4,6 +4,7 @@ Standard contracts for FaaS services.
 Defines common request/response schemas and headers used across all services.
 """
 
+
 from datetime import datetime
 from typing import Any, Dict, List, Optional
 from uuid import UUID, uuid4

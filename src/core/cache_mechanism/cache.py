@@ -6,6 +6,7 @@ supporting TTL, basic LRU eviction, and pattern-based invalidation.
 """
 
 
+
 import time
 from collections import OrderedDict
 from dataclasses import dataclass
@@ -19,6 +20,12 @@ except ImportError:  # pragma: no cover - optional dependency
 
 @dataclass
 class CacheConfig:
+    """
+    CacheConfig.
+    
+    This class groups related SDK behaviour in one place.
+    Keep the public methods small and well-typed for easy maintenance.
+    """
     backend: str = "memory"  # "memory" or "dragonfly"
     default_ttl: int = 300
     max_size: int = 1024  # only applies to memory backend
@@ -32,6 +39,15 @@ class CacheMechanism:
     """
 
     def __init__(self, config: Optional[CacheConfig] = None) -> None:
+        """
+        __init__.
+        
+        Args:
+            config (Optional[CacheConfig]): Configuration object or settings.
+        
+        Raises:
+            ImportError: Raised when this function detects an invalid state or when an underlying call fails.
+        """
         self.config = config or CacheConfig()
         self.backend = self.config.backend
 
@@ -48,7 +64,16 @@ class CacheMechanism:
             self._store: OrderedDict[str, tuple[Any, float]] = OrderedDict()
 
     def _namespaced_key(self, key: str, tenant_id: Optional[str] = None) -> str:
-        """Create namespaced cache key with optional tenant isolation."""
+        """
+        Create namespaced cache key with optional tenant isolation.
+        
+        Args:
+            key (str): Input parameter for this operation.
+            tenant_id (Optional[str]): Tenant identifier used for tenant isolation.
+        
+        Returns:
+            str: Returned text value.
+        """
         if tenant_id:
             return f"{self.config.namespace}:{tenant_id}:{key}"
         return f"{self.config.namespace}:{key}"
@@ -58,11 +83,20 @@ class CacheMechanism:
     ) -> None:
         """
         Store a value in cache with TTL.
-
+        
         COST IMPACT: Caching responses saves LLM API costs.
-        - Cache hit = $0 cost (no API call)
-        - Cache miss = normal API cost (~$0.001-0.01 per call)
-        - Typical savings: 50-90% cost reduction for repeated queries
+                                                - Cache hit = $0 cost (no API call)
+                                                - Cache miss = normal API cost (~$0.001-0.01 per call)
+                                                - Typical savings: 50-90% cost reduction for repeated queries
+        
+        Args:
+            key (str): Input parameter for this operation.
+            value (Any): Input parameter for this operation.
+            tenant_id (Optional[str]): Tenant identifier used for tenant isolation.
+            ttl (Optional[int]): Input parameter for this operation.
+        
+        Returns:
+            None: Result of the operation.
         """
         ttl = ttl or self.config.default_ttl
         expires_at = time.time() + ttl
@@ -83,9 +117,16 @@ class CacheMechanism:
     def get(self, key: str, tenant_id: Optional[str] = None) -> Optional[Any]:
         """
         Retrieve a value from cache.
-
+        
         PERFORMANCE: Cache hits are instant (<1ms), avoiding expensive API calls.
-        Returns None if key not found or expired (cache miss).
+                                                Returns None if key not found or expired (cache miss).
+        
+        Args:
+            key (str): Input parameter for this operation.
+            tenant_id (Optional[str]): Tenant identifier used for tenant isolation.
+        
+        Returns:
+            Optional[Any]: Result if available, else None.
         """
         namespaced = self._namespaced_key(key, tenant_id=tenant_id)
 
@@ -108,6 +149,16 @@ class CacheMechanism:
         return value  # Cache hit: return cached value
 
     def delete(self, key: str, tenant_id: Optional[str] = None) -> None:
+        """
+        delete.
+        
+        Args:
+            key (str): Input parameter for this operation.
+            tenant_id (Optional[str]): Tenant identifier used for tenant isolation.
+        
+        Returns:
+            None: Result of the operation.
+        """
         namespaced = self._namespaced_key(key, tenant_id=tenant_id)
         if self.backend == "dragonfly":
             self._client.delete(namespaced)
@@ -117,10 +168,13 @@ class CacheMechanism:
     def invalidate_pattern(self, pattern: str, tenant_id: Optional[str] = None) -> None:
         """
         Invalidate all keys matching pattern (simple substring match for memory).
-
+        
         Args:
-            pattern: Pattern to match
-            tenant_id: Optional tenant ID to limit invalidation to specific tenant
+            pattern (str): Input parameter for this operation.
+            tenant_id (Optional[str]): Tenant identifier used for tenant isolation.
+        
+        Returns:
+            None: Result of the operation.
         """
         if tenant_id:
             pattern = f"{tenant_id}:{pattern}"
@@ -137,6 +191,12 @@ class CacheMechanism:
             self._store.pop(k, None)
 
     def _evict_if_needed(self) -> None:
+        """
+        _evict_if_needed.
+        
+        Returns:
+            None: Result of the operation.
+        """
         while len(self._store) > self.config.max_size:
             # Pop oldest (LRU)
             self._store.popitem(last=False)
@@ -150,12 +210,15 @@ class CacheMechanism:
     ) -> None:
         """
         Cache prompt interpretation result.
-
+        
         Args:
-            prompt_hash: Hash of the prompt
-            interpretation: Interpretation result (will be JSON serialized)
-            tenant_id: Optional tenant ID
-            ttl: Optional TTL override
+            prompt_hash (str): Input parameter for this operation.
+            interpretation (Any): Input parameter for this operation.
+            tenant_id (Optional[str]): Tenant identifier used for tenant isolation.
+            ttl (Optional[int]): Input parameter for this operation.
+        
+        Returns:
+            None: Result of the operation.
         """
         import json
 
@@ -168,13 +231,13 @@ class CacheMechanism:
     ) -> Optional[Any]:
         """
         Get cached prompt interpretation.
-
+        
         Args:
-            prompt_hash: Hash of the prompt
-            tenant_id: Optional tenant ID
-
+            prompt_hash (str): Input parameter for this operation.
+            tenant_id (Optional[str]): Tenant identifier used for tenant isolation.
+        
         Returns:
-            Cached interpretation or None
+            Optional[Any]: Result if available, else None.
         """
         import json
 

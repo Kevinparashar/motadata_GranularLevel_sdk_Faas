@@ -4,6 +4,7 @@ CODEC Integration for FaaS services.
 Provides message serialization/deserialization for efficient data encoding.
 """
 
+
 import json
 import logging
 from typing import Any, Dict, Optional
@@ -22,9 +23,9 @@ class CodecManager:
     def __init__(self, codec_type: str = "json"):
         """
         Initialize codec manager.
-
+        
         Args:
-            codec_type: Codec type ("json", "msgpack", "protobuf")
+            codec_type (str): Input parameter for this operation.
         """
         self.codec_type = codec_type
         logger.info(f"Codec manager initialized (placeholder) - type: {codec_type}")
@@ -32,12 +33,15 @@ class CodecManager:
     def encode(self, data: Dict[str, Any]) -> bytes:
         """
         Encode data to bytes.
-
+        
         Args:
-            data: Data dictionary to encode
-
+            data (Dict[str, Any]): Input parameter for this operation.
+        
         Returns:
-            Encoded bytes
+            bytes: Result of the operation.
+        
+        Raises:
+            ValueError: Raised when this function detects an invalid state or when an underlying call fails.
         """
         if self.codec_type == "json":
             return json.dumps(data).encode("utf-8")
@@ -61,12 +65,15 @@ class CodecManager:
     def decode(self, data: bytes) -> Dict[str, Any]:
         """
         Decode bytes to data dictionary.
-
+        
         Args:
-            data: Encoded bytes to decode
-
+            data (bytes): Input parameter for this operation.
+        
         Returns:
-            Decoded data dictionary
+            Dict[str, Any]: Dictionary result of the operation.
+        
+        Raises:
+            ValueError: Raised when this function detects an invalid state or when an underlying call fails.
         """
         if self.codec_type == "json":
             return json.loads(data.decode("utf-8"))

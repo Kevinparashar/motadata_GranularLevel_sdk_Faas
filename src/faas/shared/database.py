@@ -2,6 +2,7 @@
 Database connection utilities for FaaS services.
 """
 
+
 from typing import Any, Optional
 
 from ..core.postgresql_database import DatabaseConnection, create_database_connection
@@ -13,9 +14,9 @@ class DatabaseManager:
     def __init__(self, database_url: str):
         """
         Initialize database manager.
-
+        
         Args:
-            database_url: Database connection URL
+            database_url (str): Input parameter for this operation.
         """
         self.database_url = database_url
         self._connection: Optional[DatabaseConnection] = None
@@ -23,9 +24,9 @@ class DatabaseManager:
     async def get_connection(self) -> DatabaseConnection:
         """
         Get database connection (creates if not exists).
-
+        
         Returns:
-            Database connection instance
+            DatabaseConnection: Result of the operation.
         """
         if self._connection is None:
             self._connection = await create_database_connection(self.database_url)
