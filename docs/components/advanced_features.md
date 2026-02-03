@@ -219,7 +219,7 @@ See the following example files for complete usage:
 
 ## Related Documentation
 
-- [RAG System Documentation](../src/core/rag/README.md)
-- [LiteLLM Gateway Documentation](../src/core/litellm_gateway/README.md)
-- [Vector Database Documentation](../src/core/postgresql_database/vector_database/README.md)
+- [RAG System Documentation](../../src/core/rag/README.md)
+- [LiteLLM Gateway Documentation](../../src/core/litellm_gateway/README.md)
+- [Vector Database Documentation](../../src/core/postgresql_database/vector_database/README.md)
 

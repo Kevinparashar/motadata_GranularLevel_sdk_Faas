@@ -311,8 +311,8 @@ cache.warm_cache(frequent_data, tenant_id="tenant_123")
 
 ### Documentation
 - **[Cache README](README.md)** - Complete cache guide
-- **[Cache Functions Documentation](functions.md)** - Factory functions
-- **[Cache Troubleshooting](../../../docs/troubleshooting/cache_troubleshooting.md)** - Common issues
+- **[Cache Functions](functions.py)** - Factory functions
+- **[Cache Troubleshooting](../../../docs/troubleshooting/cache_mechanism_troubleshooting.md)** - Common issues
 
 ### Related Components
 - **[Cache Enhancements](cache_enhancements.py)** - Advanced features

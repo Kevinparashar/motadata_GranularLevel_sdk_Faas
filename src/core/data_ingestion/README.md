@@ -316,7 +316,7 @@ except DataIngestionError as e:
 
 ## Related Documentation
 
-- **[Multi-Modal Data Processing](../components/multimodal_data_processing.md)** - Format support details
+- **[Multi-Modal Data Processing](../../../docs/components/multimodal_data_processing.md)** - Format support details
 - **[RAG System](../rag/README.md)** - RAG integration
 - **[Cache Mechanism](../cache_mechanism/README.md)** - Caching details
 - **[Agent Framework](../agno_agent_framework/README.md)** - Agent integration

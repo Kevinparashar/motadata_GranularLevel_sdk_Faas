@@ -1157,12 +1157,12 @@ MIT License - see LICENSE file for details.
 
 ## Related
 
-- [Onboarding Guide](ONBOARDING_GUIDE.md) - Complete guide for new team members
+- [Onboarding Guide](docs/ONBOARDING_GUIDE.md) - Complete guide for new team members
 - [Documentation Index](docs/guide/DOCUMENTATION_INDEX.md) - Complete navigation
 - [Developer Integration Guide](docs/guide/DEVELOPER_INTEGRATION_GUIDE.md) - Component development and integration
 - [Development Environment Setup Guide](PYTHON_SDK_DEV_ENVIRONMENT_SETUP_GUIDE.md) - Local development setup
 - [Quality Gate Rules](PYTHON_SDK_QUALITY_GATE_RULES_AND_DEVELOPMENT_GUIDELINE_DOCUMENT.md) - Quality standards
-- [Changelog](CHANGELOG.md) - Version history
+- [Changelog](docs/guide/CHANGELOG.md) - Version history
 
 ## Feedback
 

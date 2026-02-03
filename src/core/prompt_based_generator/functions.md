@@ -323,8 +323,8 @@ grant_permission(
 
 ### Documentation
 - **[Prompt-Based Generator README](README.md)** - Complete guide
-- **[Agent Generator Documentation](agent_generator.md)** - Agent generation
-- **[Tool Generator Documentation](tool_generator.md)** - Tool generation
+- **[Agent Generator Code](agent_generator.py)** - Agent generation
+- **[Tool Generator Code](tool_generator.py)** - Tool generation
 
 ### Related Components
 - **[Agent Generator](agent_generator.py)** - Agent generation implementation

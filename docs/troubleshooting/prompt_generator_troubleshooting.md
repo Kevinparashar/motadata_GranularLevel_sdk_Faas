@@ -79,6 +79,6 @@
 ## Getting Help
 
 - Check [Component Documentation](../../src/core/prompt_based_generator/README.md)
-- Review [User Guide](../guides/prompt_based_creation_guide.md)
+- Review [User Guide](../components/prompt_based_creation_guide.md)
 - See [Examples](../../examples/prompt_based/)
 

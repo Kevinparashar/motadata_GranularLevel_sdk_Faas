@@ -86,10 +86,10 @@ Component Name (e.g., "Agent Framework")
 
 #### 📘 Large Documents (>500 lines)
 Use these navigation aids:
-- **[Component Categorization](architecture/COMPONENT_CATEGORIZATION.md)** - Use outline/TOC in your editor
-- **[Agent Framework Explanation](components/agno_agent_framework_explanation.md)** - Use outline/TOC
-- **[SDK Architecture](architecture/SDK_ARCHITECTURE.md)** - Use outline/TOC
-- **[AI Architecture Design](architecture/AI_ARCHITECTURE_DESIGN.md)** - Use outline/TOC
+- **[Component Categorization](../architecture/COMPONENT_CATEGORIZATION.md)** - Use outline/TOC in your editor
+- **[Agent Framework Explanation](../components/agno_agent_framework_explanation.md)** - Use outline/TOC
+- **[SDK Architecture](../architecture/SDK_ARCHITECTURE.md)** - Use outline/TOC
+- **[AI Architecture Design](../architecture/AI_ARCHITECTURE_DESIGN.md)** - Use outline/TOC
 
 **Tip:** Most editors support outline view (VS Code: `Ctrl+Shift+O`, PyCharm: `Alt+7`)
 
@@ -111,18 +111,18 @@ Use these navigation aids:
 If you know the function name:
 1. Search in component's `functions.py` file
 2. Check component README for examples
-3. See [Function-Driven API](architecture/FUNCTION_DRIVEN_API.md)
+3. See [Function-Driven API](../architecture/FUNCTION_DRIVEN_API.md)
 
 ### 2. By Error Message
 If you have an error:
-1. Check [Troubleshooting Index](troubleshooting/README.md)
+1. Check [Troubleshooting Index](../troubleshooting/README.md)
 2. Search error message in troubleshooting guides
 3. Check component-specific troubleshooting file
 
 ### 3. By Use Case
 If you know what you want to do:
 1. Check [Documentation Index](DOCUMENTATION_INDEX.md) - "By Use Case" section
-2. Look in [Examples](../examples/) directory
+2. Look in [Examples](../../examples/) directory
 3. Check component README files
 
 ### 4. By Component
@@ -263,8 +263,8 @@ grep -A 5 -B 5 "search term" docs/README.md
 ### Most Common Documents
 1. **[Documentation Index](DOCUMENTATION_INDEX.md)** - Start here
 2. **[Quick Reference](QUICK_REFERENCE.md)** - Common tasks
-3. **[Main README](../README.md)** - Project overview
-4. **[Troubleshooting Index](troubleshooting/README.md)** - Fix issues
+3. **[Main README](../../README.md)** - Project overview
+4. **[Troubleshooting Index](../troubleshooting/README.md)** - Fix issues
 
 ### Component Documentation
 - [Agent Framework](../../src/core/agno_agent_framework/README.md)

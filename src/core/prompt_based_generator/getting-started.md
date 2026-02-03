@@ -97,6 +97,6 @@ tool = await create_tool_from_prompt(
 ## Next Steps
 
 - Read the full [README.md](README.md)
-- Explore [examples](../examples/prompt_based/)
+- Explore [examples](../../../examples/prompt_based/)
 - Check [troubleshooting guide](../../../docs/troubleshooting/prompt_generator_troubleshooting.md)
 
