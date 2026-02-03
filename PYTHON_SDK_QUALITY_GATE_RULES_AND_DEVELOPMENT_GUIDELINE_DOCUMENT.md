@@ -77,7 +77,7 @@ Define a clear and enforceable SonarQube Quality Gate for the Motadata Python AI
 | Check | Threshold | Status |
 |-------|-----------|--------|
 | **Cognitive Complexity** | 11-15 | **Warning** - Review recommended |
-| **Function Length** | 80-120 LOC | **Warning** - Review recommended |
+| **Function Length** | <= 60 LOC | **Warning** - Review recommended |
 | **Missing Private Docstrings** | Any | **Warning** - Improve recommended |
 | **Minor Code Smells** | Non-critical | **Warning** - Technical debt |
 | **Low/Medium Vulnerabilities** | Dependency issues | **Warning** - Update recommended |
