@@ -159,7 +159,7 @@ async def execute_task(
     See Also:
         - create_agent(): Factory function to create agents
         - AgentExecutionError: Exception details
-        - [Agent Framework Guide](../src/core/agno_agent_framework/README.md)
+        - [Agent Framework Guide](../../src/core/agno_agent_framework/README.md)
     """
     # Implementation...
 ```

@@ -420,7 +420,7 @@ if health.status != "healthy":
 - **[Memory System](memory.py)** - Agent memory implementation
 - **[Tools System](tools.py)** - Tool integration
 - **[Orchestration](orchestration.py)** - Multi-agent coordination
-- **[LiteLLM Gateway](../../litellm_gateway/README.md)** - LLM operations
+- **[LiteLLM Gateway](../litellm_gateway/README.md)** - LLM operations
 
 ### External Resources
 - **[Pydantic Documentation](https://docs.pydantic.dev/)** - Data validation framework

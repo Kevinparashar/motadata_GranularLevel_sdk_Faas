@@ -457,7 +457,7 @@ rag = create_rag_system(db=db, gateway=gateway, enable_memory=False)
 ### Documentation
 - **[RAG System Class Documentation](rag_system.md)** - Core RAGSystem class
 - **[RAG README](README.md)** - Complete RAG system guide
-- **[RAG Troubleshooting](../../../docs/troubleshooting/rag_troubleshooting.md)** - Common issues
+- **[RAG Troubleshooting](../../../docs/troubleshooting/rag_system_troubleshooting.md)** - Common issues
 
 ### Related Components
 - **[RAG System Class](rag_system.py)** - Core RAG implementation

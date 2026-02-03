@@ -165,5 +165,5 @@ The component provides specific exceptions:
 
 - `getting-started.md` - Detailed getting started guide
 - `docs/components/prompt_based_generator_explanation.md` - Comprehensive explanation
-- `docs/guides/prompt_based_creation_guide.md` - User guide
+- `docs/components/prompt_based_creation_guide.md` - User guide
 

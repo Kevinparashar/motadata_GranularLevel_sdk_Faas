@@ -287,7 +287,7 @@
 
 ## See Also
 
-- [CODEC Integration Guide](../../integration_guides/codec_integration_guide.md)
+- [CODEC Integration Guide](../integration_guides/codec_integration_guide.md)
 - [CORE_COMPONENTS_INTEGRATION_STORY.md](../../../CORE_COMPONENTS_INTEGRATION_STORY.md)
 - Core SDK CODEC documentation
 

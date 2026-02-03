@@ -72,6 +72,6 @@ python examples/prompt_based/feedback_example.py
 ## Next Steps
 
 - Read the [component documentation](../../src/core/prompt_based_generator/README.md)
-- Check the [user guide](../../../docs/guides/prompt_based_creation_guide.md)
+- Check the [user guide](../../docs/components/prompt_based_creation_guide.md)
 - Explore [troubleshooting guide](../../../docs/troubleshooting/prompt_generator_troubleshooting.md)
 

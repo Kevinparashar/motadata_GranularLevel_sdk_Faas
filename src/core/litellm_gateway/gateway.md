@@ -568,8 +568,8 @@ logger.info(f"Usage: {stats['total_requests']} requests, ${stats['total_cost']:.
 ### Related Components
 - **[Rate Limiter](rate_limiter.py)** - Rate limiting implementation
 - **[KV Cache](kv_cache.py)** - Attention caching
-- **[Cache Mechanism](../../cache_mechanism/README.md)** - Response caching
-- **[LLMOps](../../llmops/README.md)** - Operations tracking
+- **[Cache Mechanism](../cache_mechanism/README.md)** - Response caching
+- **[LLMOps](../llmops/README.md)** - Operations tracking
 
 ### External Resources
 - **[LiteLLM Documentation](https://docs.litellm.ai/)** - Official LiteLLM docs

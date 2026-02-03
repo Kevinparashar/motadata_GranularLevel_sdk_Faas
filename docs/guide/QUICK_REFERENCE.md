@@ -491,7 +491,7 @@ async with httpx.AsyncClient() as client:
     result = response.json()
 ```
 
-📖 **[FaaS Examples](../../examples/faas/)** | **[FaaS Documentation](../src/faas/README.md)**
+📖 **[FaaS Examples](../../examples/faas/)** | **[FaaS Documentation](../../src/faas/README.md)**
 
 ---
 

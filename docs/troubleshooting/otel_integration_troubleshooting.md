@@ -294,7 +294,7 @@
 
 ## See Also
 
-- [OTEL Integration Guide](../../integration_guides/otel_integration_guide.md)
+- [OTEL Integration Guide](../integration_guides/otel_integration_guide.md)
 - [CORE_COMPONENTS_INTEGRATION_STORY.md](../../../CORE_COMPONENTS_INTEGRATION_STORY.md)
 - Core SDK OTEL bootstrap documentation
 

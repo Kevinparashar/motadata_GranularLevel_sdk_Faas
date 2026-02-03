@@ -8,7 +8,7 @@
 
 ### Core Components
 
-1. **[Data Ingestion Service](../src/core/data_ingestion/README.md)**
+1. **[Data Ingestion Service](../../src/core/data_ingestion/README.md)**
    - Simple file upload interface
    - Automatic processing and integration
    - Multi-modal data support

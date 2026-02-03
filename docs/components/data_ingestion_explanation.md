@@ -504,7 +504,7 @@ service = create_ingestion_service(
 
 ## Related Documentation
 
-- **[Data Ingestion README](../src/core/data_ingestion/README.md)** - Component documentation
+- **[Data Ingestion README](../../src/core/data_ingestion/README.md)** - Component documentation
 - **[Multi-Modal Processing](multimodal_data_processing.md)** - Format support details
 - **[RAG System](rag_system_explanation.md)** - RAG integration
 - **[Cache Mechanism](cache_mechanism_explanation.md)** - Caching details

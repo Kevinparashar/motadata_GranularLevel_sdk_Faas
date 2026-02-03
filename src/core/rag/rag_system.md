@@ -527,13 +527,13 @@ rag.ingest_document("Title", content="Updated content...")
 ### Documentation
 - **[RAG README](README.md)** - Complete RAG system guide
 - **[RAG Functions Documentation](functions.md)** - Factory and convenience functions
-- **[RAG Troubleshooting](../../../docs/troubleshooting/rag_troubleshooting.md)** - Common issues
+- **[RAG Troubleshooting](../../../docs/troubleshooting/rag_system_troubleshooting.md)** - Common issues
 
 ### Related Components
 - **[Document Processor](document_processor.py)** - Document processing
 - **[Retriever](retriever.py)** - Document retrieval
 - **[Generator](generator.py)** - Response generation
-- **[Vector Operations](../../postgresql_database/vector_operations.py)** - Vector database operations
+- **[Vector Operations](../postgresql_database/vector_operations.py)** - Vector database operations
 
 ### External Resources
 - **[RAG Paper](https://arxiv.org/abs/2005.11401)** - Original RAG research paper

@@ -15,19 +15,19 @@ examples/
 │
 ├── basic_usage/                      # Basic component examples
 │   ├── 01_observability_basic.py
-│   ├── 02_pool_implementation_basic.py
-│   ├── 03_postgresql_database_basic.py
-│   ├── 04_connectivity_basic.py
-│   ├── 05_litellm_gateway_basic.py
-│   ├── 06_cache_basic.py
-│   ├── 07_agent_basic.py
-│   ├── 08_prompt_context_basic.py
-│   ├── 09_rag_basic.py
-│   └── 10_api_backend_basic.py
+│   ├── 02_postgresql_database_basic.py
+│   ├── 03_litellm_gateway_basic.py
+│   ├── 04_cache_basic.py
+│   ├── 05_agent_basic.py
+│   ├── 06_prompt_context_basic.py
+│   ├── 07_rag_basic.py
+│   ├── 08_api_backend_basic.py
+│   └── 09_data_ingestion_basic.py
 │
 ├── integration/                      # Multi-component integration examples
 │   ├── agent_with_rag.py
-│   └── api_with_agent.py
+│   ├── api_with_agent.py
+│   └── multi_agent_orchestration.py
 │
 ├── end_to_end/                      # Complete workflow examples
 │   └── complete_qa_system.py
@@ -35,41 +35,10 @@ examples/
 └── use_cases/                       # Real-world use case implementations
     ├── README.md                    # Use cases index
     │
-    ├── customer_support_chatbot/    # Use case: Customer Support Chatbot
-    │   ├── README.md               # Use case documentation
-    │   ├── main.py                 # Main implementation
-    │   ├── config.py               # Configuration
-    │   ├── models.py               # Data models
-    │   ├── api.py                  # API endpoints (if applicable)
-    │   ├── requirements.txt        # Use case specific dependencies
-    │   ├── .env.example            # Environment variables template
-    │   ├── tests/                  # Use case tests
-    │   │   ├── __init__.py
-    │   │   ├── test_main.py        # Unit tests
-    │   │   ├── test_integration.py # Integration tests
-    │   │   └── fixtures.py         # Test fixtures
-    │   └── docs/                   # Additional documentation
-    │       └── architecture.md     # Architecture diagram/docs
-    │
-    ├── document_qa_system/          # Use case: Document Q&A System
-    │   ├── README.md
-    │   ├── main.py
-    │   ├── config.py
-    │   ├── models.py
-    │   ├── requirements.txt
-    │   ├── .env.example
-    │   ├── tests/
-    │   └── docs/
-    │
-    ├── intelligent_agent_workflow/ # Use case: Intelligent Agent Workflow
-    │   ├── README.md
-    │   ├── main.py
-    │   ├── config.py
-    │   ├── models.py
-    │   ├── requirements.txt
-    │   ├── .env.example
-    │   ├── tests/
-    │   └── docs/
+    ├── document_qa_with_integrations/ # Use case: Document Q&A with integrations (current)
+    │   ├── README.md                  # Use case documentation
+    │   ├── main.py                    # Main implementation
+    │   └── requirements.txt           # Use case specific dependencies
     │
     └── template/                    # Template for new use cases
         ├── README.md.template
@@ -77,7 +46,6 @@ examples/
         ├── config.py.template
         ├── models.py.template
         ├── requirements.txt.template
-        ├── .env.example.template
         ├── tests/
         │   ├── __init__.py.template
         │   ├── test_main.py.template
@@ -100,9 +68,7 @@ examples/
 - Match the use case purpose
 
 **Examples**:
-- ✅ `customer_support_chatbot`
-- ✅ `document_qa_system`
-- ✅ `intelligent_agent_workflow`
+- ✅ `document_qa_with_integrations`
 - ✅ `multi_agent_coordination`
 - ✅ `rag_based_knowledge_base`
 - ❌ `customer-support-chatbot` (hyphens)
@@ -140,8 +106,9 @@ examples/
 cd examples/use_cases
 
 # Create use case folder (use snake_case)
-mkdir customer_support_chatbot
-cd customer_support_chatbot
+# Example: document_qa_with_integrations
+mkdir <your_use_case_name>
+cd <your_use_case_name>
 
 # Create standard structure
 mkdir tests docs
@@ -176,13 +143,13 @@ cp ../template/config.py.template config.py
 Add to `examples/use_cases/README.md`:
 
 ```markdown
-## customer_support_chatbot
+## <your_use_case_name>
 
-**Description**: Customer support chatbot using RAG and Agent Framework
+**Description**: One-line description of what the use case does.
 
-**Components Used**: RAG System, Agent Framework, LiteLLM Gateway, API Backend
+**Components Used**: List the SDK components used (Gateway, RAG, Agents, Cache, etc.)
 
-**See**: [README.md](customer_support_chatbot/README.md)
+**See**: `<your_use_case_name>/README.md`
 ```
 
 ## 📋 Use Case Template Structure
@@ -219,7 +186,7 @@ pytest tests/
 ```
 
 ## Architecture
-See [docs/architecture.md](docs/architecture.md)
+See the template architecture doc: [use_cases/template/docs/architecture.md.template](use_cases/template/docs/architecture.md.template)
 ```
 
 ### main.py Template
@@ -301,21 +268,15 @@ The `examples/use_cases/README.md` serves as the index:
 
 ## Active Use Cases
 
-### customer_support_chatbot
+### document_qa_with_integrations
 - **Status**: ✅ Active
-- **Components**: RAG, Agent, Gateway
-- **Last Updated**: 2024-01-15
-- [Documentation](customer_support_chatbot/README.md)
-
-### document_qa_system
-- **Status**: ✅ Active
-- **Components**: RAG, Gateway
-- **Last Updated**: 2024-01-10
-- [Documentation](document_qa_system/README.md)
+- **Components**: RAG, Gateway, Integrations
+- **Last Updated**: 2026-02-XX
+- Documentation: `document_qa_with_integrations/README.md`
 
 ## Template
 
-See [template/](template/) for creating new use cases.
+See `template/` for creating new use cases.
 ```
 
 ## ✅ Quality Checklist
@@ -344,5 +305,5 @@ Before adding a use case:
 
 - [Building New Use Cases Guide](../BUILDING_NEW_USECASE_GUIDE.md)
 - [Examples README](README.md)
-- [Developer Guide](../../PYTHON_SDK_DEVELOPMENT_ENVIRONMENT_SETUP_GUIDE.md)
+- [Developer Guide](../../PYTHON_SDK_DEV_ENVIRONMENT_SETUP_GUIDE.md)
 
