@@ -4,6 +4,7 @@ Cache Mechanism - High-Level Functions
 Factory functions, convenience functions, and utilities for cache mechanism.
 """
 
+
 from typing import Any, Dict, Optional
 
 from .cache import CacheConfig, CacheMechanism
@@ -169,15 +170,18 @@ def cache_get(cache: CacheMechanism, key: str) -> Optional[Any]:
 def cache_set(cache: CacheMechanism, key: str, value: Any, ttl: Optional[int] = None) -> None:
     """
     Set a value in cache (high-level convenience).
-
-    Args:
-        cache: CacheMechanism instance
-        key: Cache key
-        value: Value to cache
-        ttl: Optional TTL in seconds (uses default if not provided)
-
+    
     Example:
-        >>> cache_set(cache, "user:123", {"name": "John"}, ttl=600)
+                            >>> cache_set(cache, "user:123", {"name": "John"}, ttl=600)
+    
+    Args:
+        cache (CacheMechanism): Cache instance used to store and fetch cached results.
+        key (str): Input parameter for this operation.
+        value (Any): Input parameter for this operation.
+        ttl (Optional[int]): Input parameter for this operation.
+    
+    Returns:
+        None: Result of the operation.
     """
     cache.set(key, value, ttl=ttl)
 
@@ -185,13 +189,16 @@ def cache_set(cache: CacheMechanism, key: str, value: Any, ttl: Optional[int] = 
 def cache_delete(cache: CacheMechanism, key: str) -> None:
     """
     Delete a value from cache (high-level convenience).
-
-    Args:
-        cache: CacheMechanism instance
-        key: Cache key
-
+    
     Example:
-        >>> cache_delete(cache, "user:123")
+                            >>> cache_delete(cache, "user:123")
+    
+    Args:
+        cache (CacheMechanism): Cache instance used to store and fetch cached results.
+        key (str): Input parameter for this operation.
+    
+    Returns:
+        None: Result of the operation.
     """
     cache.delete(key)
 
@@ -199,13 +206,16 @@ def cache_delete(cache: CacheMechanism, key: str) -> None:
 def cache_clear_pattern(cache: CacheMechanism, pattern: str) -> None:
     """
     Clear all keys matching a pattern (high-level convenience).
-
-    Args:
-        cache: CacheMechanism instance
-        pattern: Pattern to match keys
-
+    
     Example:
-        >>> cache_clear_pattern(cache, "user:*")
+                            >>> cache_clear_pattern(cache, "user:*")
+    
+    Args:
+        cache (CacheMechanism): Cache instance used to store and fetch cached results.
+        pattern (str): Input parameter for this operation.
+    
+    Returns:
+        None: Result of the operation.
     """
     cache.invalidate_pattern(pattern)
 
@@ -250,15 +260,18 @@ def batch_cache_set(
 ) -> None:
     """
     Set multiple values in cache at once (utility function).
-
-    Args:
-        cache: CacheMechanism instance
-        items: Dictionary of key-value pairs to cache
-        ttl: Optional TTL in seconds
-
+    
     Example:
-        >>> items = {"user:1": {"name": "John"}, "user:2": {"name": "Jane"}}
-        >>> batch_cache_set(cache, items, ttl=600)
+                            >>> items = {"user:1": {"name": "John"}, "user:2": {"name": "Jane"}}
+                            >>> batch_cache_set(cache, items, ttl=600)
+    
+    Args:
+        cache (CacheMechanism): Cache instance used to store and fetch cached results.
+        items (Dict[str, Any]): Input parameter for this operation.
+        ttl (Optional[int]): Input parameter for this operation.
+    
+    Returns:
+        None: Result of the operation.
     """
     for key, value in items.items():
         cache.set(key, value, ttl=ttl)

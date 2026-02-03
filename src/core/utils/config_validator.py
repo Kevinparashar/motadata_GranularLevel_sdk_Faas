@@ -4,6 +4,7 @@ Configuration Validator and Discovery Utilities
 Provides configuration validation, discovery, and helpful error messages.
 """
 
+
 from typing import Any, Dict, List, Optional, Type, Union
 
 from ..exceptions import SDKError
@@ -22,6 +23,17 @@ class ConfigurationError(SDKError):
         suggestion: Optional[str] = None,
         **kwargs: Any,
     ):
+        """
+        __init__.
+        
+        Args:
+            message (str): Input parameter for this operation.
+            config_key (Optional[str]): Input parameter for this operation.
+            invalid_value (Optional[Any]): Input parameter for this operation.
+            valid_options (Optional[List[str]]): Input parameter for this operation.
+            suggestion (Optional[str]): Input parameter for this operation.
+            **kwargs (Any): Input parameter for this operation.
+        """
         super().__init__(message, **kwargs)
         self.config_key = config_key
         self.invalid_value = invalid_value
@@ -40,14 +52,17 @@ class ConfigValidator:
     ) -> None:
         """
         Validate that required configuration keys are present.
-
+        
         Args:
-            config: Configuration dictionary
-            required_keys: List of required keys
-            component_name: Name of component for error messages
-
+            config (Dict[str, Any]): Configuration object or settings.
+            required_keys (List[str]): Input parameter for this operation.
+            component_name (str): Input parameter for this operation.
+        
+        Returns:
+            None: Result of the operation.
+        
         Raises:
-            ConfigurationError: If required keys are missing
+            create_error_with_suggestion: Raised when this function detects an invalid state or when an underlying call fails.
         """
         missing_keys = [key for key in required_keys if key not in config]
         if missing_keys:
@@ -85,15 +100,18 @@ class ConfigValidator:
     ) -> None:
         """
         Validate that a configuration value has the correct type.
-
+        
         Args:
-            config: Configuration dictionary
-            key: Configuration key to validate
-            expected_type: Expected type
-            component_name: Name of component for error messages
-
+            config (Dict[str, Any]): Configuration object or settings.
+            key (str): Input parameter for this operation.
+            expected_type (Type[Any]): Input parameter for this operation.
+            component_name (str): Input parameter for this operation.
+        
+        Returns:
+            None: Result of the operation.
+        
         Raises:
-            ConfigurationError: If type is incorrect
+            create_error_with_suggestion: Raised when this function detects an invalid state or when an underlying call fails.
         """
         if key not in config:
             return  # Skip if key is missing (use validate_required for that)
@@ -132,15 +150,18 @@ class ConfigValidator:
     ) -> None:
         """
         Validate that a configuration value is one of the valid options.
-
+        
         Args:
-            config: Configuration dictionary
-            key: Configuration key to validate
-            valid_values: List of valid values
-            component_name: Name of component for error messages
-
+            config (Dict[str, Any]): Configuration object or settings.
+            key (str): Input parameter for this operation.
+            valid_values (List[str]): Input parameter for this operation.
+            component_name (str): Input parameter for this operation.
+        
+        Returns:
+            None: Result of the operation.
+        
         Raises:
-            ConfigurationError: If value is not in valid options
+            create_error_with_suggestion: Raised when this function detects an invalid state or when an underlying call fails.
         """
         if key not in config:
             return
@@ -175,16 +196,19 @@ class ConfigValidator:
     ) -> None:
         """
         Validate that a numeric configuration value is within range.
-
+        
         Args:
-            config: Configuration dictionary
-            key: Configuration key to validate
-            min_value: Minimum allowed value
-            max_value: Maximum allowed value
-            component_name: Name of component for error messages
-
+            config (Dict[str, Any]): Configuration object or settings.
+            key (str): Input parameter for this operation.
+            min_value (Optional[float]): Input parameter for this operation.
+            max_value (Optional[float]): Input parameter for this operation.
+            component_name (str): Input parameter for this operation.
+        
+        Returns:
+            None: Result of the operation.
+        
         Raises:
-            ConfigurationError: If value is out of range
+            create_error_with_suggestion: Raised when this function detects an invalid state or when an underlying call fails.
         """
         if key not in config:
             return
@@ -221,13 +245,13 @@ class ConfigValidator:
     ) -> Dict[str, Any]:
         """
         Discover available configuration options for a component.
-
+        
         Args:
-            component_name: Name of the component
-            config_schema: Optional schema definition
-
+            component_name (str): Input parameter for this operation.
+            config_schema (Optional[Dict[str, Any]]): Input parameter for this operation.
+        
         Returns:
-            Dictionary of available configuration options with descriptions
+            Dict[str, Any]: Dictionary result of the operation.
         """
         # This would be populated from component schemas
         # For now, return a structure that can be extended
@@ -241,7 +265,16 @@ class ConfigValidator:
 
     @staticmethod
     def _find_closest_match(value: str, options: List[str]) -> Optional[str]:
-        """Find closest match using simple string similarity."""
+        """
+        Find closest match using simple string similarity.
+        
+        Args:
+            value (str): Input parameter for this operation.
+            options (List[str]): Input parameter for this operation.
+        
+        Returns:
+            Optional[str]: Returned text value.
+        """
         value_lower = value.lower()
         best_match = None
         best_score = 0
@@ -266,12 +299,12 @@ class ConfigHelper:
     def get_config_example(component_name: str) -> Dict[str, Any]:
         """
         Get example configuration for a component.
-
+        
         Args:
-            component_name: Name of the component
-
+            component_name (str): Input parameter for this operation.
+        
         Returns:
-            Example configuration dictionary
+            Dict[str, Any]: Dictionary result of the operation.
         """
         examples = {
             "agent": {
@@ -327,18 +360,18 @@ class ConfigHelper:
     ) -> Dict[str, Any]:
         """
         Validate configuration and provide suggestions for missing/invalid keys.
-
+        
         Args:
-            config: Configuration dictionary to validate
-            component_name: Name of the component
-            required_keys: List of required keys
-            optional_keys: List of optional keys
-
+            config (Dict[str, Any]): Configuration object or settings.
+            component_name (str): Input parameter for this operation.
+            required_keys (Optional[List[str]]): Input parameter for this operation.
+            optional_keys (Optional[List[str]]): Input parameter for this operation.
+        
         Returns:
-            Validated and normalized configuration
-
+            Dict[str, Any]: Dictionary result of the operation.
+        
         Raises:
-            ConfigurationError: If validation fails
+            create_error_with_suggestion: Raised when this function detects an invalid state or when an underlying call fails.
         """
         validator = ConfigValidator()
 
@@ -385,7 +418,16 @@ class ConfigHelper:
 
     @staticmethod
     def _format_example(example: Dict[str, Any], indent: int = 0) -> str:
-        """Format example configuration as readable string."""
+        """
+        Format example configuration as readable string.
+        
+        Args:
+            example (Dict[str, Any]): Input parameter for this operation.
+            indent (int): Input parameter for this operation.
+        
+        Returns:
+            str: Returned text value.
+        """
         lines = []
         indent_str = "  " * indent
 

@@ -4,6 +4,7 @@ ML Service - Main service implementation.
 Handles model training, inference, and model management.
 """
 
+
 import logging
 from typing import Any, Dict, Optional
 
@@ -49,13 +50,13 @@ class MLService:
     ):
         """
         Initialize ML Service.
-
+        
         Args:
-            config: Service configuration
-            db_connection: Database connection
-            nats_client: NATS client (optional)
-            otel_tracer: OTEL tracer (optional)
-            codec_manager: Codec manager (optional)
+            config (ServiceConfig): Configuration object or settings.
+            db_connection (Any): Input parameter for this operation.
+            nats_client (Optional[Any]): Input parameter for this operation.
+            otel_tracer (Optional[Any]): Input parameter for this operation.
+            codec_manager (Optional[Any]): Input parameter for this operation.
         """
         self.config = config
         self.db = db_connection
@@ -82,12 +83,12 @@ class MLService:
     def _get_ml_system(self, tenant_id: str) -> MLSystem:
         """
         Create ML system for tenant (stateless - created on-demand).
-
+        
         Args:
-            tenant_id: Tenant ID
-
+            tenant_id (str): Tenant identifier used for tenant isolation.
+        
         Returns:
-            MLSystem instance
+            MLSystem: Result of the operation.
         """
         # Create ML system on-demand (stateless)
         ml_system = create_ml_system(
@@ -127,7 +128,19 @@ class MLService:
     async def _handle_train_model(  # noqa: S7503
         self, request: TrainModelRequest, headers: dict = Header(...)
     ):
-        """Train a model. Async required for FastAPI route handler."""
+        """
+        Train a model. Async required for FastAPI route handler.
+        
+        Args:
+            request (TrainModelRequest): Request payload object.
+            headers (dict): HTTP headers passed from the caller.
+        
+        Returns:
+            Any: Result of the operation.
+        
+        Raises:
+            HTTPException: Raised when this function detects an invalid state or when an underlying call fails.
+        """
         standard_headers = extract_headers(**headers)
 
         span = None
@@ -177,7 +190,17 @@ class MLService:
     async def _publish_training_event(
         self, training_id: str, model_id: str, tenant_id: str
     ) -> None:
-        """Publish training event via NATS."""
+        """
+        Publish training event via NATS.
+        
+        Args:
+            training_id (str): Input parameter for this operation.
+            model_id (str): Input parameter for this operation.
+            tenant_id (str): Tenant identifier used for tenant isolation.
+        
+        Returns:
+            None: Result of the operation.
+        """
         event = {
             "event_type": "ml.training.started",
             "training_id": training_id,
@@ -192,7 +215,20 @@ class MLService:
     async def _handle_predict(  # noqa: S7503
         self, model_id: str, request: PredictRequest, headers: dict = Header(...)
     ):
-        """Make a prediction with a model. Async required for FastAPI route handler."""
+        """
+        Make a prediction with a model. Async required for FastAPI route handler.
+        
+        Args:
+            model_id (str): Input parameter for this operation.
+            request (PredictRequest): Request payload object.
+            headers (dict): HTTP headers passed from the caller.
+        
+        Returns:
+            Any: Result of the operation.
+        
+        Raises:
+            HTTPException: Raised when this function detects an invalid state or when an underlying call fails.
+        """
         standard_headers = extract_headers(**headers)
 
         span = None
@@ -232,7 +268,20 @@ class MLService:
     async def _handle_batch_predict(  # noqa: S7503
         self, model_id: str, request: BatchPredictRequest, headers: dict = Header(...)
     ):
-        """Make batch predictions. Async required for FastAPI route handler."""
+        """
+        Make batch predictions. Async required for FastAPI route handler.
+        
+        Args:
+            model_id (str): Input parameter for this operation.
+            request (BatchPredictRequest): Request payload object.
+            headers (dict): HTTP headers passed from the caller.
+        
+        Returns:
+            Any: Result of the operation.
+        
+        Raises:
+            HTTPException: Raised when this function detects an invalid state or when an underlying call fails.
+        """
         standard_headers = extract_headers(**headers)
 
         try:
@@ -263,7 +312,17 @@ class MLService:
     async def _handle_list_models(  # noqa: S7503
         self, headers: dict = Header(...), limit: int = 100, offset: int = 0
     ):
-        """List models. Async required for FastAPI route handler."""
+        """
+        List models. Async required for FastAPI route handler.
+        
+        Args:
+            headers (dict): HTTP headers passed from the caller.
+            limit (int): Input parameter for this operation.
+            offset (int): Input parameter for this operation.
+        
+        Returns:
+            Any: Result of the operation.
+        """
         standard_headers = extract_headers(**headers)
 
         # Model listing from database - to be implemented
@@ -276,7 +335,16 @@ class MLService:
         )
 
     async def _handle_get_model(self, model_id: str, headers: dict = Header(...)):  # noqa: S7503
-        """Get model by ID. Async required for FastAPI route handler."""
+        """
+        Get model by ID. Async required for FastAPI route handler.
+        
+        Args:
+            model_id (str): Input parameter for this operation.
+            headers (dict): HTTP headers passed from the caller.
+        
+        Raises:
+            HTTPException: Raised when this function detects an invalid state or when an underlying call fails.
+        """
         extract_headers(**headers)  # Extract headers for validation
 
         # Model retrieval from database - to be implemented
@@ -288,7 +356,20 @@ class MLService:
     async def _handle_deploy_model(  # noqa: S7503
         self, model_id: str, request: DeployModelRequest, headers: dict = Header(...)
     ):
-        """Deploy a model. Async required for FastAPI route handler."""
+        """
+        Deploy a model. Async required for FastAPI route handler.
+        
+        Args:
+            model_id (str): Input parameter for this operation.
+            request (DeployModelRequest): Request payload object.
+            headers (dict): HTTP headers passed from the caller.
+        
+        Returns:
+            Any: Result of the operation.
+        
+        Raises:
+            HTTPException: Raised when this function detects an invalid state or when an underlying call fails.
+        """
         standard_headers = extract_headers(**headers)
 
         try:
@@ -312,7 +393,12 @@ class MLService:
             )
 
     async def _handle_health_check(self):  # noqa: S7503
-        """Health check endpoint. Async required for FastAPI route handler."""
+        """
+        Health check endpoint. Async required for FastAPI route handler.
+        
+        Returns:
+            Any: Result of the operation.
+        """
         return {"status": "healthy", "service": "ml-service"}
 
 

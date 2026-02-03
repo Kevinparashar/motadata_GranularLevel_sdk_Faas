@@ -4,6 +4,7 @@ Data Cleaner
 Cleanses and normalizes processed data.
 """
 
+
 # Standard library imports
 import re
 from typing import Any, Dict, Optional
@@ -23,12 +24,12 @@ class DataCleaner:
     ):
         """
         Initialize cleaner.
-
+        
         Args:
-            remove_extra_whitespace: Remove extra whitespace
-            normalize_unicode: Normalize unicode characters
-            remove_control_chars: Remove control characters
-            normalize_line_endings: Normalize line endings
+            remove_extra_whitespace (bool): Input parameter for this operation.
+            normalize_unicode (bool): Input parameter for this operation.
+            remove_control_chars (bool): Input parameter for this operation.
+            normalize_line_endings (bool): Input parameter for this operation.
         """
         self.remove_extra_whitespace = remove_extra_whitespace
         self.normalize_unicode = normalize_unicode
@@ -38,13 +39,13 @@ class DataCleaner:
     def clean(self, content: str, metadata: Optional[Dict[str, Any]] = None) -> str:
         """
         Clean content.
-
+        
         Args:
-            content: Content to clean
-            metadata: Optional metadata
-
+            content (str): Content text.
+            metadata (Optional[Dict[str, Any]]): Extra metadata for the operation.
+        
         Returns:
-            Cleaned content
+            str: Returned text value.
         """
         if not content:
             return content

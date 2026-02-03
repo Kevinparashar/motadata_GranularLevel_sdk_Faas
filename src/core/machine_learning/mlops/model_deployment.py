@@ -4,6 +4,7 @@ Model Deployment
 Manages model deployments to different environments.
 """
 
+
 import logging
 from datetime import datetime, timezone
 from typing import Any, Dict, Optional
@@ -22,9 +23,9 @@ class ModelDeployment:
     def __init__(self, tenant_id: Optional[str] = None):
         """
         Initialize model deployment manager.
-
+        
         Args:
-            tenant_id: Optional tenant ID
+            tenant_id (Optional[str]): Tenant identifier used for tenant isolation.
         """
         self.tenant_id = tenant_id
         self._deployments: Dict[str, Dict[str, Any]] = {}
@@ -36,15 +37,15 @@ class ModelDeployment:
     ) -> Dict[str, Any]:
         """
         Deploy model to environment.
-
+        
         Args:
-            model_id: Model ID
-            version: Model version
-            environment: Target environment
-            **kwargs: Additional deployment parameters
-
+            model_id (str): Input parameter for this operation.
+            version (str): Input parameter for this operation.
+            environment (str): Input parameter for this operation.
+            **kwargs (Any): Input parameter for this operation.
+        
         Returns:
-            Deployment information
+            Dict[str, Any]: Dictionary result of the operation.
         """
         deployment_id = f"{model_id}_{version}_{environment}"
 
@@ -65,9 +66,12 @@ class ModelDeployment:
     def rollback_deployment(self, deployment_id: str) -> None:
         """
         Rollback deployment.
-
+        
         Args:
-            deployment_id: Deployment ID
+            deployment_id (str): Input parameter for this operation.
+        
+        Returns:
+            None: Result of the operation.
         """
         if deployment_id in self._deployments:
             self._deployments[deployment_id]["status"] = "rolled_back"

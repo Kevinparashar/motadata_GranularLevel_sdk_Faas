@@ -4,6 +4,7 @@ LiteLLM Gateway - High-Level Functions
 Factory functions, convenience functions, and utilities for LiteLLM Gateway.
 """
 
+
 from typing import Any, AsyncIterator, Dict, List, Optional
 
 from ..utils.config_validator import ConfigurationError
@@ -16,7 +17,18 @@ from .gateway import GatewayConfig, LiteLLMGateway
 
 
 def _validate_model_format(default_model: str) -> None:
-    """Validate model name format and provider."""
+    """
+    Validate model name format and provider.
+    
+    Args:
+        default_model (str): Input parameter for this operation.
+    
+    Returns:
+        None: Result of the operation.
+    
+    Raises:
+        create_error_with_suggestion: Raised when this function detects an invalid state or when an underlying call fails.
+    """
     if not default_model:
         return
 
@@ -38,7 +50,18 @@ def _validate_model_format(default_model: str) -> None:
 
 
 def _validate_api_keys(api_keys: Optional[Dict[str, str]]) -> None:
-    """Validate that API keys are provided."""
+    """
+    Validate that API keys are provided.
+    
+    Args:
+        api_keys (Optional[Dict[str, str]]): Input parameter for this operation.
+    
+    Returns:
+        None: Result of the operation.
+    
+    Raises:
+        create_error_with_suggestion: Raised when this function detects an invalid state or when an underlying call fails.
+    """
     if api_keys is None or not api_keys:
         suggestion = "Provide API keys using one of these methods:\n"
         suggestion += "  1. Pass api_keys parameter: api_keys={'openai': 'sk-...'}\n"
@@ -54,7 +77,16 @@ def _validate_api_keys(api_keys: Optional[Dict[str, str]]) -> None:
 
 
 def _get_provider_api_key(provider: str, api_keys: Optional[Dict[str, str]]) -> Optional[str]:
-    """Get API key for a provider from dict or environment."""
+    """
+    Get API key for a provider from dict or environment.
+    
+    Args:
+        provider (str): Input parameter for this operation.
+        api_keys (Optional[Dict[str, str]]): Input parameter for this operation.
+    
+    Returns:
+        Optional[str]: Returned text value.
+    """
     import os
 
     # Check explicit api_keys dict first
@@ -77,7 +109,17 @@ def _build_model_list(
     default_model: str,
     api_keys: Optional[Dict[str, str]],
 ) -> List[Dict[str, Any]]:
-    """Build model list from providers and API keys."""
+    """
+    Build model list from providers and API keys.
+    
+    Args:
+        providers (Optional[List[str]]): Input parameter for this operation.
+        default_model (str): Input parameter for this operation.
+        api_keys (Optional[Dict[str, str]]): Input parameter for this operation.
+    
+    Returns:
+        List[Dict[str, Any]]: Dictionary result of the operation.
+    """
     if not providers:
         return []
 
@@ -272,19 +314,22 @@ async def stream_text(
 ) -> AsyncIterator[str]:
     """
     Stream text generation (high-level convenience).
-
-    Args:
-        gateway: LiteLLMGateway instance
-        prompt: Input prompt
-        model: Model to use
-        **kwargs: Additional generation parameters
-
+    
     Yields:
-        Text chunks as they're generated
-
-    Example:
-        >>> async for chunk in stream_text(gateway, "Tell me a story"):
-        ...     print(chunk, end="", flush=True)
+                            Text chunks as they're generated
+    
+                        Example:
+                            >>> async for chunk in stream_text(gateway, "Tell me a story"):
+                            ...     print(chunk, end="", flush=True)
+    
+    Args:
+        gateway (LiteLLMGateway): Gateway client used for LLM calls.
+        prompt (str): Prompt text sent to the model.
+        model (str): Model name or identifier to use.
+        **kwargs (Any): Input parameter for this operation.
+    
+    Returns:
+        AsyncIterator[str]: Result of the operation.
     """
     # Use the gateway's generate with streaming enabled
     # When stream=True, acompletion returns an async iterator

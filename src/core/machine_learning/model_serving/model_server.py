@@ -4,6 +4,7 @@ Model Server
 REST API server for model serving.
 """
 
+
 # Standard library imports
 import logging
 from typing import Any, Dict, Optional
@@ -32,12 +33,12 @@ class ModelServer:
     ):
         """
         Initialize model server.
-
+        
         Args:
-            model_manager: Model manager instance
-            host: Server host
-            port: Server port
-            tenant_id: Optional tenant ID
+            model_manager (Any): Input parameter for this operation.
+            host (str): Input parameter for this operation.
+            port (int): Input parameter for this operation.
+            tenant_id (Optional[str]): Tenant identifier used for tenant isolation.
         """
         self.model_manager = model_manager
         self.host = host
@@ -49,7 +50,12 @@ class ModelServer:
         logger.info(f"ModelServer initialized on {host}:{port}")
 
     def _setup_routes(self) -> None:
-        """Setup API routes."""
+        """
+        Setup API routes.
+        
+        Returns:
+            None: Result of the operation.
+        """
 
         @self.app.post("/predict/{model_id}")
         async def predict(model_id: str, input_data: Dict[str, Any]):
@@ -71,11 +77,21 @@ class ModelServer:
             return {"status": "healthy"}
 
     def start_server(self) -> None:
-        """Start the server."""
+        """
+        Start the server.
+        
+        Returns:
+            None: Result of the operation.
+        """
         import uvicorn
 
         uvicorn.run(self.app, host=self.host, port=self.port)
 
     def stop_server(self) -> None:
-        """Stop the server."""
+        """
+        Stop the server.
+        
+        Returns:
+            None: Result of the operation.
+        """
         logger.info("Stopping model server")

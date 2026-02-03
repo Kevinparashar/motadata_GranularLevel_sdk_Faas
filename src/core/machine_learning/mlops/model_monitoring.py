@@ -4,6 +4,7 @@ Model Monitoring
 Monitors model performance in production.
 """
 
+
 import logging
 from datetime import datetime, timedelta, timezone
 from typing import Any, Dict, List, Optional
@@ -22,9 +23,9 @@ class ModelMonitoring:
     def __init__(self, tenant_id: Optional[str] = None):
         """
         Initialize model monitoring.
-
+        
         Args:
-            tenant_id: Optional tenant ID
+            tenant_id (Optional[str]): Tenant identifier used for tenant isolation.
         """
         self.tenant_id = tenant_id
         self._metrics: Dict[str, List[Dict[str, Any]]] = {}
@@ -40,12 +41,15 @@ class ModelMonitoring:
     ) -> None:
         """
         Track a prediction.
-
+        
         Args:
-            model_id: Model ID
-            prediction_time: Prediction latency in seconds
-            success: Whether prediction succeeded
-            error: Optional error message
+            model_id (str): Input parameter for this operation.
+            prediction_time (float): Input parameter for this operation.
+            success (bool): Input parameter for this operation.
+            error (Optional[str]): Input parameter for this operation.
+        
+        Returns:
+            None: Result of the operation.
         """
         metric = {
             "timestamp": datetime.now(timezone.utc),
@@ -63,13 +67,13 @@ class ModelMonitoring:
     def get_metrics(self, model_id: str, time_window: Optional[timedelta] = None) -> Dict[str, Any]:
         """
         Get performance metrics.
-
+        
         Args:
-            model_id: Model ID
-            time_window: Optional time window for metrics
-
+            model_id (str): Input parameter for this operation.
+            time_window (Optional[timedelta]): Input parameter for this operation.
+        
         Returns:
-            Performance metrics
+            Dict[str, Any]: Dictionary result of the operation.
         """
         if model_id not in self._metrics:
             return {}
@@ -97,12 +101,12 @@ class ModelMonitoring:
     def check_health(self, model_id: str) -> Dict[str, Any]:
         """
         Check model health.
-
+        
         Args:
-            model_id: Model ID
-
+            model_id (str): Input parameter for this operation.
+        
         Returns:
-            Health status
+            Dict[str, Any]: Dictionary result of the operation.
         """
         metrics = self.get_metrics(model_id, timedelta(hours=1))
 

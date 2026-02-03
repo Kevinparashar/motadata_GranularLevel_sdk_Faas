@@ -4,6 +4,7 @@ Access Control Framework
 Manages permissions for agents and tools created through prompt-based generation.
 """
 
+
 from datetime import datetime
 from enum import Enum
 from typing import Dict, List, Optional
@@ -66,13 +67,16 @@ class AccessControl:
     ) -> None:
         """
         Grant permission to a user for a resource.
-
+        
         Args:
-            tenant_id: Tenant ID
-            user_id: User ID
-            resource_type: Type of resource (agent/tool)
-            resource_id: Resource ID
-            permission: Permission to grant
+            tenant_id (str): Tenant identifier used for tenant isolation.
+            user_id (str): User identifier (used for auditing or personalization).
+            resource_type (ResourceType): Input parameter for this operation.
+            resource_id (str): Input parameter for this operation.
+            permission (Permission): Input parameter for this operation.
+        
+        Returns:
+            None: Result of the operation.
         """
         if tenant_id not in self._permissions:
             self._permissions[tenant_id] = {}
@@ -104,13 +108,16 @@ class AccessControl:
     ) -> None:
         """
         Revoke permission from a user for a resource.
-
+        
         Args:
-            tenant_id: Tenant ID
-            user_id: User ID
-            resource_type: Type of resource (agent/tool)
-            resource_id: Resource ID
-            permission: Permission to revoke
+            tenant_id (str): Tenant identifier used for tenant isolation.
+            user_id (str): User identifier (used for auditing or personalization).
+            resource_type (ResourceType): Input parameter for this operation.
+            resource_id (str): Input parameter for this operation.
+            permission (Permission): Input parameter for this operation.
+        
+        Returns:
+            None: Result of the operation.
         """
         if tenant_id not in self._permissions:
             return
@@ -139,16 +146,16 @@ class AccessControl:
     ) -> bool:
         """
         Check if user has permission for a resource.
-
+        
         Args:
-            tenant_id: Tenant ID
-            user_id: User ID
-            resource_type: Type of resource (agent/tool)
-            resource_id: Resource ID
-            permission: Permission to check
-
+            tenant_id (str): Tenant identifier used for tenant isolation.
+            user_id (str): User identifier (used for auditing or personalization).
+            resource_type (ResourceType): Input parameter for this operation.
+            resource_id (str): Input parameter for this operation.
+            permission (Permission): Input parameter for this operation.
+        
         Returns:
-            True if user has permission, False otherwise
+            bool: True if the operation succeeds, else False.
         """
         # Check tenant isolation first
         if tenant_id not in self._permissions:
@@ -182,16 +189,19 @@ class AccessControl:
     ) -> None:
         """
         Require permission, raise exception if not granted.
-
+        
         Args:
-            tenant_id: Tenant ID
-            user_id: User ID
-            resource_type: Type of resource (agent/tool)
-            resource_id: Resource ID
-            permission: Required permission
-
+            tenant_id (str): Tenant identifier used for tenant isolation.
+            user_id (str): User identifier (used for auditing or personalization).
+            resource_type (ResourceType): Input parameter for this operation.
+            resource_id (str): Input parameter for this operation.
+            permission (Permission): Input parameter for this operation.
+        
+        Returns:
+            None: Result of the operation.
+        
         Raises:
-            AccessControlError: If permission is not granted
+            AccessControlError: Raised when this function detects an invalid state or when an underlying call fails.
         """
         if not self.check_permission(tenant_id, user_id, resource_type, resource_id, permission):
             raise AccessControlError(
@@ -208,14 +218,14 @@ class AccessControl:
     ) -> Dict[str, List[Permission]]:
         """
         Get all permissions for a user.
-
+        
         Args:
-            tenant_id: Tenant ID
-            user_id: User ID
-            resource_type: Optional resource type filter
-
+            tenant_id (str): Tenant identifier used for tenant isolation.
+            user_id (str): User identifier (used for auditing or personalization).
+            resource_type (Optional[ResourceType]): Input parameter for this operation.
+        
         Returns:
-            Dictionary mapping resource_id to list of permissions
+            Dict[str, List[Permission]]: Dictionary result of the operation.
         """
         if tenant_id not in self._permissions:
             return {}
@@ -240,21 +250,24 @@ class AccessControl:
     def set_default_permissions(self, tenant_id: str, permissions: List[Permission]) -> None:
         """
         Set default permissions for a tenant.
-
+        
         Args:
-            tenant_id: Tenant ID
-            permissions: List of default permissions
+            tenant_id (str): Tenant identifier used for tenant isolation.
+            permissions (List[Permission]): Input parameter for this operation.
+        
+        Returns:
+            None: Result of the operation.
         """
         self._default_permissions[tenant_id] = permissions
 
     def get_default_permissions(self, tenant_id: str) -> List[Permission]:
         """
         Get default permissions for a tenant.
-
+        
         Args:
-            tenant_id: Tenant ID
-
+            tenant_id (str): Tenant identifier used for tenant isolation.
+        
         Returns:
-            List of default permissions
+            List[Permission]: List result of the operation.
         """
         return self._default_permissions.get(tenant_id, [Permission.READ, Permission.EXECUTE])

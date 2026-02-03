@@ -4,6 +4,7 @@ Experiment Tracker
 Tracks ML experiments with MLflow integration.
 """
 
+
 # Standard library imports
 import logging
 from datetime import datetime
@@ -23,10 +24,10 @@ class ExperimentTracker:
     def __init__(self, tracking_uri: str = "./mlruns", tenant_id: Optional[str] = None):
         """
         Initialize experiment tracker.
-
+        
         Args:
-            tracking_uri: MLflow tracking URI
-            tenant_id: Optional tenant ID
+            tracking_uri (str): Input parameter for this operation.
+            tenant_id (Optional[str]): Tenant identifier used for tenant isolation.
         """
         self.tracking_uri = tracking_uri
         self.tenant_id = tenant_id
@@ -37,13 +38,13 @@ class ExperimentTracker:
     def create_experiment(self, experiment_name: str, tags: Optional[Dict[str, str]] = None) -> str:
         """
         Create new experiment.
-
+        
         Args:
-            experiment_name: Name of experiment
-            tags: Optional tags
-
+            experiment_name (str): Input parameter for this operation.
+            tags (Optional[Dict[str, str]]): Input parameter for this operation.
+        
         Returns:
-            Experiment ID
+            str: Returned text value.
         """
         if self._mlflow_available:
             import mlflow  # type: ignore[import-not-found]
@@ -56,7 +57,15 @@ class ExperimentTracker:
             return f"exp_{experiment_name}_{datetime.now().timestamp()}"
 
     def log_params(self, params: Dict[str, Any]) -> None:
-        """Log hyperparameters."""
+        """
+        Log hyperparameters.
+        
+        Args:
+            params (Dict[str, Any]): Input parameter for this operation.
+        
+        Returns:
+            None: Result of the operation.
+        """
         if self._mlflow_available:
             import mlflow  # type: ignore[import-not-found]
 
@@ -64,7 +73,16 @@ class ExperimentTracker:
         logger.debug(f"Logged parameters: {params}")
 
     def log_metrics(self, metrics: Dict[str, float], step: Optional[int] = None) -> None:
-        """Log metrics."""
+        """
+        Log metrics.
+        
+        Args:
+            metrics (Dict[str, float]): Input parameter for this operation.
+            step (Optional[int]): Input parameter for this operation.
+        
+        Returns:
+            None: Result of the operation.
+        """
         if self._mlflow_available:
             import mlflow  # type: ignore[import-not-found]
 
@@ -72,7 +90,15 @@ class ExperimentTracker:
         logger.debug(f"Logged metrics: {metrics}")
 
     def log_artifacts(self, artifacts: Dict[str, str]) -> None:
-        """Log artifacts (models, plots, etc.)."""
+        """
+        Log artifacts (models, plots, etc.).
+        
+        Args:
+            artifacts (Dict[str, str]): Input parameter for this operation.
+        
+        Returns:
+            None: Result of the operation.
+        """
         if self._mlflow_available:
             import mlflow  # type: ignore[import-not-found]
 
@@ -85,13 +111,13 @@ class ExperimentTracker:
     ) -> List[Dict[str, Any]]:
         """
         Search experiments.
-
+        
         Args:
-            filter_string: Optional filter string
-            max_results: Maximum results
-
+            filter_string (Optional[str]): Input parameter for this operation.
+            max_results (int): Input parameter for this operation.
+        
         Returns:
-            List of experiment information
+            List[Dict[str, Any]]: Dictionary result of the operation.
         """
         if self._mlflow_available:
             from mlflow.tracking import MlflowClient  # type: ignore[import-not-found]
@@ -105,7 +131,12 @@ class ExperimentTracker:
             return []
 
     def _check_mlflow(self) -> bool:
-        """Check if MLflow is available."""
+        """
+        Check if MLflow is available.
+        
+        Returns:
+            bool: True if the operation succeeds, else False.
+        """
         try:
             import mlflow  # type: ignore[import-not-found]  # noqa: F401
 

@@ -4,6 +4,7 @@ Trainer
 Model training orchestration with hyperparameter management, validation, and checkpointing.
 """
 
+
 import logging
 import os
 from pathlib import Path
@@ -27,10 +28,10 @@ class Trainer:
     def __init__(self, db: DatabaseConnection, tenant_id: Optional[str] = None):
         """
         Initialize trainer.
-
+        
         Args:
-            db: Database connection
-            tenant_id: Optional tenant ID
+            db (DatabaseConnection): Database connection/handle.
+            tenant_id (Optional[str]): Tenant identifier used for tenant isolation.
         """
         self.db = db
         self.tenant_id = tenant_id
@@ -49,20 +50,20 @@ class Trainer:
     ) -> Dict[str, Any]:
         """
         Execute model training.
-
+        
         Args:
-            model_id: Unique model identifier
-            model_type: Type of model (classification, regression, etc.)
-            training_data: Training dataset
-            validation_data: Optional validation dataset
-            hyperparameters: Training hyperparameters
-            **kwargs: Additional training parameters
-
+            model_id (str): Input parameter for this operation.
+            model_type (str): Input parameter for this operation.
+            training_data (Any): Input parameter for this operation.
+            validation_data (Optional[Any]): Input parameter for this operation.
+            hyperparameters (Optional[Dict[str, Any]]): Input parameter for this operation.
+            **kwargs (Any): Input parameter for this operation.
+        
         Returns:
-            Dictionary with training results (metrics, model_path, version)
-
+            Dict[str, Any]: Dictionary result of the operation.
+        
         Raises:
-            TrainingError: If training fails
+            TrainingError: Raised when this function detects an invalid state or when an underlying call fails.
         """
         try:
             logger.info(f"Starting training for {model_id}")
@@ -123,13 +124,13 @@ class Trainer:
     def validate(self, model: Any, validation_data: Any) -> Dict[str, Any]:
         """
         Validate a model.
-
+        
         Args:
-            model: Trained model
-            validation_data: Validation dataset
-
+            model (Any): Model name or identifier to use.
+            validation_data (Any): Input parameter for this operation.
+        
         Returns:
-            Validation metrics
+            Dict[str, Any]: Dictionary result of the operation.
         """
         return self._evaluate(model, validation_data)
 
@@ -138,15 +139,15 @@ class Trainer:
     ) -> str:
         """
         Save training checkpoint.
-
+        
         Args:
-            model: Model to save
-            model_id: Model ID
-            epoch: Current epoch
-            checkpoint_dir: Optional checkpoint directory
-
+            model (Any): Model name or identifier to use.
+            model_id (str): Input parameter for this operation.
+            epoch (int): Input parameter for this operation.
+            checkpoint_dir (Optional[str]): Input parameter for this operation.
+        
         Returns:
-            Path to checkpoint file
+            str: Returned text value.
         """
         import joblib
 
@@ -163,12 +164,12 @@ class Trainer:
     def load_checkpoint(self, checkpoint_path: str) -> Any:
         """
         Load training checkpoint.
-
+        
         Args:
-            checkpoint_path: Path to checkpoint file
-
+            checkpoint_path (str): Input parameter for this operation.
+        
         Returns:
-            Loaded model
+            Any: Result of the operation.
         """
         import joblib
 
@@ -177,13 +178,16 @@ class Trainer:
     def _create_model(self, model_type: str, hyperparameters: Dict[str, Any]) -> Any:
         """
         Create model instance based on type.
-
+        
         Args:
-            model_type: Type of model
-            hyperparameters: Model hyperparameters
-
+            model_type (str): Input parameter for this operation.
+            hyperparameters (Dict[str, Any]): Input parameter for this operation.
+        
         Returns:
-            Model instance
+            Any: Result of the operation.
+        
+        Raises:
+            ValueError: Raised when this function detects an invalid state or when an underlying call fails.
         """
         from sklearn.ensemble import RandomForestClassifier, RandomForestRegressor
         from sklearn.linear_model import LinearRegression, LogisticRegression
@@ -231,13 +235,13 @@ class Trainer:
     def _evaluate(self, model: Any, data: Any) -> Dict[str, Any]:
         """
         Evaluate model on data.
-
+        
         Args:
-            model: Trained model
-            data: Dataset (X, y) tuple
-
+            model (Any): Model name or identifier to use.
+            data (Any): Input parameter for this operation.
+        
         Returns:
-            Evaluation metrics
+            Dict[str, Any]: Dictionary result of the operation.
         """
         from sklearn.metrics import (
             accuracy_score,

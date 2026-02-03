@@ -4,6 +4,7 @@ Prompt-Based Generator Exception Hierarchy
 Exceptions specific to prompt-based agent and tool generation.
 """
 
+
 from typing import Optional
 
 from ..exceptions import SDKError
@@ -31,6 +32,15 @@ class PromptInterpretationError(PromptGeneratorError):
         reason: Optional[str] = None,
         original_error: Optional[Exception] = None,
     ):
+        """
+        __init__.
+        
+        Args:
+            message (str): Input parameter for this operation.
+            prompt (Optional[str]): Prompt text sent to the model.
+            reason (Optional[str]): Input parameter for this operation.
+            original_error (Optional[Exception]): Input parameter for this operation.
+        """
         super().__init__(message, original_error)
         self.prompt = prompt
         self.reason = reason
@@ -54,6 +64,16 @@ class AgentGenerationError(PromptGeneratorError):
         stage: Optional[str] = None,
         original_error: Optional[Exception] = None,
     ):
+        """
+        __init__.
+        
+        Args:
+            message (str): Input parameter for this operation.
+            prompt (Optional[str]): Prompt text sent to the model.
+            agent_id (Optional[str]): Input parameter for this operation.
+            stage (Optional[str]): Input parameter for this operation.
+            original_error (Optional[Exception]): Input parameter for this operation.
+        """
         super().__init__(message, original_error)
         self.prompt = prompt
         self.agent_id = agent_id
@@ -78,6 +98,16 @@ class ToolGenerationError(PromptGeneratorError):
         stage: Optional[str] = None,
         original_error: Optional[Exception] = None,
     ):
+        """
+        __init__.
+        
+        Args:
+            message (str): Input parameter for this operation.
+            prompt (Optional[str]): Prompt text sent to the model.
+            tool_id (Optional[str]): Tool identifier.
+            stage (Optional[str]): Input parameter for this operation.
+            original_error (Optional[Exception]): Input parameter for this operation.
+        """
         super().__init__(message, original_error)
         self.prompt = prompt
         self.tool_id = tool_id
@@ -100,6 +130,15 @@ class CodeValidationError(PromptGeneratorError):
         validation_errors: Optional[list] = None,
         original_error: Optional[Exception] = None,
     ):
+        """
+        __init__.
+        
+        Args:
+            message (str): Input parameter for this operation.
+            code (Optional[str]): Input parameter for this operation.
+            validation_errors (Optional[list]): Input parameter for this operation.
+            original_error (Optional[Exception]): Input parameter for this operation.
+        """
         super().__init__(message, original_error)
         self.code = code
         self.validation_errors = validation_errors or []
@@ -127,6 +166,18 @@ class AccessControlError(PromptGeneratorError):
         permission: Optional[str] = None,
         original_error: Optional[Exception] = None,
     ):
+        """
+        __init__.
+        
+        Args:
+            message (str): Input parameter for this operation.
+            tenant_id (Optional[str]): Tenant identifier used for tenant isolation.
+            user_id (Optional[str]): User identifier (used for auditing or personalization).
+            resource_type (Optional[str]): Input parameter for this operation.
+            resource_id (Optional[str]): Input parameter for this operation.
+            permission (Optional[str]): Input parameter for this operation.
+            original_error (Optional[Exception]): Input parameter for this operation.
+        """
         super().__init__(message, original_error)
         self.tenant_id = tenant_id
         self.user_id = user_id

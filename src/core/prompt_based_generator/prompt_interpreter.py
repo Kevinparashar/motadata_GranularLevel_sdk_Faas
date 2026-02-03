@@ -5,6 +5,7 @@ Core prompt interpretation logic for converting natural language prompts
 into structured configurations for agents and tools.
 """
 
+
 import hashlib
 import json
 from typing import Any, Dict, List, Optional, Protocol
@@ -23,13 +24,33 @@ class CacheProtocol(Protocol):
     """Protocol for cache interface."""
 
     async def get(self, key: str, tenant_id: Optional[str] = None) -> Optional[str]:
-        """Get value from cache."""
+        """
+        Get value from cache.
+        
+        Args:
+            key (str): Input parameter for this operation.
+            tenant_id (Optional[str]): Tenant identifier used for tenant isolation.
+        
+        Returns:
+            Optional[str]: Returned text value.
+        """
         ...
 
     async def set(
         self, key: str, value: str, ttl: Optional[int] = None, tenant_id: Optional[str] = None
     ) -> None:
-        """Set value in cache."""
+        """
+        Set value in cache.
+        
+        Args:
+            key (str): Input parameter for this operation.
+            value (str): Input parameter for this operation.
+            ttl (Optional[int]): Input parameter for this operation.
+            tenant_id (Optional[str]): Tenant identifier used for tenant isolation.
+        
+        Returns:
+            None: Result of the operation.
+        """
         ...
 
 
@@ -70,9 +91,9 @@ class PromptInterpreter:
     def __init__(self, gateway: GatewayProtocol):
         """
         Initialize prompt interpreter.
-
+        
         Args:
-            gateway: LiteLLM Gateway instance for LLM calls
+            gateway (GatewayProtocol): Gateway client used for LLM calls.
         """
         self.gateway = gateway
         self._agent_prompt_template = """You are an expert at analyzing requirements for AI agents. 
@@ -131,7 +152,15 @@ Respond with a JSON object containing:
 Only return valid JSON, no additional text."""
 
     def _hash_prompt(self, prompt: str) -> str:
-        """Generate hash for prompt caching."""
+        """
+        Generate hash for prompt caching.
+        
+        Args:
+            prompt (str): Prompt text sent to the model.
+        
+        Returns:
+            str: Returned text value.
+        """
         return hashlib.sha256(prompt.encode()).hexdigest()
 
     async def interpret_agent_prompt(
@@ -139,17 +168,17 @@ Only return valid JSON, no additional text."""
     ) -> AgentRequirements:
         """
         Interpret a prompt for agent creation.
-
+        
         Args:
-            prompt: Natural language description of desired agent
-            cache: Optional cache mechanism for storing interpretations
-            tenant_id: Optional tenant ID for cache isolation
-
+            prompt (str): Prompt text sent to the model.
+            cache (Optional[CacheProtocol]): Cache instance used to store and fetch cached results.
+            tenant_id (Optional[str]): Tenant identifier used for tenant isolation.
+        
         Returns:
-            AgentRequirements object with extracted requirements
-
+            AgentRequirements: Result of the operation.
+        
         Raises:
-            PromptInterpretationError: If interpretation fails
+            create_error_with_suggestion: Raised when this function detects an invalid state or when an underlying call fails.
         """
         # Check cache first
         if cache:
@@ -222,17 +251,17 @@ Only return valid JSON, no additional text."""
     ) -> ToolRequirements:
         """
         Interpret a prompt for tool creation.
-
+        
         Args:
-            prompt: Natural language description of desired tool
-            cache: Optional cache mechanism for storing interpretations
-            tenant_id: Optional tenant ID for cache isolation
-
+            prompt (str): Prompt text sent to the model.
+            cache (Optional[CacheProtocol]): Cache instance used to store and fetch cached results.
+            tenant_id (Optional[str]): Tenant identifier used for tenant isolation.
+        
         Returns:
-            ToolRequirements object with extracted requirements
-
+            ToolRequirements: Result of the operation.
+        
         Raises:
-            PromptInterpretationError: If interpretation fails
+            create_error_with_suggestion: Raised when this function detects an invalid state or when an underlying call fails.
         """
         # Check cache first
         if cache:

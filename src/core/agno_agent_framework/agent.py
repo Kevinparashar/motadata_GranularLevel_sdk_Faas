@@ -4,6 +4,7 @@ Agno Agent Framework - Core Agent Implementation
 Provides the base agent class and agent management functionality.
 """
 
+
 # Standard library imports
 import asyncio
 import json
@@ -144,11 +145,14 @@ class Agent(BaseModel):
     ) -> None:
         """
         Add a capability to the agent.
-
+        
         Args:
-            name: Capability name
-            description: Capability description
-            parameters: Optional parameters
+            name (str): Name value.
+            description (str): Human-readable description text.
+            parameters (Optional[Dict[str, Any]]): Input parameter for this operation.
+        
+        Returns:
+            None: Result of the operation.
         """
         capability = AgentCapability(
             name=name, description=description, parameters=parameters or {}
@@ -158,14 +162,14 @@ class Agent(BaseModel):
     def add_task(self, task_type: str, parameters: Dict[str, Any], priority: int = 0) -> str:
         """
         Add a task to the agent's task queue.
-
+        
         Args:
-            task_type: Type of task
-            parameters: Task parameters
-            priority: Task priority (higher = more important)
-
+            task_type (str): Input parameter for this operation.
+            parameters (Dict[str, Any]): Input parameter for this operation.
+            priority (int): Input parameter for this operation.
+        
         Returns:
-            Task ID
+            str: Returned text value.
         """
         task_id = f"{self.agent_id}_{len(self.task_queue) + 1}"
         task = AgentTask(
@@ -176,7 +180,18 @@ class Agent(BaseModel):
         return task_id
 
     def _validate_tenant_id(self, tenant_id: Optional[str]) -> None:
-        """Validate tenant_id matches agent's tenant_id."""
+        """
+        Validate tenant_id matches agent's tenant_id.
+        
+        Args:
+            tenant_id (Optional[str]): Tenant identifier used for tenant isolation.
+        
+        Returns:
+            None: Result of the operation.
+        
+        Raises:
+            create_error_with_suggestion: Raised when this function detects an invalid state or when an underlying call fails.
+        """
         if tenant_id is not None and self.tenant_id is not None:
             if tenant_id != self.tenant_id:
                 from ..utils.error_handler import create_error_with_suggestion
@@ -189,7 +204,16 @@ class Agent(BaseModel):
                 )
 
     def _store_task_result_in_memory(self, task: AgentTask, result: Any) -> None:
-        """Store task result in memory if auto-persist is enabled."""
+        """
+        Store task result in memory if auto-persist is enabled.
+        
+        Args:
+            task (AgentTask): Input parameter for this operation.
+            result (Any): Input parameter for this operation.
+        
+        Returns:
+            None: Result of the operation.
+        """
         if self.memory and self.auto_persist_memory:
             self.memory.store(
                 content=f"Task {task.task_id} result: {result}",
@@ -199,7 +223,15 @@ class Agent(BaseModel):
             )
 
     def _build_error_suggestion(self, error_msg: str) -> str:
-        """Build error suggestion based on error message."""
+        """
+        Build error suggestion based on error message.
+        
+        Args:
+            error_msg (str): Input parameter for this operation.
+        
+        Returns:
+            str: Returned text value.
+        """
         suggestion = "Common fixes:\n"
         if "timeout" in error_msg.lower():
             suggestion += "  - Increase timeout in gateway configuration\n"
@@ -219,7 +251,18 @@ class Agent(BaseModel):
         return suggestion
 
     async def _execute_with_retry(self, task: AgentTask) -> Any:
-        """Execute task with retry logic."""
+        """
+        Execute task with retry logic.
+        
+        Args:
+            task (AgentTask): Input parameter for this operation.
+        
+        Returns:
+            Any: Result of the operation.
+        
+        Raises:
+            create_error_with_suggestion: Raised when this function detects an invalid state or when an underlying call fails.
+        """
         attempt = 0
         max_attempts = max(1, self.max_retries)
 
@@ -256,16 +299,13 @@ class Agent(BaseModel):
     async def execute_task(self, task: AgentTask, tenant_id: Optional[str] = None) -> Any:
         """
         Execute a task.
-
+        
         Args:
-            task: Task to execute
-            tenant_id: Optional tenant ID for validation (must match agent's tenant_id)
-
+            task (AgentTask): Input parameter for this operation.
+            tenant_id (Optional[str]): Tenant identifier used for tenant isolation.
+        
         Returns:
-            Task result
-
-        Raises:
-            AgentConfigurationError: If tenant_id doesn't match agent's tenant_id
+            Any: Result of the operation.
         """
         self._validate_tenant_id(tenant_id)
 
@@ -284,12 +324,12 @@ class Agent(BaseModel):
     async def _execute_task_internal(self, task: AgentTask) -> Any:
         """
         Internal task execution logic with integrated prompt management and tool calling.
-
+        
         Args:
-            task: Task to execute
-
+            task (AgentTask): Input parameter for this operation.
+        
         Returns:
-            Task result
+            Any: Result of the operation.
         """
         # Use gateway for LLM operations if available
         if self.gateway and task.task_type in ["llm_query", "generate", "analyze"]:
@@ -303,7 +343,15 @@ class Agent(BaseModel):
         }
 
     async def _execute_llm_task(self, task: AgentTask) -> Dict[str, Any]:
-        """Execute LLM-based task with tool calling support."""
+        """
+        Execute LLM-based task with tool calling support.
+        
+        Args:
+            task (AgentTask): Input parameter for this operation.
+        
+        Returns:
+            Dict[str, Any]: Dictionary result of the operation.
+        """
         base_prompt = task.parameters.get("prompt", "")
         model = task.parameters.get("model", self.llm_model or "gpt-4")
 
@@ -322,7 +370,12 @@ class Agent(BaseModel):
         return await self._tool_calling_loop(task, model, messages, tools_schema, final_prompt)
 
     def _get_tools_schema(self) -> Optional[List[Dict[str, Any]]]:
-        """Get tool schemas if tools are enabled."""
+        """
+        Get tool schemas if tools are enabled.
+        
+        Returns:
+            Optional[List[Dict[str, Any]]]: Dictionary result of the operation.
+        """
         if self.enable_tool_calling and self.tool_registry:
             return self.tool_registry.get_tools_schema()
         return None
@@ -335,7 +388,19 @@ class Agent(BaseModel):
         tools_schema: Optional[List[Dict[str, Any]]],
         final_prompt: str,
     ) -> Dict[str, Any]:
-        """Execute the tool calling loop."""
+        """
+        Execute the tool calling loop.
+        
+        Args:
+            task (AgentTask): Input parameter for this operation.
+            model (str): Model name or identifier to use.
+            messages (List[Dict[str, Any]]): Chat messages in role/content format.
+            tools_schema (Optional[List[Dict[str, Any]]]): Input parameter for this operation.
+            final_prompt (str): Input parameter for this operation.
+        
+        Returns:
+            Dict[str, Any]: Dictionary result of the operation.
+        """
         iteration = 0
         tool_calls_made = []
 
@@ -369,7 +434,19 @@ class Agent(BaseModel):
         tools_schema: Optional[List[Dict[str, Any]]],
         final_prompt: str,
     ) -> Any:
-        """Make LLM call with optional tools."""
+        """
+        Make LLM call with optional tools.
+        
+        Args:
+            task (AgentTask): Input parameter for this operation.
+            model (str): Model name or identifier to use.
+            messages (List[Dict[str, Any]]): Chat messages in role/content format.
+            tools_schema (Optional[List[Dict[str, Any]]]): Input parameter for this operation.
+            final_prompt (str): Input parameter for this operation.
+        
+        Returns:
+            Any: Result of the operation.
+        """
         llm_kwargs = task.parameters.get("llm_kwargs", {})
         if tools_schema:
             llm_kwargs["tools"] = tools_schema
@@ -390,7 +467,19 @@ class Agent(BaseModel):
         tool_calls_made: List[Dict[str, Any]],
         iteration: int,
     ) -> None:
-        """Execute all function calls from LLM response."""
+        """
+        Execute all function calls from LLM response.
+        
+        Args:
+            task (AgentTask): Input parameter for this operation.
+            function_calls (List[Dict[str, Any]]): Input parameter for this operation.
+            messages (List[Dict[str, Any]]): Chat messages in role/content format.
+            tool_calls_made (List[Dict[str, Any]]): Input parameter for this operation.
+            iteration (int): Input parameter for this operation.
+        
+        Returns:
+            None: Result of the operation.
+        """
         for func_call in function_calls:
             tool_name = func_call.get("name", "")
             arguments = func_call.get("arguments", {})
@@ -421,7 +510,21 @@ class Agent(BaseModel):
         func_call: Dict[str, Any],
         iteration: int,
     ) -> None:
-        """Execute a single tool call."""
+        """
+        Execute a single tool call.
+        
+        Args:
+            task (AgentTask): Input parameter for this operation.
+            tool_name (str): Input parameter for this operation.
+            arguments (Dict[str, Any]): Input parameter for this operation.
+            messages (List[Dict[str, Any]]): Chat messages in role/content format.
+            tool_calls_made (List[Dict[str, Any]]): Input parameter for this operation.
+            func_call (Dict[str, Any]): Input parameter for this operation.
+            iteration (int): Input parameter for this operation.
+        
+        Returns:
+            None: Result of the operation.
+        """
         if not self.tool_executor:
             tool_calls_made.append(
                 {
@@ -473,7 +576,21 @@ class Agent(BaseModel):
         iterations: int,
         warning: Optional[str] = None,
     ) -> Dict[str, Any]:
-        """Build the final task result dictionary."""
+        """
+        Build the final task result dictionary.
+        
+        Args:
+            task (AgentTask): Input parameter for this operation.
+            result_text (str): Input parameter for this operation.
+            model (str): Model name or identifier to use.
+            response (Any): Input parameter for this operation.
+            tool_calls (List[Dict[str, Any]]): Input parameter for this operation.
+            iterations (int): Input parameter for this operation.
+            warning (Optional[str]): Input parameter for this operation.
+        
+        Returns:
+            Dict[str, Any]: Dictionary result of the operation.
+        """
         result = {
             "status": "completed",
             "task_id": task.task_id,
@@ -489,12 +606,12 @@ class Agent(BaseModel):
     def _extract_function_calls(self, response: Any) -> List[Dict[str, Any]]:
         """
         Extract function calls from LLM response.
-
+        
         Args:
-            response: LLM response object
-
+            response (Any): Input parameter for this operation.
+        
         Returns:
-            List of function call dictionaries
+            List[Dict[str, Any]]: Dictionary result of the operation.
         """
         if not hasattr(response, "raw_response"):
             return []
@@ -509,7 +626,15 @@ class Agent(BaseModel):
         return []
 
     def _extract_from_dict_response(self, raw: Dict[str, Any]) -> List[Dict[str, Any]]:
-        """Extract function calls from dictionary response."""
+        """
+        Extract function calls from dictionary response.
+        
+        Args:
+            raw (Dict[str, Any]): Input parameter for this operation.
+        
+        Returns:
+            List[Dict[str, Any]]: Dictionary result of the operation.
+        """
         function_calls = []
         choices = raw.get("choices", [])
 
@@ -530,7 +655,15 @@ class Agent(BaseModel):
         return function_calls
 
     def _extract_from_litellm_response(self, raw: Any) -> List[Dict[str, Any]]:
-        """Extract function calls from LiteLLM response object."""
+        """
+        Extract function calls from LiteLLM response object.
+        
+        Args:
+            raw (Any): Input parameter for this operation.
+        
+        Returns:
+            List[Dict[str, Any]]: Dictionary result of the operation.
+        """
         function_calls = []
 
         if not raw.choices:
@@ -552,19 +685,40 @@ class Agent(BaseModel):
         return function_calls
 
     def _get_tool_name(self, tool_call: Any) -> str:
-        """Extract tool name from tool call."""
+        """
+        Extract tool name from tool call.
+        
+        Args:
+            tool_call (Any): Input parameter for this operation.
+        
+        Returns:
+            str: Returned text value.
+        """
         if hasattr(tool_call, "function") and hasattr(tool_call.function, "name"):
             return tool_call.function.name
         return ""
 
     def _get_tool_arguments(self, tool_call: Any) -> Dict[str, Any]:
-        """Extract tool arguments from tool call."""
+        """
+        Extract tool arguments from tool call.
+        
+        Args:
+            tool_call (Any): Input parameter for this operation.
+        
+        Returns:
+            Dict[str, Any]: Dictionary result of the operation.
+        """
         if hasattr(tool_call, "function") and hasattr(tool_call.function, "arguments"):
             return json.loads(tool_call.function.arguments)
         return {}
 
     def _initialize_prompt_manager(self) -> None:
-        """Initialize prompt manager if needed."""
+        """
+        Initialize prompt manager if needed.
+        
+        Returns:
+            None: Result of the operation.
+        """
         if not self.use_prompt_management or self.prompt_manager:
             return
         
@@ -576,14 +730,24 @@ class Agent(BaseModel):
                 )
 
     def _build_system_prompt_parts(self) -> List[str]:
-        """Build system prompt parts."""
+        """
+        Build system prompt parts.
+        
+        Returns:
+            List[str]: List result of the operation.
+        """
         prompt_parts = []
         if self.system_prompt:
             prompt_parts.append(f"System: {self.system_prompt}")
         return prompt_parts
 
     def _build_role_prompt_part(self) -> Optional[str]:
-        """Build role prompt part from template."""
+        """
+        Build role prompt part from template.
+        
+        Returns:
+            Optional[str]: Returned text value.
+        """
         if not self.role_template or not self.prompt_manager:
             return None
         
@@ -604,7 +768,15 @@ class Agent(BaseModel):
             return None
 
     def _retrieve_memory_context(self, base_prompt: str) -> str:
-        """Retrieve relevant context from memory."""
+        """
+        Retrieve relevant context from memory.
+        
+        Args:
+            base_prompt (str): Input parameter for this operation.
+        
+        Returns:
+            str: Returned text value.
+        """
         if not self.memory:
             return ""
         
@@ -616,7 +788,16 @@ class Agent(BaseModel):
         return "\n".join(memory_contents)
 
     def _build_context(self, base_prompt: str, task: AgentTask) -> str:
-        """Build context from history, memory, and task parameters."""
+        """
+        Build context from history, memory, and task parameters.
+        
+        Args:
+            base_prompt (str): Input parameter for this operation.
+            task (AgentTask): Input parameter for this operation.
+        
+        Returns:
+            str: Returned text value.
+        """
         if self.prompt_manager and self.prompt_manager.history:
             context = self.prompt_manager.build_context_with_history(base_prompt)
         else:
@@ -632,7 +813,15 @@ class Agent(BaseModel):
         return context
 
     def _enforce_token_budget(self, full_prompt: str) -> str:
-        """Enforce token budget by truncating if necessary."""
+        """
+        Enforce token budget by truncating if necessary.
+        
+        Args:
+            full_prompt (str): Input parameter for this operation.
+        
+        Returns:
+            str: Returned text value.
+        """
         if not self.prompt_manager:
             return full_prompt
         
@@ -646,14 +835,14 @@ class Agent(BaseModel):
     def _build_prompt_with_context(self, base_prompt: str, task: AgentTask, task_type: str) -> str:
         """
         Build prompt with context management, system prompts, and memory integration.
-
+        
         Args:
-            base_prompt: Base prompt from task
-            task: Task instance
-            task_type: Type of task
-
+            base_prompt (str): Input parameter for this operation.
+            task (AgentTask): Input parameter for this operation.
+            task_type (str): Input parameter for this operation.
+        
         Returns:
-            Final prompt with context
+            str: Returned text value.
         """
         self._initialize_prompt_manager()
 
@@ -685,13 +874,16 @@ class Agent(BaseModel):
     ) -> None:
         """
         Attach an AgentMemory instance with optional persistence.
-
+        
         Args:
-            persistence_path: Optional path for memory persistence
-            tenant_id: Optional tenant ID
-            max_episodic: Maximum episodic memory items (default: 500 for ITSM)
-            max_semantic: Maximum semantic memory items (default: 2000 for ITSM)
-            max_age_days: Optional maximum age in days for automatic cleanup
+            persistence_path (Optional[str]): Input parameter for this operation.
+            tenant_id (Optional[str]): Tenant identifier used for tenant isolation.
+            max_episodic (int): Input parameter for this operation.
+            max_semantic (int): Input parameter for this operation.
+            max_age_days (Optional[int]): Input parameter for this operation.
+        
+        Returns:
+            None: Result of the operation.
         """
         self.memory = AgentMemory(
             agent_id=self.agent_id,
@@ -706,10 +898,13 @@ class Agent(BaseModel):
     ) -> None:
         """
         Attach tools to the agent.
-
+        
         Args:
-            tools: Optional list of Tool instances to register
-            registry: Optional pre-configured ToolRegistry
+            tools (Optional[List[Tool]]): Input parameter for this operation.
+            registry (Optional[ToolRegistry]): Input parameter for this operation.
+        
+        Returns:
+            None: Result of the operation.
         """
         if registry:
             self.tool_registry = registry
@@ -724,9 +919,12 @@ class Agent(BaseModel):
     def add_tool(self, tool: Tool) -> None:
         """
         Add a single tool to the agent's tool registry.
-
+        
         Args:
-            tool: Tool instance to add
+            tool (Tool): Input parameter for this operation.
+        
+        Returns:
+            None: Result of the operation.
         """
         if not self.tool_registry:
             self.tool_registry = ToolRegistry()
@@ -743,12 +941,18 @@ class Agent(BaseModel):
     ) -> None:
         """
         Attach a PromptContextManager instance to the agent.
-
+        
         Args:
-            prompt_manager: Optional PromptContextManager instance (creates new if None)
-            max_tokens: Maximum tokens for context window
-            system_prompt: Optional system prompt for the agent
-            role_template: Optional role-based template name
+            prompt_manager (Optional[Any]): Input parameter for this operation.
+            max_tokens (int): Input parameter for this operation.
+            system_prompt (Optional[str]): System prompt used to guide behaviour.
+            role_template (Optional[str]): Input parameter for this operation.
+        
+        Returns:
+            None: Result of the operation.
+        
+        Raises:
+            create_error_with_suggestion: Raised when this function detects an invalid state or when an underlying call fails.
         """
         if prompt_manager:
             self.prompt_manager = prompt_manager
@@ -774,18 +978,24 @@ class Agent(BaseModel):
     def set_system_prompt(self, system_prompt: str) -> None:
         """
         Set the system prompt for the agent.
-
+        
         Args:
-            system_prompt: System prompt text
+            system_prompt (str): System prompt used to guide behaviour.
+        
+        Returns:
+            None: Result of the operation.
         """
         self.system_prompt = system_prompt
 
     def attach_circuit_breaker(self, config: Optional[CircuitBreakerConfig] = None) -> None:
         """
         Attach a circuit breaker to the agent for external service calls.
-
+        
         Args:
-            config: Optional circuit breaker configuration
+            config (Optional[CircuitBreakerConfig]): Configuration object or settings.
+        
+        Returns:
+            None: Result of the operation.
         """
         self.circuit_breaker_config = config or CircuitBreakerConfig()
         self.circuit_breaker = CircuitBreaker(
@@ -793,7 +1003,12 @@ class Agent(BaseModel):
         )
 
     def attach_health_check(self) -> None:
-        """Attach health check to the agent."""
+        """
+        Attach health check to the agent.
+        
+        Returns:
+            None: Result of the operation.
+        """
         self.health_check = HealthCheck(name=f"agent_{self.agent_id}")
 
         # Add default health checks
@@ -832,9 +1047,9 @@ class Agent(BaseModel):
     async def get_health(self) -> Dict[str, Any]:
         """
         Get agent health status.
-
+        
         Returns:
-            Dictionary with health information
+            Dict[str, Any]: Dictionary result of the operation.
         """
         if not self.health_check:
             self.attach_health_check()
@@ -870,12 +1085,18 @@ class Agent(BaseModel):
     ) -> None:
         """
         Add a prompt template to the agent's prompt manager.
-
+        
         Args:
-            name: Template name
-            version: Template version
-            content: Template content
-            metadata: Optional metadata
+            name (str): Name value.
+            version (str): Input parameter for this operation.
+            content (str): Content text.
+            metadata (Optional[Dict[str, Any]]): Extra metadata for the operation.
+        
+        Returns:
+            None: Result of the operation.
+        
+        Raises:
+            create_error_with_suggestion: Raised when this function detects an invalid state or when an underlying call fails.
         """
         if not self.prompt_manager:
             self.attach_prompt_manager()
@@ -898,11 +1119,14 @@ class Agent(BaseModel):
     def send_message(self, to_agent: str, content: Any, message_type: str = "task") -> None:
         """
         Send a message to another agent.
-
+        
         Args:
-            to_agent: Target agent ID
-            content: Message content
-            message_type: Type of message
+            to_agent (str): Input parameter for this operation.
+            content (Any): Content text.
+            message_type (str): Input parameter for this operation.
+        
+        Returns:
+            None: Result of the operation.
         """
         if not self.communication_enabled:
             return
@@ -915,9 +1139,9 @@ class Agent(BaseModel):
     def receive_message(self) -> Optional[AgentMessage]:
         """
         Receive a message from the message queue.
-
+        
         Returns:
-            Message or None if queue is empty
+            Optional[AgentMessage]: Builder instance (returned for call chaining).
         """
         if self.message_queue:
             return self.message_queue.pop(0)
@@ -926,9 +1150,9 @@ class Agent(BaseModel):
     def get_status(self) -> Dict[str, Any]:
         """
         Get agent status information.
-
+        
         Returns:
-            Status dictionary
+            Dict[str, Any]: Dictionary result of the operation.
         """
         return {
             "agent_id": self.agent_id,
@@ -943,12 +1167,15 @@ class Agent(BaseModel):
     def save_state(self, file_path: Optional[str] = None) -> None:
         """
         Save complete agent state to disk for persistence.
-
+        
         Saves agent configuration, capabilities, task queue, tools, memory,
-        prompt manager state, and metadata.
-
+                                                prompt manager state, and metadata.
+        
         Args:
-            file_path: Optional path to save state. If None, uses agent_id.json
+            file_path (Optional[str]): Path of the input file.
+        
+        Returns:
+            None: Result of the operation.
         """
         from pathlib import Path
 
@@ -973,7 +1200,12 @@ class Agent(BaseModel):
         self._save_prompt_history(state_path)
 
     def _serialize_tools(self) -> Optional[List[Dict[str, Any]]]:
-        """Serialize tool registry."""
+        """
+        Serialize tool registry.
+        
+        Returns:
+            Optional[List[Dict[str, Any]]]: Dictionary result of the operation.
+        """
         if not self.tool_registry:
             return None
 
@@ -995,7 +1227,12 @@ class Agent(BaseModel):
         return tools_state
 
     def _serialize_prompt_manager(self) -> Optional[Dict[str, Any]]:
-        """Serialize prompt manager state."""
+        """
+        Serialize prompt manager state.
+        
+        Returns:
+            Optional[Dict[str, Any]]: Dictionary result of the operation.
+        """
         if not self.prompt_manager:
             return None
 
@@ -1013,7 +1250,12 @@ class Agent(BaseModel):
         return prompt_manager_state
 
     def _serialize_templates(self) -> List[Dict[str, Any]]:
-        """Serialize prompt templates."""
+        """
+        Serialize prompt templates.
+        
+        Returns:
+            List[Dict[str, Any]]: Dictionary result of the operation.
+        """
         templates = []
         for template_name, template in self.prompt_manager.templates.items():
             template_dict = {
@@ -1028,7 +1270,16 @@ class Agent(BaseModel):
     def _build_state_dict(
         self, tools_state: Optional[List[Dict[str, Any]]], prompt_manager_state: Optional[Dict[str, Any]]
     ) -> Dict[str, Any]:
-        """Build the complete state dictionary."""
+        """
+        Build the complete state dictionary.
+        
+        Args:
+            tools_state (Optional[List[Dict[str, Any]]]): Input parameter for this operation.
+            prompt_manager_state (Optional[Dict[str, Any]]): Input parameter for this operation.
+        
+        Returns:
+            Dict[str, Any]: Dictionary result of the operation.
+        """
         return {
             "agent_id": self.agent_id,
             "name": self.name,
@@ -1060,14 +1311,33 @@ class Agent(BaseModel):
         }
 
     def _save_prompt_history(self, state_path: Any) -> None:
-        """Save prompt manager history if available."""
+        """
+        Save prompt manager history if available.
+        
+        Args:
+            state_path (Any): Input parameter for this operation.
+        
+        Returns:
+            None: Result of the operation.
+        """
         if self.prompt_manager and hasattr(self.prompt_manager, "save_history"):
             prompt_history_path = state_path.parent / f"{self.agent_id}_prompt_history.json"
             self.prompt_manager.save_history(str(prompt_history_path))
 
     @classmethod
     def _load_state_file(cls, file_path: str) -> Dict[str, Any]:
-        """Load state from file."""
+        """
+        Load state from file.
+        
+        Args:
+            file_path (str): Path of the input file.
+        
+        Returns:
+            Dict[str, Any]: Dictionary result of the operation.
+        
+        Raises:
+            AgentStateError: Raised when this function detects an invalid state or when an underlying call fails.
+        """
         from pathlib import Path
 
         state_path = Path(file_path)
@@ -1085,7 +1355,16 @@ class Agent(BaseModel):
     def _create_agent_from_state(
         cls, state: Dict[str, Any], gateway: Optional[Any]
     ) -> "Agent":
-        """Create agent instance from state."""
+        """
+        Create agent instance from state.
+        
+        Args:
+            state (Dict[str, Any]): Input parameter for this operation.
+            gateway (Optional[Any]): Gateway client used for LLM calls.
+        
+        Returns:
+            'Agent': Builder instance (returned for call chaining).
+        """
         return cls(
             agent_id=state["agent_id"],
             name=state["name"],
@@ -1097,7 +1376,16 @@ class Agent(BaseModel):
 
     @classmethod
     def _restore_basic_state(cls, agent: "Agent", state: Dict[str, Any]) -> None:
-        """Restore basic agent state."""
+        """
+        Restore basic agent state.
+        
+        Args:
+            agent ('Agent'): Input parameter for this operation.
+            state (Dict[str, Any]): Input parameter for this operation.
+        
+        Returns:
+            None: Result of the operation.
+        """
         agent.capabilities = [AgentCapability(**cap) for cap in state.get("capabilities", [])]
         agent.status = AgentStatus(state.get("status", "idle"))
         agent.task_queue = [AgentTask(**task) for task in state.get("task_queue", [])]
@@ -1106,7 +1394,16 @@ class Agent(BaseModel):
 
     @classmethod
     def _restore_configuration(cls, agent: "Agent", state: Dict[str, Any]) -> None:
-        """Restore agent configuration."""
+        """
+        Restore agent configuration.
+        
+        Args:
+            agent ('Agent'): Input parameter for this operation.
+            state (Dict[str, Any]): Input parameter for this operation.
+        
+        Returns:
+            None: Result of the operation.
+        """
         agent.max_retries = state.get("max_retries", 1)
         agent.retry_delay = state.get("retry_delay", 0.1)
         agent.metadata = state.get("metadata", {})
@@ -1123,7 +1420,17 @@ class Agent(BaseModel):
     def _restore_prompt_manager(
         cls, agent: "Agent", state: Dict[str, Any], state_path: Any
     ) -> None:
-        """Restore prompt manager and templates."""
+        """
+        Restore prompt manager and templates.
+        
+        Args:
+            agent ('Agent'): Input parameter for this operation.
+            state (Dict[str, Any]): Input parameter for this operation.
+            state_path (Any): Input parameter for this operation.
+        
+        Returns:
+            None: Result of the operation.
+        """
         if not agent.use_prompt_management or not PromptContextManager:
             return
 
@@ -1153,7 +1460,17 @@ class Agent(BaseModel):
     def _restore_tools(
         cls, agent: "Agent", state: Dict[str, Any], restore_tools: Optional[Dict[str, Callable]]
     ) -> None:
-        """Restore tools if available."""
+        """
+        Restore tools if available.
+        
+        Args:
+            agent ('Agent'): Input parameter for this operation.
+            state (Dict[str, Any]): Input parameter for this operation.
+            restore_tools (Optional[Dict[str, Callable]]): Input parameter for this operation.
+        
+        Returns:
+            None: Result of the operation.
+        """
         tools_state = state.get("tools")
         if not tools_state or not restore_tools:
             return
@@ -1183,7 +1500,16 @@ class Agent(BaseModel):
 
     @classmethod
     def _restore_memory(cls, agent: "Agent", state: Dict[str, Any]) -> None:
-        """Restore memory if persistence path is set."""
+        """
+        Restore memory if persistence path is set.
+        
+        Args:
+            agent ('Agent'): Input parameter for this operation.
+            state (Dict[str, Any]): Input parameter for this operation.
+        
+        Returns:
+            None: Result of the operation.
+        """
         memory_path = state.get("memory_persistence_path")
         if memory_path:
             agent.memory_persistence_path = memory_path
@@ -1191,7 +1517,16 @@ class Agent(BaseModel):
 
     @classmethod
     def _restore_timestamps(cls, agent: "Agent", state: Dict[str, Any]) -> None:
-        """Restore timestamps."""
+        """
+        Restore timestamps.
+        
+        Args:
+            agent ('Agent'): Input parameter for this operation.
+            state (Dict[str, Any]): Input parameter for this operation.
+        
+        Returns:
+            None: Result of the operation.
+        """
         from datetime import datetime
 
         if state.get("created_at"):
@@ -1208,15 +1543,14 @@ class Agent(BaseModel):
     ) -> "Agent":
         """
         Load complete agent state from disk.
-
+        
         Args:
-            file_path: Path to saved state file
-            gateway: LiteLLM Gateway instance (required for agent functionality)
-            restore_tools: Optional dictionary mapping tool names to their functions.
-                          Required to restore tools with their implementations.
-
+            file_path (str): Path of the input file.
+            gateway (Optional[Any]): Gateway client used for LLM calls.
+            restore_tools (Optional[Dict[str, Callable]]): Input parameter for this operation.
+        
         Returns:
-            Restored Agent instance with complete state
+            'Agent': Builder instance (returned for call chaining).
         """
         from pathlib import Path
 
@@ -1250,51 +1584,57 @@ class AgentManager:
     def register_agent(self, agent: Agent) -> None:
         """
         Register an agent.
-
+        
         Args:
-            agent: Agent instance
+            agent (Agent): Input parameter for this operation.
+        
+        Returns:
+            None: Result of the operation.
         """
         self._agents[agent.agent_id] = agent
 
     def unregister_agent(self, agent_id: str) -> None:
         """
         Unregister an agent.
-
+        
         Args:
-            agent_id: Agent identifier
+            agent_id (str): Input parameter for this operation.
+        
+        Returns:
+            None: Result of the operation.
         """
         self._agents.pop(agent_id, None)
 
     def get_agent(self, agent_id: str) -> Optional[Agent]:
         """
         Get an agent by ID.
-
+        
         Args:
-            agent_id: Agent identifier
-
+            agent_id (str): Input parameter for this operation.
+        
         Returns:
-            Agent instance or None
+            Optional[Agent]: Result if available, else None.
         """
         return self._agents.get(agent_id)
 
     def list_agents(self) -> List[str]:
         """
         List all registered agent IDs.
-
+        
         Returns:
-            List of agent IDs
+            List[str]: List result of the operation.
         """
         return list(self._agents.keys())
 
     def find_agents_by_capability(self, capability_name: str) -> List[Agent]:
         """
         Find agents with a specific capability.
-
+        
         Args:
-            capability_name: Capability name to search for
-
+            capability_name (str): Input parameter for this operation.
+        
         Returns:
-            List of agents with the capability
+            List[Agent]: List result of the operation.
         """
         return [
             agent
@@ -1307,11 +1647,14 @@ class AgentManager:
     ) -> None:
         """
         Broadcast a message to all agents.
-
+        
         Args:
-            from_agent: Sender agent ID
-            content: Message content
-            message_type: Type of message
+            from_agent (str): Input parameter for this operation.
+            content (Any): Content text.
+            message_type (str): Input parameter for this operation.
+        
+        Returns:
+            None: Result of the operation.
         """
         for agent in self._agents.values():
             if agent.agent_id != from_agent:
@@ -1322,12 +1665,15 @@ class AgentManager:
     ) -> None:
         """
         Send a message from one agent to another.
-
+        
         Args:
-            from_agent: Sender agent ID
-            to_agent: Target agent ID
-            content: Message content
-            message_type: Type of message
+            from_agent (str): Input parameter for this operation.
+            to_agent (str): Input parameter for this operation.
+            content (Any): Content text.
+            message_type (str): Input parameter for this operation.
+        
+        Returns:
+            None: Result of the operation.
         """
         target = self.get_agent(to_agent)
         if target:
@@ -1336,21 +1682,29 @@ class AgentManager:
     def get_agent_statuses(self) -> Dict[str, Dict[str, Any]]:
         """
         Get status of all agents.
-
+        
         Returns:
-            Dictionary mapping agent IDs to their status
+            Dict[str, Dict[str, Any]]: Dictionary result of the operation.
         """
         return {agent_id: agent.get_status() for agent_id, agent in self._agents.items()}
 
     def attach_orchestrator(self, orchestrator: Any) -> None:
         """
         Attach an orchestrator to this manager.
-
+        
         Args:
-            orchestrator: AgentOrchestrator instance
+            orchestrator (Any): Input parameter for this operation.
+        
+        Returns:
+            None: Result of the operation.
         """
         self._orchestrator = orchestrator
 
     def get_orchestrator(self) -> Optional[Any]:
-        """Get the attached orchestrator."""
+        """
+        Get the attached orchestrator.
+        
+        Returns:
+            Optional[Any]: Result if available, else None.
+        """
         return self._orchestrator

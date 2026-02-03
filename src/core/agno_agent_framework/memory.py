@@ -4,6 +4,7 @@ Agent Memory Management
 Manages agent memory, including short-term and long-term memory storage.
 """
 
+
 import json
 from datetime import datetime
 from enum import Enum
@@ -59,15 +60,15 @@ class AgentMemory:
     ):
         """
         Initialize agent memory.
-
+        
         Args:
-            agent_id: Agent identifier
-            max_short_term: Maximum short-term memory items
-            max_long_term: Maximum long-term memory items
-            max_episodic: Maximum episodic memory items (default: 500 for ITSM)
-            max_semantic: Maximum semantic memory items (default: 2000 for ITSM)
-            max_age_days: Optional maximum age in days for automatic cleanup
-            persistence_path: Optional path for memory persistence
+            agent_id (str): Input parameter for this operation.
+            max_short_term (int): Input parameter for this operation.
+            max_long_term (int): Input parameter for this operation.
+            max_episodic (int): Input parameter for this operation.
+            max_semantic (int): Input parameter for this operation.
+            max_age_days (Optional[int]): Input parameter for this operation.
+            persistence_path (Optional[str]): Input parameter for this operation.
         """
         self.agent_id = agent_id
         self.max_short_term = max_short_term
@@ -97,7 +98,15 @@ class AgentMemory:
                 )
 
     def _trim_short_term(self, memory: MemoryItem) -> None:
-        """Trim short-term memory if exceeds max limit."""
+        """
+        Trim short-term memory if exceeds max limit.
+        
+        Args:
+            memory (MemoryItem): Input parameter for this operation.
+        
+        Returns:
+            None: Result of the operation.
+        """
         self._short_term.append(memory)
         if len(self._short_term) > self.max_short_term:
             # Remove least important items (LRU-like eviction based on importance)
@@ -105,7 +114,15 @@ class AgentMemory:
             self._short_term = self._short_term[-self.max_short_term :]
 
     def _trim_long_term(self, memory: MemoryItem) -> None:
-        """Trim long-term memory if exceeds max limit."""
+        """
+        Trim long-term memory if exceeds max limit.
+        
+        Args:
+            memory (MemoryItem): Input parameter for this operation.
+        
+        Returns:
+            None: Result of the operation.
+        """
         self._long_term[memory.memory_id] = memory
         if len(self._long_term) > self.max_long_term:
             # Remove least important items
@@ -115,14 +132,30 @@ class AgentMemory:
                 self._long_term.pop(item.memory_id, None)
 
     def _trim_episodic(self, memory: MemoryItem) -> None:
-        """Trim episodic memory if exceeds max limit."""
+        """
+        Trim episodic memory if exceeds max limit.
+        
+        Args:
+            memory (MemoryItem): Input parameter for this operation.
+        
+        Returns:
+            None: Result of the operation.
+        """
         self._episodic.append(memory)
         if len(self._episodic) > self.max_episodic:
             # FIFO - remove oldest
             self._episodic = self._episodic[-self.max_episodic :]
 
     def _trim_semantic(self, memory: MemoryItem) -> None:
-        """Trim semantic memory if exceeds max limit."""
+        """
+        Trim semantic memory if exceeds max limit.
+        
+        Args:
+            memory (MemoryItem): Input parameter for this operation.
+        
+        Returns:
+            None: Result of the operation.
+        """
         self._semantic[memory.memory_id] = memory
         if len(self._semantic) > self.max_semantic:
             sorted_items = sorted(self._semantic.values(), key=lambda m: m.importance)
@@ -140,16 +173,19 @@ class AgentMemory:
     ) -> MemoryItem:
         """
         Store a memory item.
-
+        
         Args:
-            content: Memory content
-            memory_type: Type of memory
-            importance: Importance score (0.0-1.0)
-            metadata: Optional metadata
-            tags: Optional tags
-
+            content (str): Content text.
+            memory_type (MemoryType): Input parameter for this operation.
+            importance (float): Input parameter for this operation.
+            metadata (Optional[Dict[str, Any]]): Extra metadata for the operation.
+            tags (Optional[List[str]]): Input parameter for this operation.
+        
         Returns:
-            Created memory item
+            MemoryItem: Result of the operation.
+        
+        Raises:
+            MemoryWriteError: Raised when this function detects an invalid state or when an underlying call fails.
         """
         import uuid
 
@@ -202,15 +238,15 @@ class AgentMemory:
     ) -> List[MemoryItem]:
         """
         Retrieve memory items.
-
+        
         Args:
-            query: Optional search query
-            memory_type: Optional memory type filter
-            tags: Optional tag filter
-            limit: Maximum number of results
-
+            query (Optional[str]): Input parameter for this operation.
+            memory_type (Optional[MemoryType]): Input parameter for this operation.
+            tags (Optional[List[str]]): Input parameter for this operation.
+            limit (int): Input parameter for this operation.
+        
         Returns:
-            List of memory items
+            List[MemoryItem]: List result of the operation.
         """
         # Determine which memories to search
         memories_to_search = []
@@ -252,12 +288,12 @@ class AgentMemory:
     def forget(self, memory_id: str) -> bool:
         """
         Forget a memory item.
-
+        
         Args:
-            memory_id: Memory identifier
-
+            memory_id (str): Input parameter for this operation.
+        
         Returns:
-            True if memory was found and removed
+            bool: True if the operation succeeds, else False.
         """
         # Try short-term
         for i, memory in enumerate(self._short_term):
@@ -288,11 +324,11 @@ class AgentMemory:
     def consolidate(self) -> int:
         """
         Consolidate short-term memories to long-term.
-
+        
         Moves important short-term memories to long-term storage.
-
+        
         Returns:
-            Number of memories consolidated
+            int: Result of the operation.
         """
         # Find important short-term memories
         important = [m for m in self._short_term if m.importance >= 0.7]
@@ -321,12 +357,12 @@ class AgentMemory:
     def cleanup_expired(self, max_age_days: Optional[int] = None) -> int:
         """
         Remove memories older than specified days.
-
+        
         Args:
-            max_age_days: Maximum age in days (uses instance default if None)
-
+            max_age_days (Optional[int]): Input parameter for this operation.
+        
         Returns:
-            Number of memories removed
+            int: Result of the operation.
         """
         from datetime import timedelta
 
@@ -367,9 +403,9 @@ class AgentMemory:
     def check_memory_pressure(self) -> Dict[str, Any]:
         """
         Check if memory usage is high.
-
+        
         Returns:
-            Dictionary with memory pressure information
+            Dict[str, Any]: Dictionary result of the operation.
         """
         total = (
             len(self._short_term) + len(self._long_term) + len(self._episodic) + len(self._semantic)
@@ -421,15 +457,15 @@ class AgentMemory:
     def handle_memory_pressure(self) -> int:
         """
         Automatically clean up when under memory pressure.
-
+        
         MEMORY PRESSURE HANDLING:
-        - Triggered when memory usage > 80% of limits
-        - First: Remove expired memories (older than max_age_days)
-        - Then: Remove least important memories (bottom 10%)
-        - This prevents memory from growing unbounded and keeps token usage controlled
-
+                                - Triggered when memory usage > 80% of limits
+                                - First: Remove expired memories (older than max_age_days)
+                                - Then: Remove least important memories (bottom 10%)
+                                - This prevents memory from growing unbounded and keeps token usage controlled
+        
         Returns:
-            Number of memories removed
+            int: Result of the operation.
         """
         pressure = self.check_memory_pressure()
 
@@ -464,9 +500,9 @@ class AgentMemory:
     def get_stats(self) -> Dict[str, Any]:
         """
         Get memory statistics.
-
+        
         Returns:
-            Dictionary with memory statistics
+            Dict[str, Any]: Dictionary result of the operation.
         """
         return {
             "agent_id": self.agent_id,
@@ -490,7 +526,15 @@ class AgentMemory:
         }
 
     def _persist(self) -> None:
-        """Persist memory to disk if configured."""
+        """
+        Persist memory to disk if configured.
+        
+        Returns:
+            None: Result of the operation.
+        
+        Raises:
+            MemoryPersistenceError: Raised when this function detects an invalid state or when an underlying call fails.
+        """
         if not self._persistence_path:
             return
         try:
@@ -513,6 +557,15 @@ class AgentMemory:
             )
 
     def _load(self) -> None:
+        """
+        _load.
+        
+        Returns:
+            None: Result of the operation.
+        
+        Raises:
+            MemoryPersistenceError: Raised when this function detects an invalid state or when an underlying call fails.
+        """
         if not self._persistence_path or not self._persistence_path.exists():
             return
         try:

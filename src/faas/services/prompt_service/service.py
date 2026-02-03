@@ -4,6 +4,7 @@ Prompt Service - Main service implementation.
 Handles prompt template management and context building.
 """
 
+
 import logging
 from typing import Any, Dict, List, Optional
 
@@ -47,13 +48,13 @@ class PromptService:
     ):
         """
         Initialize Prompt Service.
-
+        
         Args:
-            config: Service configuration
-            db_connection: Database connection
-            nats_client: NATS client (optional)
-            otel_tracer: OTEL tracer (optional)
-            codec_manager: Codec manager (optional)
+            config (ServiceConfig): Configuration object or settings.
+            db_connection (Any): Input parameter for this operation.
+            nats_client (Optional[Any]): Input parameter for this operation.
+            otel_tracer (Optional[Any]): Input parameter for this operation.
+            codec_manager (Optional[Any]): Input parameter for this operation.
         """
         self.config = config
         self.db = db_connection
@@ -81,12 +82,12 @@ class PromptService:
     def _get_prompt_manager(self, tenant_id: str) -> PromptContextManager:  # noqa: S1172
         """
         Create prompt manager for tenant (stateless - created on-demand).
-
+        
         Args:
-            tenant_id: Tenant ID (reserved for future multi-tenant support)
-
+            tenant_id (str): Tenant identifier used for tenant isolation.
+        
         Returns:
-            PromptContextManager instance
+            PromptContextManager: Result of the operation.
         """
         # Create prompt manager on-demand (stateless)
         # tenant_id is reserved for future multi-tenant support
@@ -121,7 +122,19 @@ class PromptService:
     async def _handle_create_template(
         self, request: CreateTemplateRequest, headers: dict = Header(...)
     ):
-        """Create a prompt template."""
+        """
+        Create a prompt template.
+        
+        Args:
+            request (CreateTemplateRequest): Request payload object.
+            headers (dict): HTTP headers passed from the caller.
+        
+        Returns:
+            Any: Result of the operation.
+        
+        Raises:
+            HTTPException: Raised when this function detects an invalid state or when an underlying call fails.
+        """
         standard_headers = extract_headers(**headers)
 
         span = None
@@ -173,7 +186,16 @@ class PromptService:
                 span.end()
 
     async def _publish_template_event(self, template_id: str, tenant_id: str) -> None:
-        """Publish template creation event via NATS."""
+        """
+        Publish template creation event via NATS.
+        
+        Args:
+            template_id (str): Input parameter for this operation.
+            tenant_id (str): Tenant identifier used for tenant isolation.
+        
+        Returns:
+            None: Result of the operation.
+        """
         event = {
             "event_type": "prompt.template.created",
             "template_id": template_id,
@@ -187,7 +209,17 @@ class PromptService:
     async def _handle_get_template(  # noqa: S7503
         self, template_id: str, headers: dict = Header(...), version: Optional[str] = None  # noqa: ARG002
     ):
-        """Get template by ID. Async required for FastAPI route handler."""
+        """
+        Get template by ID. Async required for FastAPI route handler.
+        
+        Args:
+            template_id (str): Input parameter for this operation.
+            headers (dict): HTTP headers passed from the caller.
+            version (Optional[str]): Input parameter for this operation.
+        
+        Raises:
+            HTTPException: Raised when this function detects an invalid state or when an underlying call fails.
+        """
         extract_headers(**headers)  # Extract headers for validation
 
         # Template retrieval from database - to be implemented
@@ -199,7 +231,19 @@ class PromptService:
     async def _handle_render_prompt(  # noqa: S7503
         self, request: RenderPromptRequest, headers: dict = Header(...)
     ):
-        """Render a prompt template. Async required for FastAPI route handler."""
+        """
+        Render a prompt template. Async required for FastAPI route handler.
+        
+        Args:
+            request (RenderPromptRequest): Request payload object.
+            headers (dict): HTTP headers passed from the caller.
+        
+        Returns:
+            Any: Result of the operation.
+        
+        Raises:
+            HTTPException: Raised when this function detects an invalid state or when an underlying call fails.
+        """
         standard_headers = extract_headers(**headers)
 
         try:
@@ -233,7 +277,19 @@ class PromptService:
     async def _handle_build_context(  # noqa: S7503
         self, request: BuildContextRequest, headers: dict = Header(...)
     ):
-        """Build context from messages. Async required for FastAPI route handler."""
+        """
+        Build context from messages. Async required for FastAPI route handler.
+        
+        Args:
+            request (BuildContextRequest): Request payload object.
+            headers (dict): HTTP headers passed from the caller.
+        
+        Returns:
+            Any: Result of the operation.
+        
+        Raises:
+            HTTPException: Raised when this function detects an invalid state or when an underlying call fails.
+        """
         standard_headers = extract_headers(**headers)
 
         try:
@@ -269,7 +325,16 @@ class PromptService:
     def _prepare_messages(
         self, messages: Any, system_prompt: Optional[str]
     ) -> List[str]:
-        """Prepare messages list for context building."""
+        """
+        Prepare messages list for context building.
+        
+        Args:
+            messages (Any): Chat messages in role/content format.
+            system_prompt (Optional[str]): System prompt used to guide behaviour.
+        
+        Returns:
+            List[str]: List result of the operation.
+        """
         # Convert messages to list of strings if needed
         message_list = (
             messages if isinstance(messages, list) else [str(messages)]
@@ -282,7 +347,17 @@ class PromptService:
     async def _handle_list_templates(  # noqa: S7503
         self, headers: dict = Header(...), limit: int = 100, offset: int = 0  # noqa: ARG002
     ):
-        """List templates. Async required for FastAPI route handler."""
+        """
+        List templates. Async required for FastAPI route handler.
+        
+        Args:
+            headers (dict): HTTP headers passed from the caller.
+            limit (int): Input parameter for this operation.
+            offset (int): Input parameter for this operation.
+        
+        Returns:
+            Any: Result of the operation.
+        """
         standard_headers = extract_headers(**headers)
 
         # Template listing from database - to be implemented
@@ -295,7 +370,12 @@ class PromptService:
         )
 
     async def _handle_health_check(self):  # noqa: S7503
-        """Health check endpoint. Async required for FastAPI route handler."""
+        """
+        Health check endpoint. Async required for FastAPI route handler.
+        
+        Returns:
+            Any: Result of the operation.
+        """
         return {"status": "healthy", "service": "prompt-service"}
 
 

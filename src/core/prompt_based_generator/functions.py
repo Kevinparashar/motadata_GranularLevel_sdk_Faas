@@ -4,6 +4,7 @@ Prompt-Based Generator - High-Level Functions
 Factory functions and convenience functions for prompt-based agent and tool creation.
 """
 
+
 from typing import Optional
 
 from ..agno_agent_framework.agent import Agent
@@ -287,23 +288,26 @@ def grant_permission(
 ) -> None:
     """
     Grant permission to a user for a resource.
-
-    Args:
-        tenant_id: Tenant ID
-        user_id: User ID
-        resource_type: Type of resource ("agent" or "tool")
-        resource_id: Resource ID
-        permission: Permission to grant ("read", "execute", "create", "delete", "admin")
-        access_control: Optional AccessControl instance
-
+    
     Example:
-        >>> grant_permission(
-        ...     tenant_id="tenant_123",
-        ...     user_id="user_456",
-        ...     resource_type="agent",
-        ...     resource_id="agent_789",
-        ...     permission="execute"
-        ... )
+                            >>> grant_permission(
+                            ...     tenant_id="tenant_123",
+                            ...     user_id="user_456",
+                            ...     resource_type="agent",
+                            ...     resource_id="agent_789",
+                            ...     permission="execute"
+                            ... )
+    
+    Args:
+        tenant_id (str): Tenant identifier used for tenant isolation.
+        user_id (str): User identifier (used for auditing or personalization).
+        resource_type (str): Input parameter for this operation.
+        resource_id (str): Input parameter for this operation.
+        permission (str): Input parameter for this operation.
+        access_control (Optional[AccessControl]): Input parameter for this operation.
+    
+    Returns:
+        None: Result of the operation.
     """
     ac = access_control or _default_access_control
 

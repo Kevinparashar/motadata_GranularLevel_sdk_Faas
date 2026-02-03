@@ -4,6 +4,7 @@ RAG Service - Main service implementation.
 Handles document ingestion, query processing, document management, and vector search.
 """
 
+
 import logging
 from typing import Any, Dict, Optional
 
@@ -50,13 +51,13 @@ class RAGService:
     ):
         """
         Initialize RAG Service.
-
+        
         Args:
-            config: Service configuration
-            db_connection: Database connection
-            nats_client: NATS client (optional)
-            otel_tracer: OTEL tracer (optional)
-            codec_manager: Codec manager (optional)
+            config (ServiceConfig): Configuration object or settings.
+            db_connection (Any): Input parameter for this operation.
+            nats_client (Optional[Any]): Input parameter for this operation.
+            otel_tracer (Optional[Any]): Input parameter for this operation.
+            codec_manager (Optional[Any]): Input parameter for this operation.
         """
         self.config = config
         self.db = db_connection
@@ -83,12 +84,12 @@ class RAGService:
     def _get_rag_system(self, tenant_id: str) -> RAGSystem:  # noqa: S1172
         """
         Create RAG system for tenant (stateless - created on-demand).
-
+        
         Args:
-            tenant_id: Tenant ID (reserved for future multi-tenant support)
-
+            tenant_id (str): Tenant identifier used for tenant isolation.
+        
         Returns:
-            RAGSystem instance
+            RAGSystem: Result of the operation.
         """
         # Create RAG system on-demand (stateless)
         # Get gateway client
@@ -107,12 +108,12 @@ class RAGService:
     def _get_gateway_client(self, tenant_id: str):  # noqa: S1172
         """
         Get gateway client for LLM calls.
-
+        
         Args:
-            tenant_id: Tenant ID (reserved for future multi-tenant support)
-
+            tenant_id (str): Tenant identifier used for tenant isolation.
+        
         Returns:
-            Gateway client instance
+            Any: Result of the operation.
         """
         # Create direct gateway
         # In production, could call Gateway Service if config.gateway_service_url is set
@@ -152,7 +153,19 @@ class RAGService:
     async def _handle_ingest_document(
         self, request: IngestDocumentRequest, headers: dict = Header(...)
     ):
-        """Ingest a document into the RAG system."""
+        """
+        Ingest a document into the RAG system.
+        
+        Args:
+            request (IngestDocumentRequest): Request payload object.
+            headers (dict): HTTP headers passed from the caller.
+        
+        Returns:
+            Any: Result of the operation.
+        
+        Raises:
+            HTTPException: Raised when this function detects an invalid state or when an underlying call fails.
+        """
         standard_headers = extract_headers(**headers)
 
         span = None
@@ -197,7 +210,16 @@ class RAGService:
                 span.end()
 
     async def _publish_ingest_event(self, document_id: str, tenant_id: str) -> None:
-        """Publish document ingestion event via NATS."""
+        """
+        Publish document ingestion event via NATS.
+        
+        Args:
+            document_id (str): Input parameter for this operation.
+            tenant_id (str): Tenant identifier used for tenant isolation.
+        
+        Returns:
+            None: Result of the operation.
+        """
         event = {
             "event_type": "rag.document.ingested",
             "document_id": document_id,
@@ -209,7 +231,19 @@ class RAGService:
         )
 
     async def _handle_query(self, request: QueryRequest, headers: dict = Header(...)):
-        """Process a RAG query."""
+        """
+        Process a RAG query.
+        
+        Args:
+            request (QueryRequest): Request payload object.
+            headers (dict): HTTP headers passed from the caller.
+        
+        Returns:
+            Any: Result of the operation.
+        
+        Raises:
+            HTTPException: Raised when this function detects an invalid state or when an underlying call fails.
+        """
         standard_headers = extract_headers(**headers)
 
         span = None
@@ -255,7 +289,19 @@ class RAGService:
                 span.end()
 
     async def _handle_search(self, request: SearchRequest, headers: dict = Header(...)):  # noqa: S7503
-        """Perform vector search. Async required for FastAPI route handler."""
+        """
+        Perform vector search. Async required for FastAPI route handler.
+        
+        Args:
+            request (SearchRequest): Request payload object.
+            headers (dict): HTTP headers passed from the caller.
+        
+        Returns:
+            Any: Result of the operation.
+        
+        Raises:
+            HTTPException: Raised when this function detects an invalid state or when an underlying call fails.
+        """
         standard_headers = extract_headers(**headers)
 
         try:
@@ -300,7 +346,16 @@ class RAGService:
     async def _handle_get_document(  # noqa: S7503
         self, document_id: str, headers: dict = Header(...)
     ):
-        """Get document by ID. Async required for FastAPI route handler."""
+        """
+        Get document by ID. Async required for FastAPI route handler.
+        
+        Args:
+            document_id (str): Input parameter for this operation.
+            headers (dict): HTTP headers passed from the caller.
+        
+        Raises:
+            HTTPException: Raised when this function detects an invalid state or when an underlying call fails.
+        """
         extract_headers(**headers)  # Extract headers for validation
 
         # Document retrieval from database - to be implemented
@@ -312,7 +367,20 @@ class RAGService:
     async def _handle_update_document(  # noqa: S7503
         self, document_id: str, request: UpdateDocumentRequest, headers: dict = Header(...)
     ):
-        """Update a document. Async required for FastAPI route handler."""
+        """
+        Update a document. Async required for FastAPI route handler.
+        
+        Args:
+            document_id (str): Input parameter for this operation.
+            request (UpdateDocumentRequest): Request payload object.
+            headers (dict): HTTP headers passed from the caller.
+        
+        Returns:
+            Any: Result of the operation.
+        
+        Raises:
+            HTTPException: Raised when this function detects an invalid state or when an underlying call fails.
+        """
         standard_headers = extract_headers(**headers)
 
         try:
@@ -345,7 +413,19 @@ class RAGService:
     async def _handle_delete_document(  # noqa: S7503
         self, document_id: str, headers: dict = Header(...)
     ):
-        """Delete a document. Async required for FastAPI route handler."""
+        """
+        Delete a document. Async required for FastAPI route handler.
+        
+        Args:
+            document_id (str): Input parameter for this operation.
+            headers (dict): HTTP headers passed from the caller.
+        
+        Returns:
+            Any: Result of the operation.
+        
+        Raises:
+            HTTPException: Raised when this function detects an invalid state or when an underlying call fails.
+        """
         standard_headers = extract_headers(**headers)
 
         try:
@@ -367,7 +447,17 @@ class RAGService:
     async def _handle_list_documents(  # noqa: S7503
         self, headers: dict = Header(...), limit: int = 100, offset: int = 0
     ):
-        """List documents. Async required for FastAPI route handler."""
+        """
+        List documents. Async required for FastAPI route handler.
+        
+        Args:
+            headers (dict): HTTP headers passed from the caller.
+            limit (int): Input parameter for this operation.
+            offset (int): Input parameter for this operation.
+        
+        Returns:
+            Any: Result of the operation.
+        """
         standard_headers = extract_headers(**headers)
 
         # Document listing from database - to be implemented
@@ -380,7 +470,12 @@ class RAGService:
         )
 
     async def _handle_health_check(self):  # noqa: S7503
-        """Health check endpoint. Async required for FastAPI route handler."""
+        """
+        Health check endpoint. Async required for FastAPI route handler.
+        
+        Returns:
+            Any: Result of the operation.
+        """
         return {"status": "healthy", "service": "rag-service"}
 
 

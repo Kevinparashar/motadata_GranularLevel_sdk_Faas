@@ -4,6 +4,7 @@ ML Framework Exception Hierarchy
 Exceptions specific to the ML Framework component.
 """
 
+
 from typing import Any, Optional
 
 from ...exceptions import SDKError
@@ -33,6 +34,16 @@ class TrainingError(MLFrameworkError):
         hyperparameters: Optional[dict] = None,
         original_error: Optional[Exception] = None,
     ):
+        """
+        __init__.
+        
+        Args:
+            message (str): Input parameter for this operation.
+            model_id (Optional[str]): Input parameter for this operation.
+            stage (Optional[str]): Input parameter for this operation.
+            hyperparameters (Optional[dict]): Input parameter for this operation.
+            original_error (Optional[Exception]): Input parameter for this operation.
+        """
         super().__init__(message, original_error)
         self.model_id = model_id
         self.stage = stage
@@ -57,6 +68,16 @@ class PredictionError(MLFrameworkError):
         operation: Optional[str] = None,
         original_error: Optional[Exception] = None,
     ):
+        """
+        __init__.
+        
+        Args:
+            message (str): Input parameter for this operation.
+            model_id (Optional[str]): Input parameter for this operation.
+            input_data (Optional[Any]): Input parameter for this operation.
+            operation (Optional[str]): Input parameter for this operation.
+            original_error (Optional[Exception]): Input parameter for this operation.
+        """
         super().__init__(message, original_error)
         self.model_id = model_id
         self.input_data = input_data
@@ -81,6 +102,16 @@ class ModelLoadError(MLFrameworkError):
         version: Optional[str] = None,
         original_error: Optional[Exception] = None,
     ):
+        """
+        __init__.
+        
+        Args:
+            message (str): Input parameter for this operation.
+            model_id (Optional[str]): Input parameter for this operation.
+            model_path (Optional[str]): Input parameter for this operation.
+            version (Optional[str]): Input parameter for this operation.
+            original_error (Optional[Exception]): Input parameter for this operation.
+        """
         super().__init__(message, original_error)
         self.model_id = model_id
         self.model_path = model_path
@@ -103,6 +134,15 @@ class ModelSaveError(MLFrameworkError):
         save_path: Optional[str] = None,
         original_error: Optional[Exception] = None,
     ):
+        """
+        __init__.
+        
+        Args:
+            message (str): Input parameter for this operation.
+            model_id (Optional[str]): Input parameter for this operation.
+            save_path (Optional[str]): Input parameter for this operation.
+            original_error (Optional[Exception]): Input parameter for this operation.
+        """
         super().__init__(message, original_error)
         self.model_id = model_id
         self.save_path = save_path
@@ -124,6 +164,15 @@ class DataProcessingError(MLFrameworkError):
         data_type: Optional[str] = None,
         original_error: Optional[Exception] = None,
     ):
+        """
+        __init__.
+        
+        Args:
+            message (str): Input parameter for this operation.
+            operation (Optional[str]): Input parameter for this operation.
+            data_type (Optional[str]): Input parameter for this operation.
+            original_error (Optional[Exception]): Input parameter for this operation.
+        """
         super().__init__(message, original_error)
         self.operation = operation
         self.data_type = data_type
@@ -145,6 +194,15 @@ class ModelNotFoundError(MLFrameworkError):
         version: Optional[str] = None,
         original_error: Optional[Exception] = None,
     ):
+        """
+        __init__.
+        
+        Args:
+            message (str): Input parameter for this operation.
+            model_id (Optional[str]): Input parameter for this operation.
+            version (Optional[str]): Input parameter for this operation.
+            original_error (Optional[Exception]): Input parameter for this operation.
+        """
         super().__init__(message, original_error)
         self.model_id = model_id
         self.version = version

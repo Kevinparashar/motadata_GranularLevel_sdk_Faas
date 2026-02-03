@@ -4,6 +4,7 @@ Data Validator
 Validates data quality and schema.
 """
 
+
 import logging
 from typing import Any, Dict, Optional
 
@@ -24,13 +25,13 @@ class DataValidator:
     def validate(self, data: Any, schema: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
         """
         Validate data.
-
+        
         Args:
-            data: Data to validate
-            schema: Optional schema
-
+            data (Any): Input parameter for this operation.
+            schema (Optional[Dict[str, Any]]): Input parameter for this operation.
+        
         Returns:
-            Validation results
+            Dict[str, Any]: Dictionary result of the operation.
         """
         results = {"valid": True, "errors": []}
 

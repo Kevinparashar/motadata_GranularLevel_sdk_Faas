@@ -4,6 +4,7 @@ Vector Operations with pgvector
 Provides functions for similarity search and vector operations using pgvector.
 """
 
+
 from typing import Any, Dict, List, Optional, Tuple
 
 from .connection import DatabaseConnection
@@ -15,9 +16,9 @@ class VectorOperations:
     def __init__(self, db: DatabaseConnection):
         """
         Initialize vector operations.
-
+        
         Args:
-            db: Database connection
+            db (DatabaseConnection): Database connection/handle.
         """
         self.db = db
 
@@ -26,14 +27,14 @@ class VectorOperations:
     ) -> int:
         """
         Insert an embedding vector.
-
+        
         Args:
-            document_id: Document ID
-            embedding: Embedding vector
-            model: Model used to generate embedding
-
+            document_id (int): Input parameter for this operation.
+            embedding (List[float]): Input parameter for this operation.
+            model (str): Model name or identifier to use.
+        
         Returns:
-            Embedding ID
+            int: Result of the operation.
         """
         query = """
         INSERT INTO embeddings (document_id, embedding, model)
@@ -56,15 +57,15 @@ class VectorOperations:
     ) -> List[Dict[str, Any]]:
         """
         Perform similarity search using cosine distance.
-
+        
         Args:
-            query_embedding: Query embedding vector
-            limit: Maximum number of results
-            threshold: Minimum similarity threshold (0-1)
-            model: Optional model filter
-
+            query_embedding (List[float]): Input parameter for this operation.
+            limit (int): Input parameter for this operation.
+            threshold (float): Input parameter for this operation.
+            model (Optional[str]): Model name or identifier to use.
+        
         Returns:
-            List of similar documents with similarity scores
+            List[Dict[str, Any]]: Dictionary result of the operation.
         """
         embedding_str = "[" + ",".join(map(str, query_embedding)) + "]"
 
@@ -109,9 +110,12 @@ class VectorOperations:
     def batch_insert_embeddings(self, embeddings: List[Tuple[int, List[float], str]]) -> None:
         """
         Batch insert multiple embeddings.
-
+        
         Args:
-            embeddings: List of (document_id, embedding, model) tuples
+            embeddings (List[Tuple[int, List[float], str]]): Input parameter for this operation.
+        
+        Returns:
+            None: Result of the operation.
         """
         # Prepare data for batch insert
         values = []

@@ -4,6 +4,7 @@ Feature Extractors
 Utilities for extracting features from raw data.
 """
 
+
 import logging
 from typing import Any, Dict, List
 
@@ -31,14 +32,14 @@ class FeatureExtractor:
     ) -> Dict[str, float]:
         """
         Extract basic features from text.
-
+        
         Args:
-            text: Input text
-            include_length: Include character length
-            include_word_count: Include word count
-
+            text (str): Input parameter for this operation.
+            include_length (bool): Input parameter for this operation.
+            include_word_count (bool): Input parameter for this operation.
+        
         Returns:
-            Dictionary of extracted features
+            Dict[str, float]: Dictionary result of the operation.
         """
         features = {}
 
@@ -56,14 +57,17 @@ class FeatureExtractor:
     ) -> Dict[str, float]:
         """
         Extract features from datetime.
-
+        
         Args:
-            datetime_value: Datetime value
-            include_hour: Include hour of day
-            include_day_of_week: Include day of week
-
+            datetime_value (Any): Input parameter for this operation.
+            include_hour (bool): Input parameter for this operation.
+            include_day_of_week (bool): Input parameter for this operation.
+        
         Returns:
-            Dictionary of extracted features
+            Dict[str, float]: Dictionary result of the operation.
+        
+        Raises:
+            ImportError: Raised when this function detects an invalid state or when an underlying call fails.
         """
         if not _pandas_available:
             raise ImportError(
@@ -90,13 +94,16 @@ class FeatureExtractor:
     def extract_categorical_features(data: Any, categorical_columns: List[str]) -> Any:
         """
         Extract features from categorical columns (one-hot encoding).
-
+        
         Args:
-            data: Input DataFrame
-            categorical_columns: List of categorical column names
-
+            data (Any): Input parameter for this operation.
+            categorical_columns (List[str]): Input parameter for this operation.
+        
         Returns:
-            DataFrame with one-hot encoded features
+            Any: Result of the operation.
+        
+        Raises:
+            ImportError: Raised when this function detects an invalid state or when an underlying call fails.
         """
         if not _pandas_available:
             raise ImportError(

@@ -4,6 +4,7 @@ Model Serialization
 Utilities for saving and loading models.
 """
 
+
 import logging
 import pickle
 from pathlib import Path
@@ -25,14 +26,17 @@ class ModelSerializer:
     def save_model(model: Any, filepath: str, format: str = "joblib") -> str:
         """
         Save model to file.
-
+        
         Args:
-            model: Model object to save
-            filepath: Path to save file
-            format: Serialization format (joblib, pickle)
-
+            model (Any): Model name or identifier to use.
+            filepath (str): Input parameter for this operation.
+            format (str): Input parameter for this operation.
+        
         Returns:
-            Path to saved file
+            str: Returned text value.
+        
+        Raises:
+            ValueError: Raised when this function detects an invalid state or when an underlying call fails.
         """
         Path(filepath).parent.mkdir(parents=True, exist_ok=True)
 
@@ -51,13 +55,16 @@ class ModelSerializer:
     def load_model(filepath: str, format: str = "joblib") -> Any:
         """
         Load model from file.
-
+        
         Args:
-            filepath: Path to model file
-            format: Serialization format (joblib, pickle)
-
+            filepath (str): Input parameter for this operation.
+            format (str): Input parameter for this operation.
+        
         Returns:
-            Loaded model object
+            Any: Result of the operation.
+        
+        Raises:
+            ValueError: Raised when this function detects an invalid state or when an underlying call fails.
         """
         if format == "joblib":
             return joblib.load(filepath)

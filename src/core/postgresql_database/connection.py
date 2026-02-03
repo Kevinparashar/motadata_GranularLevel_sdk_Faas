@@ -4,6 +4,7 @@ Database Connection Management
 Handles PostgreSQL database connections with connection pooling.
 """
 
+
 # Standard library imports
 import os
 from contextlib import contextmanager
@@ -30,7 +31,12 @@ class DatabaseConfig(BaseModel):
 
     @classmethod
     def from_env(cls) -> "DatabaseConfig":
-        """Create config from environment variables."""
+        """
+        Create config from environment variables.
+        
+        Returns:
+            'DatabaseConfig': Builder instance (returned for call chaining).
+        """
         return cls(
             host=os.getenv("DB_HOST", "localhost"),
             port=int(os.getenv("DB_PORT", "5432")),
@@ -50,15 +56,23 @@ class DatabaseConnection:
     def __init__(self, config: DatabaseConfig):
         """
         Initialize database connection.
-
+        
         Args:
-            config: Database configuration
+            config (DatabaseConfig): Configuration object or settings.
         """
         self.config = config
         self.connection_pool: Optional[pool.ThreadedConnectionPool] = None
 
     def connect(self) -> None:
-        """Create connection pool."""
+        """
+        Create connection pool.
+        
+        Returns:
+            None: Result of the operation.
+        
+        Raises:
+            ConnectionError: Raised when this function detects an invalid state or when an underlying call fails.
+        """
         try:
             self.connection_pool = pool.ThreadedConnectionPool(
                 minconn=self.config.min_connections,
@@ -75,7 +89,12 @@ class DatabaseConnection:
             raise ConnectionError(f"Unexpected error creating connection pool: {e}")
 
     def close(self) -> None:
-        """Close all connections in pool."""
+        """
+        Close all connections in pool.
+        
+        Returns:
+            None: Result of the operation.
+        """
         if self.connection_pool:
             self.connection_pool.closeall()
             self.connection_pool = None
@@ -84,9 +103,9 @@ class DatabaseConnection:
     def get_connection(self):
         """
         Get a connection from the pool.
-
+        
         Yields:
-            Database connection
+                            Database connection
         """
         if not self.connection_pool:
             self.connect()
@@ -101,12 +120,12 @@ class DatabaseConnection:
     def get_cursor(self, cursor_factory=None):
         """
         Get a cursor from the connection pool.
-
-        Args:
-            cursor_factory: Optional cursor factory (e.g., RealDictCursor)
-
+        
         Yields:
-            Database cursor
+                                    Database cursor
+        
+        Args:
+            cursor_factory (Any): Input parameter for this operation.
         """
         with self.get_connection() as conn:
             cursor = conn.cursor(cursor_factory=cursor_factory)
@@ -135,15 +154,15 @@ class DatabaseConnection:
     ):
         """
         Execute a query.
-
+        
         Args:
-            query: SQL query
-            params: Query parameters
-            fetch_one: Return single row
-            fetch_all: Return all rows
-
+            query (str): Input parameter for this operation.
+            params (Optional[tuple]): Input parameter for this operation.
+            fetch_one (bool): Input parameter for this operation.
+            fetch_all (bool): Input parameter for this operation.
+        
         Returns:
-            Query results
+            Any: Result of the operation.
         """
         with self.get_cursor(cursor_factory=RealDictCursor) as cursor:
             cursor.execute(query, params)
@@ -158,9 +177,12 @@ class DatabaseConnection:
     def execute_transaction(self, queries: list[tuple[str, Optional[tuple]]]) -> None:
         """
         Execute multiple queries in a transaction.
-
+        
         Args:
-            queries: List of (query, params) tuples
+            queries (list[tuple[str, Optional[tuple]]]): Input parameter for this operation.
+        
+        Returns:
+            None: Result of the operation.
         """
         with self.get_connection() as conn:
             cursor = conn.cursor()
@@ -184,9 +206,9 @@ class DatabaseConnection:
     def check_connection(self) -> bool:
         """
         Check if database connection is working.
-
+        
         Returns:
-            True if connection is valid
+            bool: True if the operation succeeds, else False.
         """
         try:
             with self.get_cursor() as cursor:

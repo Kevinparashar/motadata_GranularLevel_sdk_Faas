@@ -4,6 +4,7 @@ API Backend Services - High-Level Functions
 Factory functions, convenience functions, and utilities for API backend services.
 """
 
+
 from typing import Any, Callable, Dict, List, Optional
 
 from fastapi import APIRouter, FastAPI
@@ -124,15 +125,18 @@ def configure_api_app(
 def register_router(app: FastAPI, router: APIRouter, prefix: Optional[str] = None) -> None:
     """
     Register a router with the FastAPI app (high-level convenience).
-
-    Args:
-        app: FastAPI application instance
-        router: APIRouter instance
-        prefix: Optional prefix override
-
+    
     Example:
-        >>> router = create_api_router(prefix="/api/v1")
-        >>> register_router(app, router)
+                            >>> router = create_api_router(prefix="/api/v1")
+                            >>> register_router(app, router)
+    
+    Args:
+        app (FastAPI): Input parameter for this operation.
+        router (APIRouter): Input parameter for this operation.
+        prefix (Optional[str]): Input parameter for this operation.
+    
+    Returns:
+        None: Result of the operation.
     """
     if prefix:
         app.include_router(router, prefix=prefix)
@@ -149,18 +153,21 @@ def add_endpoint(
 ) -> None:
     """
     Add an endpoint to a router (high-level convenience).
-
-    Args:
-        router: APIRouter instance
-        path: Endpoint path
-        method: HTTP method (GET, POST, PUT, DELETE, etc.)
-        handler: Endpoint handler function
-        **kwargs: Additional endpoint configuration
-
+    
     Example:
-        >>> def get_status():
-        ...     return {"status": "ok"}
-        >>> add_endpoint(router, "/status", "GET", get_status)
+                            >>> def get_status():
+                            ...     return {"status": "ok"}
+                            >>> add_endpoint(router, "/status", "GET", get_status)
+    
+    Args:
+        router (APIRouter): Input parameter for this operation.
+        path (str): Input parameter for this operation.
+        method (str): Input parameter for this operation.
+        handler (Optional[Callable]): Input parameter for this operation.
+        **kwargs (Any): Input parameter for this operation.
+    
+    Returns:
+        None: Result of the operation.
     """
     if handler is None:
         return
@@ -183,15 +190,18 @@ def add_endpoint(
 def create_rag_endpoints(router: APIRouter, rag_system: Any, prefix: str = "/rag") -> None:
     """
     Create RAG system endpoints (high-level convenience).
-
-    Args:
-        router: APIRouter instance
-        rag_system: RAGSystem instance
-        prefix: URL prefix for RAG endpoints
-
+    
     Example:
-        >>> router = create_api_router()
-        >>> create_rag_endpoints(router, rag_system, prefix="/api/rag")
+                            >>> router = create_api_router()
+                            >>> create_rag_endpoints(router, rag_system, prefix="/api/rag")
+    
+    Args:
+        router (APIRouter): Input parameter for this operation.
+        rag_system (Any): Input parameter for this operation.
+        prefix (str): Input parameter for this operation.
+    
+    Returns:
+        None: Result of the operation.
     """
     from ..rag import ingest_document_simple, quick_rag_query
 
@@ -219,15 +229,18 @@ def create_rag_endpoints(router: APIRouter, rag_system: Any, prefix: str = "/rag
 def create_agent_endpoints(router: APIRouter, agent_manager: Any, prefix: str = "/agents") -> None:
     """
     Create agent framework endpoints (high-level convenience).
-
-    Args:
-        router: APIRouter instance
-        agent_manager: AgentManager instance
-        prefix: URL prefix for agent endpoints
-
+    
     Example:
-        >>> router = create_api_router()
-        >>> create_agent_endpoints(router, agent_manager, prefix="/api/agents")
+                            >>> router = create_api_router()
+                            >>> create_agent_endpoints(router, agent_manager, prefix="/api/agents")
+    
+    Args:
+        router (APIRouter): Input parameter for this operation.
+        agent_manager (Any): Input parameter for this operation.
+        prefix (str): Input parameter for this operation.
+    
+    Returns:
+        None: Result of the operation.
     """
     from ..agno_agent_framework import chat_with_agent, execute_task
 
@@ -276,7 +289,16 @@ def create_agent_endpoints(router: APIRouter, agent_manager: Any, prefix: str = 
 
 
 def _determine_processing_mode(mode: str, query: str) -> tuple[bool, bool]:
-    """Determine whether to use RAG and/or Agent based on mode and query."""
+    """
+    Determine whether to use RAG and/or Agent based on mode and query.
+    
+    Args:
+        mode (str): Input parameter for this operation.
+        query (str): Input parameter for this operation.
+    
+    Returns:
+        tuple[bool, bool]: True if the operation succeeds, else False.
+    """
     use_rag = mode in ["rag", "both", "auto"]
     use_agent = mode in ["agent", "both", "auto"]
 
@@ -304,7 +326,18 @@ def _determine_processing_mode(mode: str, query: str) -> tuple[bool, bool]:
 def _process_rag_query(
     rag_system: Any, query: str, request: Dict[str, Any], tenant_id: Optional[str]
 ) -> Dict[str, Any]:
-    """Process query with RAG system."""
+    """
+    Process query with RAG system.
+    
+    Args:
+        rag_system (Any): Input parameter for this operation.
+        query (str): Input parameter for this operation.
+        request (Dict[str, Any]): Request payload object.
+        tenant_id (Optional[str]): Tenant identifier used for tenant isolation.
+    
+    Returns:
+        Dict[str, Any]: Dictionary result of the operation.
+    """
     from ..rag import quick_rag_query
 
     try:
@@ -334,7 +367,19 @@ async def _process_agent_query(
     tenant_id: Optional[str],
     rag_context: Optional[str],
 ) -> Dict[str, Any]:
-    """Process query with Agent system."""
+    """
+    Process query with Agent system.
+    
+    Args:
+        agent_manager (Any): Input parameter for this operation.
+        query (str): Input parameter for this operation.
+        request (Dict[str, Any]): Request payload object.
+        tenant_id (Optional[str]): Tenant identifier used for tenant isolation.
+        rag_context (Optional[str]): Input parameter for this operation.
+    
+    Returns:
+        Dict[str, Any]: Dictionary result of the operation.
+    """
     from ..agno_agent_framework import chat_with_agent
 
     try:
@@ -361,7 +406,17 @@ async def _process_agent_query(
 
 
 def _determine_final_answer(result: Dict[str, Any], use_rag: bool, use_agent: bool) -> str:
-    """Determine final answer from RAG and/or Agent responses."""
+    """
+    Determine final answer from RAG and/or Agent responses.
+    
+    Args:
+        result (Dict[str, Any]): Input parameter for this operation.
+        use_rag (bool): Input parameter for this operation.
+        use_agent (bool): Input parameter for this operation.
+    
+    Returns:
+        str: Returned text value.
+    """
     if use_rag and "rag_response" in result:
         return result["rag_response"]["answer"]
     elif use_agent and "agent_response" in result:
@@ -377,21 +432,24 @@ def create_unified_query_endpoint(
 ) -> None:
     """
     Create unified query endpoint that orchestrates Agent and RAG.
-
+    
     This endpoint automatically determines whether to use Agent or RAG
-    based on the query and provides a single entry point for all queries.
-
+                        based on the query and provides a single entry point for all queries.
+    
+                        Example:
+                            >>> router = create_api_router()
+                            >>> create_unified_query_endpoint(
+                            ...     router, agent_manager, rag_system, prefix="/api/query"
+                            ... )
+    
     Args:
-        router: APIRouter instance
-        agent_manager: AgentManager instance
-        rag_system: RAGSystem instance
-        prefix: URL prefix for unified endpoint
-
-    Example:
-        >>> router = create_api_router()
-        >>> create_unified_query_endpoint(
-        ...     router, agent_manager, rag_system, prefix="/api/query"
-        ... )
+        router (APIRouter): Input parameter for this operation.
+        agent_manager (Any): Input parameter for this operation.
+        rag_system (Any): Input parameter for this operation.
+        prefix (str): Input parameter for this operation.
+    
+    Returns:
+        None: Result of the operation.
     """
 
     @router.post(f"{prefix}")
@@ -441,15 +499,18 @@ def create_unified_query_endpoint(
 def create_gateway_endpoints(router: APIRouter, gateway: Any, prefix: str = "/gateway") -> None:
     """
     Create LiteLLM Gateway endpoints (high-level convenience).
-
-    Args:
-        router: APIRouter instance
-        gateway: LiteLLMGateway instance
-        prefix: URL prefix for gateway endpoints
-
+    
     Example:
-        >>> router = create_api_router()
-        >>> create_gateway_endpoints(router, gateway, prefix="/api/gateway")
+                            >>> router = create_api_router()
+                            >>> create_gateway_endpoints(router, gateway, prefix="/api/gateway")
+    
+    Args:
+        router (APIRouter): Input parameter for this operation.
+        gateway (Any): Gateway client used for LLM calls.
+        prefix (str): Input parameter for this operation.
+    
+    Returns:
+        None: Result of the operation.
     """
     from ..litellm_gateway import generate_embeddings, generate_text
 
@@ -480,13 +541,16 @@ def create_gateway_endpoints(router: APIRouter, gateway: Any, prefix: str = "/ga
 def add_health_check(app: FastAPI, path: str = "/health") -> None:  # noqa: ARG001
     """
     Add a health check endpoint (utility function).
-
-    Args:
-        app: FastAPI application instance
-        path: Health check endpoint path
-
+    
     Example:
-        >>> add_health_check(app, path="/health")
+                            >>> add_health_check(app, path="/health")
+    
+    Args:
+        app (FastAPI): Input parameter for this operation.
+        path (str): Input parameter for this operation.
+    
+    Returns:
+        None: Result of the operation.
     """
 
     @app.get(path)

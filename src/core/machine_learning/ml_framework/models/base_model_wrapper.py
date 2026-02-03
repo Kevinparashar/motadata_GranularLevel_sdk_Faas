@@ -4,6 +4,7 @@ Base Model Wrapper
 Base wrapper class for integrating ML models (scikit-learn, etc.) with the ML framework.
 """
 
+
 import logging
 from typing import Any, Dict, Optional
 
@@ -22,11 +23,11 @@ class BaseModelWrapper:
     def __init__(self, model: Any, model_type: str, metadata: Optional[Dict[str, Any]] = None):
         """
         Initialize model wrapper.
-
+        
         Args:
-            model: The underlying ML model (scikit-learn, etc.)
-            model_type: Type of model (classification, regression, etc.)
-            metadata: Optional model metadata
+            model (Any): Model name or identifier to use.
+            model_type (str): Input parameter for this operation.
+            metadata (Optional[Dict[str, Any]]): Extra metadata for the operation.
         """
         self.model = model
         self.model_type = model_type
@@ -37,14 +38,14 @@ class BaseModelWrapper:
     def fit(self, X: Any, y: Any, **kwargs) -> "BaseModelWrapper":
         """
         Train the model.
-
+        
         Args:
-            X: Training features
-            y: Training labels
-            **kwargs: Additional training parameters
-
+            X (Any): Input parameter for this operation.
+            y (Any): Input parameter for this operation.
+            **kwargs (Any): Input parameter for this operation.
+        
         Returns:
-            Self for method chaining
+            'BaseModelWrapper': Builder instance (returned for call chaining).
         """
         self.model.fit(X, y, **kwargs)
         return self
@@ -52,24 +53,24 @@ class BaseModelWrapper:
     def predict(self, X: Any) -> Any:
         """
         Make predictions.
-
+        
         Args:
-            X: Input features
-
+            X (Any): Input parameter for this operation.
+        
         Returns:
-            Predictions
+            Any: Result of the operation.
         """
         return self.model.predict(X)
 
     def predict_proba(self, X: Any) -> Any:
         """
         Get prediction probabilities (for classification models).
-
+        
         Args:
-            X: Input features
-
+            X (Any): Input parameter for this operation.
+        
         Returns:
-            Prediction probabilities or None if not supported
+            Any: Result of the operation.
         """
         if hasattr(self.model, "predict_proba"):
             return self.model.predict_proba(X)
@@ -78,13 +79,13 @@ class BaseModelWrapper:
     def score(self, X: Any, y: Any) -> float:
         """
         Score the model.
-
+        
         Args:
-            X: Test features
-            y: Test labels
-
+            X (Any): Input parameter for this operation.
+            y (Any): Input parameter for this operation.
+        
         Returns:
-            Model score
+            float: Result of the operation.
         """
         if hasattr(self.model, "score"):
             return float(self.model.score(X, y))
@@ -93,9 +94,9 @@ class BaseModelWrapper:
     def get_params(self) -> Dict[str, Any]:
         """
         Get model parameters.
-
+        
         Returns:
-            Model parameters
+            Dict[str, Any]: Dictionary result of the operation.
         """
         if hasattr(self.model, "get_params"):
             params = self.model.get_params()
@@ -105,12 +106,12 @@ class BaseModelWrapper:
     def set_params(self, **params) -> "BaseModelWrapper":
         """
         Set model parameters.
-
+        
         Args:
-            **params: Parameters to set
-
+            **params (Any): Input parameter for this operation.
+        
         Returns:
-            Self for method chaining
+            'BaseModelWrapper': Builder instance (returned for call chaining).
         """
         if hasattr(self.model, "set_params"):
             self.model.set_params(**params)
@@ -119,8 +120,8 @@ class BaseModelWrapper:
     def get_model(self) -> Any:
         """
         Get the underlying model.
-
+        
         Returns:
-            The wrapped model
+            Any: Result of the operation.
         """
         return self.model

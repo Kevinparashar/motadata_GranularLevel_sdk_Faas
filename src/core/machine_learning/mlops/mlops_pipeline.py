@@ -4,6 +4,7 @@ MLOps Pipeline
 Main orchestrator for end-to-end MLOps workflows.
 """
 
+
 import logging
 from enum import Enum
 from typing import Any, Dict, List, Optional
@@ -33,10 +34,10 @@ class MLOpsPipeline:
     def __init__(self, pipeline_id: str, tenant_id: Optional[str] = None):
         """
         Initialize MLOps pipeline.
-
+        
         Args:
-            pipeline_id: Unique pipeline identifier
-            tenant_id: Optional tenant ID
+            pipeline_id (str): Input parameter for this operation.
+            tenant_id (Optional[str]): Tenant identifier used for tenant isolation.
         """
         self.pipeline_id = pipeline_id
         self.tenant_id = tenant_id
@@ -50,13 +51,13 @@ class MLOpsPipeline:
     ) -> Dict[str, Any]:
         """
         Execute full pipeline.
-
+        
         Args:
-            stages: Optional list of stages to run
-            **kwargs: Additional pipeline parameters
-
+            stages (Optional[List[PipelineStage]]): Input parameter for this operation.
+            **kwargs (Any): Input parameter for this operation.
+        
         Returns:
-            Pipeline execution results
+            Dict[str, Any]: Dictionary result of the operation.
         """
         self.status = "running"
         self.stages = stages or list(PipelineStage)
@@ -79,13 +80,13 @@ class MLOpsPipeline:
     def run_stage(self, stage: PipelineStage, **kwargs) -> Dict[str, Any]:
         """
         Execute specific pipeline stage.
-
+        
         Args:
-            stage: Stage to execute
-            **kwargs: Stage-specific parameters
-
+            stage (PipelineStage): Input parameter for this operation.
+            **kwargs (Any): Input parameter for this operation.
+        
         Returns:
-            Stage execution results
+            Dict[str, Any]: Dictionary result of the operation.
         """
         logger.info(f"Executing stage: {stage.value}")
         # Stage execution logic would go here
@@ -94,9 +95,9 @@ class MLOpsPipeline:
     def get_pipeline_status(self) -> Dict[str, Any]:
         """
         Get current pipeline status.
-
+        
         Returns:
-            Pipeline status information
+            Dict[str, Any]: Dictionary result of the operation.
         """
         return {
             "pipeline_id": self.pipeline_id,
@@ -105,6 +106,11 @@ class MLOpsPipeline:
         }
 
     def cancel_pipeline(self) -> None:
-        """Cancel running pipeline."""
+        """
+        Cancel running pipeline.
+        
+        Returns:
+            None: Result of the operation.
+        """
         self.status = "cancelled"
         logger.info("Pipeline cancelled")

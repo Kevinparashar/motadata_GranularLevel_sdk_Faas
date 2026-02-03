@@ -2,6 +2,7 @@
 Common exceptions for FaaS services.
 """
 
+
 from typing import Any, Dict, Optional
 
 
@@ -17,12 +18,12 @@ class ServiceException(Exception):
     ):
         """
         Initialize service exception.
-
+        
         Args:
-            message: Error message
-            status_code: HTTP status code
-            error_code: Error code for client handling
-            details: Additional error details
+            message (str): Input parameter for this operation.
+            status_code (int): Input parameter for this operation.
+            error_code (str): Input parameter for this operation.
+            details (Optional[Dict[str, Any]]): Input parameter for this operation.
         """
         self.message = message
         self.status_code = status_code
@@ -37,10 +38,10 @@ class ValidationError(ServiceException):
     def __init__(self, message: str, details: Optional[Dict[str, Any]] = None):
         """
         Initialize validation error.
-
+        
         Args:
-            message: Error message
-            details: Validation error details
+            message (str): Input parameter for this operation.
+            details (Optional[Dict[str, Any]]): Input parameter for this operation.
         """
         super().__init__(
             message=message,
@@ -56,10 +57,10 @@ class NotFoundError(ServiceException):
     def __init__(self, resource_type: str, resource_id: str):
         """
         Initialize not found error.
-
+        
         Args:
-            resource_type: Type of resource (e.g., "agent", "document")
-            resource_id: ID of resource that was not found
+            resource_type (str): Input parameter for this operation.
+            resource_id (str): Input parameter for this operation.
         """
         super().__init__(
             message=f"{resource_type} with id '{resource_id}' not found",
@@ -79,10 +80,10 @@ class InternalServerError(ServiceException):
     ):
         """
         Initialize internal server error.
-
+        
         Args:
-            message: Error message
-            details: Additional error details
+            message (str): Input parameter for this operation.
+            details (Optional[Dict[str, Any]]): Input parameter for this operation.
         """
         super().__init__(
             message=message,
@@ -98,11 +99,11 @@ class DependencyError(ServiceException):
     def __init__(self, service_name: str, message: str, details: Optional[Dict[str, Any]] = None):
         """
         Initialize dependency error.
-
+        
         Args:
-            service_name: Name of the dependency service
-            message: Error message
-            details: Additional error details
+            service_name (str): Input parameter for this operation.
+            message (str): Input parameter for this operation.
+            details (Optional[Dict[str, Any]]): Input parameter for this operation.
         """
         super().__init__(
             message=f"Dependency service '{service_name}' error: {message}",

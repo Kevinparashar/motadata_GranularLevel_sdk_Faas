@@ -4,6 +4,7 @@ Document Processing
 Handles document loading, chunking, preprocessing, and metadata handling for RAG.
 """
 
+
 # Standard library imports
 import hashlib
 import re
@@ -65,7 +66,18 @@ class DocumentChunk(BaseModel):
 
     @validator("content")
     def content_not_empty(cls, v):
-        """Validate that content is not empty."""
+        """
+        Validate that content is not empty.
+        
+        Args:
+            v (Any): Input parameter for this operation.
+        
+        Returns:
+            Any: Result of the operation.
+        
+        Raises:
+            ValidationError: Raised when this function detects an invalid state or when an underlying call fails.
+        """
         if not v or not v.strip():
             raise ValidationError(message="Chunk content cannot be empty", field="content", value=v)
         return v.strip()
@@ -85,10 +97,10 @@ class ChunkingPipeline:
     ):
         """
         Initialize chunking pipeline.
-
+        
         Args:
-            preprocessing_steps: List of preprocessing functions to apply
-            chunk_validators: List of validator functions for chunks
+            preprocessing_steps (Optional[List[Callable[[str], str]]]): Input parameter for this operation.
+            chunk_validators (Optional[List[Callable[[DocumentChunk], bool]]]): Input parameter for this operation.
         """
         self.preprocessing_steps = preprocessing_steps or []
         self.chunk_validators = chunk_validators or []
@@ -96,12 +108,12 @@ class ChunkingPipeline:
     def preprocess(self, content: str) -> str:
         """
         Apply preprocessing steps to content.
-
+        
         Args:
-            content: Raw document content
-
+            content (str): Content text.
+        
         Returns:
-            Preprocessed content
+            str: Returned text value.
         """
         processed = content
         for step in self.preprocessing_steps:
@@ -111,12 +123,12 @@ class ChunkingPipeline:
     def validate_chunk(self, chunk: DocumentChunk) -> bool:
         """
         Validate a chunk using all validators.
-
+        
         Args:
-            chunk: Chunk to validate
-
+            chunk (DocumentChunk): Input parameter for this operation.
+        
         Returns:
-            True if chunk passes all validators
+            bool: True if the operation succeeds, else False.
         """
         for validator in self.chunk_validators:
             if not validator(chunk):
@@ -136,10 +148,10 @@ class MetadataHandler:
     ):
         """
         Initialize metadata handler.
-
+        
         Args:
-            schema: Optional metadata schema for validation
-            extractors: List of metadata extraction functions
+            schema (Optional[MetadataSchema]): Input parameter for this operation.
+            extractors (Optional[List[Callable[[str, Dict[str, Any]], Dict[str, Any]]]]): Input parameter for this operation.
         """
         self.schema = schema
         self.extractors = extractors or []
@@ -149,13 +161,13 @@ class MetadataHandler:
     ) -> Dict[str, Any]:
         """
         Extract metadata from document content.
-
+        
         Args:
-            content: Document content
-            existing_metadata: Existing metadata to enrich
-
+            content (str): Content text.
+            existing_metadata (Optional[Dict[str, Any]]): Input parameter for this operation.
+        
         Returns:
-            Enriched metadata dictionary
+            Dict[str, Any]: Dictionary result of the operation.
         """
         metadata = existing_metadata.copy() if existing_metadata else {}
 
@@ -177,12 +189,12 @@ class MetadataHandler:
     def validate_metadata(self, metadata: Dict[str, Any]) -> bool:
         """
         Validate metadata against schema.
-
+        
         Args:
-            metadata: Metadata to validate
-
+            metadata (Dict[str, Any]): Extra metadata for the operation.
+        
         Returns:
-            True if valid
+            bool: True if the operation succeeds, else False.
         """
         if not self.schema:
             return True
@@ -203,13 +215,13 @@ class MetadataHandler:
     ) -> DocumentChunk:
         """
         Enrich chunk metadata with document-level metadata.
-
+        
         Args:
-            chunk: Chunk to enrich
-            document_metadata: Document-level metadata
-
+            chunk (DocumentChunk): Input parameter for this operation.
+            document_metadata (Dict[str, Any]): Input parameter for this operation.
+        
         Returns:
-            Chunk with enriched metadata
+            DocumentChunk: Result of the operation.
         """
         # Merge document metadata with chunk metadata
         enriched_metadata = {
@@ -224,7 +236,15 @@ class MetadataHandler:
         return chunk
 
     def _detect_language(self, content: str) -> str:
-        """Simple language detection (can be enhanced)."""
+        """
+        Simple language detection (can be enhanced).
+        
+        Args:
+            content (str): Content text.
+        
+        Returns:
+            str: Returned text value.
+        """
         # Basic detection - can be improved with langdetect library
         if re.search(r"[àáâãäåæçèéêë]", content, re.IGNORECASE):
             return "fr"
@@ -259,16 +279,19 @@ class DocumentProcessor:
     ):
         """
         Initialize document processor.
-
+        
         Args:
-            chunk_size: Size of each chunk in characters
-            chunk_overlap: Overlap between chunks
-            chunking_strategy: Chunking strategy ("fixed", "sentence", "paragraph", "semantic")
-            min_chunk_size: Minimum chunk size to keep (filters out tiny chunks)
-            max_chunk_size: Maximum chunk size (splits oversized chunks)
-            enable_preprocessing: Enable text preprocessing
-            enable_metadata_extraction: Enable automatic metadata extraction
-            metadata_schema: Optional metadata schema for validation
+            chunk_size (int): Input parameter for this operation.
+            chunk_overlap (int): Input parameter for this operation.
+            chunking_strategy (str): Input parameter for this operation.
+            min_chunk_size (int): Input parameter for this operation.
+            max_chunk_size (int): Input parameter for this operation.
+            enable_preprocessing (bool): Flag to enable or disable preprocessing.
+            enable_metadata_extraction (bool): Flag to enable or disable metadata extraction.
+            metadata_schema (Optional[MetadataSchema]): Input parameter for this operation.
+            enable_multimodal (bool): Flag to enable or disable multimodal.
+            multimodal_loader (Optional[MultiModalLoader]): Input parameter for this operation.
+            gateway (Optional[Any]): Gateway client used for LLM calls.
         """
         self.chunk_size = chunk_size
         self.chunk_overlap = chunk_overlap
@@ -315,19 +338,23 @@ class DocumentProcessor:
     def load_document(self, file_path: str) -> tuple[str, Dict[str, Any]]:
         """
         Load document from file with metadata extraction.
-
+        
         Supports multiple formats:
-        - Text: .txt, .md, .markdown, .html, .json
-        - Documents: .pdf, .doc, .docx, .rtf
-        - Audio: .mp3, .wav, .m4a, .ogg (with transcription)
-        - Video: .mp4, .avi, .mov, .mkv (with transcription and frame extraction)
-        - Images: .jpg, .png, .gif, .bmp (with OCR and description)
-
+                                        - Text: .txt, .md, .markdown, .html, .json
+                                        - Documents: .pdf, .doc, .docx, .rtf
+                                        - Audio: .mp3, .wav, .m4a, .ogg (with transcription)
+                                        - Video: .mp4, .avi, .mov, .mkv (with transcription and frame extraction)
+                                        - Images: .jpg, .png, .gif, .bmp (with OCR and description)
+        
         Args:
-            file_path: Path to document file
-
+            file_path (str): Path of the input file.
+        
         Returns:
-            Tuple of (content, metadata)
+            tuple[str, Dict[str, Any]]: Dictionary result of the operation.
+        
+        Raises:
+            DocumentProcessingError: Raised when this function detects an invalid state or when an underlying call fails.
+            FileNotFoundError: Raised when this function detects an invalid state or when an underlying call fails.
         """
         path = Path(file_path)
 
@@ -379,7 +406,15 @@ class DocumentProcessor:
         return content, extracted_metadata
 
     def _load_html(self, path: Path) -> str:
-        """Load HTML file and extract text content."""
+        """
+        Load HTML file and extract text content.
+        
+        Args:
+            path (Path): Input parameter for this operation.
+        
+        Returns:
+            str: Returned text value.
+        """
         try:
             from html.parser import HTMLParser
 
@@ -419,7 +454,15 @@ class DocumentProcessor:
                 return f.read()
 
     def _load_json(self, path: Path) -> str:
-        """Load JSON file and convert to text."""
+        """
+        Load JSON file and convert to text.
+        
+        Args:
+            path (Path): Input parameter for this operation.
+        
+        Returns:
+            str: Returned text value.
+        """
         import json
 
         with open(path, "r", encoding="utf-8") as f:
@@ -434,14 +477,17 @@ class DocumentProcessor:
     ) -> List[DocumentChunk]:
         """
         Chunk a document into smaller pieces with preprocessing and validation.
-
+        
         Args:
-            content: Document content
-            document_id: Document identifier
-            metadata: Optional document metadata
-
+            content (str): Content text.
+            document_id (str): Input parameter for this operation.
+            metadata (Optional[Dict[str, Any]]): Extra metadata for the operation.
+        
         Returns:
-            List of validated document chunks
+            List[DocumentChunk]: List result of the operation.
+        
+        Raises:
+            ChunkingError: Raised when this function detects an invalid state or when an underlying call fails.
         """
         # Preprocess content
         processed_content = self.pipeline.preprocess(content)
@@ -493,7 +539,17 @@ class DocumentProcessor:
     def _chunk_fixed(
         self, content: str, document_id: str, metadata: Optional[Dict[str, Any]]
     ) -> List[DocumentChunk]:
-        """Chunk document into fixed-size pieces."""
+        """
+        Chunk document into fixed-size pieces.
+        
+        Args:
+            content (str): Content text.
+            document_id (str): Input parameter for this operation.
+            metadata (Optional[Dict[str, Any]]): Extra metadata for the operation.
+        
+        Returns:
+            List[DocumentChunk]: List result of the operation.
+        """
         chunks = []
         start = 0
         chunk_index = 0
@@ -531,7 +587,17 @@ class DocumentProcessor:
     def _chunk_sentence(
         self, content: str, document_id: str, metadata: Optional[Dict[str, Any]]
     ) -> List[DocumentChunk]:
-        """Chunk document by sentences."""
+        """
+        Chunk document by sentences.
+        
+        Args:
+            content (str): Content text.
+            document_id (str): Input parameter for this operation.
+            metadata (Optional[Dict[str, Any]]): Extra metadata for the operation.
+        
+        Returns:
+            List[DocumentChunk]: List result of the operation.
+        """
         # Improved sentence splitting
         sentence_pattern = r"(?<=[.!?])\s+(?=[A-Z])|(?<=\n)\s*"
         sentences = re.split(sentence_pattern, content)
@@ -589,7 +655,18 @@ class DocumentProcessor:
         chunk_index: int,
         metadata: Optional[Dict[str, Any]],
     ) -> DocumentChunk:
-        """Helper to create a DocumentChunk."""
+        """
+        Helper to create a DocumentChunk.
+        
+        Args:
+            content (str): Content text.
+            document_id (str): Input parameter for this operation.
+            chunk_index (int): Input parameter for this operation.
+            metadata (Optional[Dict[str, Any]]): Extra metadata for the operation.
+        
+        Returns:
+            DocumentChunk: Result of the operation.
+        """
         chunk_id = self._generate_chunk_id(document_id, chunk_index)
         return DocumentChunk(
             chunk_id=chunk_id,
@@ -608,7 +685,20 @@ class DocumentProcessor:
         chunks: List[DocumentChunk],
         separator: str = "\n\n",
     ) -> None:
-        """Helper to finalize and append current chunk to chunks list."""
+        """
+        Helper to finalize and append current chunk to chunks list.
+        
+        Args:
+            current_chunk (List[str]): Input parameter for this operation.
+            document_id (str): Input parameter for this operation.
+            chunk_index (int): Input parameter for this operation.
+            metadata (Optional[Dict[str, Any]]): Extra metadata for the operation.
+            chunks (List[DocumentChunk]): Input parameter for this operation.
+            separator (str): Input parameter for this operation.
+        
+        Returns:
+            None: Result of the operation.
+        """
         if current_chunk:
             chunk_content = separator.join(current_chunk)
             chunk = self._create_chunk(chunk_content, document_id, chunk_index, metadata)
@@ -617,7 +707,17 @@ class DocumentProcessor:
     def _chunk_paragraph(
         self, content: str, document_id: str, metadata: Optional[Dict[str, Any]]
     ) -> List[DocumentChunk]:
-        """Chunk document by paragraphs."""
+        """
+        Chunk document by paragraphs.
+        
+        Args:
+            content (str): Content text.
+            document_id (str): Input parameter for this operation.
+            metadata (Optional[Dict[str, Any]]): Extra metadata for the operation.
+        
+        Returns:
+            List[DocumentChunk]: List result of the operation.
+        """
         # Split by double newlines or single newline followed by whitespace
         paragraphs = re.split(r"\n\s*\n|\n{2,}", content)
         paragraphs = [p.strip() for p in paragraphs if p.strip()]
@@ -674,7 +774,18 @@ class DocumentProcessor:
     ) -> int:
         """
         Finalize current section and add to chunks.
+        
         Returns updated chunk_index.
+        
+        Args:
+            current_section (List[str]): Input parameter for this operation.
+            document_id (str): Input parameter for this operation.
+            chunk_index (int): Input parameter for this operation.
+            metadata (Optional[Dict[str, Any]]): Extra metadata for the operation.
+            chunks (List[DocumentChunk]): Input parameter for this operation.
+        
+        Returns:
+            int: Result of the operation.
         """
         if not current_section:
             return chunk_index
@@ -694,7 +805,18 @@ class DocumentProcessor:
     ) -> int:
         """
         Handle section that exceeds chunk size.
+        
         Returns updated chunk_index.
+        
+        Args:
+            current_section (List[str]): Input parameter for this operation.
+            document_id (str): Input parameter for this operation.
+            chunk_index (int): Input parameter for this operation.
+            metadata (Optional[Dict[str, Any]]): Extra metadata for the operation.
+            chunks (List[DocumentChunk]): Input parameter for this operation.
+        
+        Returns:
+            int: Result of the operation.
         """
         section_content = "\n".join(current_section)
         
@@ -718,8 +840,16 @@ class DocumentProcessor:
     ) -> List[DocumentChunk]:
         """
         Chunk document by semantic boundaries (headers, sections).
-
+        
         Falls back to paragraph chunking if no semantic markers found.
+        
+        Args:
+            content (str): Content text.
+            document_id (str): Input parameter for this operation.
+            metadata (Optional[Dict[str, Any]]): Extra metadata for the operation.
+        
+        Returns:
+            List[DocumentChunk]: List result of the operation.
         """
         # Look for markdown headers or HTML-like headers
         header_pattern = r"^(#{1,6}\s+.+)$|^(<h[1-6]>.+</h[1-6]>)$"
@@ -770,7 +900,16 @@ class DocumentProcessor:
         return chunks
 
     def _split_large_paragraph(self, paragraph: str, max_size: int) -> List[str]:
-        """Split a large paragraph into smaller pieces."""
+        """
+        Split a large paragraph into smaller pieces.
+        
+        Args:
+            paragraph (str): Input parameter for this operation.
+            max_size (int): Input parameter for this operation.
+        
+        Returns:
+            List[str]: List result of the operation.
+        """
         if len(paragraph) <= max_size:
             return [paragraph]
 
@@ -807,22 +946,52 @@ class DocumentProcessor:
         return parts
 
     def _get_overlap_sentence_count(self) -> int:
-        """Calculate number of sentences for overlap."""
+        """
+        Calculate number of sentences for overlap.
+        
+        Returns:
+            int: Result of the operation.
+        """
         avg_sentence_length = 100
         return max(1, self.chunk_overlap // avg_sentence_length)
 
     def _generate_chunk_id(self, document_id: str, chunk_index: int) -> str:
-        """Generate unique chunk ID."""
+        """
+        Generate unique chunk ID.
+        
+        Args:
+            document_id (str): Input parameter for this operation.
+            chunk_index (int): Input parameter for this operation.
+        
+        Returns:
+            str: Returned text value.
+        """
         content = f"{document_id}_{chunk_index}"
         return hashlib.md5(content.encode()).hexdigest()[:16]
 
     def _estimate_tokens(self, text: str) -> int:
-        """Estimate token count (rough approximation: 1 token ≈ 4 characters)."""
+        """
+        Estimate token count (rough approximation: 1 token ≈ 4 characters).
+        
+        Args:
+            text (str): Input parameter for this operation.
+        
+        Returns:
+            int: Result of the operation.
+        """
         return len(text) // 4
 
     # Preprocessing functions
     def _normalize_whitespace(self, text: str) -> str:
-        """Normalize whitespace in text."""
+        """
+        Normalize whitespace in text.
+        
+        Args:
+            text (str): Input parameter for this operation.
+        
+        Returns:
+            str: Returned text value.
+        """
         # Replace multiple spaces with single space
         text = re.sub(r" +", " ", text)
         # Replace multiple newlines with double newline
@@ -830,12 +999,28 @@ class DocumentProcessor:
         return text.strip()
 
     def _remove_control_characters(self, text: str) -> str:
-        """Remove control characters except newlines and tabs."""
+        """
+        Remove control characters except newlines and tabs.
+        
+        Args:
+            text (str): Input parameter for this operation.
+        
+        Returns:
+            str: Returned text value.
+        """
         # Keep newlines (\n), carriage returns (\r), and tabs (\t)
         return re.sub(r"[\x00-\x08\x0B-\x0C\x0E-\x1F\x7F]", "", text)
 
     def _normalize_unicode(self, text: str) -> str:
-        """Normalize unicode characters."""
+        """
+        Normalize unicode characters.
+        
+        Args:
+            text (str): Input parameter for this operation.
+        
+        Returns:
+            str: Returned text value.
+        """
         try:
             import unicodedata
 
@@ -846,7 +1031,16 @@ class DocumentProcessor:
 
     # Metadata extraction functions
     def _extract_title(self, content: str, metadata: Dict[str, Any]) -> Dict[str, Any]:
-        """Extract title from content."""
+        """
+        Extract title from content.
+        
+        Args:
+            content (str): Content text.
+            metadata (Dict[str, Any]): Extra metadata for the operation.
+        
+        Returns:
+            Dict[str, Any]: Dictionary result of the operation.
+        """
         if "title" in metadata and metadata["title"]:
             return {}
 
@@ -867,7 +1061,16 @@ class DocumentProcessor:
         return {}
 
     def _extract_dates(self, content: str, metadata: Dict[str, Any]) -> Dict[str, Any]:
-        """Extract dates from content."""
+        """
+        Extract dates from content.
+        
+        Args:
+            content (str): Content text.
+            metadata (Dict[str, Any]): Extra metadata for the operation.
+        
+        Returns:
+            Dict[str, Any]: Dictionary result of the operation.
+        """
         extracted = {}
 
         # Look for date patterns
@@ -886,7 +1089,16 @@ class DocumentProcessor:
         return extracted
 
     def _extract_tags(self, content: str, metadata: Dict[str, Any]) -> Dict[str, Any]:
-        """Extract tags/keywords from content."""
+        """
+        Extract tags/keywords from content.
+        
+        Args:
+            content (str): Content text.
+            metadata (Dict[str, Any]): Extra metadata for the operation.
+        
+        Returns:
+            Dict[str, Any]: Dictionary result of the operation.
+        """
         extracted = {}
 
         # Look for hashtags or tag patterns

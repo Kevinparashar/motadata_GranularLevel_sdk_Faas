@@ -4,6 +4,7 @@ Realtime Predictor
 Handles real-time predictions.
 """
 
+
 import logging
 from typing import Any, Optional
 
@@ -22,11 +23,11 @@ class RealtimePredictor:
     ):
         """
         Initialize realtime predictor.
-
+        
         Args:
-            model_manager: Model manager instance
-            cache: Optional cache mechanism
-            tenant_id: Optional tenant ID
+            model_manager (Any): Input parameter for this operation.
+            cache (Optional[Any]): Cache instance used to store and fetch cached results.
+            tenant_id (Optional[str]): Tenant identifier used for tenant isolation.
         """
         self.model_manager = model_manager
         self.cache = cache
@@ -37,13 +38,13 @@ class RealtimePredictor:
     def predict(self, model_id: str, input_data: Any) -> Any:
         """
         Make real-time prediction.
-
+        
         Args:
-            model_id: Model ID
-            input_data: Input data
-
+            model_id (str): Input parameter for this operation.
+            input_data (Any): Input parameter for this operation.
+        
         Returns:
-            Prediction result
+            Any: Result of the operation.
         """
         # Check cache
         if self.cache:

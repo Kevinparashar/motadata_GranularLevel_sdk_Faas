@@ -4,6 +4,7 @@ Prompt Generator Service - Main service implementation.
 Handles prompt-based agent and tool creation, feedback collection, and permission management.
 """
 
+
 import logging
 from typing import Any, Dict, Optional
 
@@ -58,13 +59,13 @@ class PromptGeneratorService:
     ):
         """
         Initialize Prompt Generator Service.
-
+        
         Args:
-            config: Service configuration
-            db_connection: Database connection
-            nats_client: NATS client (optional)
-            otel_tracer: OTEL tracer (optional)
-            codec_manager: Codec manager (optional)
+            config (ServiceConfig): Configuration object or settings.
+            db_connection (Any): Input parameter for this operation.
+            nats_client (Optional[Any]): Input parameter for this operation.
+            otel_tracer (Optional[Any]): Input parameter for this operation.
+            codec_manager (Optional[Any]): Input parameter for this operation.
         """
         self.config = config
         self.db = db_connection
@@ -135,7 +136,19 @@ class PromptGeneratorService:
     async def _handle_create_agent_from_prompt(
         self, request: CreateAgentFromPromptRequest, headers: dict = Header(...)
     ):
-        """Create an agent from a natural language prompt."""
+        """
+        Create an agent from a natural language prompt.
+        
+        Args:
+            request (CreateAgentFromPromptRequest): Request payload object.
+            headers (dict): HTTP headers passed from the caller.
+        
+        Returns:
+            Any: Result of the operation.
+        
+        Raises:
+            HTTPException: Raised when this function detects an invalid state or when an underlying call fails.
+        """
         standard_headers = extract_headers(**headers)
 
         try:
@@ -165,7 +178,19 @@ class PromptGeneratorService:
     async def _handle_create_tool_from_prompt(
         self, request: CreateToolFromPromptRequest, headers: dict = Header(...)
     ):
-        """Create a tool from a natural language prompt."""
+        """
+        Create a tool from a natural language prompt.
+        
+        Args:
+            request (CreateToolFromPromptRequest): Request payload object.
+            headers (dict): HTTP headers passed from the caller.
+        
+        Returns:
+            Any: Result of the operation.
+        
+        Raises:
+            HTTPException: Raised when this function detects an invalid state or when an underlying call fails.
+        """
         standard_headers = extract_headers(**headers)
 
         try:
@@ -193,7 +218,20 @@ class PromptGeneratorService:
     async def _handle_rate_agent(  # noqa: S7503
         self, agent_id: str, request: RateAgentRequest, headers: dict = Header(...)
     ):
-        """Rate an agent. Async required for FastAPI route handler."""
+        """
+        Rate an agent. Async required for FastAPI route handler.
+        
+        Args:
+            agent_id (str): Input parameter for this operation.
+            request (RateAgentRequest): Request payload object.
+            headers (dict): HTTP headers passed from the caller.
+        
+        Returns:
+            Any: Result of the operation.
+        
+        Raises:
+            HTTPException: Raised when this function detects an invalid state or when an underlying call fails.
+        """
         standard_headers = extract_headers(**headers)
 
         try:
@@ -224,7 +262,20 @@ class PromptGeneratorService:
     async def _handle_rate_tool(  # noqa: S7503
         self, tool_id: str, request: RateToolRequest, headers: dict = Header(...)
     ):
-        """Rate a tool. Async required for FastAPI route handler."""
+        """
+        Rate a tool. Async required for FastAPI route handler.
+        
+        Args:
+            tool_id (str): Tool identifier.
+            request (RateToolRequest): Request payload object.
+            headers (dict): HTTP headers passed from the caller.
+        
+        Returns:
+            Any: Result of the operation.
+        
+        Raises:
+            HTTPException: Raised when this function detects an invalid state or when an underlying call fails.
+        """
         standard_headers = extract_headers(**headers)
 
         try:
@@ -255,7 +306,19 @@ class PromptGeneratorService:
     async def _handle_get_agent_feedback(  # noqa: S7503
         self, agent_id: str, headers: dict = Header(...)
     ):
-        """Get feedback statistics for an agent. Async required for FastAPI route handler."""
+        """
+        Get feedback statistics for an agent. Async required for FastAPI route handler.
+        
+        Args:
+            agent_id (str): Input parameter for this operation.
+            headers (dict): HTTP headers passed from the caller.
+        
+        Returns:
+            Any: Result of the operation.
+        
+        Raises:
+            HTTPException: Raised when this function detects an invalid state or when an underlying call fails.
+        """
         standard_headers = extract_headers(**headers)
 
         try:
@@ -280,7 +343,19 @@ class PromptGeneratorService:
     async def _handle_get_tool_feedback(  # noqa: S7503
         self, tool_id: str, headers: dict = Header(...)
     ):
-        """Get feedback statistics for a tool. Async required for FastAPI route handler."""
+        """
+        Get feedback statistics for a tool. Async required for FastAPI route handler.
+        
+        Args:
+            tool_id (str): Tool identifier.
+            headers (dict): HTTP headers passed from the caller.
+        
+        Returns:
+            Any: Result of the operation.
+        
+        Raises:
+            HTTPException: Raised when this function detects an invalid state or when an underlying call fails.
+        """
         standard_headers = extract_headers(**headers)
 
         try:
@@ -305,7 +380,19 @@ class PromptGeneratorService:
     async def _handle_grant_permission(  # noqa: S7503
         self, request: GrantPermissionRequest, headers: dict = Header(...)
     ):
-        """Grant permission for a resource. Async required for FastAPI route handler."""
+        """
+        Grant permission for a resource. Async required for FastAPI route handler.
+        
+        Args:
+            request (GrantPermissionRequest): Request payload object.
+            headers (dict): HTTP headers passed from the caller.
+        
+        Returns:
+            Any: Result of the operation.
+        
+        Raises:
+            HTTPException: Raised when this function detects an invalid state or when an underlying call fails.
+        """
         standard_headers = extract_headers(**headers)
 
         try:
@@ -331,13 +418,27 @@ class PromptGeneratorService:
             )
 
     async def _handle_health_check(self):  # noqa: S7503
-        """Health check endpoint. Async required for FastAPI route handler."""
+        """
+        Health check endpoint. Async required for FastAPI route handler.
+        
+        Returns:
+            Any: Result of the operation.
+        """
         return {"status": "healthy", "service": "prompt-generator-service"}
 
     async def _create_agent_from_prompt(
         self, request: CreateAgentFromPromptRequest, headers: Any
     ) -> Dict[str, Any]:
-        """Create agent from prompt."""
+        """
+        Create agent from prompt.
+        
+        Args:
+            request (CreateAgentFromPromptRequest): Request payload object.
+            headers (Any): HTTP headers passed from the caller.
+        
+        Returns:
+            Dict[str, Any]: Dictionary result of the operation.
+        """
         # Create gateway if not already created
         if not self.gateway:
             import os
@@ -368,7 +469,16 @@ class PromptGeneratorService:
     async def _create_tool_from_prompt(
         self, request: CreateToolFromPromptRequest, headers: Any
     ) -> Dict[str, Any]:
-        """Create tool from prompt."""
+        """
+        Create tool from prompt.
+        
+        Args:
+            request (CreateToolFromPromptRequest): Request payload object.
+            headers (Any): HTTP headers passed from the caller.
+        
+        Returns:
+            Dict[str, Any]: Dictionary result of the operation.
+        """
         # Create gateway if not already created
         if not self.gateway:
             import os

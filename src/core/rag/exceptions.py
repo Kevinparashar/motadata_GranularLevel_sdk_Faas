@@ -4,6 +4,7 @@ RAG System Exception Hierarchy
 Exceptions specific to the RAG (Retrieval-Augmented Generation) system.
 """
 
+
 from typing import Any, Optional
 
 from ..exceptions import SDKError
@@ -33,6 +34,16 @@ class RetrievalError(RAGError):
         operation: Optional[str] = None,
         original_error: Optional[Exception] = None,
     ):
+        """
+        __init__.
+        
+        Args:
+            message (str): Input parameter for this operation.
+            query (Optional[str]): Input parameter for this operation.
+            document_id (Optional[str]): Input parameter for this operation.
+            operation (Optional[str]): Input parameter for this operation.
+            original_error (Optional[Exception]): Input parameter for this operation.
+        """
         super().__init__(message, original_error)
         self.query = query
         self.document_id = document_id
@@ -57,6 +68,16 @@ class GenerationError(RAGError):
         operation: Optional[str] = None,
         original_error: Optional[Exception] = None,
     ):
+        """
+        __init__.
+        
+        Args:
+            message (str): Input parameter for this operation.
+            query (Optional[str]): Input parameter for this operation.
+            context (Optional[str]): Input parameter for this operation.
+            operation (Optional[str]): Input parameter for this operation.
+            original_error (Optional[Exception]): Input parameter for this operation.
+        """
         super().__init__(message, original_error)
         self.query = query
         self.context = context
@@ -79,6 +100,15 @@ class EmbeddingError(RAGError):
         model: Optional[str] = None,
         original_error: Optional[Exception] = None,
     ):
+        """
+        __init__.
+        
+        Args:
+            message (str): Input parameter for this operation.
+            text (Optional[str]): Input parameter for this operation.
+            model (Optional[str]): Model name or identifier to use.
+            original_error (Optional[Exception]): Input parameter for this operation.
+        """
         super().__init__(message, original_error)
         self.text = text
         self.model = model
@@ -102,6 +132,16 @@ class DocumentProcessingError(RAGError):
         operation: Optional[str] = None,
         original_error: Optional[Exception] = None,
     ):
+        """
+        __init__.
+        
+        Args:
+            message (str): Input parameter for this operation.
+            document_id (Optional[str]): Input parameter for this operation.
+            file_path (Optional[str]): Path of the input file.
+            operation (Optional[str]): Input parameter for this operation.
+            original_error (Optional[Exception]): Input parameter for this operation.
+        """
         super().__init__(message, original_error)
         self.document_id = document_id
         self.file_path = file_path
@@ -124,6 +164,15 @@ class ChunkingError(RAGError):
         chunking_strategy: Optional[str] = None,
         original_error: Optional[Exception] = None,
     ):
+        """
+        __init__.
+        
+        Args:
+            message (str): Input parameter for this operation.
+            document_id (Optional[str]): Input parameter for this operation.
+            chunking_strategy (Optional[str]): Input parameter for this operation.
+            original_error (Optional[Exception]): Input parameter for this operation.
+        """
         super().__init__(message, original_error)
         self.document_id = document_id
         self.chunking_strategy = chunking_strategy
@@ -145,6 +194,15 @@ class ValidationError(RAGError):
         value: Optional[Any] = None,
         original_error: Optional[Exception] = None,
     ):
+        """
+        __init__.
+        
+        Args:
+            message (str): Input parameter for this operation.
+            field (Optional[str]): Input parameter for this operation.
+            value (Optional[Any]): Input parameter for this operation.
+            original_error (Optional[Exception]): Input parameter for this operation.
+        """
         super().__init__(message, original_error)
         self.field = field
         self.value = value

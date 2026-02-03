@@ -4,6 +4,7 @@ Feature Store
 Centralized feature storage and retrieval.
 """
 
+
 import logging
 from typing import Any, Dict, List, Optional
 
@@ -22,10 +23,10 @@ class FeatureStore:
     def __init__(self, db: DatabaseConnection, tenant_id: Optional[str] = None):
         """
         Initialize feature store.
-
+        
         Args:
-            db: Database connection
-            tenant_id: Optional tenant ID
+            db (DatabaseConnection): Database connection/handle.
+            tenant_id (Optional[str]): Tenant identifier used for tenant isolation.
         """
         self.db = db
         self.tenant_id = tenant_id
@@ -41,15 +42,15 @@ class FeatureStore:
     ) -> str:
         """
         Register a feature.
-
+        
         Args:
-            feature_name: Name of feature
-            feature_data: Feature data
-            version: Feature version
-            metadata: Optional metadata
-
+            feature_name (str): Input parameter for this operation.
+            feature_data (Any): Input parameter for this operation.
+            version (str): Input parameter for this operation.
+            metadata (Optional[Dict[str, Any]]): Extra metadata for the operation.
+        
         Returns:
-            Feature ID
+            str: Returned text value.
         """
         import json
 
@@ -79,13 +80,13 @@ class FeatureStore:
     ) -> Optional[Dict[str, Any]]:
         """
         Get feature.
-
+        
         Args:
-            feature_name: Feature name
-            version: Optional version
-
+            feature_name (str): Input parameter for this operation.
+            version (Optional[str]): Input parameter for this operation.
+        
         Returns:
-            Feature data or None
+            Optional[Dict[str, Any]]: Dictionary result of the operation.
         """
         if version:
             query = """
@@ -105,7 +106,12 @@ class FeatureStore:
         return dict(result) if result else None
 
     def list_features(self) -> List[Dict[str, Any]]:
-        """List all features."""
+        """
+        List all features.
+        
+        Returns:
+            List[Dict[str, Any]]: Dictionary result of the operation.
+        """
         query = """
         SELECT DISTINCT feature_name, version FROM ml_features
         WHERE tenant_id = %s;

@@ -4,6 +4,7 @@ Performance Benchmarks for PostgreSQL Database
 Measures query performance and vector search speed.
 """
 
+
 import time
 from typing import Dict, List
 from unittest.mock import MagicMock, patch

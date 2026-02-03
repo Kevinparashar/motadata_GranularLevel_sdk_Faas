@@ -4,6 +4,7 @@ Generator Cache
 Specialized caching for prompt interpretations and generated configurations.
 """
 
+
 from typing import Optional
 
 from ..cache_mechanism import CacheConfig, CacheMechanism
@@ -24,9 +25,9 @@ class GeneratorCache:
     def __init__(self, cache: Optional[CacheMechanism] = None):
         """
         Initialize generator cache.
-
+        
         Args:
-            cache: Optional CacheMechanism instance (creates new if None)
+            cache (Optional[CacheMechanism]): Cache instance used to store and fetch cached results.
         """
         self.cache = cache or CacheMechanism(
             CacheConfig(namespace="prompt_generator", default_ttl=86400)  # 24 hours default
@@ -45,11 +46,14 @@ class GeneratorCache:
     ) -> None:
         """
         Cache prompt interpretation.
-
+        
         Args:
-            prompt_hash: Hash of the prompt
-            interpretation: Interpretation result
-            tenant_id: Optional tenant ID
+            prompt_hash (str): Input parameter for this operation.
+            interpretation (ConfigDict): Input parameter for this operation.
+            tenant_id (Optional[str]): Tenant identifier used for tenant isolation.
+        
+        Returns:
+            None: Result of the operation.
         """
         import json
 
@@ -65,13 +69,13 @@ class GeneratorCache:
     ) -> Optional[ConfigDict]:
         """
         Get cached prompt interpretation.
-
+        
         Args:
-            prompt_hash: Hash of the prompt
-            tenant_id: Optional tenant ID
-
+            prompt_hash (str): Input parameter for this operation.
+            tenant_id (Optional[str]): Tenant identifier used for tenant isolation.
+        
         Returns:
-            Cached interpretation or None
+            Optional[ConfigDict]: Result if available, else None.
         """
         import json
 
@@ -88,11 +92,14 @@ class GeneratorCache:
     ) -> None:
         """
         Cache agent configuration.
-
+        
         Args:
-            agent_id: Agent ID
-            config: Agent configuration
-            tenant_id: Optional tenant ID
+            agent_id (str): Input parameter for this operation.
+            config (ConfigDict): Configuration object or settings.
+            tenant_id (Optional[str]): Tenant identifier used for tenant isolation.
+        
+        Returns:
+            None: Result of the operation.
         """
         import json
 
@@ -108,13 +115,13 @@ class GeneratorCache:
     ) -> Optional[ConfigDict]:
         """
         Get cached agent configuration.
-
+        
         Args:
-            agent_id: Agent ID
-            tenant_id: Optional tenant ID
-
+            agent_id (str): Input parameter for this operation.
+            tenant_id (Optional[str]): Tenant identifier used for tenant isolation.
+        
         Returns:
-            Cached config or None
+            Optional[ConfigDict]: Result if available, else None.
         """
         import json
 
@@ -131,11 +138,14 @@ class GeneratorCache:
     ) -> None:
         """
         Cache tool schema.
-
+        
         Args:
-            tool_id: Tool ID
-            schema: Tool schema
-            tenant_id: Optional tenant ID
+            tool_id (str): Tool identifier.
+            schema (ConfigDict): Input parameter for this operation.
+            tenant_id (Optional[str]): Tenant identifier used for tenant isolation.
+        
+        Returns:
+            None: Result of the operation.
         """
         import json
 
@@ -151,13 +161,13 @@ class GeneratorCache:
     ) -> Optional[ConfigDict]:
         """
         Get cached tool schema.
-
+        
         Args:
-            tool_id: Tool ID
-            tenant_id: Optional tenant ID
-
+            tool_id (str): Tool identifier.
+            tenant_id (Optional[str]): Tenant identifier used for tenant isolation.
+        
         Returns:
-            Cached schema or None
+            Optional[ConfigDict]: Result if available, else None.
         """
         import json
 
@@ -172,11 +182,14 @@ class GeneratorCache:
     def cache_tool_code(self, tool_id: str, code: str, tenant_id: Optional[str] = None) -> None:
         """
         Cache generated tool code.
-
+        
         Args:
-            tool_id: Tool ID
-            code: Generated code
-            tenant_id: Optional tenant ID
+            tool_id (str): Tool identifier.
+            code (str): Input parameter for this operation.
+            tenant_id (Optional[str]): Tenant identifier used for tenant isolation.
+        
+        Returns:
+            None: Result of the operation.
         """
         self.cache.set(
             f"tool_code:{tool_id}", code, tenant_id=tenant_id, ttl=self.ttl_config["tool_code"]
@@ -185,13 +198,13 @@ class GeneratorCache:
     def get_cached_tool_code(self, tool_id: str, tenant_id: Optional[str] = None) -> Optional[str]:
         """
         Get cached tool code.
-
+        
         Args:
-            tool_id: Tool ID
-            tenant_id: Optional tenant ID
-
+            tool_id (str): Tool identifier.
+            tenant_id (Optional[str]): Tenant identifier used for tenant isolation.
+        
         Returns:
-            Cached code or None
+            Optional[str]: Returned text value.
         """
         cached = self.cache.get(f"tool_code:{tool_id}", tenant_id=tenant_id)
         return cached if isinstance(cached, str) else None
@@ -199,18 +212,24 @@ class GeneratorCache:
     def invalidate_pattern(self, pattern: str, tenant_id: Optional[str] = None) -> None:
         """
         Invalidate cache entries matching pattern.
-
+        
         Args:
-            pattern: Pattern to match
-            tenant_id: Optional tenant ID
+            pattern (str): Input parameter for this operation.
+            tenant_id (Optional[str]): Tenant identifier used for tenant isolation.
+        
+        Returns:
+            None: Result of the operation.
         """
         self.cache.invalidate_pattern(pattern, tenant_id=tenant_id)
 
     def clear_all(self, tenant_id: Optional[str] = None) -> None:
         """
         Clear all cached entries for tenant.
-
+        
         Args:
-            tenant_id: Optional tenant ID
+            tenant_id (Optional[str]): Tenant identifier used for tenant isolation.
+        
+        Returns:
+            None: Result of the operation.
         """
         self.cache.invalidate_pattern("", tenant_id=tenant_id)

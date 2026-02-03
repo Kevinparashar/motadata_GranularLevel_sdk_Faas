@@ -4,6 +4,7 @@ Prompt Context Management - High-Level Functions
 Factory functions, convenience functions, and utilities for prompt management.
 """
 
+
 from typing import Any, Dict, List, Optional
 
 from .prompt_manager import ContextWindowManager, PromptContextManager
@@ -91,21 +92,24 @@ def add_template(
 ) -> None:
     """
     Add a prompt template (high-level convenience).
-
-    Args:
-        manager: PromptContextManager instance
-        name: Template name
-        version: Template version
-        content: Template content
-        metadata: Optional metadata
-
+    
     Example:
-        >>> add_template(
-        ...     manager,
-        ...     "greeting",
-        ...     "1.0",
-        ...     "Hello {name}, welcome to {service}!"
-        ... )
+                            >>> add_template(
+                            ...     manager,
+                            ...     "greeting",
+                            ...     "1.0",
+                            ...     "Hello {name}, welcome to {service}!"
+                            ... )
+    
+    Args:
+        manager (PromptContextManager): Input parameter for this operation.
+        name (str): Name value.
+        version (str): Input parameter for this operation.
+        content (str): Content text.
+        metadata (Optional[Dict[str, Any]]): Extra metadata for the operation.
+    
+    Returns:
+        None: Result of the operation.
     """
     manager.add_template(name=name, version=version, content=content, metadata=metadata)
 

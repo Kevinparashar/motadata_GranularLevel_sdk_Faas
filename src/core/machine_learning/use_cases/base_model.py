@@ -5,6 +5,7 @@ Base class interface for all ML use case models.
 When creating a new use case, inherit from this class.
 """
 
+
 import logging
 from abc import ABC, abstractmethod
 from typing import Any, Dict, Optional
@@ -23,11 +24,11 @@ class BaseMLModel(ABC):
     def __init__(self, model_id: str, tenant_id: Optional[str] = None, **kwargs):
         """
         Initialize base model.
-
+        
         Args:
-            model_id: Unique model identifier
-            tenant_id: Optional tenant ID
-            **kwargs: Additional model-specific parameters
+            model_id (str): Input parameter for this operation.
+            tenant_id (Optional[str]): Tenant identifier used for tenant isolation.
+            **kwargs (Any): Input parameter for this operation.
         """
         self.model_id = model_id
         self.tenant_id = tenant_id
@@ -46,15 +47,15 @@ class BaseMLModel(ABC):
     ) -> Dict[str, Any]:
         """
         Train the model.
-
+        
         Args:
-            training_data: Training dataset
-            validation_data: Optional validation dataset
-            hyperparameters: Training hyperparameters
-            **kwargs: Additional training parameters
-
+            training_data (Any): Input parameter for this operation.
+            validation_data (Optional[Any]): Input parameter for this operation.
+            hyperparameters (Optional[Dict[str, Any]]): Input parameter for this operation.
+            **kwargs (Any): Input parameter for this operation.
+        
         Returns:
-            Dictionary with training results (metrics, etc.)
+            Dict[str, Any]: Dictionary result of the operation.
         """
         pass
 
@@ -62,13 +63,13 @@ class BaseMLModel(ABC):
     def predict(self, input_data: Any, **kwargs) -> Any:
         """
         Make predictions.
-
+        
         Args:
-            input_data: Input data for prediction
-            **kwargs: Additional prediction parameters
-
+            input_data (Any): Input parameter for this operation.
+            **kwargs (Any): Input parameter for this operation.
+        
         Returns:
-            Prediction results
+            Any: Result of the operation.
         """
         pass
 
@@ -76,13 +77,13 @@ class BaseMLModel(ABC):
     def evaluate(self, test_data: Any, **kwargs) -> Dict[str, Any]:
         """
         Evaluate model performance.
-
+        
         Args:
-            test_data: Test dataset
-            **kwargs: Additional evaluation parameters
-
+            test_data (Any): Input parameter for this operation.
+            **kwargs (Any): Input parameter for this operation.
+        
         Returns:
-            Dictionary with evaluation metrics
+            Dict[str, Any]: Dictionary result of the operation.
         """
         pass
 
@@ -90,13 +91,13 @@ class BaseMLModel(ABC):
     def save(self, filepath: str, **kwargs) -> str:
         """
         Save model to file.
-
+        
         Args:
-            filepath: Path to save model
-            **kwargs: Additional save parameters
-
+            filepath (str): Input parameter for this operation.
+            **kwargs (Any): Input parameter for this operation.
+        
         Returns:
-            Path to saved model file
+            str: Returned text value.
         """
         pass
 
@@ -104,19 +105,22 @@ class BaseMLModel(ABC):
     def load(self, filepath: str, **kwargs) -> None:
         """
         Load model from file.
-
+        
         Args:
-            filepath: Path to model file
-            **kwargs: Additional load parameters
+            filepath (str): Input parameter for this operation.
+            **kwargs (Any): Input parameter for this operation.
+        
+        Returns:
+            None: Result of the operation.
         """
         pass
 
     def get_model_info(self) -> Dict[str, Any]:
         """
         Get model information.
-
+        
         Returns:
-            Dictionary with model metadata
+            Dict[str, Any]: Dictionary result of the operation.
         """
         return {
             "model_id": self.model_id,

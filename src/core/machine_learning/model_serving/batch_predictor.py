@@ -4,6 +4,7 @@ Batch Predictor
 Handles batch prediction jobs.
 """
 
+
 import logging
 from datetime import datetime, timezone
 from typing import Any, Dict, List, Optional
@@ -21,10 +22,10 @@ class BatchPredictor:
     def __init__(self, model_manager: Any, tenant_id: Optional[str] = None):
         """
         Initialize batch predictor.
-
+        
         Args:
-            model_manager: Model manager instance
-            tenant_id: Optional tenant ID
+            model_manager (Any): Input parameter for this operation.
+            tenant_id (Optional[str]): Tenant identifier used for tenant isolation.
         """
         self.model_manager = model_manager
         self.tenant_id = tenant_id
@@ -37,14 +38,14 @@ class BatchPredictor:
     ) -> str:
         """
         Submit batch prediction job.
-
+        
         Args:
-            model_id: Model ID
-            input_batch: Batch of input data
-            job_id: Optional job ID
-
+            model_id (str): Input parameter for this operation.
+            input_batch (List[Any]): Input parameter for this operation.
+            job_id (Optional[str]): Input parameter for this operation.
+        
         Returns:
-            Job ID
+            str: Returned text value.
         """
         if job_id is None:
             job_id = f"batch_{model_id}_{datetime.now().timestamp()}"
@@ -63,24 +64,24 @@ class BatchPredictor:
     def get_batch_status(self, job_id: str) -> Dict[str, Any]:
         """
         Get batch job status.
-
+        
         Args:
-            job_id: Job ID
-
+            job_id (str): Input parameter for this operation.
+        
         Returns:
-            Job status information
+            Dict[str, Any]: Dictionary result of the operation.
         """
         return self._jobs.get(job_id, {})
 
     def get_batch_results(self, job_id: str) -> Optional[List[Any]]:
         """
         Get batch job results.
-
+        
         Args:
-            job_id: Job ID
-
+            job_id (str): Input parameter for this operation.
+        
         Returns:
-            Prediction results or None
+            Optional[List[Any]]: List result of the operation.
         """
         job = self._jobs.get(job_id)
         if job:

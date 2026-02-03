@@ -4,6 +4,7 @@ LLMOps Service - Main service implementation.
 Handles LLM operations logging, monitoring, metrics, and cost tracking.
 """
 
+
 import logging
 from datetime import datetime, timedelta
 from typing import Any, Dict, List, Optional
@@ -44,13 +45,13 @@ class LLMOpsService:
     ):
         """
         Initialize LLMOps Service.
-
+        
         Args:
-            config: Service configuration
-            db_connection: Database connection
-            nats_client: NATS client (optional)
-            otel_tracer: OTEL tracer (optional)
-            codec_manager: Codec manager (optional)
+            config (ServiceConfig): Configuration object or settings.
+            db_connection (Any): Input parameter for this operation.
+            nats_client (Optional[Any]): Input parameter for this operation.
+            otel_tracer (Optional[Any]): Input parameter for this operation.
+            codec_manager (Optional[Any]): Input parameter for this operation.
         """
         self.config = config
         self.db = db_connection
@@ -77,7 +78,16 @@ class LLMOpsService:
     def _handle_log_operation(
         self, request: LogOperationRequest, standard_headers: Any
     ) -> ServiceResponse:
-        """Handle log operation business logic."""
+        """
+        Handle log operation business logic.
+        
+        Args:
+            request (LogOperationRequest): Request payload object.
+            standard_headers (Any): Input parameter for this operation.
+        
+        Returns:
+            ServiceResponse: Result of the operation.
+        """
         operation_id = self.llmops.log_operation(
             operation_type=LLMOperationType(request.operation_type.value),
             model=request.model,
@@ -101,7 +111,16 @@ class LLMOpsService:
     def _calculate_cutoff_date(
         self, start_date: Optional[datetime], end_date: Optional[datetime]
     ) -> datetime:
-        """Calculate cutoff date for filtering operations."""
+        """
+        Calculate cutoff date for filtering operations.
+        
+        Args:
+            start_date (Optional[datetime]): Input parameter for this operation.
+            end_date (Optional[datetime]): Input parameter for this operation.
+        
+        Returns:
+            datetime: Result of the operation.
+        """
         if start_date:
             return start_date
         elif end_date:
@@ -120,7 +139,22 @@ class LLMOpsService:
         status_filter: Optional[str],
         end_date: Optional[datetime],
     ) -> List[Any]:
-        """Filter operations based on criteria."""
+        """
+        Filter operations based on criteria.
+        
+        Args:
+            all_operations (List[Any]): Input parameter for this operation.
+            cutoff (datetime): Input parameter for this operation.
+            filter_tenant_id (Optional[str]): Input parameter for this operation.
+            agent_id (Optional[str]): Input parameter for this operation.
+            model (Optional[str]): Model name or identifier to use.
+            operation_type (Optional[str]): Input parameter for this operation.
+            status_filter (Optional[str]): Input parameter for this operation.
+            end_date (Optional[datetime]): Input parameter for this operation.
+        
+        Returns:
+            List[Any]: List result of the operation.
+        """
         return [
             op
             for op in all_operations
@@ -134,7 +168,15 @@ class LLMOpsService:
         ]
 
     def _format_operation_list(self, operations: List[Any]) -> List[Dict[str, Any]]:
-        """Format operations list for response."""
+        """
+        Format operations list for response.
+        
+        Args:
+            operations (List[Any]): Input parameter for this operation.
+        
+        Returns:
+            List[Dict[str, Any]]: Dictionary result of the operation.
+        """
         return [
             {
                 "operation_id": op.operation_id,
@@ -167,7 +209,24 @@ class LLMOpsService:
         offset: int,
         standard_headers: Any,
     ) -> ServiceResponse:
-        """Handle query operations business logic."""
+        """
+        Handle query operations business logic.
+        
+        Args:
+            tenant_id (Optional[str]): Tenant identifier used for tenant isolation.
+            agent_id (Optional[str]): Input parameter for this operation.
+            model (Optional[str]): Model name or identifier to use.
+            operation_type (Optional[str]): Input parameter for this operation.
+            status_filter (Optional[str]): Input parameter for this operation.
+            start_date (Optional[datetime]): Input parameter for this operation.
+            end_date (Optional[datetime]): Input parameter for this operation.
+            limit (int): Input parameter for this operation.
+            offset (int): Input parameter for this operation.
+            standard_headers (Any): Input parameter for this operation.
+        
+        Returns:
+            ServiceResponse: Result of the operation.
+        """
         filter_tenant_id = tenant_id or standard_headers.tenant_id
         cutoff = self._calculate_cutoff_date(start_date, end_date)
 
@@ -196,7 +255,16 @@ class LLMOpsService:
     def _calculate_time_range(
         self, start_date: Optional[datetime], end_date: Optional[datetime]
     ) -> int:
-        """Calculate time range in hours."""
+        """
+        Calculate time range in hours.
+        
+        Args:
+            start_date (Optional[datetime]): Input parameter for this operation.
+            end_date (Optional[datetime]): Input parameter for this operation.
+        
+        Returns:
+            int: Result of the operation.
+        """
         if start_date and end_date:
             return int((end_date - start_date).total_seconds() / 3600)
         elif start_date:
@@ -205,7 +273,15 @@ class LLMOpsService:
             return 24
 
     def _format_metrics_response(self, metrics: Dict[str, Any]) -> Dict[str, Any]:
-        """Format metrics for response."""
+        """
+        Format metrics for response.
+        
+        Args:
+            metrics (Dict[str, Any]): Input parameter for this operation.
+        
+        Returns:
+            Dict[str, Any]: Dictionary result of the operation.
+        """
         return {
             "total_operations": metrics.get("total_operations", 0),
             "total_tokens": metrics.get("total_tokens", 0),
@@ -235,7 +311,20 @@ class LLMOpsService:
         end_date: Optional[datetime],
         time_range_hours: int,
     ) -> Dict[str, Any]:
-        """Format cost analysis for response."""
+        """
+        Format cost analysis for response.
+        
+        Args:
+            cost_summary (Dict[str, Any]): Input parameter for this operation.
+            metrics (Dict[str, Any]): Input parameter for this operation.
+            filter_tenant_id (Optional[str]): Input parameter for this operation.
+            start_date (Optional[datetime]): Input parameter for this operation.
+            end_date (Optional[datetime]): Input parameter for this operation.
+            time_range_hours (int): Input parameter for this operation.
+        
+        Returns:
+            Dict[str, Any]: Dictionary result of the operation.
+        """
         return {
             "total_cost_usd": cost_summary.get("total_cost_usd", 0.0),
             "cost_by_model": {
@@ -281,7 +370,19 @@ class LLMOpsService:
     async def _handle_log_operation_route(  # noqa: S7503
         self, request: LogOperationRequest, headers: dict = Header(...)
     ):
-        """Log an LLM operation. Async required for FastAPI route handler."""
+        """
+        Log an LLM operation. Async required for FastAPI route handler.
+        
+        Args:
+            request (LogOperationRequest): Request payload object.
+            headers (dict): HTTP headers passed from the caller.
+        
+        Returns:
+            Any: Result of the operation.
+        
+        Raises:
+            HTTPException: Raised when this function detects an invalid state or when an underlying call fails.
+        """
         standard_headers = extract_headers(**headers)
         try:
             return self._handle_log_operation(request, standard_headers)
@@ -305,7 +406,27 @@ class LLMOpsService:
         offset: int = Query(0, ge=0),
         headers: dict = Header(...),
     ):
-        """Query LLM operations. Async required for FastAPI route handler."""
+        """
+        Query LLM operations. Async required for FastAPI route handler.
+        
+        Args:
+            tenant_id (Optional[str]): Tenant identifier used for tenant isolation.
+            agent_id (Optional[str]): Input parameter for this operation.
+            model (Optional[str]): Model name or identifier to use.
+            operation_type (Optional[str]): Input parameter for this operation.
+            status_filter (Optional[str]): Input parameter for this operation.
+            start_date (Optional[datetime]): Input parameter for this operation.
+            end_date (Optional[datetime]): Input parameter for this operation.
+            limit (int): Input parameter for this operation.
+            offset (int): Input parameter for this operation.
+            headers (dict): HTTP headers passed from the caller.
+        
+        Returns:
+            Any: Result of the operation.
+        
+        Raises:
+            HTTPException: Raised when this function detects an invalid state or when an underlying call fails.
+        """
         standard_headers = extract_headers(**headers)
         try:
             return self._handle_query_operations(
@@ -334,7 +455,21 @@ class LLMOpsService:
         end_date: Optional[datetime] = Query(None, alias="end_date"),
         headers: dict = Header(...),
     ):
-        """Get LLM operations metrics. Async required for FastAPI route handler."""
+        """
+        Get LLM operations metrics. Async required for FastAPI route handler.
+        
+        Args:
+            tenant_id (Optional[str]): Tenant identifier used for tenant isolation.
+            start_date (Optional[datetime]): Input parameter for this operation.
+            end_date (Optional[datetime]): Input parameter for this operation.
+            headers (dict): HTTP headers passed from the caller.
+        
+        Returns:
+            Any: Result of the operation.
+        
+        Raises:
+            HTTPException: Raised when this function detects an invalid state or when an underlying call fails.
+        """
         standard_headers = extract_headers(**headers)
         try:
             filter_tenant_id = tenant_id or standard_headers.tenant_id
@@ -364,7 +499,21 @@ class LLMOpsService:
         end_date: Optional[datetime] = Query(None, alias="end_date"),
         headers: dict = Header(...),
     ):
-        """Get cost analysis. Async required for FastAPI route handler."""
+        """
+        Get cost analysis. Async required for FastAPI route handler.
+        
+        Args:
+            tenant_id (Optional[str]): Tenant identifier used for tenant isolation.
+            start_date (Optional[datetime]): Input parameter for this operation.
+            end_date (Optional[datetime]): Input parameter for this operation.
+            headers (dict): HTTP headers passed from the caller.
+        
+        Returns:
+            Any: Result of the operation.
+        
+        Raises:
+            HTTPException: Raised when this function detects an invalid state or when an underlying call fails.
+        """
         standard_headers = extract_headers(**headers)
         try:
             filter_tenant_id = tenant_id or standard_headers.tenant_id
@@ -399,7 +548,12 @@ class LLMOpsService:
             )
 
     async def _handle_health_check(self):  # noqa: S7503
-        """Health check endpoint. Async required for FastAPI route handler."""
+        """
+        Health check endpoint. Async required for FastAPI route handler.
+        
+        Returns:
+            Any: Result of the operation.
+        """
         return {"status": "healthy", "service": "llmops-service"}
 
 

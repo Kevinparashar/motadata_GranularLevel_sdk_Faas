@@ -4,6 +4,7 @@ Predictor
 Inference engine for model predictions with preprocessing, postprocessing, and caching.
 """
 
+
 # Standard library imports
 import logging
 from typing import Any, List, Optional
@@ -31,11 +32,11 @@ class Predictor:
     ):
         """
         Initialize predictor.
-
+        
         Args:
-            model_manager: Model manager instance
-            cache: Optional cache mechanism
-            tenant_id: Optional tenant ID
+            model_manager (ModelManager): Input parameter for this operation.
+            cache (Optional[CacheMechanism]): Cache instance used to store and fetch cached results.
+            tenant_id (Optional[str]): Tenant identifier used for tenant isolation.
         """
         self.model_manager = model_manager
         self.cache = cache
@@ -46,13 +47,13 @@ class Predictor:
     def predict(self, model: Any, input_data: Any) -> Any:
         """
         Make a single prediction.
-
+        
         Args:
-            model: Loaded model instance
-            input_data: Preprocessed input data
-
+            model (Any): Model name or identifier to use.
+            input_data (Any): Input parameter for this operation.
+        
         Returns:
-            Prediction result
+            Any: Result of the operation.
         """
         try:
             result = model.predict(input_data)
@@ -70,13 +71,13 @@ class Predictor:
     def predict_batch(self, model: Any, input_batch: List[Any]) -> List[Any]:
         """
         Make batch predictions.
-
+        
         Args:
-            model: Loaded model instance
-            input_batch: List of preprocessed input data
-
+            model (Any): Model name or identifier to use.
+            input_batch (List[Any]): Input parameter for this operation.
+        
         Returns:
-            List of prediction results
+            List[Any]: List result of the operation.
         """
         try:
             results = model.predict(input_batch)
@@ -94,13 +95,13 @@ class Predictor:
     def predict_proba(self, model: Any, input_data: Any) -> Any:
         """
         Get prediction probabilities (for classification models).
-
+        
         Args:
-            model: Loaded model instance
-            input_data: Preprocessed input data
-
+            model (Any): Model name or identifier to use.
+            input_data (Any): Input parameter for this operation.
+        
         Returns:
-            Prediction probabilities
+            Any: Result of the operation.
         """
         try:
             if hasattr(model, "predict_proba"):

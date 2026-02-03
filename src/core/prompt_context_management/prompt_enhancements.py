@@ -4,6 +4,7 @@ Prompt System Enhancements
 Dynamic prompting, automatic optimization, and fallback templates.
 """
 
+
 import re
 from dataclasses import dataclass
 from datetime import datetime
@@ -29,9 +30,9 @@ class DynamicPromptBuilder:
     def __init__(self, prompt_store: PromptStore):
         """
         Initialize dynamic prompt builder.
-
+        
         Args:
-            prompt_store: Prompt store instance
+            prompt_store (PromptStore): Input parameter for this operation.
         """
         self.prompt_store = prompt_store
         self.context_adapters: List[Callable] = []
@@ -39,9 +40,12 @@ class DynamicPromptBuilder:
     def add_context_adapter(self, adapter: Callable) -> None:
         """
         Add a context adapter function.
-
+        
         Args:
-            adapter: Function that modifies prompt based on context
+            adapter (Callable): Input parameter for this operation.
+        
+        Returns:
+            None: Result of the operation.
         """
         self.context_adapters.append(adapter)
 
@@ -55,16 +59,19 @@ class DynamicPromptBuilder:
     ) -> str:
         """
         Build a dynamic prompt that adjusts based on context.
-
+        
         Args:
-            template_name: Base template name
-            variables: Template variables
-            context: Additional context for dynamic adjustment
-            tenant_id: Optional tenant ID
-            version: Optional template version
-
+            template_name (str): Input parameter for this operation.
+            variables (Dict[str, Any]): Input parameter for this operation.
+            context (Dict[str, Any]): Input parameter for this operation.
+            tenant_id (Optional[str]): Tenant identifier used for tenant isolation.
+            version (Optional[str]): Input parameter for this operation.
+        
         Returns:
-            Dynamically adjusted prompt
+            str: Returned text value.
+        
+        Raises:
+            ValueError: Raised when this function detects an invalid state or when an underlying call fails.
         """
         # Get base template
         template = self.prompt_store.get(template_name, tenant_id=tenant_id, version=version)
@@ -87,13 +94,13 @@ class DynamicPromptBuilder:
     def adapt_for_context(self, prompt: str, context: Dict[str, Any]) -> str:
         """
         Adapt prompt based on context.
-
+        
         Args:
-            prompt: Base prompt
-            context: Context information
-
+            prompt (str): Prompt text sent to the model.
+            context (Dict[str, Any]): Input parameter for this operation.
+        
         Returns:
-            Adapted prompt
+            str: Returned text value.
         """
         # Example: Add context-specific instructions
         if context.get("user_role") == "admin":
@@ -121,22 +128,25 @@ class PromptOptimizer:
     def add_optimization_rule(self, rule: Callable) -> None:
         """
         Add an optimization rule.
-
+        
         Args:
-            rule: Function that optimizes a prompt
+            rule (Callable): Input parameter for this operation.
+        
+        Returns:
+            None: Result of the operation.
         """
         self.optimization_rules.append(rule)
 
     def optimize(self, prompt: str, context: Optional[Dict[str, Any]] = None) -> str:
         """
         Optimize a prompt.
-
+        
         Args:
-            prompt: Prompt to optimize
-            context: Optional context
-
+            prompt (str): Prompt text sent to the model.
+            context (Optional[Dict[str, Any]]): Input parameter for this operation.
+        
         Returns:
-            Optimized prompt
+            str: Returned text value.
         """
         optimized = prompt
 
@@ -163,12 +173,12 @@ class PromptOptimizer:
     def optimize_for_clarity(self, prompt: str) -> str:
         """
         Optimize prompt for clarity.
-
+        
         Args:
-            prompt: Prompt to optimize
-
+            prompt (str): Prompt text sent to the model.
+        
         Returns:
-            Optimized prompt
+            str: Returned text value.
         """
         # Remove redundant whitespace
         prompt = re.sub(r"\s+", " ", prompt)
@@ -183,13 +193,13 @@ class PromptOptimizer:
     def optimize_for_length(self, prompt: str, max_length: int = 2000) -> str:
         """
         Optimize prompt length.
-
+        
         Args:
-            prompt: Prompt to optimize
-            max_length: Maximum length
-
+            prompt (str): Prompt text sent to the model.
+            max_length (int): Input parameter for this operation.
+        
         Returns:
-            Optimized prompt
+            str: Returned text value.
         """
         if len(prompt) <= max_length:
             return prompt
@@ -209,12 +219,12 @@ class PromptOptimizer:
     def optimize_for_specificity(self, prompt: str) -> str:
         """
         Optimize prompt for specificity.
-
+        
         Args:
-            prompt: Prompt to optimize
-
+            prompt (str): Prompt text sent to the model.
+        
         Returns:
-            Optimized prompt
+            str: Returned text value.
         """
         # Add specificity markers if missing
         if "be specific" not in prompt.lower() and "detailed" not in prompt.lower():
@@ -234,9 +244,9 @@ class FallbackTemplateManager:
     def __init__(self, prompt_store: PromptStore):
         """
         Initialize fallback template manager.
-
+        
         Args:
-            prompt_store: Prompt store instance
+            prompt_store (PromptStore): Input parameter for this operation.
         """
         self.prompt_store = prompt_store
         self.fallbacks: Dict[str, FallbackTemplate] = {}
@@ -247,11 +257,14 @@ class FallbackTemplateManager:
     ) -> None:
         """
         Register a fallback template.
-
+        
         Args:
-            primary_template: Primary template name
-            fallback_template: Fallback template name
-            condition: Optional condition function
+            primary_template (str): Input parameter for this operation.
+            fallback_template (str): Input parameter for this operation.
+            condition (Optional[Callable]): Input parameter for this operation.
+        
+        Returns:
+            None: Result of the operation.
         """
         self.fallbacks[primary_template] = FallbackTemplate(
             primary_template=primary_template,
@@ -262,9 +275,12 @@ class FallbackTemplateManager:
     def set_default_fallback(self, template_name: str) -> None:
         """
         Set default fallback template.
-
+        
         Args:
-            template_name: Default fallback template name
+            template_name (str): Input parameter for this operation.
+        
+        Returns:
+            None: Result of the operation.
         """
         self.default_fallback = template_name
 
@@ -275,7 +291,18 @@ class FallbackTemplateManager:
         version: Optional[str],
         context: Optional[Dict[str, Any]],
     ) -> Optional[PromptTemplate]:
-        """Try to use conditional fallback if condition is met."""
+        """
+        Try to use conditional fallback if condition is met.
+        
+        Args:
+            template_name (str): Input parameter for this operation.
+            tenant_id (Optional[str]): Tenant identifier used for tenant isolation.
+            version (Optional[str]): Input parameter for this operation.
+            context (Optional[Dict[str, Any]]): Input parameter for this operation.
+        
+        Returns:
+            Optional[PromptTemplate]: Result if available, else None.
+        """
         if template_name not in self.fallbacks:
             return None
         
@@ -301,7 +328,17 @@ class FallbackTemplateManager:
         tenant_id: Optional[str],
         version: Optional[str],
     ) -> Optional[PromptTemplate]:
-        """Get the configured fallback template."""
+        """
+        Get the configured fallback template.
+        
+        Args:
+            template_name (str): Input parameter for this operation.
+            tenant_id (Optional[str]): Tenant identifier used for tenant isolation.
+            version (Optional[str]): Input parameter for this operation.
+        
+        Returns:
+            Optional[PromptTemplate]: Result if available, else None.
+        """
         if template_name not in self.fallbacks:
             return None
         
@@ -317,7 +354,16 @@ class FallbackTemplateManager:
         tenant_id: Optional[str],
         version: Optional[str],
     ) -> Optional[PromptTemplate]:
-        """Get the default fallback template."""
+        """
+        Get the default fallback template.
+        
+        Args:
+            tenant_id (Optional[str]): Tenant identifier used for tenant isolation.
+            version (Optional[str]): Input parameter for this operation.
+        
+        Returns:
+            Optional[PromptTemplate]: Result if available, else None.
+        """
         if not self.default_fallback:
             return None
         
@@ -336,15 +382,15 @@ class FallbackTemplateManager:
     ) -> Optional[PromptTemplate]:
         """
         Get template with fallback support.
-
+        
         Args:
-            template_name: Primary template name
-            tenant_id: Optional tenant ID
-            version: Optional template version
-            context: Optional context for condition evaluation
-
+            template_name (str): Input parameter for this operation.
+            tenant_id (Optional[str]): Tenant identifier used for tenant isolation.
+            version (Optional[str]): Input parameter for this operation.
+            context (Optional[Dict[str, Any]]): Input parameter for this operation.
+        
         Returns:
-            Template (primary or fallback)
+            Optional[PromptTemplate]: Result if available, else None.
         """
         # Try primary template
         template = self.prompt_store.get(template_name, tenant_id=tenant_id, version=version)
@@ -374,19 +420,19 @@ class FallbackTemplateManager:
     ) -> str:
         """
         Render template with fallback support.
-
+        
         Args:
-            template_name: Primary template name
-            variables: Template variables
-            tenant_id: Optional tenant ID
-            version: Optional template version
-            context: Optional context
-
+            template_name (str): Input parameter for this operation.
+            variables (Dict[str, Any]): Input parameter for this operation.
+            tenant_id (Optional[str]): Tenant identifier used for tenant isolation.
+            version (Optional[str]): Input parameter for this operation.
+            context (Optional[Dict[str, Any]]): Input parameter for this operation.
+        
         Returns:
-            Rendered prompt
-
+            str: Returned text value.
+        
         Raises:
-            ValueError: If no template (including fallbacks) is found
+            ValueError: Raised when this function detects an invalid state or when an underlying call fails.
         """
         template = self.get_template_with_fallback(
             template_name, tenant_id=tenant_id, version=version, context=context
@@ -409,10 +455,10 @@ class EnhancedPromptContextManager:
     def __init__(self, max_tokens: int = 4000, safety_margin: int = 200):
         """
         Initialize enhanced prompt context manager.
-
+        
         Args:
-            max_tokens: Maximum tokens
-            safety_margin: Safety margin for token estimation
+            max_tokens (int): Input parameter for this operation.
+            safety_margin (int): Input parameter for this operation.
         """
         from .prompt_manager import PromptContextManager
 
@@ -437,18 +483,18 @@ class EnhancedPromptContextManager:
     ) -> str:
         """
         Render prompt with all enhancements.
-
+        
         Args:
-            template_name: Template name
-            variables: Template variables
-            tenant_id: Optional tenant ID
-            version: Optional template version
-            context: Optional context for dynamic adjustment
-            optimize: Whether to optimize the prompt
-            use_fallback: Whether to use fallback templates
-
+            template_name (str): Input parameter for this operation.
+            variables (Dict[str, Any]): Input parameter for this operation.
+            tenant_id (Optional[str]): Tenant identifier used for tenant isolation.
+            version (Optional[str]): Input parameter for this operation.
+            context (Optional[Dict[str, Any]]): Input parameter for this operation.
+            optimize (bool): Input parameter for this operation.
+            use_fallback (bool): Input parameter for this operation.
+        
         Returns:
-            Rendered and enhanced prompt
+            str: Returned text value.
         """
         # Get template with fallback
         if use_fallback:

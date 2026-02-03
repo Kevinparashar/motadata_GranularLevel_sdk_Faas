@@ -9,6 +9,7 @@ Handles loading and processing of various data formats:
 - Images: .jpg, .png, .gif, .bmp (with OCR and description)
 """
 
+
 # Standard library imports
 import io
 import mimetypes
@@ -81,15 +82,15 @@ class MultiModalLoader:
     ):
         """
         Initialize multi-modal loader.
-
+        
         Args:
-            enable_audio_transcription: Enable audio transcription
-            enable_video_transcription: Enable video transcription
-            enable_image_ocr: Enable OCR for images
-            enable_image_description: Enable image description generation
-            audio_language: Language for audio transcription
-            video_extract_frames: Extract frames from video
-            video_frames_per_second: Frames to extract per second
+            enable_audio_transcription (bool): Flag to enable or disable audio transcription.
+            enable_video_transcription (bool): Flag to enable or disable video transcription.
+            enable_image_ocr (bool): Flag to enable or disable image ocr.
+            enable_image_description (bool): Flag to enable or disable image description.
+            audio_language (str): Input parameter for this operation.
+            video_extract_frames (bool): Input parameter for this operation.
+            video_frames_per_second (float): Input parameter for this operation.
         """
         self.enable_audio_transcription = enable_audio_transcription
         self.enable_video_transcription = enable_video_transcription
@@ -108,16 +109,16 @@ class MultiModalLoader:
     def load(self, file_path: str, gateway: Optional[Any] = None) -> Tuple[str, Dict[str, Any]]:
         """
         Load content from file and return text content with metadata.
-
+        
         Args:
-            file_path: Path to file
-            gateway: Optional gateway for image description generation
-
+            file_path (str): Path of the input file.
+            gateway (Optional[Any]): Gateway client used for LLM calls.
+        
         Returns:
-            Tuple of (content, metadata)
-
+            Tuple[str, Dict[str, Any]]: Dictionary result of the operation.
+        
         Raises:
-            DocumentProcessingError: If file cannot be loaded
+            DocumentProcessingError: Raised when this function detects an invalid state or when an underlying call fails.
         """
         path = Path(file_path)
 
@@ -177,7 +178,15 @@ class MultiModalLoader:
         return content, metadata
 
     def _get_file_metadata(self, path: Path) -> Dict[str, Any]:
-        """Extract file metadata."""
+        """
+        Extract file metadata.
+        
+        Args:
+            path (Path): Input parameter for this operation.
+        
+        Returns:
+            Dict[str, Any]: Dictionary result of the operation.
+        """
         stat = path.stat()
         return {
             "file_name": path.name,
@@ -187,13 +196,31 @@ class MultiModalLoader:
         }
 
     def _load_text(self, path: Path, metadata: Dict[str, Any]) -> Tuple[str, Dict[str, Any]]:
-        """Load text file."""
+        """
+        Load text file.
+        
+        Args:
+            path (Path): Input parameter for this operation.
+            metadata (Dict[str, Any]): Extra metadata for the operation.
+        
+        Returns:
+            Tuple[str, Dict[str, Any]]: Dictionary result of the operation.
+        """
         with open(path, "r", encoding="utf-8") as f:
             content = f.read()
         return content, metadata
 
     def _load_html(self, path: Path, metadata: Dict[str, Any]) -> Tuple[str, Dict[str, Any]]:
-        """Load HTML file and extract text."""
+        """
+        Load HTML file and extract text.
+        
+        Args:
+            path (Path): Input parameter for this operation.
+            metadata (Dict[str, Any]): Extra metadata for the operation.
+        
+        Returns:
+            Tuple[str, Dict[str, Any]]: Dictionary result of the operation.
+        """
         try:
             from bs4 import BeautifulSoup
 
@@ -211,7 +238,16 @@ class MultiModalLoader:
             return content, metadata
 
     def _load_json(self, path: Path, metadata: Dict[str, Any]) -> Tuple[str, Dict[str, Any]]:
-        """Load JSON file and convert to readable text."""
+        """
+        Load JSON file and convert to readable text.
+        
+        Args:
+            path (Path): Input parameter for this operation.
+            metadata (Dict[str, Any]): Extra metadata for the operation.
+        
+        Returns:
+            Tuple[str, Dict[str, Any]]: Dictionary result of the operation.
+        """
         import json
 
         with open(path, "r", encoding="utf-8") as f:
@@ -222,7 +258,19 @@ class MultiModalLoader:
         return content, metadata
 
     def _load_pdf(self, path: Path, metadata: Dict[str, Any]) -> Tuple[str, Dict[str, Any]]:
-        """Load PDF file and extract text."""
+        """
+        Load PDF file and extract text.
+        
+        Args:
+            path (Path): Input parameter for this operation.
+            metadata (Dict[str, Any]): Extra metadata for the operation.
+        
+        Returns:
+            Tuple[str, Dict[str, Any]]: Dictionary result of the operation.
+        
+        Raises:
+            DocumentProcessingError: Raised when this function detects an invalid state or when an underlying call fails.
+        """
         if not PDF_AVAILABLE:
             raise DocumentProcessingError(
                 message="PyPDF2 is required for PDF support. Install with: pip install PyPDF2",
@@ -252,7 +300,19 @@ class MultiModalLoader:
         return content, metadata
 
     def _load_docx(self, path: Path, metadata: Dict[str, Any]) -> Tuple[str, Dict[str, Any]]:
-        """Load DOCX file and extract text."""
+        """
+        Load DOCX file and extract text.
+        
+        Args:
+            path (Path): Input parameter for this operation.
+            metadata (Dict[str, Any]): Extra metadata for the operation.
+        
+        Returns:
+            Tuple[str, Dict[str, Any]]: Dictionary result of the operation.
+        
+        Raises:
+            DocumentProcessingError: Raised when this function detects an invalid state or when an underlying call fails.
+        """
         if not DOCX_AVAILABLE:
             raise DocumentProcessingError(
                 message="python-docx is required for DOCX support. Install with: pip install python-docx",
@@ -288,7 +348,19 @@ class MultiModalLoader:
             )
 
     def _load_audio(self, path: Path, metadata: Dict[str, Any]) -> Tuple[str, Dict[str, Any]]:
-        """Load audio file and transcribe."""
+        """
+        Load audio file and transcribe.
+        
+        Args:
+            path (Path): Input parameter for this operation.
+            metadata (Dict[str, Any]): Extra metadata for the operation.
+        
+        Returns:
+            Tuple[str, Dict[str, Any]]: Dictionary result of the operation.
+        
+        Raises:
+            DocumentProcessingError: Raised when this function detects an invalid state or when an underlying call fails.
+        """
         if not AUDIO_AVAILABLE:
             raise DocumentProcessingError(
                 message="Audio processing libraries required. Install with: pip install SpeechRecognition pydub",
@@ -341,7 +413,16 @@ class MultiModalLoader:
             )
 
     def _extract_video_properties(self, cap: Any, metadata: Dict[str, Any]) -> Tuple[float, float]:
-        """Extract video properties and add to metadata."""
+        """
+        Extract video properties and add to metadata.
+        
+        Args:
+            cap (Any): Input parameter for this operation.
+            metadata (Dict[str, Any]): Extra metadata for the operation.
+        
+        Returns:
+            Tuple[float, float]: Result of the operation.
+        """
         fps = cap.get(cv2.CAP_PROP_FPS)
         frame_count = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
         duration = frame_count / fps if fps > 0 else 0
@@ -353,7 +434,17 @@ class MultiModalLoader:
         return fps, duration
 
     def _extract_video_frames(self, cap: Any, fps: float, content_parts: list) -> int:
-        """Extract frames from video and add to content_parts."""
+        """
+        Extract frames from video and add to content_parts.
+        
+        Args:
+            cap (Any): Input parameter for this operation.
+            fps (float): Input parameter for this operation.
+            content_parts (list): Input parameter for this operation.
+        
+        Returns:
+            int: Result of the operation.
+        """
         frame_interval = int(fps / self.video_frames_per_second) if fps > 0 else 30
         frame_num = 0
         extracted_frames = 0
@@ -375,7 +466,19 @@ class MultiModalLoader:
     def _load_video(
         self, path: Path, metadata: Dict[str, Any]
     ) -> Tuple[str, Dict[str, Any]]:
-        """Load video file, extract frames, and transcribe audio."""
+        """
+        Load video file, extract frames, and transcribe audio.
+        
+        Args:
+            path (Path): Input parameter for this operation.
+            metadata (Dict[str, Any]): Extra metadata for the operation.
+        
+        Returns:
+            Tuple[str, Dict[str, Any]]: Dictionary result of the operation.
+        
+        Raises:
+            DocumentProcessingError: Raised when this function detects an invalid state or when an underlying call fails.
+        """
         if not VIDEO_AVAILABLE:
             raise DocumentProcessingError(
                 message="OpenCV is required for video support. Install with: pip install opencv-python",
@@ -427,7 +530,20 @@ class MultiModalLoader:
     def _load_image(
         self, path: Path, metadata: Dict[str, Any], gateway: Optional[Any]
     ) -> Tuple[str, Dict[str, Any]]:
-        """Load image file, perform OCR, and generate description."""
+        """
+        Load image file, perform OCR, and generate description.
+        
+        Args:
+            path (Path): Input parameter for this operation.
+            metadata (Dict[str, Any]): Extra metadata for the operation.
+            gateway (Optional[Any]): Gateway client used for LLM calls.
+        
+        Returns:
+            Tuple[str, Dict[str, Any]]: Dictionary result of the operation.
+        
+        Raises:
+            DocumentProcessingError: Raised when this function detects an invalid state or when an underlying call fails.
+        """
         if not IMAGE_AVAILABLE:
             raise DocumentProcessingError(
                 message="Image processing libraries required. Install with: pip install Pillow pytesseract",

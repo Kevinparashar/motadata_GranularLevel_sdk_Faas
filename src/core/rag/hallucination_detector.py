@@ -5,6 +5,7 @@ Detects hallucinations in LLM-generated responses by checking if
 the response is grounded in the retrieved context documents.
 """
 
+
 # Standard library imports
 import logging
 import re
@@ -30,14 +31,14 @@ class HallucinationResult:
     ):
         """
         Initialize hallucination result.
-
+        
         Args:
-            is_hallucination: Whether hallucination was detected
-            confidence: Confidence score (0.0-1.0)
-            reasons: List of reasons for the detection
-            grounded_sentences: Sentences that are grounded in context
-            ungrounded_sentences: Sentences that are not grounded
-            metadata: Optional metadata
+            is_hallucination (bool): Flag to indicate whether hallucination is true.
+            confidence (float): Input parameter for this operation.
+            reasons (List[str]): Input parameter for this operation.
+            grounded_sentences (List[str]): Input parameter for this operation.
+            ungrounded_sentences (List[str]): Input parameter for this operation.
+            metadata (Optional[Dict[str, Any]]): Extra metadata for the operation.
         """
         self.is_hallucination = is_hallucination
         self.confidence = confidence
@@ -47,7 +48,12 @@ class HallucinationResult:
         self.metadata = metadata or {}
 
     def to_dict(self) -> Dict[str, Any]:
-        """Convert to dictionary."""
+        """
+        Convert to dictionary.
+        
+        Returns:
+            Dict[str, Any]: Dictionary result of the operation.
+        """
         return {
             "is_hallucination": self.is_hallucination,
             "confidence": self.confidence,
@@ -78,12 +84,12 @@ class HallucinationDetector:
     ):
         """
         Initialize hallucination detector.
-
+        
         Args:
-            gateway: Optional gateway for LLM-based verification
-            enable_llm_verification: Whether to use LLM for verification
-            similarity_threshold: Minimum similarity for grounding
-            min_grounded_ratio: Minimum ratio of sentences that must be grounded
+            gateway (Optional[LiteLLMGateway]): Gateway client used for LLM calls.
+            enable_llm_verification (bool): Flag to enable or disable llm verification.
+            similarity_threshold (float): Input parameter for this operation.
+            min_grounded_ratio (float): Input parameter for this operation.
         """
         self.gateway = gateway
         self.enable_llm_verification = enable_llm_verification
@@ -95,14 +101,14 @@ class HallucinationDetector:
     ) -> HallucinationResult:
         """
         Detect hallucinations in a response.
-
+        
         Args:
-            response: Generated response text
-            context_documents: Retrieved context documents
-            query: Original query (optional)
-
+            response (str): Input parameter for this operation.
+            context_documents (List[Dict[str, Any]]): Input parameter for this operation.
+            query (Optional[str]): Input parameter for this operation.
+        
         Returns:
-            HallucinationResult with detection results
+            HallucinationResult: Result of the operation.
         """
         reasons = []
         grounded_sentences = []
@@ -171,14 +177,14 @@ class HallucinationDetector:
     ) -> HallucinationResult:
         """
         Detect hallucinations asynchronously.
-
+        
         Args:
-            response: Generated response text
-            context_documents: Retrieved context documents
-            query: Original query (optional)
-
+            response (str): Input parameter for this operation.
+            context_documents (List[Dict[str, Any]]): Input parameter for this operation.
+            query (Optional[str]): Input parameter for this operation.
+        
         Returns:
-            HallucinationResult with detection results
+            HallucinationResult: Result of the operation.
         """
         # Same as sync version for now, but can be extended with async LLM calls
         return self.detect(response, context_documents, query)
@@ -186,12 +192,12 @@ class HallucinationDetector:
     def _split_sentences(self, text: str) -> List[str]:
         """
         Split text into sentences.
-
+        
         Args:
-            text: Input text
-
+            text (str): Input parameter for this operation.
+        
         Returns:
-            List of sentences
+            List[str]: List result of the operation.
         """
         # Simple sentence splitting (can be improved with NLTK/spaCy)
         sentences = re.split(r"[.!?]+\s+", text)
@@ -200,12 +206,12 @@ class HallucinationDetector:
     def _build_context_text(self, documents: List[Dict[str, Any]]) -> str:
         """
         Build context text from documents.
-
+        
         Args:
-            documents: Context documents
-
+            documents (List[Dict[str, Any]]): Input parameter for this operation.
+        
         Returns:
-            Combined context text
+            str: Returned text value.
         """
         context_parts = []
         for doc in documents:
@@ -219,13 +225,13 @@ class HallucinationDetector:
     ) -> bool:
         """
         Check if a sentence is grounded in context.
-
+        
         Args:
-            sentence: Sentence to check
-            context_text: Full context text
-
+            sentence (str): Input parameter for this operation.
+            context_text (str): Input parameter for this operation.
+        
         Returns:
-            True if sentence is grounded
+            bool: True if the operation succeeds, else False.
         """
         # Strategy 1: Check for direct text overlap
         sentence_lower = sentence.lower()
@@ -266,13 +272,13 @@ class HallucinationDetector:
     def _check_semantic_similarity(self, sentence: str, context: str) -> float:
         """
         Check semantic similarity using embeddings.
-
+        
         Args:
-            sentence: Sentence to check
-            context: Context text
-
+            sentence (str): Input parameter for this operation.
+            context (str): Input parameter for this operation.
+        
         Returns:
-            Similarity score (0.0-1.0)
+            float: Result of the operation.
         """
         if not self.gateway:
             return 0.0
@@ -303,12 +309,12 @@ class HallucinationDetector:
     def _has_citations(self, sentence: str) -> bool:
         """
         Check if sentence has citations.
-
+        
         Args:
-            sentence: Sentence to check
-
+            sentence (str): Input parameter for this operation.
+        
         Returns:
-            True if citations found
+            bool: True if the operation succeeds, else False.
         """
         # Check for citation patterns
         citation_patterns = [
@@ -333,14 +339,14 @@ class HallucinationDetector:
     ) -> Optional[Dict[str, Any]]:
         """
         Use LLM to verify hallucination.
-
+        
         Args:
-            response: Generated response
-            context_text: Context text
-            query: Original query
-
+            response (str): Input parameter for this operation.
+            context_text (str): Input parameter for this operation.
+            query (Optional[str]): Input parameter for this operation.
+        
         Returns:
-            Verification result dictionary or None
+            Optional[Dict[str, Any]]: Dictionary result of the operation.
         """
         if not self.gateway:
             return None

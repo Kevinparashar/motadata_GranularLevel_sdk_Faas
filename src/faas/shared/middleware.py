@@ -4,6 +4,7 @@ Common middleware for FaaS services.
 Provides authentication, logging, error handling, and observability.
 """
 
+
 import logging
 import time
 from typing import Callable
@@ -22,7 +23,16 @@ class LoggingMiddleware(BaseHTTPMiddleware):
     """Middleware for request/response logging."""
 
     async def dispatch(self, request: Request, call_next: Callable) -> Response:
-        """Log request and response."""
+        """
+        Log request and response.
+        
+        Args:
+            request (Request): Request payload object.
+            call_next (Callable): Input parameter for this operation.
+        
+        Returns:
+            Response: Result of the operation.
+        """
         start_time = time.time()
 
         # Log request
@@ -61,7 +71,16 @@ class AuthMiddleware(BaseHTTPMiddleware):
     """Middleware for authentication validation."""
 
     async def dispatch(self, request: Request, call_next: Callable) -> Response:
-        """Validate authentication headers."""
+        """
+        Validate authentication headers.
+        
+        Args:
+            request (Request): Request payload object.
+            call_next (Callable): Input parameter for this operation.
+        
+        Returns:
+            Response: Result of the operation.
+        """
         # Extract tenant_id from header (set by API Gateway)
         tenant_id = request.headers.get("X-Tenant-ID")
 

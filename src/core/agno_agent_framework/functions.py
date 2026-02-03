@@ -4,6 +4,7 @@ Agno Agent Framework - High-Level Functions
 Factory functions, convenience functions, and utilities for agent framework.
 """
 
+
 from typing import Any, Dict, List, Optional
 
 from ..utils.type_helpers import ConfigDict, GatewayProtocol
@@ -74,25 +75,22 @@ def create_agent_with_memory(
 ) -> Agent:
     """
     Create an agent with memory pre-configured.
-
-    Args:
-        agent_id: Unique agent identifier
-        name: Agent name
-        gateway: LiteLLM Gateway instance
-        memory_config: Memory configuration dict with keys:
-            - persistence_path: Optional path for memory persistence
-            - max_short_term: Max short-term memories (default: 50)
-            - max_long_term: Max long-term memories (default: 1000)
-        **kwargs: Additional agent configuration
-
-    Returns:
-        Agent instance with memory attached
-
+    
     Example:
-        >>> agent = create_agent_with_memory(
-        ...     "agent1", "Assistant", gateway,
-        ...     memory_config={"persistence_path": "/tmp/memory.json"}
-        ... )
+                    >>> agent = create_agent_with_memory(
+                    ...     "agent1", "Assistant", gateway,
+                    ...     memory_config={"persistence_path": "/tmp/memory.json"}
+                    ... )
+    
+    Args:
+        agent_id (str): Input parameter for this operation.
+        name (str): Name value.
+        gateway (GatewayProtocol): Gateway client used for LLM calls.
+        memory_config (Optional[ConfigDict]): Input parameter for this operation.
+        **kwargs (Any): Input parameter for this operation.
+    
+    Returns:
+        Agent: Result of the operation.
     """
     agent = create_agent(agent_id, name, gateway, **kwargs)
 
@@ -125,30 +123,28 @@ def create_agent_with_prompt_management(
 ) -> Agent:
     """
     Create an agent with prompt context management pre-configured.
-
-    Args:
-        agent_id: Unique agent identifier
-        name: Agent name
-        gateway: LiteLLM Gateway instance
-        system_prompt: Optional system prompt for the agent
-        role_template: Optional role-based template name
-        max_context_tokens: Maximum tokens for context window (default: 4000)
-        prompt_config: Optional prompt configuration dict with keys:
-            - max_tokens: Max tokens (overrides max_context_tokens)
-            - safety_margin: Safety margin for token estimation
-            - templates: List of template dicts with name, version, content, metadata
-        **kwargs: Additional agent configuration
-
-    Returns:
-        Agent instance with prompt management attached
-
+    
     Example:
-        >>> agent = create_agent_with_prompt_management(
-        ...     "agent1", "Assistant", gateway,
-        ...     system_prompt="You are a helpful AI assistant.",
-        ...     role_template="assistant_role",
-        ...     max_context_tokens=8000
-        ... )
+                    >>> agent = create_agent_with_prompt_management(
+                    ...     "agent1", "Assistant", gateway,
+                    ...     system_prompt="You are a helpful AI assistant.",
+                    ...     role_template="assistant_role",
+                    ...     max_context_tokens=8000
+                    ... )
+    
+    Args:
+        agent_id (str): Input parameter for this operation.
+        name (str): Name value.
+        gateway (Any): Gateway client used for LLM calls.
+        tenant_id (Optional[str]): Tenant identifier used for tenant isolation.
+        system_prompt (Optional[str]): System prompt used to guide behaviour.
+        role_template (Optional[str]): Input parameter for this operation.
+        max_context_tokens (int): Input parameter for this operation.
+        prompt_config (Optional[Dict[str, Any]]): Input parameter for this operation.
+        **kwargs (Any): Input parameter for this operation.
+    
+    Returns:
+        Agent: Result of the operation.
     """
     agent = create_agent(agent_id, name, gateway, tenant_id=tenant_id, **kwargs)
 
@@ -477,7 +473,21 @@ def batch_process_agents(
 
 
 def _create_async_retry_wrapper(func, max_retries, retry_delay, exceptions):
-    """Create async wrapper with retry logic."""
+    """
+    Create async wrapper with retry logic.
+    
+    Args:
+        func (Any): Input parameter for this operation.
+        max_retries (Any): Input parameter for this operation.
+        retry_delay (Any): Input parameter for this operation.
+        exceptions (Any): Input parameter for this operation.
+    
+    Returns:
+        Any: Result of the operation.
+    
+    Raises:
+        last_error: Raised when this function detects an invalid state or when an underlying call fails.
+    """
     import asyncio
     from functools import wraps
 
@@ -498,7 +508,21 @@ def _create_async_retry_wrapper(func, max_retries, retry_delay, exceptions):
 
 
 def _create_sync_retry_wrapper(func, max_retries, retry_delay, exceptions):
-    """Create sync wrapper with retry logic."""
+    """
+    Create sync wrapper with retry logic.
+    
+    Args:
+        func (Any): Input parameter for this operation.
+        max_retries (Any): Input parameter for this operation.
+        retry_delay (Any): Input parameter for this operation.
+        exceptions (Any): Input parameter for this operation.
+    
+    Returns:
+        Any: Result of the operation.
+    
+    Raises:
+        last_error: Raised when this function detects an invalid state or when an underlying call fails.
+    """
     import time
     from functools import wraps
 
@@ -554,13 +578,16 @@ def retry_on_failure(
 def save_agent_state(agent: Agent, file_path: Optional[str] = None) -> None:
     """
     Save agent state to disk for persistence (utility function).
-
-    Args:
-        agent: Agent instance to save
-        file_path: Optional path to save state
-
+    
     Example:
-        >>> save_agent_state(agent, "/tmp/agent_state.json")
+                            >>> save_agent_state(agent, "/tmp/agent_state.json")
+    
+    Args:
+        agent (Agent): Input parameter for this operation.
+        file_path (Optional[str]): Path of the input file.
+    
+    Returns:
+        None: Result of the operation.
     """
     agent.save_state(file_path)
 

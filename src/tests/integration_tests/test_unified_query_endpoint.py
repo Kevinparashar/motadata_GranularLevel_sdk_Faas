@@ -4,6 +4,7 @@ Integration Tests for Unified Query Endpoint
 Tests the integration of the unified query endpoint with Agent and RAG.
 """
 
+
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest

@@ -4,6 +4,7 @@ Circuit Breaker Pattern Implementation
 Provides a circuit breaker pattern for handling external service failures gracefully.
 """
 
+
 import asyncio
 from dataclasses import dataclass
 from datetime import datetime
@@ -52,10 +53,10 @@ class CircuitBreaker:
     def __init__(self, name: str, config: Optional[CircuitBreakerConfig] = None):
         """
         Initialize circuit breaker.
-
+        
         Args:
-            name: Name of the circuit breaker (e.g., "gateway", "tool_api")
-            config: Circuit breaker configuration
+            name (str): Name value.
+            config (Optional[CircuitBreakerConfig]): Configuration object or settings.
         """
         self.name = name
         self.config = config or CircuitBreakerConfig()
@@ -67,17 +68,17 @@ class CircuitBreaker:
     async def call(self, func: Callable, *args, **kwargs) -> Any:
         """
         Execute a function with circuit breaker protection.
-
+        
         Args:
-            func: Function to execute (can be async or sync)
-            *args: Function arguments
-            **kwargs: Function keyword arguments
-
+            func (Callable): Input parameter for this operation.
+            *args (Any): Input parameter for this operation.
+            **kwargs (Any): Input parameter for this operation.
+        
         Returns:
-            Function result
-
+            Any: Result of the operation.
+        
         Raises:
-            Exception: If circuit is open or function fails
+            RuntimeError: Raised when this function detects an invalid state or when an underlying call fails.
         """
         async with self._lock:
             # Check if circuit should transition
@@ -110,7 +111,12 @@ class CircuitBreaker:
             raise
 
     def _check_state_transition(self) -> None:
-        """Check and perform state transitions."""
+        """
+        Check and perform state transitions.
+        
+        Returns:
+            None: Result of the operation.
+        """
         if self.state == CircuitState.OPEN:
             # Check if timeout has passed
             if (
@@ -126,7 +132,12 @@ class CircuitBreaker:
             pass
 
     def _on_success(self) -> None:
-        """Handle successful call."""
+        """
+        Handle successful call.
+        
+        Returns:
+            None: Result of the operation.
+        """
         self.stats.successes += 1
         self.stats.total_calls += 1
         self.stats.last_success_time = datetime.now()
@@ -140,7 +151,12 @@ class CircuitBreaker:
                 self._opened_at = None
 
     def _on_failure(self) -> None:
-        """Handle failed call."""
+        """
+        Handle failed call.
+        
+        Returns:
+            None: Result of the operation.
+        """
         self.stats.failures += 1
         self.stats.total_calls += 1
         self.stats.last_failure_time = datetime.now()
@@ -160,7 +176,12 @@ class CircuitBreaker:
             self.stats.successes = 0
 
     def get_stats(self) -> Dict[str, Any]:
-        """Get circuit breaker statistics."""
+        """
+        Get circuit breaker statistics.
+        
+        Returns:
+            Dict[str, Any]: Dictionary result of the operation.
+        """
         return {
             "name": self.name,
             "state": self.state.value,
@@ -178,7 +199,12 @@ class CircuitBreaker:
         }
 
     def reset(self) -> None:
-        """Manually reset circuit breaker to closed state."""
+        """
+        Manually reset circuit breaker to closed state.
+        
+        Returns:
+            None: Result of the operation.
+        """
         self.state = CircuitState.CLOSED
         self.stats = CircuitBreakerStats()
         self._opened_at = None
