@@ -4,9 +4,27 @@
 
 ---
 
-# 📋 EXECUTIVE SUMMARY - QUICK REFERENCE
+## Table of Contents
 
-## Quality Gate - Python AI SDK
+- [Executive Summary (Quick Reference)](#executive-summary-quick-reference)
+- [Business Value and Industry Alignment](#business-value-and-industry-alignment)
+- [Organizational Quality Standards](#organizational-quality-standards)
+- [Final Quality Gate Summary](#final-quality-gate-summary)
+- [Document Structure](#document-structure)
+- [1) Mandatory Operating Model](#1-mandatory-operating-model-non-negotiable)
+- [2) Quality Gate Definition](#2-quality-gate-definition-sonar--ci-aligned)
+- [3) Mandatory Code Rules](#3-mandatory-code-rules-with-examples)
+- [4) Coverage Gate](#4-coverage-gate-85---mandatory-with-examples)
+- [5) Complexity Limits](#5-complexity-limits-mandatory)
+- [6) Security Rules](#6-security-rules-mandatory---secrets-unsafe-eval-dependency-risk)
+- [7) PR Rules](#7-pr-rules-mandatory---templates-and-checkpoints)
+- [8) Component-Specific Quality Gates](#8-component-specific-quality-gates-mandatory)
+- [9) CI and Sonar Enforcement Templates](#9-ci--sonar-enforcement-templates-drop-in)
+- [10) Mandatory Checkpoints](#10-mandatory-checkpoints-single-page-summary)
+
+## Executive Summary (Quick Reference)
+
+### Quality Gate: Python AI SDK
 
 ### Purpose
 Define a clear and enforceable SonarQube Quality Gate for the Motadata Python AI SDK, aligned with organizational standards, focused on mandatory rules and thresholds required for production readiness.
@@ -19,105 +37,108 @@ Define a clear and enforceable SonarQube Quality Gate for the Motadata Python AI
 
 ---
 
-## ⚠️ MERGE-BLOCKING THRESHOLDS
+### Merge-Blocking Thresholds
 
-**A build MUST FAIL if any condition below is violated:**
+> [!IMPORTANT]
+> A build **must fail** if any merge-blocking condition below is violated.
 
 ### SonarQube Quality Gate Conditions
 
 | Category | Threshold | Status |
 |----------|-----------|--------|
-| **New Bugs** | 0 | ❌ **BLOCKS MERGE** |
-| **New Security Hotspots (Unreviewed)** | 0 | ❌ **BLOCKS MERGE** |
-| **New Critical / Major Code Smells** | 0 | ❌ **BLOCKS MERGE** |
-| **Reliability Rating** | A | ❌ **BLOCKS MERGE** |
-| **Security Rating** | A | ❌ **BLOCKS MERGE** |
-| **Maintainability Rating** | A | ❌ **BLOCKS MERGE** |
-| **Coverage on New Code** | ≥ 85% | ❌ **BLOCKS MERGE** |
-| **Duplications on New Code** | ≤ 3% | ❌ **BLOCKS MERGE** |
+| **New Bugs** | 0 | **Blocks merge** |
+| **New Security Hotspots (Unreviewed)** | 0 | **Blocks merge** |
+| **New Critical / Major Code Smells** | 0 | **Blocks merge** |
+| **Reliability Rating** | A | **Blocks merge** |
+| **Security Rating** | A | **Blocks merge** |
+| **Maintainability Rating** | A | **Blocks merge** |
+| **Coverage on New Code** | ≥ 85% | **Blocks merge** |
+| **Duplications on New Code** | ≤ 3% | **Blocks merge** |
 
 ### CI Pipeline Checks (Mandatory)
 
 | Check | Tool | Status |
 |-------|------|--------|
-| **Format Check** | Black + isort | ❌ **BLOCKS MERGE** |
-| **Lint Check** | Ruff | ❌ **BLOCKS MERGE** |
-| **Type Check** | MyPy | ❌ **BLOCKS MERGE** |
-| **Unit Tests** | Pytest | ❌ **BLOCKS MERGE** |
-| **Integration Tests** | Pytest | ❌ **BLOCKS MERGE** |
-| **Security Scans** | Bandit + pip-audit + detect-secrets | ❌ **BLOCKS MERGE** |
-| **Build Verification** | python -m build | ❌ **BLOCKS MERGE** |
+| **Format Check** | Black + isort | **Blocks merge** |
+| **Lint Check** | Ruff | **Blocks merge** |
+| **Type Check** | MyPy | **Blocks merge** |
+| **Unit Tests** | Pytest | **Blocks merge** |
+| **Integration Tests** | Pytest | **Blocks merge** |
+| **Security Scans** | Bandit + pip-audit + detect-secrets | **Blocks merge** |
+| **Build Verification** | python -m build | **Blocks merge** |
 
 ---
 
-## ⚠️ WARNINGS (Non-Blocking)
+### Non-Blocking Warnings
 
-**These generate warnings but do NOT block merge:**
+> [!NOTE]
+> These checks generate warnings but **do not block** merge.
 
 | Check | Threshold | Status |
 |-------|-----------|--------|
-| **Cognitive Complexity** | 11-15 | ⚠️ **WARNING** - Review recommended |
-| **Function Length** | 80-120 LOC | ⚠️ **WARNING** - Review recommended |
-| **Missing Private Docstrings** | Any | ⚠️ **WARNING** - Improve recommended |
-| **Minor Code Smells** | Non-critical | ⚠️ **WARNING** - Technical debt |
-| **Low/Medium Vulnerabilities** | Dependency issues | ⚠️ **WARNING** - Update recommended |
+| **Cognitive Complexity** | 11-15 | **Warning** - Review recommended |
+| **Function Length** | 80-120 LOC | **Warning** - Review recommended |
+| **Missing Private Docstrings** | Any | **Warning** - Improve recommended |
+| **Minor Code Smells** | Non-critical | **Warning** - Technical debt |
+| **Low/Medium Vulnerabilities** | Dependency issues | **Warning** - Update recommended |
 
 ---
 
-## 📊 ENFORCED RULE CATEGORIES
+### Enforced Rule Categories
 
-> **📝 Tool Responsibility:** Rules are enforced by either SonarQube (code quality analysis) or CI tools (formatting, linting, type checking). See [Section 2.1.1](#211-sonarqube-vs-ci-tools-responsibility-split) for complete responsibility breakdown.
+> [!NOTE]
+> **Tool responsibility:** Rules are enforced by either SonarQube (code quality analysis) or CI tools (formatting, linting, type checking). See [Section 2.1.1](#211-sonarqube-vs-ci-tools-responsibility-split) for the responsibility split.
 
 ### 1. Reliability (Bugs) - Gate Rule: **New Bugs = 0**
 **Enforced by:** SonarQube + CI Tools (Ruff, MyPy)
 
-- ❌ No unused imports or variables *(CI: Ruff)*
-- ❌ No undefined names *(CI: Ruff, MyPy)*
-- ❌ No unreachable or dead code *(SonarQube)*
-- ❌ No duplicate conditions in if/elif *(SonarQube)*
-- ❌ No self-assigned variables *(SonarQube)*
-- ❌ No useless if(True) / if(False) blocks *(SonarQube)*
+- No unused imports or variables *(CI: Ruff)*
+- No undefined names *(CI: Ruff, MyPy)*
+- No unreachable or dead code *(SonarQube)*
+- No duplicate conditions in if/elif *(SonarQube)*
+- No self-assigned variables *(SonarQube)*
+- No useless if(True) / if(False) blocks *(SonarQube)*
 
 ### 2. Security Hotspots - Gate Rule: **Unreviewed Hotspots = 0**
 **Enforced by:** SonarQube + CI Tools (Bandit, detect-secrets)
 
-- ❌ Hard-coded credentials not allowed *(CI: detect-secrets, Bandit)*
-- ❌ Hard-coded IP addresses not allowed *(SonarQube)*
-- ❌ SQL injection vulnerabilities not allowed *(SonarQube, Bandit)*
-- ❌ Dangerous calls (eval, exec) not allowed *(SonarQube, Bandit)*
-- ❌ Secrets in code not allowed *(CI: detect-secrets)*
+- Hard-coded credentials not allowed *(CI: detect-secrets, Bandit)*
+- Hard-coded IP addresses not allowed *(SonarQube)*
+- SQL injection vulnerabilities not allowed *(SonarQube, Bandit)*
+- Dangerous calls (eval, exec) not allowed *(SonarQube, Bandit)*
+- Secrets in code not allowed *(CI: detect-secrets)*
 
 ### 3. Maintainability & Complexity - Gate Rule: **No new Critical/Major issues**
 **Enforced by:** SonarQube
 
-- ⚠️ Function cognitive complexity ≤ 10 (warning at 11-15) *(SonarQube)*
-- ❌ Function cognitive complexity > 15 (blocks merge) *(SonarQube)*
-- ❌ Deeply nested if/for/while statements not allowed *(SonarQube)*
-- ❌ Overly complex expressions not allowed *(SonarQube)*
-- ❌ Code duplication > 3% not allowed *(SonarQube CPD)*
+- Function cognitive complexity ≤ 10 (warning at 11-15) *(SonarQube)*
+- Function cognitive complexity > 15 (blocks merge) *(SonarQube)*
+- Deeply nested if/for/while statements not allowed *(SonarQube)*
+- Overly complex expressions not allowed *(SonarQube)*
+- Code duplication > 3% not allowed *(SonarQube CPD)*
 
 ### 4. Function & File Constraints
 **Enforced by:** SonarQube
 
-- ❌ Functions must not be empty *(SonarQube)*
-- ❌ Functions must not have identical implementations *(SonarQube)*
-- ⚠️ Parameters should be limited (≤ 5 recommended) *(SonarQube warning)*
-- ⚠️ Functions should be reasonably sized (≤ 60 lines recommended) *(SonarQube warning)*
-- ⚠️ Files should not be excessively large *(SonarQube warning)*
+- Functions must not be empty *(SonarQube)*
+- Functions must not have identical implementations *(SonarQube)*
+- Parameters should be limited (≤ 5 recommended) *(SonarQube warning)*
+- Functions should be reasonably sized (≤ 60 lines recommended) *(SonarQube warning)*
+- Files should not be excessively large *(SonarQube warning)*
 
 ### 5. Coding Standards & Hygiene
 **Enforced by:** CI Tools (Black, Ruff, MyPy) + SonarQube
 
-- ❌ Type hints required on all public functions *(CI: MyPy)*
-- ❌ No bare except: clauses *(CI: Ruff, SonarQube)*
-- ❌ No mutable default arguments *(CI: Ruff, MyPy)*
-- ❌ No swallowing exceptions without logging *(SonarQube)*
-- ⚠️ TODO/FIXME must have ticket reference (warning) *(SonarQube)*
-- ❌ Docstrings required on public classes/functions *(CI: Ruff, SonarQube)*
+- Type hints required on all public functions *(CI: MyPy)*
+- No bare except: clauses *(CI: Ruff, SonarQube)*
+- No mutable default arguments *(CI: Ruff, MyPy)*
+- No swallowing exceptions without logging *(SonarQube)*
+- TODO/FIXME must have ticket reference (warning) *(SonarQube)*
+- Docstrings required on public classes/functions *(CI: Ruff, SonarQube)*
 
 ---
 
-## 💼 BUSINESS VALUE AND INDUSTRY ALIGNMENT
+## Business Value and Industry Alignment
 
 ### How Quality Gates Reduce Production Bugs
 
@@ -151,19 +172,36 @@ Quality gates significantly reduce production bugs through **early detection and
   - Type safety reduces runtime errors
 - **Impact:** High-quality code has 3-5x fewer production bugs than low-quality code
 
- #### Industry Tool Standards
+#### Industry Tool Standards
 
 Our tool selection aligns with industry standards:
 
 | Tool Category | Industry Standard | Our Choice | Alignment |
 |--------------|-------------------|------------|-----------|
-| **Code Quality** | SonarQube (most common) | SonarQube | ✅ **STANDARD** |
-| **Linting** | Ruff (emerging standard) | Ruff | ✅ **MODERN STANDARD** |
-| **Type Checking** | MyPy (Python standard) | MyPy | ✅ **STANDARD** |
-| **Security Scanning** | Bandit + pip-audit | Bandit + pip-audit | ✅ **STANDARD** |
-| **Test Framework** | pytest (Python standard) | pytest | ✅ **STANDARD** |
+| **Code Quality** | SonarQube (most common) | SonarQube | **Standard** |
+| **Linting** | Ruff (emerging standard) | Ruff | **Modern standard** |
+| **Type Checking** | MyPy (Python standard) | MyPy | **Standard** |
+| **Security Scanning** | Bandit + pip-audit | Bandit + pip-audit | **Standard** |
+| **Test Framework** | pytest (Python standard) | pytest | **Standard** |
 
 ---
+
+### How These Gates Meet Industry Standards
+
+These quality gates align with widely accepted software quality and security standards. The goal is not to "get a certificate", but to follow proven practices that reduce production risk.
+
+#### Quality model alignment (what "good" looks like)
+- **ISO/IEC 25010 (Software Quality Model)**: We explicitly enforce reliability, maintainability, and security via gates (bugs=0, ratings=A, complexity limits, duplication limits).
+- **Engineering best practices**: Mandatory tests + coverage on new code, consistent formatting, and static checks align with standard industry SDLC practices.
+
+#### Security alignment (what "safe" looks like)
+- **OWASP guidance (secure coding)**: Secrets detection, dependency audits, and SAST-style checks reduce common injection and insecure configuration risks.
+- **CWE Top Weakness patterns**: Prevents typical issues like hard-coded credentials, unsafe eval/exec usage, and missing input validation patterns.
+- **SEI CERT secure coding principles**: Encourages safe error handling, predictable behaviour, and defensive coding patterns.
+
+#### Compliance readiness (why management cares)
+- **Audit-friendly**: CI logs + Sonar reports provide evidence of checks, exceptions (waivers), and approvals.
+- **Repeatable enforcement**: Automated checks reduce "manual only" dependency and improve consistency across teams.
 
 ### Technical Debt Reduction
 
@@ -242,7 +280,6 @@ Quality gates systematically reduce technical debt through **prevention, detecti
 - **Setup Time:** 1-2 days initial setup
 - **Ongoing Overhead:** 5-10 minutes per PR (automated)
 - **Developer Training:** 2-4 hours for team
-```
 
 #### 6. Long-Term Benefits
 
@@ -258,17 +295,17 @@ Quality gates systematically reduce technical debt through **prevention, detecti
 
 ---
 
-## 🔄 ORGANIZATIONAL QUALITY STANDARDS
+## Organizational Quality Standards
 
 The Python AI SDK maintains high quality standards aligned with organizational best practices:
 
 ### Quality Thresholds
-- ✅ **New Bugs:** 0
-- ✅ **Security Hotspots:** 0
-- ✅ **Coverage:** ≥ 85%
-- ✅ **Duplications:** ≤ 3%
-- ✅ **Reliability Rating:** A
-- ✅ **Security Rating:** A
+- **New Bugs:** 0
+- **Security Hotspots:** 0
+- **Coverage:** ≥ 85%
+- **Duplications:** ≤ 3%
+- **Reliability Rating:** A
+- **Security Rating:** A
 
 ### Python AI/ML SDK Standards
 
@@ -283,93 +320,55 @@ The Python AI SDK maintains high quality standards aligned with organizational b
 
 ---
 
-## 🎯 FINAL QUALITY GATE SUMMARY
+## Final Quality Gate Summary
 
-### QUALITY GATE: Python AI SDK Production Gate
+### Quality Gate: Python AI SDK Production Gate
 
 **FAIL IF:**
 ```
-❌ New Bugs > 0
-❌ New Critical/Major Code Smells > 0
-❌ Reliability Rating < A
-❌ Security Rating < A
-❌ Maintainability Rating < A
-❌ Coverage on New Code < 80-anguage 85%
-❌ Duplications on New Code > 3%
-❌ CI Checks (format/lint/type/test/security) failing
+New Bugs > 0
+New Critical/Major Code Smells > 0
+Reliability Rating < A
+Security Rating < A
+Maintainability Rating < A
+Coverage on New Code < 85%
+Duplications on New Code > 3%
+CI Checks (format/lint/type/test/security) failing
 ```
 
 **WARN IF:**
 ```
-⚠️ Cognitive Complexity 11-15
-⚠️ Function Length 80-120 LOC
-⚠️ Missing private method docstrings
-⚠️ Minor code smells (non-critical)
-⚠️ Low/Medium dependency vulnerabilities
+Cognitive Complexity 11-15
+Function Length 80-120 LOC
+Missing private method docstrings
+Minor code smells (non-critical)
+Low/Medium dependency vulnerabilities
 ```
 
 ---
 
-## 📖 DOCUMENT STRUCTURE
+## Document Structure
 
 This document is organized as follows:
 
 1. **Executive Summary:** Quick reference for quality gates and thresholds
-2. **Business Value and Industry Alignment:** How quality gates reduce bugs, meet industry standards, and reduce technical debt
-3. **Section 0:** Current SDK Status & Gaps
-4. **Section 1:** Mandatory Operating Model (Branch Protection, Waiver Policy)
-5. **Section 2:** Quality Gate Definition (PR Gate, Release Gate, Cross-Team Alignment)
-6. **Section 3:** Mandatory Code Rules (Formatting, Linting, Type Hints)
-7. **Section 4:** Coverage Gate (≥ 85%)
-8. **Section 5:** Security Gate (SAST, Secrets, Dependencies)
-9. **Section 6:** Complexity Gate (Cognitive Complexity)
-10. **Section 7:** Documentation Standards
-11. **Section 8:** Component-Specific Rules (Agent, RAG, Gateway, Cache, FaaS)
-12. **Section 9:** Testing Standards (Unit, Integration, E2E)
-13. **Section 10:** CI/CD Pipeline Definition
+2. **Business Value and Industry Alignment:** Why these gates reduce bugs, meet industry standards, and reduce technical debt
+3. **Organizational Quality Standards:** Cross-team alignment and baseline thresholds
+4. **Final Quality Gate Summary:** One-page "fail/warn" checklist
+5. **Section 1:** Mandatory Operating Model (Branch Protection, Waiver Policy)
+6. **Section 2:** Quality Gate Definition (PR Gate, Release Gate, Responsibility Split)
+7. **Section 3:** Mandatory Code Rules (Formatting, Linting, Type Hints, Docstrings)
+8. **Section 4:** Coverage Gate (≥ 85%)
+9. **Section 5:** Complexity Limits (cognitive complexity thresholds + enforcement options)
+10. **Section 6:** Security Rules (secrets, unsafe eval, dependency risk, required tools)
+11. **Section 7:** PR Rules (templates, reviewer checklist, SDK-specific patterns)
+12. **Section 8:** Component-Specific Quality Gates (Agent, RAG, Gateway, Cache, FaaS, ML)
+13. **Section 9:** CI + Sonar enforcement templates (drop-in)
+14. **Section 10:** Mandatory checkpoints (single-page summary)
 
 **For detailed guidance on any topic, refer to the full sections below.**
 
 ---
-
-## 🚀 APPROVAL
-
-This Quality Gate is intended to be applied across all Python SDK repositories for production deployments, aligned with organizational standards.
-
-**Last Updated:** 2026-02-02  
-**Version:** 2.0 (Cross-team aligned)
-
----
-
----
-
-### 0.1 Verified in your SDK repo (already present)
-**Tooling**
-- `pyproject.toml` config exists for: **black**, **isort**, **mypy**, **pytest**.
-- Dev deps include: `pytest`, `pytest-asyncio`, `pytest-mock`, `pytest-cov`, `black`, `isort`, `mypy`.
-
-**Makefile targets (usable today)**
-- `format`, `format-check` → black + isort
-- `type-check` → mypy
-- `test`, `test-unit`, `test-integration`, `test-cov` → pytest + coverage report (HTML/term)
-- `build` → `python -m build`
-- `ci` → runs clean + install-dev + test + format-check + type-check
-
-**Test structure**
-- `src/tests/unit_tests`, `src/tests/integration_tests`, `src/tests/benchmarks`
-
-### 0.2 Not present in the repo (must be added to be Sonar+CI compliant)
-These are **Quality Gate must-haves** that are missing today:
-- ❌ **No CI pipeline configuration** (no `.github/workflows/*`, no GitLab CI, etc.)
-- ❌ **No Sonar configuration** (`sonar-project.properties` / scanner settings)
-- ❌ **No enforced coverage threshold** (`--cov-fail-under=85` is not used in Makefile)
-- ❌ **Lint is a placeholder** in Makefile (no ruff/flake8/pylint installed or executed)
-- ❌ **No complexity enforcement**
-- ❌ **No security gates** (`bandit`, `pip-audit`, `detect-secrets`) not present
-- ❌ **No branch protection / PR governance documented with templates**
-- ❌ **No duplication threshold enforcement** (≤ 3% on new code)
-
-This document upgrades your current baseline into a **merge-blocking Quality Gate system**.
 
 ---
 
@@ -397,7 +396,7 @@ Waivers are allowed **only** with:
 - remediation ticket
 - owner + deadline
 
-No silent bypasses. No “we will fix later” without a tracked ticket.
+No silent bypasses. No "we will fix later" without a tracked ticket.
 
 ---
 
@@ -474,13 +473,13 @@ The following thresholds are enforced for the Python AI/ML SDK:
 
 | Metric | Python AI/ML SDK | Status |
 |--------|------------------|--------|
-| **New Bugs** | 0 | ✅ **REQUIRED** |
-| **Security Hotspots (Unreviewed)** | 0 | ✅ **REQUIRED** |
-| **Coverage on New Code** | ≥ 85% | ✅ **REQUIRED** |
-| **Duplications on New Code** | ≤ 3% | ✅ **REQUIRED** |
-| **Reliability Rating** | A | ✅ **REQUIRED** |
-| **Security Rating** | A | ✅ **REQUIRED** |
-| **Cognitive Complexity (Blocking)** | > 15 | ✅ **REQUIRED** |
+| **New Bugs** | 0 | **Required** |
+| **Security Hotspots (Unreviewed)** | 0 | **Required** |
+| **Coverage on New Code** | ≥ 85% | **Required** |
+| **Duplications on New Code** | ≤ 3% | **Required** |
+| **Reliability Rating** | A | **Required** |
+| **Security Rating** | A | **Required** |
+| **Cognitive Complexity (Blocking)** | > 15 | **Required** |
 
 #### 2.3.2 Python AI/ML SDK Standards
 
@@ -529,7 +528,7 @@ This section defines what constitutes code duplication, when it's acceptable, an
 - **Duplicated logic patterns** across different modules
 - **Similar code structures** with only variable/function name differences
 
-> **📝 Note:** SonarQube CPD uses token-based analysis, not string literal matching. Repeated string literals are tracked separately as code smells (not duplication) and should be centralized as a coding best practice, but they do not count toward the duplication percentage.
+> **Note:** SonarQube CPD uses token-based analysis, not string literal matching. Repeated string literals are tracked separately as code smells (not duplication) and should be centralized as a coding best practice, but they do not count toward the duplication percentage.
 
 **Measurement:**
 ```
@@ -563,7 +562,7 @@ The following are **NOT** considered violations:
 **Example 1: Duplicated Validation Logic**
 
 ```python
-# ❌ BAD: Duplicated validation logic
+# BAD: Duplicated validation logic
 def validate_agent_input(data: Dict[str, Any]) -> bool:
     if not data.get("name"):
         raise ValueError("name is required")
@@ -582,7 +581,7 @@ def validate_tool_input(data: Dict[str, Any]) -> bool:
         raise ValueError("tenant_id is required")
     return True
 
-# ✅ GOOD: Extracted common validation
+# GOOD: Extracted common validation
 from typing import Dict, Any, Optional
 
 def validate_name_field(
@@ -620,7 +619,7 @@ def validate_tool_input(data: Dict[str, Any]) -> bool:
 > **Note:** While repeated string literals don't count as Sonar duplication, centralizing them is a coding best practice for maintainability.
 
 ```python
-# ❌ BAD: Repeated string literals (maintenance risk)
+# BAD: Repeated string literals (maintenance risk)
 def create_agent_cache_key(agent_id: str, tenant_id: str) -> str:
     return f"agent:{tenant_id}:{agent_id}"
 
@@ -632,7 +631,7 @@ def invalidate_agent_cache(agent_id: str, tenant_id: str) -> None:
     key = f"agent:{tenant_id}:{agent_id}"
     cache.delete(key)
 
-# ✅ GOOD: Centralized key generation
+# GOOD: Centralized key generation
 AGENT_CACHE_PREFIX = "agent"
 
 def create_agent_cache_key(agent_id: str, tenant_id: str) -> str:
@@ -653,7 +652,7 @@ def invalidate_agent_cache(agent_id: str, tenant_id: str) -> None:
 **Example 3: Duplicated Database Query Patterns**
 
 ```python
-# ❌ BAD: Duplicated query patterns
+# BAD: Duplicated query patterns
 async def get_agent_by_id(db: DatabaseConnection, agent_id: str, tenant_id: str) -> Optional[Dict]:
     query = "SELECT * FROM agents WHERE agent_id = %s AND tenant_id = %s"
     result = await db.execute_query(query, (agent_id, tenant_id))
@@ -664,7 +663,7 @@ async def get_tool_by_id(db: DatabaseConnection, tool_id: str, tenant_id: str) -
     result = await db.execute_query(query, (tool_id, tool_id))
     return result[0] if result else None
 
-# ✅ GOOD: Generic repository pattern
+# GOOD: Generic repository pattern
 from typing import TypeVar, Generic, Optional, Dict, Any
 
 T = TypeVar('T')
@@ -747,7 +746,7 @@ If duplication > 3% is unavoidable:
 
 ### 3.1 Formatting rules (mandatory)
 **Rule**
-- Black + isort output is the canonical style. No “pretty formatting” by hand.
+- Black + isort output is the canonical style. No "pretty formatting" by hand.
 
 **Good example**
 ```python
@@ -1208,33 +1207,33 @@ pydocstyle src --convention=google
 
 | Check | Status | Action |
 |-------|--------|--------|
-| Format check fails | ❌ **FAILS CI** | Block merge, must fix |
-| Lint errors | ❌ **FAILS CI** | Block merge, must fix |
-| Type errors | ❌ **FAILS CI** | Block merge, must fix |
-| Test failures | ❌ **FAILS CI** | Block merge, must fix |
-| Coverage < 85% | ❌ **FAILS CI** | Block merge, must add tests |
-| Secrets detected | ❌ **FAILS CI** | Block merge, must remove |
-| Sonar gate failed | ❌ **FAILS CI** | Block merge, must fix |
-| Complexity > 15 | ⚠️ **WARNING** | Review recommended |
-| Missing private docstrings | ⚠️ **WARNING** | Improve recommended |
-| Code smells (minor) | ⚠️ **WARNING** | Technical debt |
+| Format check fails | **FAILS CI** | Block merge, must fix |
+| Lint errors | **FAILS CI** | Block merge, must fix |
+| Type errors | **FAILS CI** | Block merge, must fix |
+| Test failures | **FAILS CI** | Block merge, must fix |
+| Coverage < 85% | **FAILS CI** | Block merge, must add tests |
+| Secrets detected | **FAILS CI** | Block merge, must remove |
+| Sonar gate failed | **FAILS CI** | Block merge, must fix |
+| Complexity > 15 | **Warning** | Review recommended |
+| Missing private docstrings | **Warning** | Improve recommended |
+| Code smells (minor) | **Warning** | Technical debt |
 
 #### 3.6.4 Example CI Output
 
 **FAILING CI (Blocked):**
 ```
-❌ Format check: FAILED
+Format check: FAILED
    - src/core/rag/rag_system.py:15:1 - Line too long
    - src/core/agent/agent.py:42:3 - Import not sorted
 
-❌ Lint check: FAILED
+Lint check: FAILED
    - src/core/gateway/gateway.py:23 - Unused import 'os'
    - src/core/cache/cache.py:45 - Undefined name 'dragonfly_client'
 
-❌ Type check: FAILED
+Type check: FAILED
    - src/core/rag/rag_system.py:67 - Missing return type annotation
 
-❌ Coverage: FAILED
+Coverage: FAILED
    - New code coverage: 65% (required: 85%)
    - Missing coverage in: src/core/rag/retriever.py
 
@@ -1243,15 +1242,15 @@ pydocstyle src --convention=google
 
 **PASSING CI (with warnings):**
 ```
-✅ Format check: PASSED
-✅ Lint check: PASSED
-✅ Type check: PASSED
-✅ Tests: PASSED (120 tests, 0 failures)
-✅ Coverage: PASSED (85% new code coverage)
-✅ Security: PASSED (no secrets, no high vulnerabilities)
-✅ Sonar: PASSED (Quality Gate: PASSED)
+Format check: PASSED
+Lint check: PASSED
+Type check: PASSED
+Tests: PASSED (120 tests, 0 failures)
+Coverage: PASSED (85% new code coverage)
+Security: PASSED (no secrets, no high vulnerabilities)
+Sonar: PASSED (Quality Gate: PASSED)
 
-⚠️ Warnings:
+Warnings:
    - src/core/agent/agent.py:234 - Function complexity: 12 (recommended: ≤10)
    - src/core/rag/rag_system.py:156 - Missing docstring on private method
    - Sonar: 3 minor code smells detected
@@ -1261,7 +1260,7 @@ pydocstyle src --convention=google
 
 ---
 
-## 4) Coverage Gate (≥ 85%) — Mandatory with examples
+## 4) Coverage Gate (85%) - Mandatory (with examples)
 
 ### 4.1 Coverage threshold (mandatory)
 - **Coverage on New Code ≥ 85%** (Sonar gate)
@@ -1281,7 +1280,7 @@ test-cov: ## Run tests with coverage report + enforce threshold
 		--cov-fail-under=85
 ```
 
-### 4.3 Example: what “good coverage” means
+### 4.3 Example: what "good coverage" means
 If you add a new helper `normalize_headers()` you must add a test that covers:
 - normal input
 - empty input
@@ -1312,9 +1311,9 @@ def test_normalize_headers_lowercases_and_strips():
 
 | Cognitive Complexity | Action | Status |
 |---------------------|--------|--------|
-| **≤ 10** | ✅ Ideal - No issues | **PASS** |
-| **11-15** | ⚠️ Warning - Review recommended | **WARN** (non-blocking) |
-| **> 15** | ❌ Must refactor or get waiver | **FAIL** (blocks merge) |
+| **≤ 10** | Ideal - No issues | **PASS** |
+| **11-15** | Warning - Review recommended | **WARN** (non-blocking) |
+| **> 15** | Must refactor or get waiver | **FAIL** (blocks merge) |
 
 **Python Team Quality Bar:**
 - The blocking threshold is 15, with a warning at 10 to encourage simpler, more maintainable code for AI/ML operations.
@@ -1370,7 +1369,7 @@ def build_payload(data: dict) -> dict:
 
 ---
 
-## 6) Security Rules (mandatory) — secrets, unsafe eval, dependency risk
+## 6) Security Rules (mandatory) - secrets, unsafe eval, dependency risk
 
 ### 6.1 Mandatory block rules
 CI must fail if:
@@ -1440,7 +1439,7 @@ detect-secrets scan > .secrets.baseline
 
 ---
 
-## 7) PR Rules (mandatory) — templates and checkpoints
+## 7) PR Rules (mandatory) - templates and checkpoints
 
 ### 7.1 PR requirements (merge-blocking)
 - [ ] No direct commits to `main`
