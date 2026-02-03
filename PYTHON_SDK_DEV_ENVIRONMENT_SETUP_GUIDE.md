@@ -915,7 +915,7 @@ pytest -m "not slow"  # Skip slow tests
 
 ## 10. IDE Setup (Recommended)
 
-> **📝 Note:** Use any text editor you prefer. VS Code is recommended for its Python support.
+> **📝 Note:** Use any text editor you prefer. VS Code and PyCharm are recommended for their Python support.
 
 ### VS Code Setup (Optional but Recommended)
 
@@ -950,7 +950,51 @@ code .
 # Test that tests are discovered in the testing panel
 ```
 
-> **💡 Tip:** See [IDE Configuration Guide](docs/guides/IDE_SETUP.md) for advanced configuration, PyCharm setup, and debugging configurations
+### PyCharm Setup (Optional but Recommended)
+
+**Install PyCharm:** https://www.jetbrains.com/pycharm/
+
+**Configure Python Interpreter:**
+1. Open PyCharm and open the project directory
+2. Go to `File` → `Settings` (or `PyCharm` → `Preferences` on macOS)
+3. Navigate to `Project: motadata-python-ai-sdk` → `Python Interpreter`
+4. Click the gear icon → `Add...`
+5. Select `Existing environment` and browse to `.venv/bin/python` (or `.venv\Scripts\python.exe` on Windows)
+6. Click `OK` to apply
+
+**Configure Code Style:**
+1. Go to `File` → `Settings` → `Editor` → `Code Style` → `Python`
+2. Set `Hard wrap at` to `100` (to match Black's line length)
+3. Enable `Wrap on typing`
+
+**Configure Formatter:**
+1. Go to `File` → `Settings` → `Tools` → `External Tools`
+2. Click `+` to add a new tool:
+   - **Name:** `Black Formatter`
+   - **Program:** `$ProjectFileDir$/.venv/bin/black` (or `.venv\Scripts\black.exe` on Windows)
+   - **Arguments:** `$FilePath$`
+   - **Working directory:** `$ProjectFileDir$`
+3. Click `OK` to save
+
+**Configure Testing:**
+1. Go to `File` → `Settings` → `Tools` → `Python Integrated Tools`
+2. Set `Testing` to `pytest`
+3. Set `Default test runner` to `pytest`
+4. Click `OK` to apply
+
+**Verification:**
+```bash
+# Open the project in PyCharm
+# File → Open → Select project directory
+
+# Test that interpreter is set correctly
+# Check bottom-right corner shows Python 3.11 from .venv
+
+# Test that formatter works
+# Right-click on a Python file → External Tools → Black Formatter
+```
+
+> **💡 Tip:** See [IDE Configuration Guide](docs/guides/IDE_SETUP.md) for advanced configuration and debugging configurations
 
 ---
 
