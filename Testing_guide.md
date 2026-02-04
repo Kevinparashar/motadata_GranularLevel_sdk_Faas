@@ -712,32 +712,6 @@ We employ **three layers of validation** for comprehensive coverage:
 | **Error Handlers** | 100% | All error paths | 100% |
 | **Configuration** | ≥ 75% | N/A | 100% |
 
-### Test Execution Time Limits
-
-| Metric | Limit | Rationale |
-|--------|-------|-----------|
-| **Single Unit Test** | < 1 second | Fast feedback in development |
-| **Unit Test Suite** | < 5 minutes | CI/CD pipeline efficiency |
-| **Single Integration Test** | < 30 seconds | Reasonable workflow validation |
-| **Integration Test Suite** | < 15 minutes | Complete validation without blocking |
-
-### Performance Boundaries
-
-While full performance testing is out of scope, tests must validate **performance invariants**:
-
-| Component | Metric | Boundary | Test Type |
-|-----------|--------|----------|-----------|
-| **LiteLLM Gateway** | Response time (mocked) | < 100ms | Unit |
-| **Agent Framework** | Max execution steps | ≤ 20 iterations | Unit |
-| **Agent Framework** | Execution timeout | < 30 seconds | Integration |
-| **RAG Retrieval** | Query time (mocked DB) | < 200ms | Unit |
-| **RAG Context Assembly** | Context size | ≤ 8000 tokens | Unit |
-| **Cache Operations** | Cache hit lookup | < 10ms | Unit |
-| **Prompt Generation** | Template rendering | < 50ms | Unit |
-| **Data Ingestion** | File validation | < 500ms per file | Unit |
-
-**Example:** Tests should validate that components complete within their performance boundaries (e.g., agent execution < 30 seconds, cache operations < 10ms).
-
 ### Quality Gates (Blocking)
 
 All gates must pass before code can be merged:
