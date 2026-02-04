@@ -12,13 +12,18 @@
 5. [Methodology](#methodology)
 6. [Core Testing Principles](#core-testing-principles)
 7. [Quality Metrics and Standards](#quality-metrics-and-standards)
-8. [Unit Testing Framework](#unit-testing-framework)
-9. [Integration Testing Framework](#integration-testing-framework)
-10. [Error Scenarios and Edge Cases](#error-scenarios-and-edge-cases)
+8. [Mocking Strategy](#mocking-strategy)
+9. [Unit Testing Framework](#unit-testing-framework)
+10. [Integration Testing Framework](#integration-testing-framework)
 11. [Test Execution and Validation](#test-execution-and-validation)
 12. [Best Practices and Guidelines](#best-practices-and-guidelines)
-13. [Conclusion](#conclusion)
-14. [References](#references)
+13. [Code Examples - Testing Libraries Usage](#code-examples---testing-libraries-usage)
+14. [Code Examples - Component-Specific Unit Tests](#code-examples---component-specific-unit-tests)
+15. [Code Examples - Integration Test Scenarios](#code-examples---integration-test-scenarios)
+16. [Code Examples - Error Scenarios and Edge Cases](#code-examples---error-scenarios-and-edge-cases)
+17. [Code Examples - Benchmark Testing](#code-examples---benchmark-testing)
+18. [Conclusion](#conclusion)
+19. [References](#references)
 
 ---
 
@@ -129,18 +134,6 @@ This section details all libraries, frameworks, and tools used for testing GenAI
 - Enables parametrized testing for multiple input scenarios
 - Offers rich plugin ecosystem for extended functionality
 
-**Usage Example:**
-```python
-# Run all tests
-pytest src/tests/
-
-# Run with verbose output
-pytest src/tests/ -v
-
-# Run specific test file
-pytest src/tests/unit_tests/test_gateway.py
-```
-
 **Why we use it:**
 - Industry-standard Python testing framework
 - Excellent developer experience with minimal boilerplate
@@ -161,18 +154,6 @@ pytest src/tests/unit_tests/test_gateway.py
 - Supports async fixtures for asynchronous test setup/teardown
 - Handles coroutine execution within pytest framework
 
-**Usage Example:**
-```python
-import pytest
-
-@pytest.mark.asyncio
-async def test_async_llm_call():
-    """Test asynchronous LLM generation."""
-    gateway = LiteLLMGateway()
-    result = await gateway.generate_async("Hello", model="gpt-4")
-    assert result["text"] is not None
-```
-
 **Why we use it:**
 - SDK components use async/await extensively
 - Ensures proper async context management in tests
@@ -191,22 +172,6 @@ async def test_async_llm_call():
 - Integrates `unittest.mock` with pytest's fixture system
 - Automatic cleanup of mocks after each test
 - Spy functionality to track calls without replacing implementation
-
-**Usage Example:**
-```python
-def test_with_mocker(mocker):
-    """Test using pytest-mock fixture."""
-    # Create mock
-    mock_llm = mocker.Mock()
-    mock_llm.generate.return_value = {"text": "Response"}
-    
-    # Use mock in test
-    gateway = LiteLLMGateway(llm_client=mock_llm)
-    result = gateway.generate("Hello")
-    
-    # Verify mock was called
-    mock_llm.generate.assert_called_once()
-```
 
 **Why we use it:**
 - Cleaner syntax than raw unittest.mock
@@ -619,51 +584,7 @@ pytest --testmon
 
 ### Installation
 
-**Install all testing dependencies:**
-
-```bash
-# Install from requirements-test.txt
-pip install -r requirements-test.txt
-
-# Or install individually
-pip install pytest>=7.0.0 \
-            pytest-asyncio>=0.21.0 \
-            pytest-mock>=3.10.0 \
-            pytest-cov>=4.0.0 \
-            pytest-benchmark>=4.0.0 \
-            pytest-timeout>=2.1.0 \
-            responses>=0.23.0 \
-            Faker>=18.0.0 \
-            assertpy>=1.1 \
-            pytest-snapshot>=0.9.0 \
-            pytest-postgresql>=5.0.0 \
-            pytest-testmon>=2.0.0
-```
-
-**requirements-test.txt example:**
-```txt
-# Core Testing
-pytest>=7.0.0
-pytest-asyncio>=0.21.0
-pytest-mock>=3.10.0
-pytest-cov>=4.0.0
-
-# Performance & Utilities
-pytest-benchmark>=4.0.0
-pytest-timeout>=2.1.0
-pytest-testmon>=2.0.0
-
-# Mocking & Test Data
-responses>=0.23.0
-Faker>=18.0.0
-
-# Assertions & Snapshots
-assertpy>=1.1
-pytest-snapshot>=0.9.0
-
-# Database Testing
-pytest-postgresql>=5.0.0
-```
+**Install all testing dependencies from `requirements-test.txt` or install individually as needed.**
 
 ---
 
@@ -742,29 +663,9 @@ We employ **three layers of validation** for comprehensive coverage:
 
 **Rule:** Tests must validate **deterministic contracts and invariants**, not exact textual output, unless the LLM response is explicitly mocked or stubbed.
 
-**Allowed:**
-```python
-# ✅ GOOD: Testing structure and behavior
-def test_agent_response_structure(mock_llm):
-    agent = Agent(gateway=mock_llm)
-    result = agent.chat("Hello")
-    
-    assert isinstance(result, dict)
-    assert "text" in result
-    assert len(result["text"]) > 0
-    assert result["finish_reason"] in ["stop", "length", "tool_calls"]
-```
+**Allowed:** Tests should validate structure and behavior (output type, required fields, schema conformance).
 
-**Not Allowed:**
-```python
-# ❌ BAD: Testing exact output (will fail randomly)
-def test_agent_response_content():
-    agent = Agent(gateway=real_llm)  # Using real LLM
-    result = agent.chat("What is Python?")
-    
-    # This will fail when LLM response changes
-    assert result["text"] == "Python is a programming language..."
-```
+**Not Allowed:** Testing exact textual output from non-mocked LLM calls (will fail randomly).
 
 **Exception:** Exact output matching is **only permitted** when:
 1. ✅ The LLM call is mocked/stubbed
@@ -777,19 +678,7 @@ def test_agent_response_content():
 - 🔁 **Repeatable** - Same input = same result, every time
 - ⚡ **Fast** - Each test completes in < 1 second
 
-**Implementation:**
-```python
-# ✅ GOOD: Fully mocked dependencies
-def test_rag_retrieval(mock_vector_db, mock_gateway):
-    rag = RAGSystem(vector_db=mock_vector_db, gateway=mock_gateway)
-    results = rag.retrieve("query", top_k=5)
-    assert len(results) <= 5
-
-# ❌ BAD: Real database dependency
-def test_rag_retrieval_bad():
-    rag = RAGSystem(vector_db=real_postgres_db)  # Will fail without DB
-    results = rag.retrieve("query", top_k=5)
-```
+**Implementation:** All external dependencies must be mocked. Tests should not depend on real databases, APIs, or external services.
 
 ### Principle 3: Error Path Coverage
 
@@ -797,25 +686,7 @@ def test_rag_retrieval_bad():
 
 **Rule:** For every `try/except` block, there must be a corresponding test that triggers the exception.
 
-**Example:**
-```python
-# Component code
-def process_document(doc):
-    try:
-        return parse_pdf(doc)
-    except PDFError as e:
-        raise DocumentProcessingError(f"Failed to parse: {e}")
-
-# Required test
-def test_document_processing_pdf_error():
-    with patch('parse_pdf') as mock_parse:
-        mock_parse.side_effect = PDFError("Corrupted file")
-        
-        with pytest.raises(DocumentProcessingError) as exc:
-            process_document(doc)
-        
-        assert "Failed to parse" in str(exc.value)
-```
+**Example:** For every `try/except` block in component code, there must be a corresponding test that triggers the exception and validates the error handling.
 
 ### Principle 4: Mock at Service Boundaries
 
@@ -825,21 +696,7 @@ def test_document_processing_pdf_error():
 - ✅ Mock: LLM API calls, database connections, external HTTP APIs
 - ❌ Don't mock: Internal helper functions, business logic, validators
 
-**Example:**
-```python
-# ✅ GOOD: Mocking at service boundary
-@patch('litellm.completion')
-def test_gateway_generate(mock_completion):
-    mock_completion.return_value = Mock(choices=[...])
-    gateway = LiteLLMGateway()
-    result = gateway.generate("Hello", model="gpt-4")
-
-# ❌ BAD: Mocking internal method
-def test_gateway_generate_bad():
-    gateway = LiteLLMGateway()
-    gateway._format_response = Mock(return_value={...})  # Too granular
-    result = gateway.generate("Hello", model="gpt-4")
-```
+**Example:** Mock external service calls (LLM APIs, databases, HTTP APIs) at service boundaries. Do not mock internal helper functions or business logic.
 
 ---
 
@@ -879,26 +736,7 @@ While full performance testing is out of scope, tests must validate **performanc
 | **Prompt Generation** | Template rendering | < 50ms | Unit |
 | **Data Ingestion** | File validation | < 500ms per file | Unit |
 
-**Example Test:**
-```python
-import time
-import pytest
-
-def test_agent_execution_timeout():
-    """Agent must complete within 30 seconds."""
-    agent = create_agent_with_mocked_llm()
-    
-    start_time = time.time()
-    result = agent.execute_task("Analyze document")
-    duration = time.time() - start_time
-    
-    # Validate performance boundary
-    assert duration < 30, f"Agent exceeded timeout: {duration:.2f}s"
-    
-    # Validate result structure
-    assert "output" in result
-    assert result["status"] in ["completed", "failed"]
-```
+**Example:** Tests should validate that components complete within their performance boundaries (e.g., agent execution < 30 seconds, cache operations < 10ms).
 
 ### Quality Gates (Blocking)
 
@@ -920,11 +758,7 @@ All gates must pass before code can be merged:
 **Primary:** `pytest-mock` (preferred for pytest ecosystem)
 **Secondary:** `unittest.mock` (Python standard library)
 
-**Import Pattern:**
-```python
-from unittest.mock import Mock, patch, MagicMock, AsyncMock
-import pytest
-```
+**Import Pattern:** Use `from unittest.mock import Mock, patch, MagicMock, AsyncMock` and `import pytest`.
 
 ### Mocking Principles
 
@@ -936,139 +770,15 @@ import pytest
 
 ### Standard Mock Fixtures
 
-Create reusable fixtures in `conftest.py`:
-
-```python
-# conftest.py - Shared test fixtures
-
-import pytest
-from unittest.mock import Mock, AsyncMock
-
-@pytest.fixture
-def mock_llm_gateway():
-    """Mock LiteLLM Gateway with standard responses."""
-    gateway = Mock()
-    gateway.generate.return_value = {
-        "text": "Mock LLM response",
-        "model": "gpt-4",
-        "tokens": 50,
-        "finish_reason": "stop"
-    }
-    gateway.generate_embeddings.return_value = [0.1] * 1536
-    return gateway
-
-@pytest.fixture
-def mock_database():
-    """Mock PostgreSQL database connection."""
-    db = Mock()
-    db.execute_query.return_value = []
-    db.fetch_one.return_value = None
-    db.fetch_all.return_value = []
-    return db
-
-@pytest.fixture
-def mock_cache():
-    """Mock cache mechanism."""
-    cache = Mock()
-    cache.get.return_value = None  # Cache miss by default
-    cache.set.return_value = True
-    cache.delete.return_value = True
-    return cache
-
-@pytest.fixture
-def mock_vector_db():
-    """Mock vector database for RAG."""
-    vdb = Mock()
-    vdb.search.return_value = [
-        {"doc_id": "1", "score": 0.9, "content": "Sample content"},
-        {"doc_id": "2", "score": 0.7, "content": "Related content"}
-    ]
-    return vdb
-
-@pytest.fixture
-async def mock_async_llm():
-    """Mock async LLM calls."""
-    mock = AsyncMock()
-    mock.generate_async.return_value = {
-        "text": "Async mock response",
-        "model": "gpt-4"
-    }
-    return mock
-```
+Create reusable fixtures in `conftest.py` for common mocks: `mock_llm_gateway`, `mock_database`, `mock_cache`, `mock_vector_db`, and `mock_async_llm`. These fixtures provide standard responses and can be reused across multiple tests.
 
 ### Component-Specific Mocking Patterns
 
-#### Pattern 1: Mocking LLM Providers
+**Pattern 1: Mocking LLM Providers** - Use `@patch('litellm.completion')` to mock LLM API calls and validate request/response structure.
 
-```python
-from unittest.mock import patch
+**Pattern 2: Mocking Database Operations** - Mock database and vector DB connections, configure return values for search/query operations.
 
-@patch('litellm.completion')
-def test_gateway_generate(mock_completion):
-    """Test gateway with mocked LLM provider."""
-    # Setup mock response
-    mock_completion.return_value = Mock(
-        choices=[Mock(
-            message=Mock(content="Test response"),
-            finish_reason="stop"
-        )],
-        usage=Mock(total_tokens=50)
-    )
-    
-    gateway = LiteLLMGateway()
-    response = gateway.generate("Hello", model="gpt-4")
-    
-    # Validate
-    assert response["text"] == "Test response"
-    assert response["tokens"] == 50
-    mock_completion.assert_called_once()
-```
-
-#### Pattern 2: Mocking Database Operations
-
-```python
-def test_rag_with_mocked_db(mock_database, mock_vector_db):
-    """Test RAG system with mocked database."""
-    rag = RAGSystem(db=mock_database, vector_db=mock_vector_db)
-    
-    # Configure mock behavior
-    mock_vector_db.search.return_value = [
-        {"doc_id": "1", "score": 0.95, "content": "Relevant doc"}
-    ]
-    
-    results = rag.retrieve("test query", top_k=5)
-    
-    # Validate structure
-    assert isinstance(results, list)
-    assert len(results) <= 5
-    assert all("doc_id" in r for r in results)
-    mock_vector_db.search.assert_called_once()
-```
-
-#### Pattern 3: Mocking Agent Tools
-
-```python
-def test_agent_tool_execution(mock_llm_gateway):
-    """Test agent with mocked tools."""
-    # Create mock tool
-    mock_tool = Mock()
-    mock_tool.name = "search"
-    mock_tool.execute.return_value = {"results": ["item1", "item2"]}
-    
-    agent = Agent(gateway=mock_llm_gateway)
-    agent.add_tool(mock_tool)
-    
-    # Mock LLM to call the tool
-    mock_llm_gateway.generate.return_value = {
-        "tool_calls": [{"name": "search", "arguments": {"query": "test"}}]
-    }
-    
-    result = agent.execute_task("Find information")
-    
-    # Validate tool was called
-    mock_tool.execute.assert_called_once_with(query="test")
-    assert "results" in result
-```
+**Pattern 3: Mocking Agent Tools** - Create mock tools with `Mock()` objects, configure `execute()` return values, and validate tool invocation.
 
 ---
 
@@ -1089,58 +799,13 @@ def test_agent_tool_execution(mock_llm_gateway):
 ### Unit Testing Validation Types
 
 #### 1. Structural Contract Validation
-```python
-def test_structural_contract():
-    """Validate output type and schema."""
-    gateway = LiteLLMGateway()
-    
-    with patch('litellm.completion') as mock:
-        mock.return_value = Mock(choices=[...])
-        result = gateway.generate("Hello", model="gpt-4")
-    
-    # Structural validation
-    assert isinstance(result, dict)
-    assert "text" in result
-    assert "model" in result
-    assert "tokens" in result
-    assert isinstance(result["tokens"], int)
-```
+Validate output type and schema (dict, list, string), required fields presence, and schema conformance.
 
 #### 2. Behavioral Contract Validation
-```python
-def test_behavioral_contract():
-    """Validate correct behavior and side effects."""
-    agent = Agent(gateway=mock_gateway)
-    search_tool = Mock()
-    agent.add_tool(search_tool)
-    
-    mock_gateway.generate.return_value = {
-        "tool_calls": [{"name": "search", "arguments": {"q": "test"}}]
-    }
-    
-    agent.execute_task("Search for test")
-    
-    # Behavioral validation
-    search_tool.execute.assert_called_once()
-    assert search_tool.execute.call_args[1]["q"] == "test"
-```
+Validate correct behavior and side effects: correct function/tool selection, arguments passed correctly, termination conditions met.
 
 #### 3. Invariant Validation
-```python
-def test_invariant_validation():
-    """Validate system invariants are maintained."""
-    manager = PromptManager(max_tokens=1000)
-    
-    # Add content exceeding limit
-    for i in range(100):
-        manager.add_context("user", "Long message" * 100)
-    
-    context = manager.build_context()
-    
-    # Invariant validation
-    total_tokens = sum(len(msg["content"]) // 4 for msg in context)
-    assert total_tokens <= 1000  # Must respect limit
-```
+Validate system invariants: resource limits respected, ordering rules preserved, tenant isolation maintained, performance boundaries not violated.
 
 ---
 
@@ -1155,7 +820,7 @@ def test_invariant_validation():
 - Cache integration
 - Rate limiting per tenant
 
-**Example Tests:**
+**Testing Requirements:** Validate request structure, error handling, tenant isolation, and cache integration. See code examples section for implementation details.
 
 ```python
 import pytest
@@ -1243,7 +908,587 @@ def test_gateway_cache_integration():
 - Termination conditions
 - Memory context management
 
-**Example Tests:**
+**Testing Requirements:** Validate tool selection, termination bounds, tool failure handling, and memory context. See code examples section for implementation details.
+
+---
+
+### 3. RAG System
+
+**Test Focus:**
+- Retrieval query formation
+- Filtering and ranking logic
+- Context assembly behavior
+- Token limit enforcement
+
+**Testing Requirements:** Validate document retrieval, empty result handling, context size limits, and query optimization. See code examples section for implementation details.
+
+---
+
+### 4. Prompt Context Management
+
+**Test Focus:**
+- Context ordering
+- Token limit enforcement
+- Truncation strategy
+- Priority preservation
+
+**Testing Requirements:** Validate context ordering, token limits, priority preservation, and deterministic assembly. See code examples section for implementation details.
+
+---
+
+### 5. Prompt-Based Generator
+
+**Test Focus:**
+- Prompt template rendering
+- Variable substitution
+- Formatting and escaping
+- Error handling for missing variables
+
+**Testing Requirements:** Validate template rendering, missing variable handling, variable escaping, and snapshot matching. See code examples section for implementation details.
+
+---
+
+### 6. Data Ingestion Service
+
+**Test Focus:**
+- Input validation
+- Parsing logic
+- Deduplication behavior
+- Metadata preservation
+
+**Testing Requirements:** Validate input validation, file size limits, deduplication, and metadata preservation. See code examples section for implementation details.
+
+---
+
+### 7. Cache Mechanism
+
+**Test Focus:**
+- Cache key generation
+- TTL logic
+- Read/write behavior
+- Tenant isolation
+
+**Testing Requirements:** Validate basic operations, TTL expiration, tenant isolation, and key collision prevention. See code examples section for implementation details.
+
+---
+
+### 8. LLMOps
+
+**Test Focus:**
+- Log generation
+- Metric emission
+- Trace context propagation
+- Sensitive data filtering
+
+**Testing Requirements:** Validate log structure, correlation ID propagation, sensitive data filtering, and metric emission. See code examples section for implementation details.
+
+---
+
+## Integration Testing Framework
+
+### Overview
+
+**Objective:** Validate that multiple GenAI components work together correctly under controlled, realistic scenarios.
+
+### General Integration Testing Rules
+
+✅ **External services must be stubbed or simulated** - No real LLM/DB calls
+✅ **Tests validate data flow and orchestration** - Not internal implementation
+✅ **Both success and failure paths must be covered** - Happy + error scenarios
+✅ **Performance boundaries validated** - Timeouts, resource limits
+
+### Integration Testing Validation Strategy
+
+Integration tests must validate:
+
+1. **Correct component interaction** - Components communicate properly
+2. **Correct data passed between components** - Data format/structure maintained
+3. **Stable system behavior** - Works despite non-deterministic outputs
+
+**Assertions focus on:**
+- Schema validity
+- Required fields
+- Tool usage
+- Workflow completion
+- Error propagation
+
+---
+
+## Required Integration Test Scenarios
+
+### Scenario 1: Prompt Generator → LiteLLM Gateway
+
+**Validate:**
+- ✅ Prompt generated and passed correctly
+- ✅ Gateway response parsed correctly
+- ✅ Errors propagate in standardized form
+
+**Testing Requirements:** See code examples section for implementation details.
+
+### Scenario 2: Agent → Tools
+
+**Validate:**
+- ✅ Agent invokes correct tools
+- ✅ Tools invoked in correct order
+- ✅ Agent completes without infinite loops
+
+**Testing Requirements:** See code examples section for implementation details.
+
+### Scenario 3: RAG Pipeline (Ingestion → Retrieval → Generation)
+
+**Validate:**
+- ✅ Ingested data is retrievable
+- ✅ Retrieved context included in prompt
+- ✅ Output adheres to expected response structure
+
+**Testing Requirements:** See code examples section for implementation details.
+
+### Scenario 4: Cache Integration
+
+**Validate:**
+- ✅ Cache hit avoids recomputation
+- ✅ Cache miss triggers fresh execution
+- ✅ Cached data scoped correctly by tenant
+
+**Testing Requirements:** See code examples section for implementation details.
+
+### Scenario 5: LLMOps Integration
+
+**Validate:**
+- ✅ Logs, metrics, and traces generated for full workflow
+- ✅ Correlation ID preserved across components
+- ✅ Failures still emit telemetry
+
+**Testing Requirements:** See code examples section for implementation details.
+
+---
+
+## Error Scenarios and Edge Cases
+
+### Overview
+
+**All components must test comprehensive error scenarios** to ensure graceful failure handling and proper error propagation.
+
+### Network Errors
+
+**Testing Requirements:** Validate timeout handling, connection refused errors. See code examples section for implementation details.
+
+### LLM Provider Errors
+
+**Testing Requirements:** Validate rate limit errors, invalid API key errors, model not found errors. See code examples section for implementation details.
+
+### Malformed Input Errors
+
+**Testing Requirements:** Validate empty query handling, missing tenant ID validation, invalid tool arguments. See code examples section for implementation details.
+
+### Edge Cases
+
+**Testing Requirements:** Validate null value handling, max retrieval limits, empty context handling. See code examples section for implementation details.
+
+---
+
+## Test Execution and Validation
+
+### Running Tests
+
+#### Unit Tests
+
+**Commands:** Use `pytest src/tests/unit_tests/` with various flags for coverage, verbosity, and filtering. See code examples section for detailed command examples.
+
+#### Integration Tests
+
+**Commands:** Use `pytest src/tests/integration_tests/` with integration markers and timeout flags. See code examples section for detailed command examples.
+
+#### Coverage Reports
+
+**Commands:** Use `pytest --cov=src` with various report formats. See code examples section for detailed command examples.
+
+### Pre-Merge Validation Checklist
+
+Before merging any pull request, verify:
+
+- ✅ **All tests pass** - Zero failures in unit + integration suites
+- ✅ **Coverage thresholds met** - ≥80% for modified components
+- ✅ **No new linting errors** - Run `ruff check src/`
+- ✅ **All error paths tested** - 100% coverage of error handlers
+- ✅ **Performance boundaries respected** - No timeout violations
+- ✅ **Assertions contract-based** - No exact text matching (unless mocked)
+- ✅ **Mocks properly configured** - All external services mocked
+- ✅ **Documentation updated** - README and docstrings current
+
+### Continuous Integration
+
+**Required CI Checks:** Configure CI/CD pipeline with unit tests, integration tests, coverage checks, and coverage upload. See code examples section for CI configuration example.
+
+---
+
+## Best Practices and Guidelines
+
+### 1. Test Naming Conventions
+
+**Format:** `test_<component>_<scenario>_<expected_behavior>`
+
+**Examples:** Use descriptive names like `test_gateway_rate_limit_raises_error()`. Avoid vague names like `test_gateway()`.
+
+### 2. Test Organization
+
+**Structure:** Group related tests in classes. Organize by happy path, error path, and edge cases.
+
+### 3. Assertion Messages
+
+**Provide context in assertions:** Include clear failure messages with expected vs actual values.
+
+### 4. Test Data Management
+
+**Use fixtures for test data:** Create reusable fixtures for common test data patterns.
+
+### 5. Async Test Patterns
+
+**Use pytest-asyncio for async tests:** Decorate async test functions with `@pytest.mark.asyncio`.
+
+---
+
+## Code Examples - Testing Libraries Usage
+
+### pytest Usage Examples
+
+```python
+# Run all tests
+pytest src/tests/
+
+# Run with verbose output
+pytest src/tests/ -v
+
+# Run specific test file
+pytest src/tests/unit_tests/test_gateway.py
+```
+
+### pytest-asyncio Usage Examples
+
+```python
+import pytest
+
+@pytest.mark.asyncio
+async def test_async_llm_call():
+    """Test asynchronous LLM generation."""
+    gateway = LiteLLMGateway()
+    result = await gateway.generate_async("Hello", model="gpt-4")
+    assert result["text"] is not None
+```
+
+### pytest-mock Usage Examples
+
+```python
+def test_with_mocker(mocker):
+    """Test using pytest-mock fixture."""
+    # Create mock
+    mock_llm = mocker.Mock()
+    mock_llm.generate.return_value = {"text": "Response"}
+    
+    # Use mock in test
+    gateway = LiteLLMGateway(llm_client=mock_llm)
+    result = gateway.generate("Hello")
+    
+    # Verify mock was called
+    mock_llm.generate.assert_called_once()
+```
+
+### unittest.mock Usage Examples
+
+```python
+from unittest.mock import Mock, patch, MagicMock
+
+@patch('litellm.completion')
+def test_with_patch(mock_completion):
+    """Test with patched external dependency."""
+    mock_completion.return_value = Mock(
+        choices=[Mock(message=Mock(content="Response"))]
+    )
+    
+    gateway = LiteLLMGateway()
+    result = gateway.generate("Hello", model="gpt-4")
+    assert result["text"] == "Response"
+```
+
+### pytest-cov Usage Examples
+
+```bash
+# Run tests with coverage
+pytest --cov=src --cov-report=html
+
+# Enforce minimum coverage threshold
+pytest --cov=src --cov-fail-under=80
+
+# Show missing lines
+pytest --cov=src --cov-report=term-missing
+```
+
+### pytest-benchmark Usage Examples
+
+```python
+def test_cache_performance(benchmark):
+    """Benchmark cache lookup performance."""
+    cache = CacheManager()
+    cache.set("key1", "value1")
+    
+    # Benchmark cache get operation
+    result = benchmark(cache.get, "key1")
+    
+    assert result == "value1"
+    # Benchmark will report: mean, median, stddev
+```
+
+### pytest-timeout Usage Examples
+
+```python
+import pytest
+
+@pytest.mark.timeout(30)
+def test_agent_execution():
+    """Test must complete within 30 seconds."""
+    agent = Agent(gateway=mock_gateway)
+    result = agent.execute_task("Long-running task")
+    assert result["status"] == "completed"
+```
+
+### Faker Usage Examples
+
+```python
+from faker import Faker
+
+def test_with_fake_data():
+    """Test with generated fake data."""
+    fake = Faker()
+    
+    # Generate test data
+    user_name = fake.name()
+    user_email = fake.email()
+    document_text = fake.text(max_nb_chars=500)
+    
+    # Use in test
+    result = process_user(name=user_name, email=user_email)
+    assert result["email"] == user_email
+```
+
+### responses Usage Examples
+
+```python
+import responses
+
+@responses.activate
+def test_http_client():
+    """Test HTTP client with mocked responses."""
+    # Mock HTTP endpoint
+    responses.add(
+        responses.POST,
+        "https://api.openai.com/v1/chat/completions",
+        json={"choices": [{"message": {"content": "Response"}}]},
+        status=200
+    )
+    
+    # Make request (will be intercepted)
+    gateway = LiteLLMGateway()
+    result = gateway.generate("Hello", model="gpt-4")
+    
+    # Validate mock was called
+    assert len(responses.calls) == 1
+    assert result["text"] == "Response"
+```
+
+### pytest-snapshot Usage Examples
+
+```python
+def test_prompt_template(snapshot):
+    """Test prompt template generates consistent output."""
+    template = PromptTemplate("Analyze: {text}")
+    result = template.render(text="Sample text")
+    
+    # Compare against saved snapshot
+    snapshot.assert_match(result)
+```
+
+### assertpy Usage Examples
+
+```python
+from assertpy import assert_that
+
+def test_with_assertpy():
+    """Test using fluent assertions."""
+    result = gateway.generate("Hello", model="gpt-4")
+    
+    # Fluent assertions
+    assert_that(result).contains_key("text")
+    assert_that(result["text"]).is_not_empty()
+    assert_that(result["tokens"]).is_greater_than(0)
+    assert_that(result["model"]).is_equal_to("gpt-4")
+```
+
+### pytest-postgresql Usage Examples
+
+```python
+def test_with_postgres(postgresql):
+    """Test with real PostgreSQL database."""
+    # Get connection
+    conn = postgresql
+    cursor = conn.cursor()
+    
+    # Run test
+    cursor.execute("CREATE TABLE test (id INT, data TEXT)")
+    cursor.execute("INSERT INTO test VALUES (1, 'data')")
+    conn.commit()
+    
+    # Verify
+    cursor.execute("SELECT * FROM test")
+    assert cursor.fetchone() == (1, 'data')
+```
+
+### pytest-logging Usage Examples
+
+```python
+import logging
+
+def test_logging(caplog):
+    """Test that component logs correctly."""
+    with caplog.at_level(logging.INFO):
+        gateway = LiteLLMGateway()
+        gateway.generate("Hello", model="gpt-4")
+    
+    # Assert on log messages
+    assert "Generating text with model gpt-4" in caplog.text
+    assert any(record.levelname == "INFO" for record in caplog.records)
+```
+
+### Installation Examples
+
+```bash
+# Install from requirements-test.txt
+pip install -r requirements-test.txt
+
+# Or install individually
+pip install pytest>=7.0.0 \
+            pytest-asyncio>=0.21.0 \
+            pytest-mock>=3.10.0 \
+            pytest-cov>=4.0.0 \
+            pytest-benchmark>=4.0.0 \
+            pytest-timeout>=2.1.0 \
+            responses>=0.23.0 \
+            Faker>=18.0.0 \
+            assertpy>=1.1 \
+            pytest-snapshot>=0.9.0 \
+            pytest-postgresql>=5.0.0 \
+            pytest-testmon>=2.0.0
+```
+
+**requirements-test.txt example:**
+```txt
+# Core Testing
+pytest>=7.0.0
+pytest-asyncio>=0.21.0
+pytest-mock>=3.10.0
+pytest-cov>=4.0.0
+
+# Performance & Utilities
+pytest-benchmark>=4.0.0
+pytest-timeout>=2.1.0
+pytest-testmon>=2.0.0
+
+# Mocking & Test Data
+responses>=0.23.0
+Faker>=18.0.0
+
+# Assertions & Snapshots
+assertpy>=1.1
+pytest-snapshot>=0.9.0
+
+# Database Testing
+pytest-postgresql>=5.0.0
+```
+
+---
+
+## Code Examples - Component-Specific Unit Tests
+
+### 1. LiteLLM Gateway Unit Tests
+
+```python
+import pytest
+from unittest.mock import Mock, patch
+from src.core.litellm_gateway import LiteLLMGateway, GatewayConfig
+
+def test_gateway_request_structure():
+    """Test that gateway constructs correct request payload."""
+    gateway = LiteLLMGateway(config=GatewayConfig(provider="openai"))
+    
+    with patch('litellm.completion') as mock_completion:
+        mock_completion.return_value = Mock(
+            choices=[Mock(message=Mock(content="Response"))],
+            usage=Mock(total_tokens=10)
+        )
+        
+        gateway.generate("Hello", model="gpt-4", temperature=0.7)
+        
+        # Validate request structure
+        call_args = mock_completion.call_args
+        assert call_args[1]["model"] == "gpt-4"
+        assert call_args[1]["messages"][0]["content"] == "Hello"
+        assert call_args[1]["temperature"] == 0.7
+
+def test_gateway_error_normalization():
+    """Test that provider errors are normalized to SDK errors."""
+    gateway = LiteLLMGateway()
+    
+    with patch('litellm.completion') as mock_completion:
+        # Simulate provider rate limit error
+        mock_completion.side_effect = Exception("Rate limit exceeded")
+        
+        with pytest.raises(GatewayError) as exc_info:
+            gateway.generate("Hello", model="gpt-4")
+        
+        # Validate error is normalized
+        assert "rate limit" in str(exc_info.value).lower()
+        assert exc_info.value.error_type == "rate_limit"
+
+def test_gateway_tenant_isolation():
+    """Test that cache keys include tenant_id for isolation."""
+    gateway = LiteLLMGateway()
+    
+    key1 = gateway._generate_cache_key(
+        prompt="Hello",
+        model="gpt-4",
+        tenant_id="tenant_1"
+    )
+    key2 = gateway._generate_cache_key(
+        prompt="Hello",
+        model="gpt-4",
+        tenant_id="tenant_2"
+    )
+    
+    # Same prompt, different tenants = different cache keys
+    assert key1 != key2
+    assert "tenant_1" in key1
+    assert "tenant_2" in key2
+
+def test_gateway_cache_integration():
+    """Test gateway uses cache correctly."""
+    mock_cache = Mock()
+    mock_cache.get.return_value = None  # Cache miss
+    
+    gateway = LiteLLMGateway(cache=mock_cache)
+    
+    with patch('litellm.completion') as mock_llm:
+        mock_llm.return_value = Mock(
+            choices=[Mock(message=Mock(content="Response"))],
+            usage=Mock(total_tokens=50)
+        )
+        
+        gateway.generate("Hello", model="gpt-4", tenant_id="t1")
+    
+    # Validate cache operations
+    assert mock_cache.get.called  # Checked cache first
+    assert mock_cache.set.called  # Stored result in cache
+```
+
+### 2. Agno Agent Framework Unit Tests
 
 ```python
 import pytest
@@ -2574,18 +2819,4 @@ This guide is a **living document** and should be updated as:
 - **Python unittest.mock**: https://docs.python.org/3/library/unittest.mock.html
 - **pytest-asyncio**: https://pytest-asyncio.readthedocs.io/
 
-### Best Practices
-
-- **Martin Fowler - Test Pyramid**: https://martinfowler.com/articles/practical-test-pyramid.html
-- **Python Testing Best Practices**: https://docs.python-guide.org/writing/tests/
-- **Test-Driven Development**: *Test-Driven Development by Example* by Kent Beck
-
-### Related Standards
-
-- **PEP 8 - Python Style Guide**: https://peps.python.org/pep-0008/
-- **Code Coverage Standards**: Internal engineering standards document
-- **CI/CD Pipeline Configuration**: `.github/workflows/` directory
-
 ---
-
-**Review Cycle:** Quarterly
