@@ -1,4 +1,4 @@
-# GenAI Components – Testing Guide
+# AI Components – Testing Guide
 ## Comprehensive Unit and Integration Testing Framework for AI-Powered Systems
 
 ---
