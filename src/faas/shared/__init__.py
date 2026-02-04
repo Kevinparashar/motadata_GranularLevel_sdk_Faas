@@ -18,10 +18,8 @@ from .contracts import (
     ServiceResponse,
     StandardHeaders,
 )
-from .database import (
-    DatabaseConnection,
-    get_database_connection,
-)
+from .database import get_database_connection
+from ...core.postgresql_database import DatabaseConnection
 from .exceptions import (
     InternalServerError,
     NotFoundError,

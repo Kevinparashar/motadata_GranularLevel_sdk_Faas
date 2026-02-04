@@ -4,9 +4,9 @@ Configuration management for FaaS services.
 
 
 import os
-from typing import Any, Dict, Optional
+from typing import Any, Optional
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, ConfigDict, Field
 
 
 class ServiceConfig(BaseModel):
@@ -51,9 +51,9 @@ class ServiceConfig(BaseModel):
     enable_otel: bool = Field(default=False, description="Enable OTEL integration")
     enable_codec: bool = Field(default=False, description="Enable CODEC integration")
 
-    class Config:
-        env_file = ".env"
-        case_sensitive = False
+    model_config = ConfigDict(
+        extra="ignore",
+    )
 
 
 _config: Optional[ServiceConfig] = None
@@ -83,6 +83,8 @@ def load_config(service_name: str, **overrides: Any) -> ServiceConfig:
         "ml_service_url": os.getenv("ML_SERVICE_URL"),
         "prompt_service_url": os.getenv("PROMPT_SERVICE_URL"),
         "data_ingestion_service_url": os.getenv("DATA_INGESTION_SERVICE_URL"),
+        "prompt_generator_service_url": os.getenv("PROMPT_GENERATOR_SERVICE_URL"),
+        "llmops_service_url": os.getenv("LLMOPS_SERVICE_URL"),
         "database_url": os.getenv("DATABASE_URL", "postgresql://user:pass@localhost/db"),
         "redis_url": os.getenv("REDIS_URL"),
         "nats_url": os.getenv("NATS_URL"),

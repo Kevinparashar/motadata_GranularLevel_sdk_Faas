@@ -11,7 +11,7 @@ from typing import Any, Dict, Optional
 
 from ...core.agno_agent_framework import Agent, create_agent
 from ...core.litellm_gateway import LiteLLMGateway
-from ...core.postgresql_database.connection import DatabaseConnection
+from ...core.postgresql_database import DatabaseConnection
 
 logger = logging.getLogger(__name__)
 
@@ -23,12 +23,12 @@ class AgentStorage:
     Stores agent definitions in database and recreates Agent instances on demand.
     """
 
-    def __init__(self, db_connection: Any):
+    def __init__(self, db_connection: DatabaseConnection):
         """
         Initialize agent storage.
         
         Args:
-            db_connection (Any): Input parameter for this operation.
+            db_connection: Database connection instance.
         """
         self.db = db_connection
         self._ensure_table()
@@ -105,9 +105,9 @@ class AgentStorage:
                     agent.llm_provider,
                     agent.system_prompt,
                     json.dumps(
-                        list(agent.capabilities.keys()) if hasattr(agent, "capabilities") else []
+                        [cap.name for cap in agent.capabilities] if agent.capabilities else []
                     ),
-                    json.dumps(agent.config if hasattr(agent, "config") else {}),
+                    json.dumps(agent.metadata if agent.metadata else {}),
                 ),
             )
 
@@ -128,7 +128,9 @@ class AgentStorage:
         Returns:
             Optional[Agent]: Result if available, else None.
         """
-        with self.db.get_cursor() as cursor:
+        from psycopg2.extras import RealDictCursor
+
+        with self.db.get_cursor(cursor_factory=RealDictCursor) as cursor:
             cursor.execute(
                 """
                 SELECT 
@@ -164,8 +166,18 @@ class AgentStorage:
                     if isinstance(row["capabilities"], str)
                     else row["capabilities"]
                 )
-                for capability in capabilities:
-                    agent.add_capability(capability, f"Capability: {capability}")
+                for capability_name in capabilities:
+                    agent.add_capability(capability_name, f"Capability: {capability_name}")
+
+            # Restore metadata/config
+            if row.get("config"):
+                config_data = (
+                    json.loads(row["config"])
+                    if isinstance(row["config"], str)
+                    else row["config"]
+                )
+                if isinstance(config_data, dict):
+                    agent.metadata.update(config_data)
 
             return agent
 
@@ -179,14 +191,16 @@ class AgentStorage:
         List agents for a tenant.
         
         Args:
-            tenant_id (str): Tenant identifier used for tenant isolation.
-            limit (int): Input parameter for this operation.
-            offset (int): Input parameter for this operation.
+            tenant_id: Tenant identifier used for tenant isolation.
+            limit: Maximum number of agents to return.
+            offset: Number of agents to skip.
         
         Returns:
-            list[Dict[str, Any]]: Dictionary result of the operation.
+            List of agent dictionaries.
         """
-        with self.db.get_cursor() as cursor:
+        from psycopg2.extras import RealDictCursor
+
+        with self.db.get_cursor(cursor_factory=RealDictCursor) as cursor:
             cursor.execute(
                 """
                 SELECT 
