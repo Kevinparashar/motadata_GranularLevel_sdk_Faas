@@ -8,11 +8,11 @@ inter-service communication in FaaS architecture.
 
 import asyncio
 import logging
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, Optional
 
 import httpx
 
-from ...core.utils.circuit_breaker import CircuitBreaker, CircuitBreakerConfig, CircuitState
+from ...core.utils.circuit_breaker import CircuitBreaker, CircuitBreakerConfig
 from .config import ServiceConfig
 
 logger = logging.getLogger(__name__)
@@ -186,12 +186,13 @@ class ServiceHTTPClient:
             try:
                 response = await self._make_request("GET", endpoint, headers=headers, params=params)
                 return response.json()
-            except (ServiceTimeoutError, ServiceClientError) as e:
+            except ServiceUnavailableError:
+                # Circuit breaker is open, don't retry
+                raise
+            except ServiceClientError as e:
                 last_error = e
                 if attempt < max_retries - 1:
                     # Exponential backoff
-                    import asyncio
-
                     wait_time = 2**attempt
                     await asyncio.sleep(wait_time)
                     continue
@@ -236,7 +237,7 @@ class ServiceHTTPClient:
             except ServiceUnavailableError:
                 # Circuit breaker is open, don't retry
                 raise
-            except (ServiceTimeoutError, ServiceClientError) as e:
+            except ServiceClientError as e:
                 last_error = e
                 if attempt < max_retries - 1:
                     wait_time = min(2**attempt, 10)  # Cap at 10 seconds
@@ -283,7 +284,7 @@ class ServiceHTTPClient:
             except ServiceUnavailableError:
                 # Circuit breaker is open, don't retry
                 raise
-            except (ServiceTimeoutError, ServiceClientError) as e:
+            except ServiceClientError as e:
                 last_error = e
                 if attempt < max_retries - 1:
                     wait_time = min(2**attempt, 10)  # Cap at 10 seconds
@@ -328,7 +329,7 @@ class ServiceHTTPClient:
             except ServiceUnavailableError:
                 # Circuit breaker is open, don't retry
                 raise
-            except (ServiceTimeoutError, ServiceClientError) as e:
+            except ServiceClientError as e:
                 last_error = e
                 if attempt < max_retries - 1:
                     wait_time = min(2**attempt, 10)  # Cap at 10 seconds
@@ -376,10 +377,9 @@ class ServiceHTTPClient:
 
     def __del__(self):
         """Cleanup on deletion."""
-        try:
-            asyncio.create_task(self.close())
-        except Exception:
-            pass
+        # Note: Async cleanup in __del__ is not reliable
+        # Clients should be explicitly closed using await client.close()
+        pass
 
 
 class ServiceClientManager:

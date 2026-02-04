@@ -101,7 +101,7 @@ class AuthMiddleware(BaseHTTPMiddleware):
         return response
 
 
-async def error_handler(request: Request, exc: Exception) -> JSONResponse:
+def error_handler(request: Request, exc: Exception) -> JSONResponse:
     """
     Global error handler for all services.
 
