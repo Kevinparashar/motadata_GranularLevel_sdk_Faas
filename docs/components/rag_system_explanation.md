@@ -6,6 +6,68 @@
 
 The RAG (Retrieval-Augmented Generation) System is a comprehensive solution for building context-aware AI applications. It combines document retrieval with LLM generation to provide accurate, contextually relevant responses based on a knowledge base of documents.
 
+**RAG System Architecture Diagram:**
+
+```
+┌─────────────────────────────────────────────────────────────────┐
+│                          INPUT                                   │
+│  ┌──────────────────────┐    ┌──────────────────────┐         │
+│  │     Documents        │    │    User Query         │         │
+│  │  Text, PDF, Audio,  │    │                       │         │
+│  │  Video, Images      │    │                       │         │
+│  └──────────┬──────────┘    └──────────┬───────────┘          │
+│             │                          │                      │
+└─────────────┼──────────────────────────┼──────────────────────┘
+              │                          │
+              ▼                          ▼
+┌─────────────────────────────────────────────────────────────────┐
+│                      RAG SYSTEM                                  │
+│                                                                  │
+│  ┌──────────────────────────────────────────────────────────┐  │
+│  │              DOCUMENT INGESTION FLOW                     │  │
+│  │                                                            │  │
+│  │  Documents → Ingestion → Processing → Embedding          │  │
+│  │                │            │            │                │  │
+│  │                ▼            ▼            ▼                │  │
+│  │          ┌─────────┐  ┌─────────┐  ┌─────────┐           │  │
+│  │          │Ingestion│  │Processing│  │Embedding│           │  │
+│  │          │         │  │Chunking │  │Generate │           │  │
+│  │          └────┬────┘  └────┬────┘  └────┬────┘           │  │
+│  │               │             │            │                │  │
+│  │               └─────────────┼────────────┘                │  │
+│  │                             │                             │  │
+│  │                             ▼                             │  │
+│  │                       ┌─────────┐                          │  │
+│  │                       │ Storage │                          │  │
+│  │                       │ Vector │                          │  │
+│  │                       └────┬────┘                          │  │
+│  └────────────────────────────┼──────────────────────────────┘  │
+│                                │                                  │
+│  ┌────────────────────────────┼──────────────────────────────┐  │
+│  │              QUERY PROCESSING FLOW                        │  │
+│  │                                                            │  │
+│  │  Query → Retrieve → Context → Generate                    │  │
+│  │    │        │         │          │                        │  │
+│  │    ▼        ▼         ▼          ▼                        │  │
+│  │  ┌─────┐ ┌──────┐ ┌──────┐ ┌────────┐                   │  │
+│  │  │Query│ │Retrie│ │Context│ │Generate│                   │  │
+│  │  │     │ │val   │ │Build  │ │Response│                   │  │
+│  │  └──┬──┘ └───┬──┘ └───┬──┘ └───┬────┘                   │  │
+│  │     │        │         │        │                        │  │
+│  │     └────────┼─────────┼────────┘                        │  │
+│  └─────────────┼─────────┼──────────────────────────────────┘  │
+│                │         │                                      │
+└────────────────┼─────────┼──────────────────────────────────────┘
+                 │         │
+        ┌────────┼─────────┼────────┐
+        │        │         │        │
+        ▼        ▼         ▼        ▼
+┌──────────────┐ ┌──────────────┐ ┌──────────────┐ ┌──────────────┐
+│   Gateway    │ │  PostgreSQL  │ │    Cache     │ │   Memory     │
+│  (LiteLLM)   │ │  (pgvector)  │ │              │ │  (Agent)     │
+└──────────────┘ └──────────────┘ └──────────────┘ └──────────────┘
+```
+
 ## Table of Contents
 
 1. [Document Processing](#document-processing)
