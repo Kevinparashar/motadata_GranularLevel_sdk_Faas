@@ -80,7 +80,7 @@ class TestCacheMechanism:
         mock_redis_client.get.return_value = b"value1"
         mock_redis_client.set.return_value = True
 
-        config = CacheConfig(backend="dragonfly", dragonfly_url="redis://localhost:6379/0")
+        config = CacheConfig(backend="dragonfly", dragonfly_url="dragonfly://localhost:6379/0")
         cache = CacheMechanism(config=config)
 
         await cache.set("key1", "value1")

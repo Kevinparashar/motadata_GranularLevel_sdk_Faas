@@ -42,7 +42,7 @@ class CacheMechanism:
         self._store: OrderedDict[str, tuple[Any, float]] = OrderedDict()
 
     async def _ensure_async_client(self) -> Any:
-        """Ensure async Redis client is initialized."""
+        """Ensure async Dragonfly client is initialized."""
         if self._async_client is None and self.backend == "dragonfly":
             if aioredis is None:
                 raise ImportError("aioredis required for Dragonfly backend")
