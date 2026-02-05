@@ -52,9 +52,9 @@ class ModelSerializer:
         return filepath
 
     @staticmethod
-    def load_model(filepath: str, format: str = "joblib") -> Any:
+    async def load_model(filepath: str, format: str = "joblib") -> Any:
         """
-        Load model from file.
+        Load model from file asynchronously.
         
         Args:
             filepath (str): Input parameter for this operation.
@@ -66,10 +66,16 @@ class ModelSerializer:
         Raises:
             ValueError: Raised when this function detects an invalid state or when an underlying call fails.
         """
-        if format == "joblib":
-            return joblib.load(filepath)
-        elif format == "pickle":
-            with open(filepath, "rb") as f:
-                return pickle.load(f)
-        else:
-            raise ValueError(f"Unknown format: {format}")
+        import asyncio
+        
+        def _load_sync() -> Any:
+            if format == "joblib":
+                return joblib.load(filepath)
+            elif format == "pickle":
+                with open(filepath, "rb") as f:
+                    return pickle.load(f)
+            else:
+                raise ValueError(f"Unknown format: {format}")
+
+        # Run file I/O in thread pool to avoid blocking
+        return await asyncio.to_thread(_load_sync)

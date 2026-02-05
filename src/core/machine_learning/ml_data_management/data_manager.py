@@ -34,11 +34,11 @@ class DataManager:
 
         logger.info(f"DataManager initialized for tenant: {tenant_id}")
 
-    def ingest_data(
+    async def ingest_data(
         self, dataset_name: str, metadata: Optional[Dict[str, Any]] = None
     ) -> str:
         """
-        Ingest new data.
+        Ingest new data asynchronously.
         
         Args:
             dataset_name (str): Input parameter for this operation.
@@ -51,11 +51,11 @@ class DataManager:
 
         query = """
         INSERT INTO ml_datasets (dataset_name, metadata, tenant_id, created_at)
-        VALUES (%s, %s::jsonb, %s, %s)
+        VALUES ($1, $2::jsonb, $3, $4)
         RETURNING id;
         """
 
-        result = self.db.execute_query(
+        result = await self.db.execute_query(
             query,
             (dataset_name, json.dumps(metadata or {}), self.tenant_id, datetime.now(timezone.utc)),
             fetch_one=True,
@@ -78,9 +78,9 @@ class DataManager:
         # Basic validation logic
         return True
 
-    def archive_data(self, dataset_id: str) -> None:
+    async def archive_data(self, dataset_id: str) -> None:
         """
-        Archive old data.
+        Archive old data asynchronously.
         
         Args:
             dataset_id (str): Input parameter for this operation.
@@ -90,9 +90,9 @@ class DataManager:
         """
         query = """
         UPDATE ml_datasets
-        SET archived = true, updated_at = %s
-        WHERE id = %s AND tenant_id = %s;
+        SET archived = true, updated_at = $1
+        WHERE id = $2 AND tenant_id = $3;
         """
 
-        self.db.execute_query(query, (datetime.now(timezone.utc), dataset_id, self.tenant_id))
+        await self.db.execute_query(query, (datetime.now(timezone.utc), dataset_id, self.tenant_id))
         logger.info(f"Data archived: {dataset_id}")

@@ -5,6 +5,7 @@ Measures cache hit rates, performance, and TTL behavior.
 """
 
 
+import asyncio
 import time
 from typing import Dict, List
 
@@ -68,7 +69,8 @@ class TestCacheBenchmarks:
         """Cache mechanism fixture."""
         return CacheMechanism(CacheConfig(default_ttl=3600, max_size=10000))
 
-    def test_set_get_latency(self, cache):
+    @pytest.mark.asyncio
+    async def test_set_get_latency(self, cache):
         """Benchmark set/get operations."""
         benchmark = BenchmarkCache()
         iterations = 1000
@@ -76,14 +78,14 @@ class TestCacheBenchmarks:
         # Benchmark set operations
         for i in range(iterations):
             start = time.time()
-            cache.set(f"key_{i}", f"value_{i}", ttl=3600)
+            await cache.set(f"key_{i}", f"value_{i}", ttl=3600)
             latency = time.time() - start
             benchmark.record_latency("set", latency)
 
         # Benchmark get operations
         for i in range(iterations):
             start = time.time()
-            value = cache.get(f"key_{i}")
+            value = await cache.get(f"key_{i}")
             latency = time.time() - start
             benchmark.record_latency("get", latency)
             assert value == f"value_{i}"
@@ -99,19 +101,20 @@ class TestCacheBenchmarks:
         assert set_stats["avg"] < 0.001  # < 1ms
         assert get_stats["avg"] < 0.001  # < 1ms
 
-    def test_cache_hit_rate(self, cache):
+    @pytest.mark.asyncio
+    async def test_cache_hit_rate(self, cache):
         """Benchmark cache hit rate."""
         benchmark = BenchmarkCache()
         iterations = 100
 
         # Fill cache
         for i in range(iterations):
-            cache.set(f"key_{i}", f"value_{i}", ttl=3600)
+            await cache.set(f"key_{i}", f"value_{i}", ttl=3600)
 
         # Test hit rate with repeated access
         for _ in range(5):  # 5 rounds
             for i in range(iterations):
-                value = cache.get(f"key_{i}")
+                value = await cache.get(f"key_{i}")
                 if value:
                     benchmark.record_hit()
                 else:
@@ -123,7 +126,8 @@ class TestCacheBenchmarks:
         # Should have high hit rate (> 95%)
         assert hit_rate > 95.0
 
-    def test_cache_throughput(self, cache):
+    @pytest.mark.asyncio
+    async def test_cache_throughput(self, cache):
         """Benchmark cache throughput (operations per second)."""
         iterations = 10000
 
@@ -131,8 +135,8 @@ class TestCacheBenchmarks:
 
         # Mix of set and get operations
         for i in range(iterations):
-            cache.set(f"key_{i}", f"value_{i}", ttl=3600)
-            cache.get(f"key_{i}")
+            await cache.set(f"key_{i}", f"value_{i}", ttl=3600)
+            await cache.get(f"key_{i}")
 
         elapsed = time.time() - start
         throughput = (iterations * 2) / elapsed  # 2 ops per iteration (set + get)
@@ -144,7 +148,8 @@ class TestCacheBenchmarks:
         # Should handle high throughput (> 10k ops/sec)
         assert throughput > 10000
 
-    def test_cache_eviction_performance(self, cache):
+    @pytest.mark.asyncio
+    async def test_cache_eviction_performance(self, cache):
         """Benchmark cache eviction performance."""
         max_size = 1000
         eviction_cache = CacheMechanism(CacheConfig(default_ttl=3600, max_size=max_size))
@@ -155,11 +160,14 @@ class TestCacheBenchmarks:
 
         start = time.time()
         for i in range(total_keys):
-            eviction_cache.set(f"key_{i}", f"value_{i}", ttl=3600)
+            await eviction_cache.set(f"key_{i}", f"value_{i}", ttl=3600)
         fill_time = time.time() - start
 
         # Check that eviction worked
-        current_size = len([k for k in range(total_keys) if eviction_cache.get(f"key_{k}")])
+        current_size = 0
+        for k in range(total_keys):
+            if await eviction_cache.get(f"key_{k}"):
+                current_size += 1
 
         print("\nCache Eviction Performance:")
         print(f"  Max size: {max_size}")
@@ -171,21 +179,22 @@ class TestCacheBenchmarks:
         assert current_size <= max_size
         assert fill_time < 1.0  # Should complete quickly
 
-    def test_ttl_expiration_performance(self, cache):
+    @pytest.mark.asyncio
+    async def test_ttl_expiration_performance(self, cache):
         """Benchmark TTL expiration performance."""
         ttl_cache = CacheMechanism(CacheConfig(default_ttl=1, max_size=1000))  # 1 second TTL
 
         # Set values with short TTL
         for i in range(100):
-            ttl_cache.set(f"key_{i}", f"value_{i}", ttl=1)
+            await ttl_cache.set(f"key_{i}", f"value_{i}", ttl=1)
 
         # Wait for expiration
-        time.sleep(1.1)
+        await asyncio.sleep(1.1)
 
         start = time.time()
         expired_count = 0
         for i in range(100):
-            if ttl_cache.get(f"key_{i}") is None:
+            if await ttl_cache.get(f"key_{i}") is None:
                 expired_count += 1
         check_time = time.time() - start
 

@@ -104,11 +104,11 @@ class RAGSystem:
         )
         self.generator = RAGGenerator(gateway=gateway, model=generation_model)
 
-    def _load_document_from_file(
+    async def _load_document_from_file(
         self, file_path: str, metadata: Optional[Dict[str, Any]]
     ) -> tuple[str, Dict[str, Any], str]:
         """
-        Load document from file path.
+        Load document from file path asynchronously.
         
         Args:
             file_path (str): Path of the input file.
@@ -117,14 +117,14 @@ class RAGSystem:
         Returns:
             tuple[str, Dict[str, Any], str]: Dictionary result of the operation.
         """
-        content, loaded_metadata = self.document_processor.load_document(file_path)
+        content, loaded_metadata = await self.document_processor.load_document(file_path)
         if metadata:
             metadata.update(loaded_metadata)
         else:
             metadata = loaded_metadata
         return content, metadata, file_path
 
-    def _insert_document_to_db(
+    async def _insert_document_to_db(
         self, title: str, content: str, metadata: Optional[Dict[str, Any]], source: Optional[str], tenant_id: Optional[str]
     ) -> str:
         """
@@ -148,7 +148,7 @@ class RAGSystem:
         RETURNING id;
         """
         metadata_json = json.dumps(metadata or {})
-        result = self.db.execute_query(
+        result = await self.db.execute_query(
             query, (title, content, metadata_json, source, tenant_id), fetch_one=True
         )
         return str(result["id"])
@@ -227,7 +227,7 @@ class RAGSystem:
             embeddings_data = self._generate_embeddings_individual(chunks, document_id)
         return embeddings_data
 
-    def _store_embeddings(self, embeddings_data: List[tuple]) -> None:
+    async def _store_embeddings(self, embeddings_data: List[tuple]) -> None:
         """
         Store embeddings and trigger reindexing.
         
@@ -240,9 +240,9 @@ class RAGSystem:
         if not embeddings_data:
             return
 
-        self.vector_ops.batch_insert_embeddings(embeddings_data)
+        await self.vector_ops.batch_insert_embeddings(embeddings_data)
         try:
-            self.index_manager.auto_reindex_on_embedding_change(
+            await self.index_manager.auto_reindex_on_embedding_change(
                 table_name="embeddings", column_name="embedding"
             )
         except Exception as e:
@@ -281,13 +281,17 @@ class RAGSystem:
         Raises:
             ValueError: Raised when this function detects an invalid state or when an underlying call fails.
         """
+        import asyncio
+
         if file_path:
-            content, metadata, source = self._load_document_from_file(file_path, metadata)
+            # Call async method from sync context
+            content, metadata, source = asyncio.run(self._load_document_from_file(file_path, metadata))
 
         if not content:
             raise ValueError("Either 'content' or 'file_path' must be provided")
 
-        document_id = self._insert_document_to_db(title, content, metadata, source, tenant_id)
+        # Call async method from sync context
+        document_id = asyncio.run(self._insert_document_to_db(title, content, metadata, source, tenant_id))
 
         chunks = self.document_processor.chunk_document(
             content=content, document_id=document_id, metadata=metadata
@@ -297,7 +301,7 @@ class RAGSystem:
             return document_id
 
         embeddings_data = self._process_embeddings(chunks, document_id)
-        self._store_embeddings(embeddings_data)
+        asyncio.run(self._store_embeddings(embeddings_data))
 
         return document_id
 
@@ -363,13 +367,15 @@ class RAGSystem:
         Returns:
             Dict[str, Any]: Dictionary result of the operation.
         """
+        import asyncio
+
         # Retrieve relevant memories if memory is enabled
         memories = []
         memory_context = ""
         if self.memory:
-            memories = self.memory.retrieve(
+            memories = asyncio.run(self.memory.retrieve(
                 query=query, limit=5
-            )
+            ))
             if memories:
                 memory_context = "\n".join([f"- {mem.content}" for mem in memories[:3]])
 
@@ -380,7 +386,7 @@ class RAGSystem:
 
         # Include tenant_id in cache key for tenant isolation
         cache_key = f"rag:query:{tenant_id or 'global'}:{query}:{top_k}:{threshold}:{max_tokens}:{retrieval_strategy}"
-        cached = self.cache.get(cache_key, tenant_id=tenant_id)
+        cached = asyncio.run(self.cache.get(cache_key, tenant_id=tenant_id))
         if cached:
             return cached
 
@@ -418,11 +424,11 @@ class RAGSystem:
             }
 
             # Store in cache
-            self.cache.set(cache_key, result, ttl=300, tenant_id=tenant_id)
+            asyncio.run(self.cache.set(cache_key, result, ttl=300, tenant_id=tenant_id))
 
             # Store in memory for future context
             if self.memory:
-                self.memory.store(
+                asyncio.run(self.memory.store(
                     content=f"Query: {original_query}\nAnswer: {answer}",
                     memory_type=MemoryType.EPISODIC,
                     importance=0.7,
@@ -432,7 +438,7 @@ class RAGSystem:
                         "tenant_id": tenant_id,
                         "num_documents": len(retrieved_docs),
                     },
-                )
+                ))
 
             return result
         except (ConnectionError, TimeoutError) as e:
@@ -500,7 +506,7 @@ class RAGSystem:
         memories = []
         memory_context = ""
         if self.memory:
-            memories = self.memory.retrieve(
+            memories = await self.memory.retrieve(
                 query=query, limit=5
             )
             if memories:
@@ -517,7 +523,7 @@ class RAGSystem:
         # COST OPTIMIZATION: Cache hits avoid expensive embedding + generation calls
         # Cost saved per cache hit: ~$0.003-0.03 (embedding + generation)
         cache_key = f"rag:query:{tenant_id or 'global'}:{query}:{top_k}:{threshold}:{max_tokens}:{retrieval_strategy}"
-        cached = self.cache.get(cache_key, tenant_id=tenant_id)
+        cached = await self.cache.get(cache_key, tenant_id=tenant_id)
         if cached:
             return cached
 
@@ -565,11 +571,11 @@ class RAGSystem:
             }
 
             # Store in cache
-            self.cache.set(cache_key, result, ttl=300, tenant_id=tenant_id)
+            await self.cache.set(cache_key, result, ttl=300, tenant_id=tenant_id)
 
             # Store in memory for future context
             if self.memory:
-                self.memory.store(
+                await self.memory.store(
                     content=f"Query: {original_query}\nAnswer: {answer}",
                     memory_type=MemoryType.EPISODIC,
                     importance=0.7,
@@ -668,7 +674,7 @@ class RAGSystem:
                 continue
         return embeddings_data
 
-    def _store_embeddings_and_reindex(self, embeddings_data: List[tuple]) -> None:
+    async def _store_embeddings_and_reindex(self, embeddings_data: List[tuple]) -> None:
         """
         Store embeddings and trigger reindexing.
         
@@ -679,9 +685,9 @@ class RAGSystem:
             None: Result of the operation.
         """
         if embeddings_data:
-            self.vector_ops.batch_insert_embeddings(embeddings_data)
+            await self.vector_ops.batch_insert_embeddings(embeddings_data)
             try:
-                self.index_manager.auto_reindex_on_embedding_change(
+                await self.index_manager.auto_reindex_on_embedding_change(
                     table_name="embeddings", column_name="embedding"
                 )
             except Exception as e:
@@ -717,7 +723,7 @@ class RAGSystem:
 
         metadata_json = json.dumps(metadata or {})
 
-        result = self.db.execute_query(
+        result = await self.db.execute_query(
             query, (title, content, metadata_json, source), fetch_one=True
         )
 
@@ -740,7 +746,7 @@ class RAGSystem:
             embeddings_data = await self._fallback_individual_embeddings(chunks, document_id)
 
         # Store embeddings and reindex
-        self._store_embeddings_and_reindex(embeddings_data)
+        await self._store_embeddings_and_reindex(embeddings_data)
 
         return document_id
 
@@ -838,12 +844,12 @@ class RAGSystem:
 
         return document_ids
 
-    def create_index(
+    async def create_index(
         self,
         index_type: IndexType = IndexType.IVFFLAT,
         distance: IndexDistance = IndexDistance.COSINE,
         **kwargs: Any,
-    ) -> bool:
+    ) -> str:
         """
         Create a vector index for optimal search performance.
         
@@ -853,9 +859,9 @@ class RAGSystem:
             **kwargs (Any): Input parameter for this operation.
         
         Returns:
-            bool: True if the operation succeeds, else False.
+            str: The name of the created or existing index.
         """
-        return self.index_manager.create_index(
+        return await self.index_manager.create_index(
             table_name="embeddings",
             column_name="embedding",
             index_type=index_type,
@@ -863,7 +869,7 @@ class RAGSystem:
             **kwargs,
         )
 
-    def reindex(self, concurrently: bool = True) -> List[str]:
+    async def reindex(self, concurrently: bool = True) -> List[str]:
         """
         Reindex all vector indexes (useful after embedding model changes or bulk updates).
         
@@ -873,16 +879,16 @@ class RAGSystem:
         Returns:
             List[str]: List result of the operation.
         """
-        return self.index_manager.reindex_table(table_name="embeddings", concurrently=concurrently)
+        return await self.index_manager.reindex_table(table_name="embeddings", concurrently=concurrently)
 
-    def get_index_info(self) -> List[Dict[str, Any]]:
+    async def get_index_info(self) -> List[Dict[str, Any]]:
         """
         Get information about all vector indexes.
         
         Returns:
             List[Dict[str, Any]]: Dictionary result of the operation.
         """
-        return self.index_manager.list_indexes(table_name="embeddings")
+        return await self.index_manager.list_indexes(table_name="embeddings")
 
     def _build_document_update_query(
         self, title: Optional[str], metadata: Optional[Dict[str, Any]]
@@ -911,7 +917,7 @@ class RAGSystem:
         
         return updates, params
 
-    def _generate_and_store_embeddings(
+    async def _generate_and_store_embeddings(
         self, chunks: List[Any], document_id: str
     ) -> None:
         """
@@ -928,7 +934,7 @@ class RAGSystem:
             return
         
         chunk_texts = [chunk.content for chunk in chunks]
-        embedding_response = self.gateway.embed(
+        embedding_response = await self.gateway.embed_async(
             texts=chunk_texts, model=self.embedding_model
         )
         
@@ -939,9 +945,9 @@ class RAGSystem:
                     embeddings_data.append((int(document_id), embedding, self.embedding_model))
             
             if embeddings_data:
-                self.vector_ops.batch_insert_embeddings(embeddings_data)
+                await self.vector_ops.batch_insert_embeddings(embeddings_data)
 
-    def _update_document_content(
+    async def _update_document_content(
         self, document_id: str, content: str, metadata: Optional[Dict[str, Any]]
     ) -> None:
         """
@@ -956,18 +962,18 @@ class RAGSystem:
             None: Result of the operation.
         """
         # Delete old chunks and embeddings
-        self._delete_document_chunks(document_id)
+        await self._delete_document_chunks(document_id)
         
         # Re-process and re-embed
         chunks = self.document_processor.chunk_document(
             content=content, document_id=document_id, metadata=metadata
         )
         
-        self._generate_and_store_embeddings(chunks, document_id)
+        await self._generate_and_store_embeddings(chunks, document_id)
         
         # Auto-reindex
         try:
-            self.index_manager.auto_reindex_on_embedding_change(
+            await self.index_manager.auto_reindex_on_embedding_change(
                 table_name="embeddings", column_name="embedding"
             )
         except Exception as e:
@@ -975,9 +981,9 @@ class RAGSystem:
         
         # Update content in database
         query = "UPDATE documents SET content = %s WHERE id = %s;"
-        self.db.execute_query(query, (content, document_id))
+        await self.db.execute_query(query, (content, document_id))
 
-    def update_document(
+    async def update_document(
         self,
         document_id: str,
         title: Optional[str] = None,
@@ -1007,14 +1013,14 @@ class RAGSystem:
                 WHERE id = %s;
                 """
                 params.append(document_id)
-                self.db.execute_query(query, tuple(params))
+                await self.db.execute_query(query, tuple(params))
 
             # If content changed, re-process document
             if content is not None:
-                self._update_document_content(document_id, content, metadata)
+                await self._update_document_content(document_id, content, metadata)
 
             # Invalidate cache for this document
-            self.cache.invalidate_pattern(f"rag:doc:{document_id}")
+            await self.cache.invalidate_pattern(f"rag:doc:{document_id}")
 
             return True
         except (ConnectionError, ValueError) as e:
@@ -1026,7 +1032,7 @@ class RAGSystem:
             logger.error(f"Unexpected error updating document {document_id}: {e}", exc_info=True)
             return False
 
-    def delete_document(self, document_id: str) -> bool:
+    async def delete_document(self, document_id: str) -> bool:
         """
         Delete a document and its associated chunks/embeddings from the RAG system.
         
@@ -1038,15 +1044,15 @@ class RAGSystem:
         """
         try:
             # Delete document chunks and embeddings
-            self._delete_document_chunks(document_id)
+            await self._delete_document_chunks(document_id)
 
             # Delete document
             query = "DELETE FROM documents WHERE id = %s;"
-            self.db.execute_query(query, (document_id,))
+            await self.db.execute_query(query, (document_id,))
 
             # Invalidate cache
-            self.cache.invalidate_pattern(f"rag:doc:{document_id}")
-            self.cache.invalidate_pattern("rag:query:*")
+            await self.cache.invalidate_pattern(f"rag:doc:{document_id}")
+            await self.cache.invalidate_pattern("rag:query:*")
 
             return True
         except (ConnectionError, ValueError) as e:
@@ -1058,7 +1064,7 @@ class RAGSystem:
             logger.error(f"Unexpected error deleting document {document_id}: {e}", exc_info=True)
             return False
 
-    def _delete_document_chunks(self, document_id: str) -> None:
+    async def _delete_document_chunks(self, document_id: str) -> None:
         """
         Delete all chunks and embeddings for a document.
         
@@ -1070,8 +1076,8 @@ class RAGSystem:
         """
         # Delete embeddings
         query = "DELETE FROM embeddings WHERE document_id = %s;"
-        self.db.execute_query(query, (document_id,))
+        await self.db.execute_query(query, (document_id,))
 
         # Note: If you have a chunks table, delete from there too
         # query = "DELETE FROM chunks WHERE document_id = %s;"
-        # self.db.execute_query(query, (document_id,))
+        # await self.db.execute_query(query, (document_id,))

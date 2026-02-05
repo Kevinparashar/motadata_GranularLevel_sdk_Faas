@@ -202,7 +202,7 @@ class GatewayService:
         }
         await self.nats_client.publish(
             f"gateway.events.{tenant_id}",
-            self.codec_manager.encode(event),
+            await self.codec_manager.encode(event),
         )
 
     async def _handle_generate_stream(  # noqa: S7503

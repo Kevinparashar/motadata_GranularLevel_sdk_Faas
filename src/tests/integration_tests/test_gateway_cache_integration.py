@@ -128,10 +128,11 @@ class TestGatewayCacheIntegration:
         cache_key = gateway._generate_cache_key(
             prompt="Test", model="gpt-4", tenant_id="test_tenant"
         )
-        cached = cache.get(cache_key, tenant_id="test_tenant")
+        cached = await cache.get(cache_key, tenant_id="test_tenant")
         assert cached is None
 
-    def test_cache_statistics_tracking(self, gateway_with_cache):
+    @pytest.mark.asyncio
+    async def test_cache_statistics_tracking(self, gateway_with_cache):
         """Test that cache statistics are tracked correctly."""
         _, cache, _ = gateway_with_cache
 
@@ -142,9 +143,9 @@ class TestGatewayCacheIntegration:
 
         # Make calls that will hit/miss cache
         # This would require actual async execution, so we'll test the cache directly
-        cache.set("test_key", "test_value", tenant_id="test_tenant")
-        cache.get("test_key", tenant_id="test_tenant")  # Hit
-        cache.get("non_existent", tenant_id="test_tenant")  # Miss
+        await cache.set("test_key", "test_value", tenant_id="test_tenant")
+        await cache.get("test_key", tenant_id="test_tenant")  # Hit
+        await cache.get("non_existent", tenant_id="test_tenant")  # Miss
 
         stats = cache.get_stats()
         assert stats.get("hits", 0) > initial_hits

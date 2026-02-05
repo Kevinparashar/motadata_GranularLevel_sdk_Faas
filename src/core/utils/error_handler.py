@@ -5,9 +5,10 @@ Provides consistent error handling patterns across all SDK components.
 """
 
 
+import asyncio
 import logging
 from functools import wraps
-from typing import Any, Callable, Optional, Type, TypeVar
+from typing import Any, Awaitable, Callable, Optional, Type, TypeVar, cast
 
 from ..exceptions import SDKError
 
@@ -75,7 +76,7 @@ def _execute_with_retry(
     on_retry: Optional[Callable[[int, Exception], None]],
 ) -> T:
     """
-    Execute function with retry logic.
+    Execute function with retry logic (synchronous).
     
     Args:
         func (Callable[..., T]): Input parameter for this operation.
@@ -117,6 +118,82 @@ def _execute_with_retry(
     raise RuntimeError("Unexpected error in retry logic")
 
 
+async def _call_on_retry_async(
+    on_retry: Callable[[int, Exception], None], attempt: int, exception: Exception
+) -> None:
+    """Call on_retry callback, handling both sync and async callbacks."""
+    if asyncio.iscoroutinefunction(on_retry):
+        await on_retry(attempt, exception)
+    else:
+        on_retry(attempt, exception)
+
+
+async def _handle_retryable_exception_async(
+    func: Callable[..., Any],
+    exception: Exception,
+    attempt: int,
+    max_retries: int,
+    retry_delay: float,
+    on_retry: Optional[Callable[[int, Exception], None]],
+) -> None:
+    """Handle retryable exception in async context."""
+    if attempt < max_retries - 1:
+        _log_retry_attempt(func.__name__, attempt + 1, max_retries, exception)
+        if on_retry:
+            await _call_on_retry_async(on_retry, attempt + 1, exception)
+        await asyncio.sleep(retry_delay * (attempt + 1))
+    else:
+        _handle_max_retries_exceeded(func.__name__, max_retries, exception)
+
+
+async def _execute_with_retry_async(
+    func: Callable[..., Any],
+    args: tuple,
+    kwargs: dict,
+    max_retries: int,
+    retry_delay: float,
+    retryable_exceptions: tuple[Type[Exception], ...],
+    on_retry: Optional[Callable[[int, Exception], None]],
+) -> Any:
+    """
+    Execute async function with retry logic.
+    
+    Args:
+        func (Callable[..., Any]): Input parameter for this operation.
+        args (tuple): Input parameter for this operation.
+        kwargs (dict): Input parameter for this operation.
+        max_retries (int): Input parameter for this operation.
+        retry_delay (float): Input parameter for this operation.
+        retryable_exceptions (tuple[Type[Exception], ...]): Input parameter for this operation.
+        on_retry (Optional[Callable[[int, Exception], None]]): Input parameter for this operation.
+    
+    Returns:
+        Any: Result of the operation.
+    
+    Raises:
+        RuntimeError: Raised when this function detects an invalid state or when an underlying call fails.
+        last_exception: Raised when this function detects an invalid state or when an underlying call fails.
+    """
+    last_exception: Optional[Exception] = None
+    for attempt in range(max_retries):
+        try:
+            return await func(*args, **kwargs)
+        except retryable_exceptions as e:
+            last_exception = e
+            await _handle_retryable_exception_async(
+                func, e, attempt, max_retries, retry_delay, on_retry
+            )
+        except Exception as e:
+            # Non-retryable exception - re-raise immediately
+            logger.error(f"Non-retryable error in {func.__name__}: {str(e)}")
+            raise
+
+    # This should never be reached, but type checker needs it
+    if last_exception:
+        raise last_exception
+    raise RuntimeError("Unexpected error in retry logic")
+
+
 class ErrorHandler:
     """
     Standardized error handler for SDK components.
@@ -134,6 +211,7 @@ class ErrorHandler:
     ) -> Callable[..., T]:
         """
         Decorator for retry logic with consistent error handling.
+        Supports both sync and async functions.
         
         Args:
             func (Callable[..., T]): Input parameter for this operation.
@@ -145,13 +223,56 @@ class ErrorHandler:
         Returns:
             Callable[..., T]: Result of the operation.
         """
+        if asyncio.iscoroutinefunction(func):
+            @wraps(func)
+            async def async_wrapper(*args: Any, **kwargs: Any) -> Any:
+                return await _execute_with_retry_async(
+                    func, args, kwargs, max_retries, retry_delay, retryable_exceptions, on_retry
+                )
+            return async_wrapper  # type: ignore[return-value]
+        else:
+            @wraps(func)
+            def sync_wrapper(*args: Any, **kwargs: Any) -> T:
+                return _execute_with_retry(
+                    func, args, kwargs, max_retries, retry_delay, retryable_exceptions, on_retry
+                )
+            return sync_wrapper
 
+    @staticmethod
+    def _create_async_fallback_wrapper(
+        func: Callable[..., T],
+        fallback_value: T,
+        fallback_exceptions: tuple[Type[Exception], ...],
+        log_error: bool,
+    ) -> Callable[..., Awaitable[T]]:
+        """Create async wrapper for fallback decorator."""
+        @wraps(func)
+        async def async_wrapper(*args: Any, **kwargs: Any) -> T:
+            try:
+                async_func = cast(Callable[..., Awaitable[T]], func)
+                return await async_func(*args, **kwargs)
+            except fallback_exceptions as e:
+                if log_error:
+                    logger.warning(f"Error in {func.__name__}: {str(e)}. Using fallback value.")
+                return fallback_value
+        return async_wrapper
+
+    @staticmethod
+    def _create_sync_fallback_wrapper(
+        func: Callable[..., T],
+        fallback_value: T,
+        fallback_exceptions: tuple[Type[Exception], ...],
+        log_error: bool,
+    ) -> Callable[..., T]:
+        """Create sync wrapper for fallback decorator."""
         @wraps(func)
         def sync_wrapper(*args: Any, **kwargs: Any) -> T:
-            return _execute_with_retry(
-                func, args, kwargs, max_retries, retry_delay, retryable_exceptions, on_retry
-            )
-
+            try:
+                return func(*args, **kwargs)
+            except fallback_exceptions as e:
+                if log_error:
+                    logger.warning(f"Error in {func.__name__}: {str(e)}. Using fallback value.")
+                return fallback_value
         return sync_wrapper
 
     @staticmethod
@@ -163,6 +284,7 @@ class ErrorHandler:
     ) -> Callable[..., T]:
         """
         Decorator for fallback value on error.
+        Supports both sync and async functions.
         
         Args:
             func (Callable[..., T]): Input parameter for this operation.
@@ -173,17 +295,58 @@ class ErrorHandler:
         Returns:
             Callable[..., T]: Result of the operation.
         """
+        if asyncio.iscoroutinefunction(func):
+            return cast(Callable[..., T], ErrorHandler._create_async_fallback_wrapper(
+                func, fallback_value, fallback_exceptions, log_error
+            ))
+        else:
+            return ErrorHandler._create_sync_fallback_wrapper(
+                func, fallback_value, fallback_exceptions, log_error
+            )
 
+    @staticmethod
+    def _wrap_exception(
+        error_class: Type[SDKError], error_message: str, exception: Exception, **error_kwargs: Any
+    ) -> SDKError:
+        """Wrap an exception in SDK error hierarchy."""
+        return error_class(
+            message=f"{error_message}: {str(exception)}", original_error=exception, **error_kwargs
+        )
+
+    @staticmethod
+    def _create_async_error_wrapper(
+        func: Callable[..., T], error_class: Type[SDKError], error_message: str, **error_kwargs: Any
+    ) -> Callable[..., Awaitable[T]]:
+        """Create async wrapper for error wrapping decorator."""
         @wraps(func)
-        def wrapper(*args: Any, **kwargs: Any) -> T:
+        async def async_wrapper(*args: Any, **kwargs: Any) -> T:
+            try:
+                async_func = cast(Callable[..., Awaitable[T]], func)
+                return await async_func(*args, **kwargs)
+            except SDKError:
+                # Re-raise SDK errors as-is
+                raise
+            except Exception as e:
+                # Wrap other exceptions
+                raise ErrorHandler._wrap_exception(error_class, error_message, e, **error_kwargs)
+        return async_wrapper
+
+    @staticmethod
+    def _create_sync_error_wrapper(
+        func: Callable[..., T], error_class: Type[SDKError], error_message: str, **error_kwargs: Any
+    ) -> Callable[..., T]:
+        """Create sync wrapper for error wrapping decorator."""
+        @wraps(func)
+        def sync_wrapper(*args: Any, **kwargs: Any) -> T:
             try:
                 return func(*args, **kwargs)
-            except fallback_exceptions as e:
-                if log_error:
-                    logger.warning(f"Error in {func.__name__}: {str(e)}. Using fallback value.")
-                return fallback_value
-
-        return wrapper
+            except SDKError:
+                # Re-raise SDK errors as-is
+                raise
+            except Exception as e:
+                # Wrap other exceptions
+                raise ErrorHandler._wrap_exception(error_class, error_message, e, **error_kwargs)
+        return sync_wrapper
 
     @staticmethod
     def wrap_sdk_error(
@@ -191,6 +354,7 @@ class ErrorHandler:
     ) -> Callable[..., T]:
         """
         Wrap exceptions in SDK error hierarchy.
+        Supports both sync and async functions.
         
         Args:
             func (Callable[..., T]): Input parameter for this operation.
@@ -204,21 +368,14 @@ class ErrorHandler:
         Raises:
             error_class: Raised when this function detects an invalid state or when an underlying call fails.
         """
-
-        @wraps(func)
-        def wrapper(*args: Any, **kwargs: Any) -> T:
-            try:
-                return func(*args, **kwargs)
-            except SDKError:
-                # Re-raise SDK errors as-is
-                raise
-            except Exception as e:
-                # Wrap other exceptions
-                raise error_class(
-                    message=f"{error_message}: {str(e)}", original_error=e, **error_kwargs
-                )
-
-        return wrapper
+        if asyncio.iscoroutinefunction(func):
+            return cast(Callable[..., T], ErrorHandler._create_async_error_wrapper(
+                func, error_class, error_message, **error_kwargs
+            ))
+        else:
+            return ErrorHandler._create_sync_error_wrapper(
+                func, error_class, error_message, **error_kwargs
+            )
 
 
 def create_error_with_suggestion(

@@ -1,247 +1,155 @@
 """
 Cache Mechanism
 
-Provides a simple pluggable cache layer with in-memory and Dragonfly backends,
-supporting TTL, basic LRU eviction, and pattern-based invalidation.
+Provides async-first cache layer with in-memory and Dragonfly backends.
+Production-ready implementation for scalable deployments.
 """
 
-
-
+import asyncio
+import json
 import time
 from collections import OrderedDict
 from dataclasses import dataclass
-from typing import Any, List, Optional, cast
+from typing import Any, Optional
 
 try:
-    import redis  # Dragonfly is Redis-compatible
-except ImportError:  # pragma: no cover - optional dependency
-    redis = None
+    import aioredis  # type: ignore[import]
+except ImportError:
+    aioredis = None
 
 
 @dataclass
 class CacheConfig:
-    """
-    CacheConfig.
-    
-    This class groups related SDK behaviour in one place.
-    Keep the public methods small and well-typed for easy maintenance.
-    """
-    backend: str = "memory"  # "memory" or "dragonfly"
+    """Cache configuration."""
+    backend: str = "memory"
     default_ttl: int = 300
-    max_size: int = 1024  # only applies to memory backend
+    max_size: int = 1024
     dragonfly_url: Optional[str] = None
     namespace: str = "sdk_cache"
 
 
 class CacheMechanism:
     """
-    Cache wrapper that supports in-memory and Dragonfly backends with TTL support.
+    Async-first cache wrapper supporting in-memory and Dragonfly backends.
     """
 
     def __init__(self, config: Optional[CacheConfig] = None) -> None:
-        """
-        __init__.
-        
-        Args:
-            config (Optional[CacheConfig]): Configuration object or settings.
-        
-        Raises:
-            ImportError: Raised when this function detects an invalid state or when an underlying call fails.
-        """
+        """Initialize cache mechanism."""
         self.config = config or CacheConfig()
         self.backend = self.config.backend
+        self._async_client: Optional[Any] = None
+        self._lock = asyncio.Lock()
+        self._store: OrderedDict[str, tuple[Any, float]] = OrderedDict()
 
-        if self.backend == "dragonfly":
-            if redis is None:
-                raise ImportError(
-                    "redis package is required for Dragonfly backend (Dragonfly is Redis-compatible)"
-                )
-            self._client = redis.Redis.from_url(
-                self.config.dragonfly_url or "dragonfly://localhost:6379/0"
+    async def _ensure_async_client(self) -> Any:
+        """Ensure async Redis client is initialized."""
+        if self._async_client is None and self.backend == "dragonfly":
+            if aioredis is None:
+                raise ImportError("aioredis required for Dragonfly backend")
+            self._async_client = await aioredis.from_url(
+                self.config.dragonfly_url or "redis://localhost:6379/0",
+                encoding="utf-8",
+                decode_responses=False
             )
-        else:
-            # Simple in-memory LRU with TTL
-            self._store: OrderedDict[str, tuple[Any, float]] = OrderedDict()
+        return self._async_client
 
     def _namespaced_key(self, key: str, tenant_id: Optional[str] = None) -> str:
-        """
-        Create namespaced cache key with optional tenant isolation.
-        
-        Args:
-            key (str): Input parameter for this operation.
-            tenant_id (Optional[str]): Tenant identifier used for tenant isolation.
-        
-        Returns:
-            str: Returned text value.
-        """
+        """Create namespaced cache key."""
         if tenant_id:
             return f"{self.config.namespace}:{tenant_id}:{key}"
         return f"{self.config.namespace}:{key}"
 
-    def set(
+    async def set(
         self, key: str, value: Any, tenant_id: Optional[str] = None, ttl: Optional[int] = None
     ) -> None:
-        """
-        Store a value in cache with TTL.
-        
-        COST IMPACT: Caching responses saves LLM API costs.
-                                                - Cache hit = $0 cost (no API call)
-                                                - Cache miss = normal API cost (~$0.001-0.01 per call)
-                                                - Typical savings: 50-90% cost reduction for repeated queries
-        
-        Args:
-            key (str): Input parameter for this operation.
-            value (Any): Input parameter for this operation.
-            tenant_id (Optional[str]): Tenant identifier used for tenant isolation.
-            ttl (Optional[int]): Input parameter for this operation.
-        
-        Returns:
-            None: Result of the operation.
-        """
+        """Store value in cache asynchronously."""
         ttl = ttl or self.config.default_ttl
         expires_at = time.time() + ttl
         namespaced = self._namespaced_key(key, tenant_id=tenant_id)
 
         if self.backend == "dragonfly":
-            # Dragonfly backend: Distributed cache, survives process restarts
-            self._client.set(namespaced, value, ex=ttl)
+            client = await self._ensure_async_client()
+            await client.set(namespaced, value, ex=ttl)
             return
 
-        # MEMORY BACKEND: In-memory LRU cache with TTL
-        # LRU (Least Recently Used) eviction: removes least recently accessed items when full
-        # This keeps frequently accessed items in cache, maximizing cache hit rate
-        self._store[namespaced] = (value, expires_at)
-        self._store.move_to_end(namespaced)  # Mark as recently used (LRU)
-        self._evict_if_needed()  # Remove oldest items if cache is full
+        async with self._lock:
+            self._store[namespaced] = (value, expires_at)
+            self._store.move_to_end(namespaced)
+            self._evict_if_needed()
 
-    def get(self, key: str, tenant_id: Optional[str] = None) -> Optional[Any]:
-        """
-        Retrieve a value from cache.
-        
-        PERFORMANCE: Cache hits are instant (<1ms), avoiding expensive API calls.
-                                                Returns None if key not found or expired (cache miss).
-        
-        Args:
-            key (str): Input parameter for this operation.
-            tenant_id (Optional[str]): Tenant identifier used for tenant isolation.
-        
-        Returns:
-            Optional[Any]: Result if available, else None.
-        """
+    async def get(self, key: str, tenant_id: Optional[str] = None) -> Optional[Any]:
+        """Retrieve value from cache asynchronously."""
         namespaced = self._namespaced_key(key, tenant_id=tenant_id)
 
         if self.backend == "dragonfly":
-            value = self._client.get(namespaced)
-            return value
+            client = await self._ensure_async_client()
+            return await client.get(namespaced)
 
         if namespaced not in self._store:
-            return None  # Cache miss
+            return None
 
         value, expires_at = self._store[namespaced]
         if expires_at < time.time():
-            # TTL expired: Remove from cache (cache miss)
             self._store.pop(namespaced, None)
             return None
 
-        # LRU: Mark as recently used (move to end of OrderedDict)
-        # This ensures frequently accessed items stay in cache longer
-        self._store.move_to_end(namespaced)
-        return value  # Cache hit: return cached value
+        async with self._lock:
+            self._store.move_to_end(namespaced)
+        return value
 
-    def delete(self, key: str, tenant_id: Optional[str] = None) -> None:
-        """
-        delete.
-        
-        Args:
-            key (str): Input parameter for this operation.
-            tenant_id (Optional[str]): Tenant identifier used for tenant isolation.
-        
-        Returns:
-            None: Result of the operation.
-        """
+    async def delete(self, key: str, tenant_id: Optional[str] = None) -> None:
+        """Delete key from cache asynchronously."""
         namespaced = self._namespaced_key(key, tenant_id=tenant_id)
         if self.backend == "dragonfly":
-            self._client.delete(namespaced)
+            client = await self._ensure_async_client()
+            await client.delete(namespaced)
         else:
-            self._store.pop(namespaced, None)
+            async with self._lock:
+                self._store.pop(namespaced, None)
 
-    def invalidate_pattern(self, pattern: str, tenant_id: Optional[str] = None) -> None:
-        """
-        Invalidate all keys matching pattern (simple substring match for memory).
-        
-        Args:
-            pattern (str): Input parameter for this operation.
-            tenant_id (Optional[str]): Tenant identifier used for tenant isolation.
-        
-        Returns:
-            None: Result of the operation.
-        """
+    async def invalidate_pattern(self, pattern: str, tenant_id: Optional[str] = None) -> None:
+        """Invalidate keys matching pattern asynchronously."""
         if tenant_id:
             pattern = f"{tenant_id}:{pattern}"
+        
         if self.backend == "dragonfly":
-            # Redis keys() returns a list synchronously
-            keys_result = self._client.keys(f"{self.config.namespace}:{pattern}*")
-            keys: List[Any] = cast(List[Any], keys_result)
-            if keys:
-                self._client.delete(*keys)
+            client = await self._ensure_async_client()
+            keys_to_delete = []
+            cursor = b'0'
+            while cursor:
+                cursor, keys = await client.scan(
+                    cursor, match=f"{self.config.namespace}:{pattern}*", count=100
+                )
+                keys_to_delete.extend(keys)
+                if cursor == b'0':
+                    break
+            if keys_to_delete:
+                await client.delete(*keys_to_delete)
             return
 
-        to_delete = [k for k in self._store if pattern in k]
-        for k in to_delete:
-            self._store.pop(k, None)
+        async with self._lock:
+            to_delete = [k for k in self._store if pattern in k]
+            for k in to_delete:
+                self._store.pop(k, None)
 
     def _evict_if_needed(self) -> None:
-        """
-        _evict_if_needed.
-        
-        Returns:
-            None: Result of the operation.
-        """
+        """Evict oldest entries if cache exceeds max size."""
         while len(self._store) > self.config.max_size:
-            # Pop oldest (LRU)
             self._store.popitem(last=False)
 
-    def cache_prompt_interpretation(
-        self,
-        prompt_hash: str,
-        interpretation: Any,
-        tenant_id: Optional[str] = None,
-        ttl: Optional[int] = None,
+    async def cache_prompt_interpretation(
+        self, prompt_hash: str, interpretation: Any, tenant_id: Optional[str] = None, ttl: Optional[int] = None
     ) -> None:
-        """
-        Cache prompt interpretation result.
-        
-        Args:
-            prompt_hash (str): Input parameter for this operation.
-            interpretation (Any): Input parameter for this operation.
-            tenant_id (Optional[str]): Tenant identifier used for tenant isolation.
-            ttl (Optional[int]): Input parameter for this operation.
-        
-        Returns:
-            None: Result of the operation.
-        """
-        import json
-
+        """Cache prompt interpretation asynchronously."""
         if isinstance(interpretation, dict):
             interpretation = json.dumps(interpretation)
-        self.set(f"prompt_interp:{prompt_hash}", interpretation, tenant_id=tenant_id, ttl=ttl)
+        await self.set(f"prompt_interp:{prompt_hash}", interpretation, tenant_id=tenant_id, ttl=ttl)
 
-    def get_prompt_interpretation(
+    async def get_prompt_interpretation(
         self, prompt_hash: str, tenant_id: Optional[str] = None
     ) -> Optional[Any]:
-        """
-        Get cached prompt interpretation.
-        
-        Args:
-            prompt_hash (str): Input parameter for this operation.
-            tenant_id (Optional[str]): Tenant identifier used for tenant isolation.
-        
-        Returns:
-            Optional[Any]: Result if available, else None.
-        """
-        import json
-
-        cached = self.get(f"prompt_interp:{prompt_hash}", tenant_id=tenant_id)
+        """Get cached prompt interpretation asynchronously."""
+        cached = await self.get(f"prompt_interp:{prompt_hash}", tenant_id=tenant_id)
         if cached:
             try:
                 if isinstance(cached, str):
@@ -250,3 +158,23 @@ class CacheMechanism:
             except Exception:
                 return None
         return None
+
+    async def clear(self, tenant_id: Optional[str] = None) -> None:
+        """Clear cache entries asynchronously."""
+        if self.backend == "dragonfly":
+            pattern = f"{tenant_id}:*" if tenant_id else "*"
+            await self.invalidate_pattern(pattern.replace(f"{self.config.namespace}:", ""))
+        else:
+            async with self._lock:
+                if tenant_id:
+                    to_delete = [k for k in self._store if f":{tenant_id}:" in k]
+                    for k in to_delete:
+                        self._store.pop(k, None)
+                else:
+                    self._store.clear()
+
+    async def close(self) -> None:
+        """Close async client connections."""
+        if self._async_client:
+            await self._async_client.close()
+            self._async_client = None

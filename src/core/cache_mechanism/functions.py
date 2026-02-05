@@ -150,9 +150,9 @@ def configure_cache(
 # ============================================================================
 
 
-def cache_get(cache: CacheMechanism, key: str) -> Optional[Any]:
+async def cache_get(cache: CacheMechanism, key: str) -> Optional[Any]:
     """
-    Get a value from cache (high-level convenience).
+    Get a value from cache asynchronously (high-level convenience).
 
     Args:
         cache: CacheMechanism instance
@@ -162,17 +162,17 @@ def cache_get(cache: CacheMechanism, key: str) -> Optional[Any]:
         Cached value or None if not found/expired
 
     Example:
-        >>> value = cache_get(cache, "user:123")
+        >>> value = await cache_get(cache, "user:123")
     """
-    return cache.get(key)
+    return await cache.get(key)
 
 
-def cache_set(cache: CacheMechanism, key: str, value: Any, ttl: Optional[int] = None) -> None:
+async def cache_set(cache: CacheMechanism, key: str, value: Any, ttl: Optional[int] = None) -> None:
     """
-    Set a value in cache (high-level convenience).
+    Set a value in cache asynchronously (high-level convenience).
     
     Example:
-                            >>> cache_set(cache, "user:123", {"name": "John"}, ttl=600)
+                            >>> await cache_set(cache, "user:123", {"name": "John"}, ttl=600)
     
     Args:
         cache (CacheMechanism): Cache instance used to store and fetch cached results.
@@ -183,15 +183,15 @@ def cache_set(cache: CacheMechanism, key: str, value: Any, ttl: Optional[int] = 
     Returns:
         None: Result of the operation.
     """
-    cache.set(key, value, ttl=ttl)
+    await cache.set(key, value, ttl=ttl)
 
 
-def cache_delete(cache: CacheMechanism, key: str) -> None:
+async def cache_delete(cache: CacheMechanism, key: str) -> None:
     """
-    Delete a value from cache (high-level convenience).
+    Delete a value from cache asynchronously (high-level convenience).
     
     Example:
-                            >>> cache_delete(cache, "user:123")
+                            >>> await cache_delete(cache, "user:123")
     
     Args:
         cache (CacheMechanism): Cache instance used to store and fetch cached results.
@@ -200,15 +200,15 @@ def cache_delete(cache: CacheMechanism, key: str) -> None:
     Returns:
         None: Result of the operation.
     """
-    cache.delete(key)
+    await cache.delete(key)
 
 
-def cache_clear_pattern(cache: CacheMechanism, pattern: str) -> None:
+async def cache_clear_pattern(cache: CacheMechanism, pattern: str) -> None:
     """
-    Clear all keys matching a pattern (high-level convenience).
+    Clear all keys matching a pattern asynchronously (high-level convenience).
     
     Example:
-                            >>> cache_clear_pattern(cache, "user:*")
+                            >>> await cache_clear_pattern(cache, "user:*")
     
     Args:
         cache (CacheMechanism): Cache instance used to store and fetch cached results.
@@ -217,7 +217,7 @@ def cache_clear_pattern(cache: CacheMechanism, pattern: str) -> None:
     Returns:
         None: Result of the operation.
     """
-    cache.invalidate_pattern(pattern)
+    await cache.invalidate_pattern(pattern)
 
 
 # ============================================================================
@@ -225,45 +225,52 @@ def cache_clear_pattern(cache: CacheMechanism, pattern: str) -> None:
 # ============================================================================
 
 
-def cache_or_compute(
+async def cache_or_compute(
     cache: CacheMechanism, key: str, compute_func: Any, ttl: Optional[int] = None
 ) -> Any:
     """
-    Get from cache or compute and cache the result (utility function).
+    Get from cache or compute and cache the result asynchronously (utility function).
 
     Args:
         cache: CacheMechanism instance
         key: Cache key
-        compute_func: Function to compute value if not cached
+        compute_func: Function to compute value if not cached (can be sync or async)
         ttl: Optional TTL in seconds
 
     Returns:
         Cached or computed value
 
     Example:
-        >>> def expensive_operation():
+        >>> async def expensive_operation():
         ...     # Expensive computation
         ...     return result
-        >>> value = cache_or_compute(cache, "expensive:key", expensive_operation, ttl=3600)
+        >>> value = await cache_or_compute(cache, "expensive:key", expensive_operation, ttl=3600)
     """
-    cached = cache.get(key)
+    import asyncio
+    
+    cached = await cache.get(key)
     if cached is not None:
         return cached
 
-    value = compute_func()
-    cache.set(key, value, ttl=ttl)
+    # Support both sync and async compute functions
+    if asyncio.iscoroutinefunction(compute_func):
+        value = await compute_func()
+    else:
+        value = compute_func()
+    
+    await cache.set(key, value, ttl=ttl)
     return value
 
 
-def batch_cache_set(
+async def batch_cache_set(
     cache: CacheMechanism, items: Dict[str, Any], ttl: Optional[int] = None
 ) -> None:
     """
-    Set multiple values in cache at once (utility function).
+    Set multiple values in cache at once asynchronously (utility function).
     
     Example:
                             >>> items = {"user:1": {"name": "John"}, "user:2": {"name": "Jane"}}
-                            >>> batch_cache_set(cache, items, ttl=600)
+                            >>> await batch_cache_set(cache, items, ttl=600)
     
     Args:
         cache (CacheMechanism): Cache instance used to store and fetch cached results.
@@ -273,8 +280,9 @@ def batch_cache_set(
     Returns:
         None: Result of the operation.
     """
-    for key, value in items.items():
-        cache.set(key, value, ttl=ttl)
+    import asyncio
+    # Use asyncio.gather for parallel cache operations
+    await asyncio.gather(*[cache.set(key, value, ttl=ttl) for key, value in items.items()])
 
 
 def batch_cache_get(cache: CacheMechanism, keys: list[str]) -> Dict[str, Optional[Any]]:

@@ -59,7 +59,7 @@ class FeedbackCollector:
         self._agent_feedback: Dict[str, list] = {}  # {agent_id: [feedback]}
         self._tool_feedback: Dict[str, list] = {}  # {tool_id: [feedback]}
 
-    def collect_agent_feedback(
+    async def collect_agent_feedback(
         self,
         agent_id: str,
         rating: int,
@@ -70,7 +70,7 @@ class FeedbackCollector:
         metadata: Optional[Dict[str, Any]] = None,
     ) -> str:
         """
-        Collect feedback for an agent.
+        Collect feedback for an agent asynchronously.
         
         Args:
             agent_id (str): Input parameter for this operation.
@@ -101,7 +101,7 @@ class FeedbackCollector:
 
         # Also record in feedback loop if available
         if self.feedback_loop:
-            self.feedback_loop.record_feedback(
+            await self.feedback_loop.record_feedback(
                 query=f"Agent {agent_id} feedback",
                 response=f"Rating: {rating}, Effectiveness: {feedback.effectiveness_score}",
                 feedback_type=FeedbackType.RATING,
@@ -117,7 +117,7 @@ class FeedbackCollector:
 
         return feedback.agent_id
 
-    def collect_tool_feedback(
+    async def collect_tool_feedback(
         self,
         tool_id: str,
         rating: int,
@@ -128,7 +128,7 @@ class FeedbackCollector:
         metadata: Optional[Dict[str, Any]] = None,
     ) -> str:
         """
-        Collect feedback for a tool.
+        Collect feedback for a tool asynchronously.
         
         Args:
             tool_id (str): Tool identifier.
@@ -159,7 +159,7 @@ class FeedbackCollector:
 
         # Also record in feedback loop if available
         if self.feedback_loop:
-            self.feedback_loop.record_feedback(
+            await self.feedback_loop.record_feedback(
                 query=f"Tool {tool_id} feedback",
                 response=f"Rating: {rating}, Performance: {feedback.performance_score}",
                 feedback_type=FeedbackType.RATING,

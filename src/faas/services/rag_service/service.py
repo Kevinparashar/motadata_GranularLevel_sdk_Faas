@@ -78,6 +78,13 @@ class RAGService:
         # Setup middleware
         setup_middleware(self.app)
 
+        # Register startup event to ensure database connection is ready
+        @self.app.on_event("startup")
+        async def startup_event():
+            """Ensure database connection is ready on service startup."""
+            if hasattr(self.db, "connect"):
+                await self.db.connect()
+
         # Register routes
         self._register_routes()
 
@@ -227,7 +234,7 @@ class RAGService:
         }
         await self.nats_client.publish(
             f"rag.events.{tenant_id}",
-            self.codec_manager.encode(event),
+            await self.codec_manager.encode(event),
         )
 
     async def _handle_query(self, request: QueryRequest, headers: dict = Header(...)):
@@ -309,7 +316,7 @@ class RAGService:
             rag_system = self._get_rag_system(standard_headers.tenant_id)
 
             # Perform search
-            # retriever.retrieve() is synchronous and takes: query, tenant_id, top_k, threshold, filters
+            # retriever.retrieve() is synchronous (uses asyncio.run internally) and takes: query, tenant_id, top_k, threshold, filters
             if not request.query_text:
                 raise HTTPException(
                     status_code=status.HTTP_400_BAD_REQUEST,
@@ -387,9 +394,8 @@ class RAGService:
             # Get RAG system (created on-demand, stateless)
             rag_system = self._get_rag_system(standard_headers.tenant_id)
 
-            # Update document
-            # update_document() is synchronous and takes: document_id, title, content, metadata
-            rag_system.update_document(
+            # Update document (async)
+            await rag_system.update_document(
                 document_id=document_id,
                 title=request.title,
                 content=request.content,
@@ -432,9 +438,8 @@ class RAGService:
             # Get RAG system (created on-demand, stateless)
             rag_system = self._get_rag_system(standard_headers.tenant_id)
 
-            # Delete document
-            # delete_document() is synchronous and takes: document_id
-            rag_system.delete_document(document_id=document_id)
+            # Delete document (async)
+            await rag_system.delete_document(document_id=document_id)
 
             return None
         except Exception as e:

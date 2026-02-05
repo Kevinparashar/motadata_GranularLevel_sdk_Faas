@@ -55,9 +55,9 @@ class DataValidator:
         self.file_size_limit = max_file_size or self.MAX_FILE_SIZE
         self.allowed_formats = allowed_formats or self.SUPPORTED_FORMATS
 
-    def validate_file(self, file_path: Path) -> Dict[str, Any]:
+    async def validate_file(self, file_path: Path) -> Dict[str, Any]:
         """
-        Validate a file.
+        Validate a file asynchronously.
         
         Args:
             file_path (Path): Path of the input file.
@@ -65,33 +65,39 @@ class DataValidator:
         Returns:
             Dict[str, Any]: Dictionary result of the operation.
         """
-        if not file_path.exists():
-            return {"valid": False, "error": f"File not found: {file_path}"}
+        import asyncio
+        
+        # Run file I/O operations in thread pool to prevent blocking
+        def _validate_sync() -> Dict[str, Any]:
+            if not file_path.exists():
+                return {"valid": False, "error": f"File not found: {file_path}"}
 
-        # Check file size
-        file_size = file_path.stat().st_size
-        if file_size > self.file_size_limit:
-            return {
-                "valid": False,
-                "error": f"File too large: {file_size} bytes (max: {self.file_size_limit})",
-            }
+            # Check file size
+            file_size = file_path.stat().st_size
+            if file_size > self.file_size_limit:
+                return {
+                    "valid": False,
+                    "error": f"File too large: {file_size} bytes (max: {self.file_size_limit})",
+                }
 
-        # Check format
-        suffix = file_path.suffix.lower()
-        if suffix not in self.allowed_formats:
-            return {
-                "valid": False,
-                "error": f"Unsupported format: {suffix}. Supported: {', '.join(self.allowed_formats)}",
-            }
+            # Check format
+            suffix = file_path.suffix.lower()
+            if suffix not in self.allowed_formats:
+                return {
+                    "valid": False,
+                    "error": f"Unsupported format: {suffix}. Supported: {', '.join(self.allowed_formats)}",
+                }
 
-        # Check MIME type
-        mime_type, _ = mimetypes.guess_type(str(file_path))
-        if mime_type:
-            # Additional validation based on MIME type
-            if not self._is_valid_mime_type(mime_type, suffix):
-                return {"valid": False, "error": f"MIME type mismatch: {mime_type} for {suffix}"}
+            # Check MIME type
+            mime_type, _ = mimetypes.guess_type(str(file_path))
+            if mime_type:
+                # Additional validation based on MIME type
+                if not self._is_valid_mime_type(mime_type, suffix):
+                    return {"valid": False, "error": f"MIME type mismatch: {mime_type} for {suffix}"}
 
-        return {"valid": True, "file_size": file_size, "format": suffix, "mime_type": mime_type}
+            return {"valid": True, "file_size": file_size, "format": suffix, "mime_type": mime_type}
+        
+        return await asyncio.to_thread(_validate_sync)
 
     def _is_valid_mime_type(self, mime_type: str, suffix: str) -> bool:
         """
@@ -122,9 +128,9 @@ class DataValidator:
 
         return True  # Allow if not in map
 
-    def validate_content(self, content: str, format: str) -> Dict[str, Any]:
+    async def validate_content(self, content: str, format: str) -> Dict[str, Any]:
         """
-        Validate content structure.
+        Validate content structure asynchronously.
         
         Args:
             content (str): Content text.
@@ -133,16 +139,21 @@ class DataValidator:
         Returns:
             Dict[str, Any]: Dictionary result of the operation.
         """
-        if len(content) > self.MAX_TEXT_SIZE:
-            return {"valid": False, "error": f"Content too large: {len(content)} bytes"}
+        import asyncio
+        
+        # Run CPU-intensive validation in thread pool
+        def _validate_content_sync() -> Dict[str, Any]:
+            if len(content) > self.MAX_TEXT_SIZE:
+                return {"valid": False, "error": f"Content too large: {len(content)} bytes"}
 
-        # Format-specific validation
-        if format == self.JSON_EXT:
-            try:
-                import json
+            # Format-specific validation
+            if format == self.JSON_EXT:
+                try:
+                    import json
+                    json.loads(content)
+                except json.JSONDecodeError as e:
+                    return {"valid": False, "error": f"Invalid JSON: {str(e)}"}
 
-                json.loads(content)
-            except json.JSONDecodeError as e:
-                return {"valid": False, "error": f"Invalid JSON: {str(e)}"}
-
-        return {"valid": True}
+            return {"valid": True}
+        
+        return await asyncio.to_thread(_validate_content_sync)

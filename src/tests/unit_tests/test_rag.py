@@ -227,7 +227,7 @@ class TestRAGSystem:
         )
 
         # Store some memories
-        rag.memory.store(
+        await rag.memory.store(
             content="Previous query about AI",
             memory_type=MemoryType.EPISODIC,
             metadata={"query": "What is AI?"},

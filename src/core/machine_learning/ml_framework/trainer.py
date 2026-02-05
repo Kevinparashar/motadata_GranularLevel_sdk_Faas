@@ -39,7 +39,7 @@ class Trainer:
 
         logger.info(f"Trainer initialized for tenant: {tenant_id}")
 
-    def train(
+    async def train(
         self,
         model_id: str,
         model_type: str,
@@ -49,7 +49,7 @@ class Trainer:
         **kwargs,
     ) -> Dict[str, Any]:
         """
-        Execute model training.
+        Execute model training asynchronously.
         
         Args:
             model_id (str): Input parameter for this operation.
@@ -65,29 +65,33 @@ class Trainer:
         Raises:
             TrainingError: Raised when this function detects an invalid state or when an underlying call fails.
         """
+        import asyncio
+        
         try:
             logger.info(f"Starting training for {model_id}")
 
             # Import model creation based on type
             model = self._create_model(model_type, hyperparameters or {})
 
-            # Train model
-            if validation_data is not None:
-                model.fit(training_data[0], training_data[1])
-                val_metrics = self._evaluate(model, validation_data)
-            else:
-                model.fit(training_data[0], training_data[1])
-                val_metrics = {}
+            # Train model (CPU-bound, run in thread pool)
+            def _train_sync() -> tuple[Dict[str, Any], Dict[str, Any]]:
+                if validation_data is not None:
+                    model.fit(training_data[0], training_data[1])
+                    val_metrics = self._evaluate(model, validation_data)
+                else:
+                    model.fit(training_data[0], training_data[1])
+                    val_metrics = {}
+                train_metrics = self._evaluate(model, training_data)
+                return train_metrics, val_metrics
 
-            # Calculate training metrics
-            train_metrics = self._evaluate(model, training_data)
+            train_metrics, val_metrics = await asyncio.to_thread(_train_sync)
 
             # Save model
             version = kwargs.get("version", "1.0.0")
-            model_path = self.model_manager.save_model(model, model_id, version)
+            model_path = await self.model_manager.save_model(model, model_id, version)
 
             # Register model
-            self.model_manager.register_model(
+            await self.model_manager.register_model(
                 model_id=model_id,
                 model_type=model_type,
                 model_path=model_path,
@@ -134,11 +138,11 @@ class Trainer:
         """
         return self._evaluate(model, validation_data)
 
-    def save_checkpoint(
+    async def save_checkpoint(
         self, model: Any, model_id: str, epoch: int, checkpoint_dir: Optional[str] = None
     ) -> str:
         """
-        Save training checkpoint.
+        Save training checkpoint asynchronously.
         
         Args:
             model (Any): Model name or identifier to use.
@@ -149,6 +153,7 @@ class Trainer:
         Returns:
             str: Returned text value.
         """
+        import asyncio
         import joblib
 
         if checkpoint_dir is None:
@@ -156,7 +161,12 @@ class Trainer:
 
         Path(checkpoint_dir).mkdir(parents=True, exist_ok=True)
         checkpoint_path = os.path.join(checkpoint_dir, f"checkpoint_epoch_{epoch}.joblib")
-        joblib.dump(model, checkpoint_path)
+        
+        def _save_sync() -> None:
+            joblib.dump(model, checkpoint_path)
+        
+        # Run file I/O in thread pool to avoid blocking
+        await asyncio.to_thread(_save_sync)
 
         logger.info(f"Checkpoint saved: {checkpoint_path}")
         return checkpoint_path

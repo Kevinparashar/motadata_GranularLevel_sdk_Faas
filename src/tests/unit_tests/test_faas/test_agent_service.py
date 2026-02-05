@@ -50,8 +50,14 @@ def mock_db():
 @pytest.fixture
 def agent_service(mock_config, mock_db):
     """Create agent service instance for testing."""
-    with patch("src.faas.services.agent_service.get_database_connection") as mock_get_db:
+    with patch("src.faas.services.agent_service.get_database_connection") as mock_get_db, \
+         patch("src.faas.services.agent_service.create_gateway") as mock_create_gateway:
         mock_get_db.return_value.get_connection.return_value = mock_db
+        
+        # Mock gateway
+        mock_gateway = Mock()
+        mock_create_gateway.return_value = mock_gateway
+        
         service = create_agent_service(
             service_name="agent-service",
             config_overrides={
@@ -59,6 +65,12 @@ def agent_service(mock_config, mock_db):
                 "gateway_service_url": "http://gateway-service:8080",
             },
         )
+        
+        # Mock async agent_storage methods
+        service.agent_storage.save_agent = AsyncMock(return_value=None)
+        service.agent_storage.load_agent = AsyncMock(return_value=None)
+        service.agent_storage.list_agents = AsyncMock(return_value=[])
+        
         return service
 
 
@@ -71,49 +83,73 @@ def test_agent_service_creation(agent_service):
 
 def test_create_agent_endpoint(agent_service):
     """Test create agent endpoint."""
-    client = TestClient(agent_service.app)
+    from src.core.agno_agent_framework import Agent, AgentStatus
+    
+    # Mock agent to be returned by create_agent
+    mock_agent = Mock(spec=Agent)
+    mock_agent.agent_id = "test_agent_123"
+    mock_agent.name = "Test Agent"
+    mock_agent.status = AgentStatus.IDLE
+    mock_agent.capabilities = []
+    mock_agent.add_capability = Mock()
+    
+    with patch("src.faas.services.agent_service.create_agent", return_value=mock_agent), \
+         patch("src.faas.services.agent_service.create_nats_client", return_value=None), \
+         patch("src.faas.services.agent_service.create_otel_tracer", return_value=None):
+        client = TestClient(agent_service.app)
 
-    response = client.post(
-        "/api/v1/agents",
-        json={
-            "name": "Test Agent",
-            "description": "Test description",
-            "llm_model": "gpt-4",
-        },
-        headers={
-            "X-Tenant-ID": "tenant_123",
-            "X-User-ID": "user_456",
-        },
-    )
+        response = client.post(
+            "/api/v1/agents",
+            json={
+                "name": "Test Agent",
+                "description": "Test description",
+                "llm_model": "gpt-4",
+            },
+            headers={
+                "X-Tenant-ID": "tenant_123",
+                "X-User-ID": "user_456",
+            },
+        )
 
-    assert response.status_code in [201, 500]  # 500 if gateway creation fails
-    if response.status_code == 201:
-        data = response.json()
-        assert data["success"] is True
-        assert "agent_id" in data["data"]
+        assert response.status_code in [201, 500]  # 500 if gateway creation fails
+        if response.status_code == 201:
+            data = response.json()
+            assert data["success"] is True
+            assert "agent_id" in data["data"]
 
 
 def test_get_agent_endpoint(agent_service):
     """Test get agent endpoint."""
-    client = TestClient(agent_service.app)
+    from src.core.agno_agent_framework import Agent, AgentStatus
+    
+    # Mock agent to be returned by load_agent
+    mock_agent = Mock(spec=Agent)
+    mock_agent.agent_id = "test_agent_123"
+    mock_agent.name = "Test Agent"
+    mock_agent.description = "Test description"
+    mock_agent.status = AgentStatus.IDLE
+    mock_agent.capabilities = []
+    
+    # Set load_agent to return the mock agent
+    agent_service.agent_storage.load_agent = AsyncMock(return_value=mock_agent)
+    
+    with patch("src.faas.services.agent_service.create_gateway") as mock_create_gateway:
+        mock_gateway = Mock()
+        mock_create_gateway.return_value = mock_gateway
+        
+        client = TestClient(agent_service.app)
 
-    # First create an agent
-    create_response = client.post(
-        "/api/v1/agents",
-        json={"name": "Test Agent"},
-        headers={"X-Tenant-ID": "tenant_123"},
-    )
-
-    if create_response.status_code == 201:
-        agent_id = create_response.json()["data"]["agent_id"]
-
-        # Then get it
+        # Get agent
         response = client.get(
-            f"/api/v1/agents/{agent_id}",
+            "/api/v1/agents/test_agent_123",
             headers={"X-Tenant-ID": "tenant_123"},
         )
 
         assert response.status_code in [200, 404]
+        if response.status_code == 200:
+            data = response.json()
+            assert data["success"] is True
+            assert data["data"]["agent_id"] == "test_agent_123"
 
 
 def test_health_check(agent_service):

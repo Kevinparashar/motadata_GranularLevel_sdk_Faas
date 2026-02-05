@@ -60,7 +60,7 @@ def create_ingestion_service(
     )
 
 
-def upload_and_process(
+async def upload_and_process(
     file_path: str,
     rag_system: Optional[RAGSystem] = None,
     cache: Optional[CacheMechanism] = None,
@@ -71,7 +71,7 @@ def upload_and_process(
     tenant_id: Optional[str] = None,
 ) -> Dict[str, Any]:
     """
-    Convenience function to upload and process a file.
+    Convenience function to upload and process a file asynchronously.
 
     Args:
         file_path: Path to file
@@ -85,11 +85,14 @@ def upload_and_process(
 
     Returns:
         Processing result
+
+    Example:
+        >>> result = await upload_and_process("document.pdf", rag_system=rag, cache=cache)
     """
     service = create_ingestion_service(
         rag_system=rag_system, cache=cache, gateway=gateway, db=db, tenant_id=tenant_id
     )
-    return service.upload_and_process(file_path=file_path, title=title, metadata=metadata)
+    return await service.upload_and_process(file_path=file_path, title=title, metadata=metadata)
 
 
 async def upload_and_process_async(
@@ -103,7 +106,7 @@ async def upload_and_process_async(
     tenant_id: Optional[str] = None,
 ) -> Dict[str, Any]:
     """
-    Asynchronously upload and process a file.
+    Asynchronously upload and process a file (alias for upload_and_process).
 
     Args:
         file_path: Path to file
@@ -117,16 +120,17 @@ async def upload_and_process_async(
 
     Returns:
         Processing result
+
+    Example:
+        >>> result = await upload_and_process_async("document.pdf", rag_system=rag, cache=cache)
     """
-    service = create_ingestion_service(
-        rag_system=rag_system, cache=cache, gateway=gateway, db=db, tenant_id=tenant_id
-    )
-    return await service.upload_and_process_async(
-        file_path=file_path, title=title, metadata=metadata
+    # Delegate to the main async function
+    return await upload_and_process(
+        file_path, rag_system, cache, gateway, db, title, metadata, tenant_id
     )
 
 
-def batch_upload_and_process(
+async def batch_upload_and_process(
     file_paths: List[str],
     rag_system: Optional[RAGSystem] = None,
     cache: Optional[CacheMechanism] = None,
@@ -137,7 +141,7 @@ def batch_upload_and_process(
     tenant_id: Optional[str] = None,
 ) -> List[Dict[str, Any]]:
     """
-    Batch upload and process multiple files.
+    Batch upload and process multiple files asynchronously.
 
     Args:
         file_paths: List of file paths
@@ -151,10 +155,56 @@ def batch_upload_and_process(
 
     Returns:
         List of processing results
+
+    Example:
+        >>> results = await batch_upload_and_process(
+        ...     ["doc1.pdf", "doc2.txt"],
+        ...     rag_system=rag,
+        ...     cache=cache
+        ... )
     """
     service = create_ingestion_service(
         rag_system=rag_system, cache=cache, gateway=gateway, db=db, tenant_id=tenant_id
     )
-    return service.batch_upload_and_process(
+    return await service.batch_upload_and_process(
         file_paths=file_paths, titles=titles, metadata_list=metadata_list
+    )
+
+
+async def batch_upload_and_process_async(
+    file_paths: List[str],
+    rag_system: Optional[RAGSystem] = None,
+    cache: Optional[CacheMechanism] = None,
+    gateway: Optional[LiteLLMGateway] = None,
+    db: Optional[DatabaseConnection] = None,
+    titles: Optional[List[str]] = None,
+    metadata_list: Optional[List[Dict[str, Any]]] = None,
+    tenant_id: Optional[str] = None,
+) -> List[Dict[str, Any]]:
+    """
+    Batch upload and process multiple files asynchronously (alias for batch_upload_and_process).
+
+    Args:
+        file_paths: List of file paths
+        rag_system: Optional RAG system
+        cache: Optional cache
+        gateway: Optional gateway
+        db: Optional database
+        titles: Optional titles
+        metadata_list: Optional metadata list
+        tenant_id: Optional tenant ID
+
+    Returns:
+        List of processing results
+
+    Example:
+        >>> results = await batch_upload_and_process_async(
+        ...     ["doc1.pdf", "doc2.txt"],
+        ...     rag_system=rag,
+        ...     cache=cache
+        ... )
+    """
+    # Delegate to the main async function
+    return await batch_upload_and_process(
+        file_paths, rag_system, cache, gateway, db, titles, metadata_list, tenant_id
     )

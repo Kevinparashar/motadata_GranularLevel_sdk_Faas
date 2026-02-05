@@ -68,7 +68,7 @@ class MLSystem:
 
         logger.info(f"MLSystem initialized for tenant: {tenant_id}")
 
-    def train_model(
+    async def train_model(
         self,
         model_id: str,
         model_type: str,
@@ -78,7 +78,7 @@ class MLSystem:
         **kwargs,
     ) -> Dict[str, Any]:
         """
-        Train a new model.
+        Train a new model asynchronously.
         
         Args:
             model_id (str): Input parameter for this operation.
@@ -107,7 +107,7 @@ class MLSystem:
                 )
 
             # Train model
-            training_result = self.trainer.train(
+            training_result = await self.trainer.train(
                 model_id=model_id,
                 model_type=model_type,
                 training_data=processed_data,
@@ -126,7 +126,7 @@ class MLSystem:
                     stage="model_registration"
                 )
             
-            self.model_registry.register_version(
+            await self.model_registry.register_version(
                 model_id=model_id,
                 version=training_result.get("version", "1.0.0"),
                 model_path=model_path,
@@ -144,11 +144,11 @@ class MLSystem:
                 error_msg, model_id=model_id, hyperparameters=hyperparameters, original_error=e
             )
 
-    def predict(
+    async def predict(
         self, model_id: str, input_data: Any, version: Optional[str] = None, use_cache: bool = True
     ) -> Any:
         """
-        Make a single prediction.
+        Make a single prediction asynchronously.
         
         Args:
             model_id (str): Input parameter for this operation.
@@ -166,14 +166,14 @@ class MLSystem:
             # Check cache
             if use_cache:
                 cache_key = f"ml_prediction:{self.tenant_id}:{model_id}:{hash(str(input_data))}"
-                cached_result = self.cache.get(cache_key)
+                cached_result = await self.cache.get(cache_key)
                 if cached_result:
                     logger.debug(f"Cache hit for model: {model_id}")
                     return cached_result
 
             # Load model if not loaded
             if model_id not in self._loaded_models:
-                self._load_model(model_id, version)
+                await self._load_model(model_id, version)
 
             # Preprocess input
             processed_input = self.data_processor.preprocess(input_data, is_training=False)
@@ -188,7 +188,7 @@ class MLSystem:
 
             # Cache result
             if use_cache:
-                self.cache.set(cache_key, final_result, ttl=3600)
+                await self.cache.set(cache_key, final_result, ttl=3600)
 
             return final_result
 
@@ -205,7 +205,7 @@ class MLSystem:
                 original_error=e,
             )
 
-    def predict_batch(
+    async def predict_batch(
         self,
         model_id: str,
         input_batch: List[Any],
@@ -213,7 +213,7 @@ class MLSystem:
         batch_size: int = 32,
     ) -> List[Any]:
         """
-        Make batch predictions.
+        Make batch predictions asynchronously.
         
         Args:
             model_id (str): Input parameter for this operation.
@@ -230,7 +230,7 @@ class MLSystem:
         try:
             # Load model if not loaded
             if model_id not in self._loaded_models:
-                self._load_model(model_id, version)
+                await self._load_model(model_id, version)
 
             results = []
             for i in range(0, len(input_batch), batch_size):
@@ -266,7 +266,7 @@ class MLSystem:
         self, model_id: str, input_data: Any, version: Optional[str] = None
     ) -> Any:
         """
-        Make async prediction.
+        Make async prediction (alias for predict).
         
         Args:
             model_id (str): Input parameter for this operation.
@@ -276,12 +276,11 @@ class MLSystem:
         Returns:
             Any: Result of the operation.
         """
-        loop = asyncio.get_event_loop()
-        return await loop.run_in_executor(None, self.predict, model_id, input_data, version)
+        return await self.predict(model_id, input_data, version)
 
-    def load_model(self, model_id: str, version: Optional[str] = None) -> None:
+    async def load_model(self, model_id: str, version: Optional[str] = None) -> None:
         """
-        Load model into memory.
+        Load model into memory asynchronously.
         
         Args:
             model_id (str): Input parameter for this operation.
@@ -290,7 +289,7 @@ class MLSystem:
         Returns:
             None: Result of the operation.
         """
-        self._load_model(model_id, version)
+        await self._load_model(model_id, version)
 
     def unload_model(self, model_id: str) -> None:
         """
@@ -308,9 +307,9 @@ class MLSystem:
                 del self._model_memory_usage[model_id]
             logger.info(f"Model unloaded: {model_id}")
 
-    def get_model_info(self, model_id: str, version: Optional[str] = None) -> Dict[str, Any]:
+    async def get_model_info(self, model_id: str, version: Optional[str] = None) -> Dict[str, Any]:
         """
-        Get model metadata and information.
+        Get model metadata and information asynchronously.
         
         Args:
             model_id (str): Input parameter for this operation.
@@ -322,14 +321,14 @@ class MLSystem:
         Raises:
             ModelNotFoundError: Raised when this function detects an invalid state or when an underlying call fails.
         """
-        result = self.model_registry.get_model_version(model_id, version)
+        result = await self.model_registry.get_model_version(model_id, version)
         if result is None:
             raise ModelNotFoundError(f"Model not found: {model_id}", model_id=model_id, version=version)
         return result
 
-    def _load_model(self, model_id: str, version: Optional[str] = None) -> None:
+    async def _load_model(self, model_id: str, version: Optional[str] = None) -> None:
         """
-        Internal method to load model with memory management.
+        Internal method to load model with memory management asynchronously.
         
         Args:
             model_id (str): Input parameter for this operation.
@@ -346,14 +345,14 @@ class MLSystem:
             return
 
         # Check memory limits
-        model_info = self.model_registry.get_model_version(model_id, version)
+        model_info = await self.model_registry.get_model_version(model_id, version)
         if not model_info:
             raise ModelNotFoundError(
                 f"Model not found: {model_id}", model_id=model_id, version=version
             )
 
         # Load model through model manager
-        model = self.model_manager.load_model(model_id, version)
+        model = await self.model_manager.load_model(model_id, version)
 
         # Track memory usage (simplified - actual implementation would measure)
         estimated_memory = 100  # MB (placeholder)

@@ -5,6 +5,7 @@ Provides message serialization/deserialization for efficient data encoding.
 """
 
 
+import asyncio
 import json
 import logging
 from typing import Any, Dict, Optional
@@ -30,9 +31,9 @@ class CodecManager:
         self.codec_type = codec_type
         logger.info(f"Codec manager initialized (placeholder) - type: {codec_type}")
 
-    def encode(self, data: Dict[str, Any]) -> bytes:
+    async def encode(self, data: Dict[str, Any]) -> bytes:
         """
-        Encode data to bytes.
+        Encode data to bytes asynchronously.
         
         Args:
             data (Dict[str, Any]): Input parameter for this operation.
@@ -43,28 +44,37 @@ class CodecManager:
         Raises:
             ValueError: Raised when this function detects an invalid state or when an underlying call fails.
         """
-        if self.codec_type == "json":
+        def _encode_json() -> bytes:
+            """Encode data to JSON bytes."""
             return json.dumps(data).encode("utf-8")
+        
+        if self.codec_type == "json":
+            # Wrap JSON encoding in thread pool to avoid blocking event loop
+            return await asyncio.to_thread(_encode_json)
         elif self.codec_type == "msgpack":
             # TODO: SDK-INT-002 - Implement msgpack encoding  # NOSONAR - Tracked technical debt with ticket reference
             # Placeholder implementation - replace with actual msgpack when integration is ready
             # import msgpack
-            # return msgpack.packb(data)
+            # def _encode_msgpack():
+            #     return msgpack.packb(data)
+            # return await asyncio.to_thread(_encode_msgpack)
             logger.warning("msgpack codec not implemented, falling back to JSON")
-            return json.dumps(data).encode("utf-8")
+            return await asyncio.to_thread(_encode_json)
         elif self.codec_type == "protobuf":
             # TODO: SDK-INT-002 - Implement protobuf encoding  # NOSONAR - Tracked technical debt with ticket reference
             # Placeholder implementation - replace with actual protobuf when integration is ready
             # from google.protobuf.message import Message
-            # return message.SerializeToString()
+            # def _encode_protobuf():
+            #     return message.SerializeToString()
+            # return await asyncio.to_thread(_encode_protobuf)
             logger.warning("protobuf codec not implemented, falling back to JSON")
-            return json.dumps(data).encode("utf-8")
+            return await asyncio.to_thread(_encode_json)
         else:
             raise ValueError(f"Unsupported codec type: {self.codec_type}")
 
-    def decode(self, data: bytes) -> Dict[str, Any]:
+    async def decode(self, data: bytes) -> Dict[str, Any]:
         """
-        Decode bytes to data dictionary.
+        Decode bytes to data dictionary asynchronously.
         
         Args:
             data (bytes): Input parameter for this operation.
@@ -75,23 +85,32 @@ class CodecManager:
         Raises:
             ValueError: Raised when this function detects an invalid state or when an underlying call fails.
         """
-        if self.codec_type == "json":
+        def _decode_json() -> Dict[str, Any]:
+            """Decode JSON bytes to dictionary."""
             return json.loads(data.decode("utf-8"))
+        
+        if self.codec_type == "json":
+            # Wrap JSON decoding in thread pool to avoid blocking event loop
+            return await asyncio.to_thread(_decode_json)
         elif self.codec_type == "msgpack":
             # TODO: SDK-INT-002 - Implement msgpack decoding  # NOSONAR - Tracked technical debt with ticket reference
             # Placeholder implementation - replace with actual msgpack when integration is ready
             # import msgpack
-            # return msgpack.unpackb(data, raw=False)
+            # def _decode_msgpack():
+            #     return msgpack.unpackb(data, raw=False)
+            # return await asyncio.to_thread(_decode_msgpack)
             logger.warning("msgpack codec not implemented, falling back to JSON")
-            return json.loads(data.decode("utf-8"))
+            return await asyncio.to_thread(_decode_json)
         elif self.codec_type == "protobuf":
             # TODO: SDK-INT-002 - Implement protobuf decoding  # NOSONAR - Tracked technical debt with ticket reference
             # Placeholder implementation - replace with actual protobuf when integration is ready
             # from google.protobuf.message import Message
-            # message.ParseFromString(data)
-            # return message_to_dict(message)
+            # def _decode_protobuf():
+            #     message.ParseFromString(data)
+            #     return message_to_dict(message)
+            # return await asyncio.to_thread(_decode_protobuf)
             logger.warning("protobuf codec not implemented, falling back to JSON")
-            return json.loads(data.decode("utf-8"))
+            return await asyncio.to_thread(_decode_json)
         else:
             raise ValueError(f"Unsupported codec type: {self.codec_type}")
 

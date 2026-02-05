@@ -70,33 +70,18 @@ class RAGGenerator:
         Returns:
             Dict[str, Any]: Dictionary result of the operation.
         """
-        # Build context from documents
-        context = self._build_context(context_documents)
+        import asyncio
 
-        # Build prompt with context
-        prompt = self._build_prompt(query, context)
-
-        # Generate response
-        response = self.gateway.generate(
-            prompt=prompt, model=self.model, max_tokens=max_tokens, temperature=temperature
-        )
-
-        result = {"response": response.text, "model": response.model, "usage": response.usage}
-
-        # Check for hallucinations if enabled
-        should_check = (
-            check_hallucination
-            if check_hallucination is not None
-            else self.enable_hallucination_detection
-        )
-        if should_check and self.hallucination_detector:
-            hallucination_result = self.hallucination_detector.detect(
-                response=response.text, context_documents=context_documents, query=query
+        # Call async method from sync context
+        return asyncio.run(
+            self.generate_async(
+                query=query,
+                context_documents=context_documents,
+                max_tokens=max_tokens,
+                temperature=temperature,
+                check_hallucination=check_hallucination,
             )
-            result["hallucination_result"] = hallucination_result.to_dict()
-            result["is_hallucination"] = hallucination_result.is_hallucination
-
-        return result
+        )
 
     async def generate_async(
         self,
@@ -135,7 +120,7 @@ class RAGGenerator:
             else self.enable_hallucination_detection
         )
         if should_check and self.hallucination_detector:
-            hallucination_result = self.hallucination_detector.detect_async(
+            hallucination_result = await self.hallucination_detector.detect_async(
                 response=response.text, context_documents=context_documents, query=query
             )
             result["hallucination_result"] = hallucination_result.to_dict()

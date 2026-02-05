@@ -379,7 +379,7 @@ class ServiceHTTPClient:
         """Cleanup on deletion."""
         # Note: Async cleanup in __del__ is not reliable
         # Clients should be explicitly closed using await client.close()
-            pass
+        pass
 
 
 class ServiceClientManager:

@@ -97,7 +97,7 @@ class DataIngestionService:
             enable_image_description=True,
         )
 
-    def upload_and_process(
+    async def upload_and_process(
         self,
         file_path: str,
         title: Optional[str] = None,
@@ -105,7 +105,7 @@ class DataIngestionService:
         auto_ingest: Optional[bool] = None,
     ) -> Dict[str, Any]:
         """
-        Upload and process a data file.
+        Upload and process a data file asynchronously.
         
         This is a one-stop method that:
                                                 1. Validates the file
@@ -116,7 +116,7 @@ class DataIngestionService:
         
                                                 Example:
                                                     >>> service = create_ingestion_service(rag=rag, cache=cache)
-                                                    >>> result = service.upload_and_process("document.pdf")
+                                                    >>> result = await service.upload_and_process("document.pdf")
                                                     >>> print(result["document_id"])  # RAG document ID
                                                     >>> print(result["content_preview"])  # Processed content preview
         
@@ -146,13 +146,13 @@ class DataIngestionService:
 
         # Validate file
         if self.validator:
-            validation_result = self.validator.validate_file(path)
+            validation_result = await self.validator.validate_file(path)
             if not validation_result["valid"]:
                 raise ValidationError(message=validation_result["error"], file_path=str(file_path))
 
         # Load and process content
         try:
-            content, loaded_metadata = self.multimodal_loader.load(str(path), gateway=self.gateway)
+            content, loaded_metadata = await self.multimodal_loader.load(str(path), gateway=self.gateway)
         except Exception as e:
             raise DataIngestionError(
                 message=f"Error loading file: {str(e)}", file_path=str(file_path), original_error=e
@@ -165,12 +165,12 @@ class DataIngestionService:
 
         # Cleanse data if enabled
         if self.cleaner:
-            content = self.cleaner.clean(content, metadata)
+            content = await self.cleaner.clean(content, metadata)
 
         # Cache processed content
         cache_key = f"ingested:{path.name}:{path.stat().st_mtime}"
         if self.enable_caching:
-            self.cache.set(
+            await self.cache.set(
                 cache_key,
                 {"content": content, "metadata": metadata},
                 tenant_id=self.tenant_id,
@@ -218,7 +218,7 @@ class DataIngestionService:
         auto_ingest: Optional[bool] = None,
     ) -> Dict[str, Any]:
         """
-        Asynchronously upload and process a data file.
+        Asynchronously upload and process a data file (alias for upload_and_process).
         
         Args:
             file_path (str): Path of the input file.
@@ -229,52 +229,17 @@ class DataIngestionService:
         Returns:
             Dict[str, Any]: Dictionary result of the operation.
         """
-        # Run synchronous processing in executor
-        loop = asyncio.get_event_loop()
-        return await loop.run_in_executor(
-            None, self.upload_and_process, file_path, title, metadata, auto_ingest
-        )
+        # Delegate to the main async method
+        return await self.upload_and_process(file_path, title, metadata, auto_ingest)
 
-    def batch_upload_and_process(
+    async def batch_upload_and_process(
         self,
         file_paths: List[str],
         titles: Optional[List[str]] = None,
         metadata_list: Optional[List[Dict[str, Any]]] = None,
     ) -> List[Dict[str, Any]]:
         """
-        Batch upload and process multiple files.
-        
-        Args:
-            file_paths (List[str]): Input parameter for this operation.
-            titles (Optional[List[str]]): Input parameter for this operation.
-            metadata_list (Optional[List[Dict[str, Any]]]): Input parameter for this operation.
-        
-        Returns:
-            List[Dict[str, Any]]: Dictionary result of the operation.
-        """
-        results = []
-        for i, file_path in enumerate(file_paths):
-            try:
-                title = titles[i] if titles and i < len(titles) else None
-                metadata = metadata_list[i] if metadata_list and i < len(metadata_list) else None
-
-                result = self.upload_and_process(
-                    file_path=file_path, title=title, metadata=metadata
-                )
-                results.append(result)
-            except Exception as e:
-                results.append({"success": False, "file_path": file_path, "error": str(e)})
-
-        return results
-
-    async def batch_upload_and_process_async(
-        self,
-        file_paths: List[str],
-        titles: Optional[List[str]] = None,
-        metadata_list: Optional[List[Dict[str, Any]]] = None,
-    ) -> List[Dict[str, Any]]:
-        """
-        Asynchronously batch upload and process multiple files.
+        Batch upload and process multiple files asynchronously.
         
         Args:
             file_paths (List[str]): Input parameter for this operation.
@@ -290,7 +255,7 @@ class DataIngestionService:
             metadata = metadata_list[i] if metadata_list and i < len(metadata_list) else None
 
             tasks.append(
-                self.upload_and_process_async(file_path=file_path, title=title, metadata=metadata)
+                self.upload_and_process(file_path=file_path, title=title, metadata=metadata)
             )
 
         results = await asyncio.gather(*tasks, return_exceptions=True)
@@ -315,3 +280,23 @@ class DataIngestionService:
                 })
         
         return processed_results
+
+    async def batch_upload_and_process_async(
+        self,
+        file_paths: List[str],
+        titles: Optional[List[str]] = None,
+        metadata_list: Optional[List[Dict[str, Any]]] = None,
+    ) -> List[Dict[str, Any]]:
+        """
+        Asynchronously batch upload and process multiple files (alias for batch_upload_and_process).
+        
+        Args:
+            file_paths (List[str]): Input parameter for this operation.
+            titles (Optional[List[str]]): Input parameter for this operation.
+            metadata_list (Optional[List[Dict[str, Any]]]): Input parameter for this operation.
+        
+        Returns:
+            List[Dict[str, Any]]: Dictionary result of the operation.
+        """
+        # Delegate to the main async method
+        return await self.batch_upload_and_process(file_paths, titles, metadata_list)

@@ -14,7 +14,7 @@ Handles loading and processing of various data formats:
 import io
 import mimetypes
 from pathlib import Path
-from typing import Any, Dict, Optional, Tuple
+from typing import Any, Dict, List, Optional, Tuple
 
 # Third-party imports
 try:
@@ -106,9 +106,9 @@ class MultiModalLoader:
         else:
             self.recognizer = None
 
-    def load(self, file_path: str, gateway: Optional[Any] = None) -> Tuple[str, Dict[str, Any]]:
+    async def load(self, file_path: str, gateway: Optional[Any] = None) -> Tuple[str, Dict[str, Any]]:
         """
-        Load content from file and return text content with metadata.
+        Load content from file and return text content with metadata asynchronously.
         
         Args:
             file_path (str): Path of the input file.
@@ -120,15 +120,19 @@ class MultiModalLoader:
         Raises:
             DocumentProcessingError: Raised when this function detects an invalid state or when an underlying call fails.
         """
+        import asyncio
+
         path = Path(file_path)
 
-        if not path.exists():
+        # Check file existence asynchronously
+        exists = await asyncio.to_thread(path.exists)
+        if not exists:
             raise DocumentProcessingError(
                 message=f"File not found: {file_path}", file_path=str(file_path), operation="load"
             )
 
-        # Get file metadata
-        file_metadata = self._get_file_metadata(path)
+        # Get file metadata asynchronously
+        file_metadata = await self._get_file_metadata(path)
 
         # Determine file type and load
         suffix = path.suffix.lower()
@@ -136,25 +140,25 @@ class MultiModalLoader:
 
         try:
             if suffix in [".txt", ".md", ".markdown"]:
-                content, metadata = self._load_text(path, file_metadata)
+                content, metadata = await self._load_text(path, file_metadata)
             elif suffix == ".html":
-                content, metadata = self._load_html(path, file_metadata)
+                content, metadata = await self._load_html(path, file_metadata)
             elif suffix == ".json":
-                content, metadata = self._load_json(path, file_metadata)
+                content, metadata = await self._load_json(path, file_metadata)
             elif suffix == ".pdf":
-                content, metadata = self._load_pdf(path, file_metadata)
+                content, metadata = await self._load_pdf(path, file_metadata)
             elif suffix in [".doc", ".docx"]:
-                content, metadata = self._load_docx(path, file_metadata)
+                content, metadata = await self._load_docx(path, file_metadata)
             elif suffix in [".mp3", ".wav", ".m4a", ".ogg", ".flac"]:
-                content, metadata = self._load_audio(path, file_metadata)
+                content, metadata = await self._load_audio(path, file_metadata)
             elif suffix in [".mp4", ".avi", ".mov", ".mkv", ".webm"]:
-                content, metadata = self._load_video(path, file_metadata)
+                content, metadata = await self._load_video(path, file_metadata)
             elif suffix in [".jpg", ".jpeg", ".png", ".gif", ".bmp", ".webp"]:
-                content, metadata = self._load_image(path, file_metadata, gateway)
+                content, metadata = await self._load_image(path, file_metadata, gateway)
             else:
                 # Try as text file
                 try:
-                    content, metadata = self._load_text(path, file_metadata)
+                    content, metadata = await self._load_text(path, file_metadata)
                 except UnicodeDecodeError as e:
                     raise DocumentProcessingError(
                         message=f"Unsupported file format: {suffix}",
@@ -177,9 +181,9 @@ class MultiModalLoader:
 
         return content, metadata
 
-    def _get_file_metadata(self, path: Path) -> Dict[str, Any]:
+    async def _get_file_metadata(self, path: Path) -> Dict[str, Any]:
         """
-        Extract file metadata.
+        Extract file metadata asynchronously.
         
         Args:
             path (Path): Input parameter for this operation.
@@ -187,7 +191,9 @@ class MultiModalLoader:
         Returns:
             Dict[str, Any]: Dictionary result of the operation.
         """
-        stat = path.stat()
+        import asyncio
+
+        stat = await asyncio.to_thread(path.stat)
         return {
             "file_name": path.name,
             "file_size": stat.st_size,
@@ -195,9 +201,9 @@ class MultiModalLoader:
             "modified_at": stat.st_mtime,
         }
 
-    def _load_text(self, path: Path, metadata: Dict[str, Any]) -> Tuple[str, Dict[str, Any]]:
+    async def _load_text(self, path: Path, metadata: Dict[str, Any]) -> Tuple[str, Dict[str, Any]]:
         """
-        Load text file.
+        Load text file asynchronously.
         
         Args:
             path (Path): Input parameter for this operation.
@@ -206,13 +212,18 @@ class MultiModalLoader:
         Returns:
             Tuple[str, Dict[str, Any]]: Dictionary result of the operation.
         """
-        with open(path, "r", encoding="utf-8") as f:
-            content = f.read()
+        import asyncio
+
+        def _read_file(p: Path) -> str:
+            with open(p, "r", encoding="utf-8") as f:
+                return f.read()
+
+        content = await asyncio.to_thread(_read_file, path)
         return content, metadata
 
-    def _load_html(self, path: Path, metadata: Dict[str, Any]) -> Tuple[str, Dict[str, Any]]:
+    async def _load_html(self, path: Path, metadata: Dict[str, Any]) -> Tuple[str, Dict[str, Any]]:
         """
-        Load HTML file and extract text.
+        Load HTML file and extract text asynchronously.
         
         Args:
             path (Path): Input parameter for this operation.
@@ -221,25 +232,29 @@ class MultiModalLoader:
         Returns:
             Tuple[str, Dict[str, Any]]: Dictionary result of the operation.
         """
-        try:
-            from bs4 import BeautifulSoup
+        import asyncio
 
-            with open(path, "r", encoding="utf-8") as f:
-                soup = BeautifulSoup(f.read(), "html.parser")
-            content = soup.get_text(separator=" ", strip=True)
-            return content, metadata
-        except ImportError:
-            # Fallback: basic HTML tag removal
-            import re
+        def _read_and_parse_html(p: Path) -> str:
+            try:
+                from bs4 import BeautifulSoup
 
-            with open(path, "r", encoding="utf-8") as f:
-                html = f.read()
-            content = re.sub(r"<[^>]+>", "", html)
-            return content, metadata
+                with open(p, "r", encoding="utf-8") as f:
+                    soup = BeautifulSoup(f.read(), "html.parser")
+                return soup.get_text(separator=" ", strip=True)
+            except ImportError:
+                # Fallback: basic HTML tag removal
+                import re
 
-    def _load_json(self, path: Path, metadata: Dict[str, Any]) -> Tuple[str, Dict[str, Any]]:
+                with open(p, "r", encoding="utf-8") as f:
+                    html = f.read()
+                return re.sub(r"<[^>]+>", "", html)
+
+        content = await asyncio.to_thread(_read_and_parse_html, path)
+        return content, metadata
+
+    async def _load_json(self, path: Path, metadata: Dict[str, Any]) -> Tuple[str, Dict[str, Any]]:
         """
-        Load JSON file and convert to readable text.
+        Load JSON file and convert to readable text asynchronously.
         
         Args:
             path (Path): Input parameter for this operation.
@@ -248,18 +263,21 @@ class MultiModalLoader:
         Returns:
             Tuple[str, Dict[str, Any]]: Dictionary result of the operation.
         """
+        import asyncio
         import json
 
-        with open(path, "r", encoding="utf-8") as f:
-            data = json.load(f)
+        def _read_and_parse_json(p: Path) -> str:
+            with open(p, "r", encoding="utf-8") as f:
+                data = json.load(f)
+            # Convert to readable text format
+            return json.dumps(data, indent=2, ensure_ascii=False)
 
-        # Convert to readable text format
-        content = json.dumps(data, indent=2, ensure_ascii=False)
+        content = await asyncio.to_thread(_read_and_parse_json, path)
         return content, metadata
 
-    def _load_pdf(self, path: Path, metadata: Dict[str, Any]) -> Tuple[str, Dict[str, Any]]:
+    async def _load_pdf(self, path: Path, metadata: Dict[str, Any]) -> Tuple[str, Dict[str, Any]]:
         """
-        Load PDF file and extract text.
+        Load PDF file and extract text asynchronously.
         
         Args:
             path (Path): Input parameter for this operation.
@@ -271,6 +289,8 @@ class MultiModalLoader:
         Raises:
             DocumentProcessingError: Raised when this function detects an invalid state or when an underlying call fails.
         """
+        import asyncio
+
         if not PDF_AVAILABLE:
             raise DocumentProcessingError(
                 message="PyPDF2 is required for PDF support. Install with: pip install PyPDF2",
@@ -278,16 +298,21 @@ class MultiModalLoader:
                 operation="load_pdf",
             )
 
-        content_parts = []
-        try:
-            with open(path, "rb") as f:
+        def _read_pdf(p: Path) -> Tuple[str, int]:
+            content_parts = []
+            with open(p, "rb") as f:
                 pdf_reader = PyPDF2.PdfReader(f)
-                metadata["page_count"] = len(pdf_reader.pages)
+                page_count = len(pdf_reader.pages)
 
                 for page_num, page in enumerate(pdf_reader.pages):
                     text = page.extract_text()
                     if text:
                         content_parts.append(f"--- Page {page_num + 1} ---\n{text}\n")
+            return "\n".join(content_parts), page_count
+
+        try:
+            content, page_count = await asyncio.to_thread(_read_pdf, path)
+            metadata["page_count"] = page_count
         except Exception as e:
             raise DocumentProcessingError(
                 message=f"Error reading PDF: {str(e)}",
@@ -296,12 +321,29 @@ class MultiModalLoader:
                 original_error=e,
             )
 
-        content = "\n".join(content_parts)
         return content, metadata
 
-    def _load_docx(self, path: Path, metadata: Dict[str, Any]) -> Tuple[str, Dict[str, Any]]:
+    def _extract_docx_paragraphs(self, doc: Any) -> List[str]:
+        """Extract text from DOCX paragraphs."""
+        content_parts = []
+        for para in doc.paragraphs:
+            if para.text.strip():
+                content_parts.append(para.text)
+        return content_parts
+
+    def _extract_docx_tables(self, doc: Any) -> List[str]:
+        """Extract text from DOCX tables."""
+        content_parts = []
+        for table in doc.tables:
+            for row in table.rows:
+                row_text = " | ".join([cell.text for cell in row.cells])
+                if row_text.strip():
+                    content_parts.append(row_text)
+        return content_parts
+
+    async def _load_docx(self, path: Path, metadata: Dict[str, Any]) -> Tuple[str, Dict[str, Any]]:
         """
-        Load DOCX file and extract text.
+        Load DOCX file and extract text asynchronously.
         
         Args:
             path (Path): Input parameter for this operation.
@@ -313,6 +355,8 @@ class MultiModalLoader:
         Raises:
             DocumentProcessingError: Raised when this function detects an invalid state or when an underlying call fails.
         """
+        import asyncio
+
         if not DOCX_AVAILABLE:
             raise DocumentProcessingError(
                 message="python-docx is required for DOCX support. Install with: pip install python-docx",
@@ -320,24 +364,18 @@ class MultiModalLoader:
                 operation="load_docx",
             )
 
-        try:
-            doc = DocxDocument(str(path))
+        def _read_docx(p: Path) -> Tuple[str, int]:
+            doc = DocxDocument(str(p))
             content_parts = []
-
-            # Extract text from paragraphs
-            for para in doc.paragraphs:
-                if para.text.strip():
-                    content_parts.append(para.text)
-
-            # Extract text from tables
-            for table in doc.tables:
-                for row in table.rows:
-                    row_text = " | ".join([cell.text for cell in row.cells])
-                    if row_text.strip():
-                        content_parts.append(row_text)
-
+            content_parts.extend(self._extract_docx_paragraphs(doc))
+            content_parts.extend(self._extract_docx_tables(doc))
             content = "\n".join(content_parts)
-            metadata["paragraph_count"] = len(doc.paragraphs)
+            paragraph_count = len(doc.paragraphs)
+            return content, paragraph_count
+
+        try:
+            content, paragraph_count = await asyncio.to_thread(_read_docx, path)
+            metadata["paragraph_count"] = paragraph_count
             return content, metadata
         except Exception as e:
             raise DocumentProcessingError(
@@ -347,9 +385,9 @@ class MultiModalLoader:
                 original_error=e,
             )
 
-    def _load_audio(self, path: Path, metadata: Dict[str, Any]) -> Tuple[str, Dict[str, Any]]:
+    async def _load_audio(self, path: Path, metadata: Dict[str, Any]) -> Tuple[str, Dict[str, Any]]:
         """
-        Load audio file and transcribe.
+        Load audio file and transcribe asynchronously.
         
         Args:
             path (Path): Input parameter for this operation.
@@ -361,6 +399,8 @@ class MultiModalLoader:
         Raises:
             DocumentProcessingError: Raised when this function detects an invalid state or when an underlying call fails.
         """
+        import asyncio
+
         if not AUDIO_AVAILABLE:
             raise DocumentProcessingError(
                 message="Audio processing libraries required. Install with: pip install SpeechRecognition pydub",
@@ -371,11 +411,13 @@ class MultiModalLoader:
         if not self.enable_audio_transcription:
             return "", {**metadata, "transcription_disabled": True}
 
-        try:
+        def _process_audio(p: Path) -> Tuple[str, Dict[str, Any]]:
             # Load audio file
-            audio = AudioSegment.from_file(str(path))
-            metadata["duration_seconds"] = len(audio) / 1000.0
-            metadata["sample_rate"] = audio.frame_rate
+            audio = AudioSegment.from_file(str(p))
+            audio_metadata = {
+                "duration_seconds": len(audio) / 1000.0,
+                "sample_rate": audio.frame_rate,
+            }
 
             # Convert to WAV for recognition
             wav_io = io.BytesIO()
@@ -390,20 +432,25 @@ class MultiModalLoader:
                         audio_data, language=self.audio_language
                     )
                     content = f"[Audio Transcript]\n{transcript}"
-                    metadata["transcription_language"] = self.audio_language
-                    return content, metadata
+                    audio_metadata["transcription_language"] = self.audio_language
+                    return content, audio_metadata
                 except sr.UnknownValueError:
                     return (
                         "[Audio file loaded but transcription failed - audio may be unclear]",
-                        metadata,
+                        audio_metadata,
                     )
                 except sr.RequestError as e:
                     raise DocumentProcessingError(
                         message=f"Transcription service error: {str(e)}",
-                        file_path=str(path),
+                        file_path=str(p),
                         operation="load_audio",
                         original_error=e,
                     )
+
+        try:
+            content, audio_metadata = await asyncio.to_thread(_process_audio, path)
+            metadata.update(audio_metadata)
+            return content, metadata
         except Exception as e:
             raise DocumentProcessingError(
                 message=f"Error processing audio: {str(e)}",
@@ -463,11 +510,11 @@ class MultiModalLoader:
 
         return extracted_frames
 
-    def _load_video(
+    async def _load_video(
         self, path: Path, metadata: Dict[str, Any]
     ) -> Tuple[str, Dict[str, Any]]:
         """
-        Load video file, extract frames, and transcribe audio.
+        Load video file, extract frames, and transcribe audio asynchronously.
         
         Args:
             path (Path): Input parameter for this operation.
@@ -479,6 +526,8 @@ class MultiModalLoader:
         Raises:
             DocumentProcessingError: Raised when this function detects an invalid state or when an underlying call fails.
         """
+        import asyncio
+
         if not VIDEO_AVAILABLE:
             raise DocumentProcessingError(
                 message="OpenCV is required for video support. Install with: pip install opencv-python",
@@ -486,39 +535,45 @@ class MultiModalLoader:
                 operation="load_video",
             )
 
-        content_parts = []
+        def _process_video(p: Path) -> Tuple[str, Dict[str, Any]]:
+            content_parts = []
+            video_metadata = {}
 
-        try:
-            cap = cv2.VideoCapture(str(path))
+            cap = cv2.VideoCapture(str(p))
             if not cap.isOpened():
                 raise DocumentProcessingError(
-                    message="Could not open video file", file_path=str(path), operation="load_video"
+                    message="Could not open video file", file_path=str(p), operation="load_video"
                 )
 
-            # Get video properties and add to metadata
-            fps, duration = self._extract_video_properties(cap, metadata)
+            try:
+                # Get video properties and add to metadata
+                fps, duration = self._extract_video_properties(cap, video_metadata)
 
-            # Extract audio and transcribe if enabled
-            if self.enable_video_transcription and self.recognizer:
-                # Note: Audio extraction from video requires ffmpeg
-                # This is a simplified version - full implementation would extract audio track
-                content_parts.append(
-                    "[Video Audio: Transcription available if audio track extracted]"
-                )
+                # Extract audio and transcribe if enabled
+                if self.enable_video_transcription and self.recognizer:
+                    # Note: Audio extraction from video requires ffmpeg
+                    # This is a simplified version - full implementation would extract audio track
+                    content_parts.append(
+                        "[Video Audio: Transcription available if audio track extracted]"
+                    )
 
-            # Extract frames if enabled
-            if self.video_extract_frames:
-                extracted_frames = self._extract_video_frames(cap, fps, content_parts)
-                metadata["extracted_frames"] = extracted_frames
-                content_parts.append(
-                    f"\n[Video Summary: {extracted_frames} frames extracted from {duration:.2f}s video]"
-                )
+                # Extract frames if enabled
+                if self.video_extract_frames:
+                    extracted_frames = self._extract_video_frames(cap, fps, content_parts)
+                    video_metadata["extracted_frames"] = extracted_frames
+                    content_parts.append(
+                        f"\n[Video Summary: {extracted_frames} frames extracted from {duration:.2f}s video]"
+                    )
 
-            cap.release()
+                content = "\n".join(content_parts) if content_parts else "[Video file processed]"
+                return content, video_metadata
+            finally:
+                cap.release()
 
-            content = "\n".join(content_parts) if content_parts else "[Video file processed]"
+        try:
+            content, video_metadata = await asyncio.to_thread(_process_video, path)
+            metadata.update(video_metadata)
             return content, metadata
-
         except Exception as e:
             raise DocumentProcessingError(
                 message=f"Error processing video: {str(e)}",
@@ -527,11 +582,51 @@ class MultiModalLoader:
                 original_error=e,
             )
 
-    def _load_image(
+    def _process_image_ocr(self, image: Any, content_parts: List[str], img_metadata: Dict[str, Any]) -> None:
+        """Process OCR on image."""
+        try:
+            ocr_text = pytesseract.image_to_string(image)
+            if ocr_text.strip():
+                content_parts.append(f"[OCR Text]\n{ocr_text}")
+                img_metadata["ocr_performed"] = True
+        except Exception as e:
+            content_parts.append(f"[OCR failed: {str(e)}]")
+            img_metadata["ocr_performed"] = False
+
+    def _process_image_description(
+        self, image: Any, content_parts: List[str], img_metadata: Dict[str, Any], _gateway: Optional[Any]
+    ) -> None:
+        """Process image description generation.
+        
+        Args:
+            image: PIL Image object
+            content_parts: List to append description content to
+            img_metadata: Metadata dictionary to update
+            _gateway: Gateway client (unused, reserved for future vision API integration)
+        """
+        try:
+            # Convert image to base64 for API
+            import base64
+
+            buffered = io.BytesIO()
+            image.save(buffered, format="PNG")
+            _ = base64.b64encode(buffered.getvalue()).decode()  # For future use with vision API
+
+            # Use vision model to describe image
+            # Note: This requires a vision-capable model like GPT-4 Vision
+            # Future: _gateway will be used to call vision API
+            description = "[Image description would be generated using vision model]"
+            content_parts.append(f"[Image Description]\n{description}")
+            img_metadata["description_generated"] = True
+        except Exception as e:
+            content_parts.append(f"[Description generation failed: {str(e)}]")
+            img_metadata["description_generated"] = False
+
+    async def _load_image(
         self, path: Path, metadata: Dict[str, Any], gateway: Optional[Any]
     ) -> Tuple[str, Dict[str, Any]]:
         """
-        Load image file, perform OCR, and generate description.
+        Load image file, perform OCR, and generate description asynchronously.
         
         Args:
             path (Path): Input parameter for this operation.
@@ -544,6 +639,8 @@ class MultiModalLoader:
         Raises:
             DocumentProcessingError: Raised when this function detects an invalid state or when an underlying call fails.
         """
+        import asyncio
+
         if not IMAGE_AVAILABLE:
             raise DocumentProcessingError(
                 message="Image processing libraries required. Install with: pip install Pillow pytesseract",
@@ -551,47 +648,31 @@ class MultiModalLoader:
                 operation="load_image",
             )
 
-        content_parts = []
-
-        try:
-            image = Image.open(path)
-            metadata["image_width"] = image.width
-            metadata["image_height"] = image.height
-            metadata["image_format"] = image.format
+        def _process_image_sync(p: Path) -> Tuple[str, Dict[str, Any]]:
+            image = Image.open(p)
+            img_metadata = {
+                "image_width": image.width,
+                "image_height": image.height,
+                "image_format": image.format,
+            }
+            content_parts = []
 
             # OCR if enabled
             if self.enable_image_ocr:
-                try:
-                    ocr_text = pytesseract.image_to_string(image)
-                    if ocr_text.strip():
-                        content_parts.append(f"[OCR Text]\n{ocr_text}")
-                        metadata["ocr_performed"] = True
-                except Exception as e:
-                    content_parts.append(f"[OCR failed: {str(e)}]")
-                    metadata["ocr_performed"] = False
+                self._process_image_ocr(image, content_parts, img_metadata)
 
-            # Generate description if gateway provided
+            # Note: Image description generation would use gateway (async)
+            # For now, this is a placeholder
             if self.enable_image_description and gateway:
-                try:
-                    # Convert image to base64 for API
-                    import base64
-
-                    buffered = io.BytesIO()
-                    image.save(buffered, format="PNG")
-                    _ = base64.b64encode(buffered.getvalue()).decode()  # For future use with vision API
-
-                    # Use vision model to describe image
-                    # Note: This requires a vision-capable model like GPT-4 Vision
-                    description = "[Image description would be generated using vision model]"
-                    content_parts.append(f"[Image Description]\n{description}")
-                    metadata["description_generated"] = True
-                except Exception as e:
-                    content_parts.append(f"[Description generation failed: {str(e)}]")
-                    metadata["description_generated"] = False
+                self._process_image_description(image, content_parts, img_metadata, gateway)
 
             content = "\n".join(content_parts) if content_parts else "[Image file processed]"
-            return content, metadata
+            return content, img_metadata
 
+        try:
+            content, image_metadata = await asyncio.to_thread(_process_image_sync, path)
+            metadata.update(image_metadata)
+            return content, metadata
         except Exception as e:
             raise DocumentProcessingError(
                 message=f"Error processing image: {str(e)}",

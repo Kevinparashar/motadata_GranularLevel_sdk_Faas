@@ -3,6 +3,8 @@ Vector Index Management
 
 Provides comprehensive index management for pgvector, including creation,
 monitoring, and reindexing of IVFFlat and HNSW indexes.
+
+All methods are async-first for production scalability.
 """
 
 
@@ -25,12 +27,12 @@ class DatabaseError(Exception):
         original_error: Optional[Exception] = None,
     ):
         """
-        __init__.
+        Initialize DatabaseError.
         
         Args:
-            message (str): Input parameter for this operation.
-            operation (Optional[str]): Input parameter for this operation.
-            original_error (Optional[Exception]): Input parameter for this operation.
+            message (str): Error message.
+            operation (Optional[str]): Operation that failed.
+            original_error (Optional[Exception]): Original exception.
         """
         self.message = message
         self.operation = operation
@@ -48,12 +50,12 @@ class VectorIndexError(Exception):
         original_error: Optional[Exception] = None,
     ):
         """
-        __init__.
+        Initialize VectorIndexError.
         
         Args:
-            message (str): Input parameter for this operation.
-            index_name (Optional[str]): Input parameter for this operation.
-            original_error (Optional[Exception]): Input parameter for this operation.
+            message (str): Error message.
+            index_name (Optional[str]): Index name that caused error.
+            original_error (Optional[Exception]): Original exception.
         """
         self.message = message
         self.index_name = index_name
@@ -85,6 +87,8 @@ class VectorIndexManager:
 
     Supports IVFFlat and HNSW indexes with automatic reindexing
     when embeddings change or models are updated.
+    
+    All methods are async-first for production scalability.
     """
 
     def __init__(self, db: DatabaseConnection):
@@ -101,10 +105,10 @@ class VectorIndexManager:
         Get the operator class for the given distance metric.
         
         Args:
-            distance (IndexDistance): Input parameter for this operation.
+            distance (IndexDistance): Distance metric.
         
         Returns:
-            str: Returned text value.
+            str: Operator class name.
         """
         if distance == IndexDistance.COSINE:
             return "vector_cosine_ops"
@@ -120,14 +124,14 @@ class VectorIndexManager:
         Build IVFFlat index creation query.
         
         Args:
-            index_name (str): Input parameter for this operation.
-            table_name (str): Input parameter for this operation.
-            column_name (str): Input parameter for this operation.
-            opclass (str): Input parameter for this operation.
-            lists (int): Input parameter for this operation.
+            index_name (str): Name for the index.
+            table_name (str): Table name.
+            column_name (str): Column name.
+            opclass (str): Operator class.
+            lists (int): Number of lists for IVFFlat.
         
         Returns:
-            str: Returned text value.
+            str: SQL query string.
         """
         return f"""
         CREATE INDEX IF NOT EXISTS {index_name}
@@ -148,15 +152,15 @@ class VectorIndexManager:
         Build HNSW index creation query.
         
         Args:
-            index_name (str): Input parameter for this operation.
-            table_name (str): Input parameter for this operation.
-            column_name (str): Input parameter for this operation.
-            opclass (str): Input parameter for this operation.
-            m (int): Input parameter for this operation.
-            ef_construction (int): Input parameter for this operation.
+            index_name (str): Name for the index.
+            table_name (str): Table name.
+            column_name (str): Column name.
+            opclass (str): Operator class.
+            m (int): HNSW m parameter.
+            ef_construction (int): HNSW ef_construction parameter.
         
         Returns:
-            str: Returned text value.
+            str: SQL query string.
         """
         return f"""
         CREATE INDEX IF NOT EXISTS {index_name}
@@ -164,7 +168,7 @@ class VectorIndexManager:
         WITH (m = {m}, ef_construction = {ef_construction});
         """
 
-    def create_index(  # noqa: S3516
+    async def create_index(
         self,
         table_name: str = "embeddings",
         column_name: str = "embedding",
@@ -174,32 +178,32 @@ class VectorIndexManager:
         m: Optional[int] = None,  # For HNSW
         ef_construction: Optional[int] = None,  # For HNSW
         tenant_id: Optional[str] = None,
-    ) -> bool:
+    ) -> str:
         """
-        Create a vector index on the specified table and column.
+        Create a vector index on the specified table and column asynchronously.
         
         Args:
-            table_name (str): Input parameter for this operation.
-            column_name (str): Input parameter for this operation.
-            index_type (IndexType): Input parameter for this operation.
-            distance (IndexDistance): Input parameter for this operation.
-            lists (Optional[int]): Input parameter for this operation.
-            m (Optional[int]): Input parameter for this operation.
-            ef_construction (Optional[int]): Input parameter for this operation.
-            tenant_id (Optional[str]): Tenant identifier used for tenant isolation.
+            table_name (str): Table name.
+            column_name (str): Column name.
+            index_type (IndexType): Type of index (IVFFLAT or HNSW).
+            distance (IndexDistance): Distance metric.
+            lists (Optional[int]): Number of lists for IVFFlat.
+            m (Optional[int]): HNSW m parameter.
+            ef_construction (Optional[int]): HNSW ef_construction parameter.
+            tenant_id (Optional[str]): Tenant identifier for multi-tenancy.
         
         Returns:
-            bool: True if the operation succeeds, else False.
+            str: The name of the created or existing index.
         
         Raises:
-            DatabaseError: Raised when this function detects an invalid state or when an underlying call fails.
+            DatabaseError: If index creation fails.
         """
         index_name = self._get_index_name(table_name, column_name, index_type, tenant_id)
 
         # Check if index already exists
-        if self.index_exists(index_name):
+        if await self.index_exists(index_name):
             logger.info(f"Index {index_name} already exists")
-            return True
+            return index_name
 
         # Get distance operator class
         opclass = self._get_distance_opclass(distance)
@@ -208,7 +212,7 @@ class VectorIndexManager:
         if index_type == IndexType.IVFFLAT:
             # Calculate lists parameter if not provided
             if lists is None:
-                row_count = self._get_table_row_count(table_name, tenant_id)
+                row_count = await self._get_table_row_count(table_name, tenant_id)
                 lists = max(100, int(row_count**0.5)) if row_count > 0 else 100
                 logger.info(f"Calculated IVFFlat lists: {lists} (based on {row_count} rows)")
             query = self._build_ivfflat_query(index_name, table_name, column_name, opclass, lists)
@@ -221,45 +225,45 @@ class VectorIndexManager:
             )
 
         try:
-            self.db.execute_query(query)
+            await self.db.execute_query(query, fetch_all=False)
             logger.info(
                 f"Created {index_type.value} index {index_name} on {table_name}.{column_name}"
             )
-            return True
+            return index_name
         except Exception as e:
             error_msg = f"Failed to create index {index_name}: {str(e)}"
             logger.error(error_msg)
-            raise DatabaseError(message=error_msg, operation="create_index", original_error=e)
+            raise DatabaseError(message=error_msg, operation="create_index", original_error=e) from e
 
-    def index_exists(self, index_name: str) -> bool:
+    async def index_exists(self, index_name: str) -> bool:
         """
-        Check if an index exists.
+        Check if an index exists asynchronously.
         
         Args:
-            index_name (str): Input parameter for this operation.
+            index_name (str): Index name to check.
         
         Returns:
-            bool: True if the operation succeeds, else False.
+            bool: True if index exists.
         """
         query = """
         SELECT EXISTS (
             SELECT 1
             FROM pg_indexes
-            WHERE indexname = %s
+            WHERE indexname = $1
         );
         """
-        result = self.db.execute_query(query, (index_name,), fetch_one=True)
+        result = await self.db.execute_query(query, (index_name,), fetch_one=True)
         return result.get("exists", False) if result else False
 
-    def get_index_info(self, index_name: str) -> Optional[Dict[str, Any]]:
+    async def get_index_info(self, index_name: str) -> Optional[Dict[str, Any]]:
         """
-        Get information about an index.
+        Get information about an index asynchronously.
         
         Args:
-            index_name (str): Input parameter for this operation.
+            index_name (str): Index name.
         
         Returns:
-            Optional[Dict[str, Any]]: Dictionary result of the operation.
+            Optional[Dict[str, Any]]: Index information or None.
         """
         query = """
         SELECT
@@ -272,23 +276,23 @@ class VectorIndexManager:
         FROM pg_indexes i
         JOIN pg_class c ON c.relname = i.indexname
         JOIN pg_index idx ON idx.indexrelid = c.oid
-        WHERE i.indexname = %s;
+        WHERE i.indexname = $1;
         """
 
-        result = self.db.execute_query(query, (index_name,), fetch_one=True)
+        result = await self.db.execute_query(query, (index_name,), fetch_one=True)
         return result
 
-    def list_indexes(
+    async def list_indexes(
         self, table_name: Optional[str] = None
     ) -> List[Dict[str, Any]]:
         """
-        List all vector indexes.
+        List all vector indexes asynchronously.
         
         Args:
-            table_name (Optional[str]): Input parameter for this operation.
+            table_name (Optional[str]): Filter by table name.
         
         Returns:
-            List[Dict[str, Any]]: Dictionary result of the operation.
+            List[Dict[str, Any]]: List of index information.
         """
         if table_name:
             query = """
@@ -298,11 +302,11 @@ class VectorIndexManager:
                 i.indexdef,
                 pg_size_pretty(pg_relation_size(i.indexname::regclass)) as index_size
             FROM pg_indexes i
-            WHERE i.tablename = %s
+            WHERE i.tablename = $1
                 AND (i.indexdef LIKE '%ivfflat%' OR i.indexdef LIKE '%hnsw%')
             ORDER BY i.indexname;
             """
-            results = self.db.execute_query(query, (table_name,))
+            results = await self.db.execute_query(query, (table_name,))
         else:
             query = """
             SELECT
@@ -314,25 +318,25 @@ class VectorIndexManager:
             WHERE i.indexdef LIKE '%ivfflat%' OR i.indexdef LIKE '%hnsw%'
             ORDER BY i.tablename, i.indexname;
             """
-            results = self.db.execute_query(query)
+            results = await self.db.execute_query(query)
 
         return results or []
 
-    def reindex(self, index_name: str, concurrently: bool = False) -> bool:
+    async def reindex(self, index_name: str, concurrently: bool = False) -> bool:
         """
-        Rebuild an existing index.
+        Rebuild an existing index asynchronously.
         
         Args:
-            index_name (str): Input parameter for this operation.
-            concurrently (bool): Input parameter for this operation.
+            index_name (str): Index name to rebuild.
+            concurrently (bool): Whether to reindex concurrently.
         
         Returns:
-            bool: True if the operation succeeds, else False.
+            bool: True if reindex successful.
         
         Raises:
-            VectorIndexError: Raised when this function detects an invalid state or when an underlying call fails.
+            VectorIndexError: If index doesn't exist or reindex fails.
         """
-        if not self.index_exists(index_name):
+        if not await self.index_exists(index_name):
             error_msg = f"Index {index_name} does not exist"
             logger.error(error_msg)
             raise VectorIndexError(message=error_msg, index_name=index_name)
@@ -344,34 +348,34 @@ class VectorIndexManager:
             else:
                 query = f"REINDEX INDEX {index_name};"
 
-            self.db.execute_query(query)
+            await self.db.execute_query(query, fetch_all=False)
             logger.info(f"Reindexed {index_name} (concurrent: {concurrently})")
             return True
         except Exception as e:
             error_msg = f"Failed to reindex {index_name}: {str(e)}"
             logger.error(error_msg)
-            raise VectorIndexError(message=error_msg, index_name=index_name, original_error=e)
+            raise VectorIndexError(message=error_msg, index_name=index_name, original_error=e) from e
 
-    def reindex_table(
+    async def reindex_table(
         self, table_name: str, concurrently: bool = False
     ) -> List[str]:
         """
-        Reindex all vector indexes on a table.
+        Reindex all vector indexes on a table asynchronously.
         
         Args:
-            table_name (str): Input parameter for this operation.
-            concurrently (bool): Input parameter for this operation.
+            table_name (str): Table name.
+            concurrently (bool): Whether to reindex concurrently.
         
         Returns:
-            List[str]: List result of the operation.
+            List[str]: List of reindexed index names.
         """
-        indexes = self.list_indexes(table_name=table_name)
+        indexes = await self.list_indexes(table_name=table_name)
         reindexed = []
 
         for index_info in indexes:
             index_name = index_info["indexname"]
             try:
-                self.reindex(index_name, concurrently=concurrently)
+                await self.reindex(index_name, concurrently=concurrently)
                 reindexed.append(index_name)
             except Exception as e:
                 logger.warning(f"Failed to reindex {index_name}: {str(e)}")
@@ -379,35 +383,35 @@ class VectorIndexManager:
 
         return reindexed
 
-    def drop_index(self, index_name: str, if_exists: bool = True) -> bool:  # noqa: S3516
+    async def drop_index(self, index_name: str, if_exists: bool = True) -> Optional[str]:
         """
-        Drop an index.
+        Drop an index asynchronously.
         
         Args:
-            index_name (str): Input parameter for this operation.
-            if_exists (bool): Input parameter for this operation.
+            index_name (str): Index name to drop.
+            if_exists (bool): Only drop if exists.
         
         Returns:
-            bool: True if the operation succeeds, else False.
+            Optional[str]: The name of the dropped index, or None if it didn't exist and if_exists=True.
         
         Raises:
-            DatabaseError: Raised when this function detects an invalid state or when an underlying call fails.
+            DatabaseError: If drop fails.
         """
-        if if_exists and not self.index_exists(index_name):
+        if if_exists and not await self.index_exists(index_name):
             logger.info(f"Index {index_name} does not exist, skipping drop")
-            return True
+            return None
 
         try:
             query = f"DROP INDEX IF EXISTS {index_name};"
-            self.db.execute_query(query)
+            await self.db.execute_query(query, fetch_all=False)
             logger.info(f"Dropped index {index_name}")
-            return True
+            return index_name
         except Exception as e:
             error_msg = f"Failed to drop index {index_name}: {str(e)}"
             logger.error(error_msg)
-            raise DatabaseError(message=error_msg, operation="drop_index", original_error=e)
+            raise DatabaseError(message=error_msg, operation="drop_index", original_error=e) from e
 
-    def auto_reindex_on_embedding_change(
+    async def auto_reindex_on_embedding_change(
         self,
         table_name: str = "embeddings",
         column_name: str = "embedding",
@@ -415,53 +419,66 @@ class VectorIndexManager:
         tenant_id: Optional[str] = None,
     ) -> bool:
         """
-        Automatically reindex when embeddings change significantly.
+        Automatically reindex when embeddings change significantly (async).
         
         This should be called after bulk embedding updates or model changes.
         
         Args:
-            table_name (str): Input parameter for this operation.
-            column_name (str): Input parameter for this operation.
-            index_type (Optional[IndexType]): Input parameter for this operation.
-            tenant_id (Optional[str]): Tenant identifier used for tenant isolation.
+            table_name (str): Table name.
+            column_name (str): Column name.
+            index_type (Optional[IndexType]): Specific index type to reindex.
+            tenant_id (Optional[str]): Tenant identifier.
         
         Returns:
-            bool: True if the operation succeeds, else False.
+            bool: True if reindex successful.
         """
         if index_type:
             index_name = self._get_index_name(table_name, column_name, index_type, tenant_id)
-            if self.index_exists(index_name):
-                return self.reindex(index_name, concurrently=True)
+            if await self.index_exists(index_name):
+                return await self.reindex(index_name, concurrently=True)
             else:
                 logger.warning(f"Index {index_name} does not exist, skipping reindex")
                 return False
         else:
             # Reindex all indexes on the table
-            return len(self.reindex_table(table_name, concurrently=True)) > 0
+            reindexed = await self.reindex_table(table_name, concurrently=True)
+            return len(reindexed) > 0
 
-    def get_index_statistics(self, index_name: str) -> Optional[Dict[str, Any]]:
+    async def get_index_statistics(self, index_name: str) -> Optional[Dict[str, Any]]:
         """
-        Get statistics about an index.
+        Get statistics about an index asynchronously.
         
         Args:
-            index_name (str): Input parameter for this operation.
+            index_name (str): Index name.
         
         Returns:
-            Optional[Dict[str, Any]]: Dictionary result of the operation.
+            Optional[Dict[str, Any]]: Index statistics or None.
         """
-        if not self.index_exists(index_name):
+        if not await self.index_exists(index_name):
             return None
 
+        # Note: pg_stat functions require index OID, not name
+        # We need to get the OID first
+        oid_query = """
+        SELECT oid FROM pg_class WHERE relname = $1;
+        """
+        oid_result = await self.db.execute_query(oid_query, (index_name,), fetch_one=True)
+        
+        if not oid_result or not oid_result.get("oid"):
+            return None
+        
+        index_oid = oid_result["oid"]
+        
         query = """
         SELECT
-            pg_size_pretty(pg_relation_size(%s::regclass)) as size,
-            pg_stat_get_numscans(%s::regclass) as num_scans,
-            pg_stat_get_tuples_returned(%s::regclass) as tuples_returned,
-            pg_stat_get_tuples_fetched(%s::regclass) as tuples_fetched
+            pg_size_pretty(pg_relation_size($1)) as size,
+            pg_stat_get_numscans($1) as num_scans,
+            pg_stat_get_tuples_returned($1) as tuples_returned,
+            pg_stat_get_tuples_fetched($1) as tuples_fetched
         """
 
-        result = self.db.execute_query(
-            query, (index_name, index_name, index_name, index_name), fetch_one=True
+        result = await self.db.execute_query(
+            query, (index_oid,), fetch_one=True
         )
         return result
 
@@ -476,36 +493,36 @@ class VectorIndexManager:
         Generate index name.
         
         Args:
-            table_name (str): Input parameter for this operation.
-            column_name (str): Input parameter for this operation.
-            index_type (IndexType): Input parameter for this operation.
-            tenant_id (Optional[str]): Tenant identifier used for tenant isolation.
+            table_name (str): Table name.
+            column_name (str): Column name.
+            index_type (IndexType): Index type.
+            tenant_id (Optional[str]): Tenant identifier.
         
         Returns:
-            str: Returned text value.
+            str: Generated index name.
         """
         base_name = f"{table_name}_{column_name}_{index_type.value}_idx"
         if tenant_id:
             base_name = f"{base_name}_{tenant_id}"
         return base_name
 
-    def _get_table_row_count(self, table_name: str, tenant_id: Optional[str] = None) -> int:
+    async def _get_table_row_count(self, table_name: str, tenant_id: Optional[str] = None) -> int:
         """
-        Get row count for a table.
+        Get row count for a table asynchronously.
         
         Args:
-            table_name (str): Input parameter for this operation.
-            tenant_id (Optional[str]): Tenant identifier used for tenant isolation.
+            table_name (str): Table name.
+            tenant_id (Optional[str]): Tenant identifier.
         
         Returns:
-            int: Result of the operation.
+            int: Row count.
         """
         if tenant_id:
-            query = f"SELECT COUNT(*) as count FROM {table_name} WHERE tenant_id = %s;"
-            result = self.db.execute_query(query, (tenant_id,), fetch_one=True)
+            query = f"SELECT COUNT(*) as count FROM {table_name} WHERE tenant_id = $1;"
+            result = await self.db.execute_query(query, (tenant_id,), fetch_one=True)
         else:
             query = f"SELECT COUNT(*) as count FROM {table_name};"
-            result = self.db.execute_query(query, fetch_one=True)
+            result = await self.db.execute_query(query, fetch_one=True)
 
         return result.get("count", 0) if result else 0
 

@@ -7,7 +7,10 @@ Provides message bus functionality for service-to-service communication.
 
 import asyncio
 import logging
-from typing import Callable, Optional
+from typing import TYPE_CHECKING, Callable, Optional
+
+if TYPE_CHECKING:
+    from typing import Any, Awaitable, Union
 
 logger = logging.getLogger(__name__)
 
@@ -69,20 +72,33 @@ class NATSClient:
         # await self._client.publish(subject, payload, reply=reply)
         logger.info(f"NATS publish (placeholder): subject={subject}, payload_size={len(payload)}")
 
-    async def subscribe(self, subject: str, _callback: Callable, queue: Optional[str] = None):
+    async def subscribe(
+        self, 
+        subject: str, 
+        callback: "Union[Callable[..., Any], Callable[..., Awaitable[Any]]]", 
+        queue: Optional[str] = None
+    ):
         """
         Subscribe to NATS subject.
         
+        Supports both sync and async callbacks. Async callbacks will be awaited.
+        
         Args:
-            subject (str): Input parameter for this operation.
-            _callback (Callable): Input parameter for this operation.
-            queue (Optional[str]): Input parameter for this operation.
+            subject (str): NATS subject to subscribe to.
+            callback (Union[Callable[..., Any], Callable[..., Awaitable[Any]]): 
+                Callback function to handle messages (can be sync or async).
+            queue (Optional[str]): Queue group name for load balancing.
         """
         if not self._connected:
             await self.connect()
 
         # TODO: SDK-INT-001 - Implement actual NATS subscribe  # noqa: FIX002, S1135
         # Placeholder implementation - replace with actual NATS client when integration is ready
+        # When implementing, ensure callback is properly handled:
+        # if asyncio.iscoroutinefunction(callback):
+        #     await callback(msg)
+        # else:
+        #     callback(msg)
         # await self._client.subscribe(subject, cb=_callback, queue=queue)
         logger.info(f"NATS subscribe (placeholder): subject={subject}, queue={queue}")
 

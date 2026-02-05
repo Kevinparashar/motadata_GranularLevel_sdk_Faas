@@ -13,6 +13,7 @@ from unittest.mock import AsyncMock, MagicMock, patch
 import pytest
 
 from src.core.agno_agent_framework import Agent
+from src.core.agno_agent_framework.functions import execute_task
 from src.core.litellm_gateway import GatewayConfig, LiteLLMGateway
 
 
@@ -85,7 +86,8 @@ class TestAgentBenchmarks:
 
         for i in range(iterations):
             start = time.time()
-            await agent_without_memory.execute_task_async(
+            await execute_task(
+                agent=agent_without_memory,
                 task_type="llm_query",
                 parameters={"prompt": f"Test task {i}", "model": "gpt-4"},
                 tenant_id="benchmark_tenant",
@@ -108,7 +110,8 @@ class TestAgentBenchmarks:
         # Tasks without memory
         for i in range(iterations):
             start = time.time()
-            await agent_without_memory.execute_task_async(
+            await execute_task(
+                agent=agent_without_memory,
                 task_type="llm_query",
                 parameters={"prompt": f"Task {i}"},
                 tenant_id="benchmark_tenant",
@@ -119,7 +122,8 @@ class TestAgentBenchmarks:
         # Tasks with memory
         for i in range(iterations):
             start = time.time()
-            await agent_with_memory.execute_task_async(
+            await execute_task(
+                agent=agent_with_memory,
                 task_type="llm_query",
                 parameters={"prompt": f"Task {i}"},
                 tenant_id="benchmark_tenant",
@@ -147,9 +151,10 @@ class TestAgentBenchmarks:
         concurrent_tasks = 5
         total_tasks = 20
 
-        async def execute_task(task_num: int):
+        async def execute_single_task(task_num: int):
             """Execute a single task."""
-            await agent_without_memory.execute_task_async(
+            await execute_task(
+                agent=agent_without_memory,
                 task_type="llm_query",
                 parameters={"prompt": f"Concurrent task {task_num}"},
                 tenant_id="benchmark_tenant",
@@ -160,7 +165,7 @@ class TestAgentBenchmarks:
         # Run concurrent tasks
         tasks = []
         for i in range(total_tasks):
-            tasks.append(execute_task(i))
+            tasks.append(execute_single_task(i))
             if len(tasks) >= concurrent_tasks:
                 await asyncio.gather(*tasks)
                 tasks = []

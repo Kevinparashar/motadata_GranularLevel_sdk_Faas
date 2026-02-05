@@ -5,8 +5,7 @@ Tests caching operations for LLM responses and embeddings.
 """
 
 
-import time
-from unittest.mock import Mock, patch
+from unittest.mock import patch
 
 import pytest
 
@@ -22,63 +21,70 @@ class TestCacheMechanism:
         cache = CacheMechanism(config=config)
         assert cache.config.backend == "memory"
 
-    def test_set_get(self):
+    @pytest.mark.asyncio
+    async def test_set_get(self):
         """Test set and get operations."""
         cache = CacheMechanism(config=CacheConfig(backend="memory"))
 
-        cache.set("key1", "value1")
-        value = cache.get("key1")
+        await cache.set("key1", "value1")
+        value = await cache.get("key1")
         assert value == "value1"
 
-    def test_set_with_ttl(self):
+    @pytest.mark.asyncio
+    async def test_set_with_ttl(self):
         """Test set with TTL."""
+        import asyncio
         cache = CacheMechanism(config=CacheConfig(backend="memory"))
 
-        cache.set("key1", "value1", ttl=1)
-        value = cache.get("key1")
+        await cache.set("key1", "value1", ttl=1)
+        value = await cache.get("key1")
         assert value == "value1"
 
         # Wait for expiration
-        time.sleep(1.1)
-        expired_value = cache.get("key1")
+        await asyncio.sleep(1.1)
+        expired_value = await cache.get("key1")
         assert expired_value is None
 
-    def test_delete(self):
+    @pytest.mark.asyncio
+    async def test_delete(self):
         """Test delete operation."""
         cache = CacheMechanism(config=CacheConfig(backend="memory"))
 
-        cache.set("key1", "value1")
-        cache.delete("key1")
-        value = cache.get("key1")
+        await cache.set("key1", "value1")
+        await cache.delete("key1")
+        value = await cache.get("key1")
         assert value is None
 
-    def test_invalidate_pattern(self):
+    @pytest.mark.asyncio
+    async def test_invalidate_pattern(self):
         """Test pattern-based invalidation."""
         cache = CacheMechanism(config=CacheConfig(backend="memory"))
 
-        cache.set("user:1", "value1")
-        cache.set("user:2", "value2")
-        cache.set("post:1", "value3")
+        await cache.set("user:1", "value1")
+        await cache.set("user:2", "value2")
+        await cache.set("post:1", "value3")
 
-        cache.invalidate_pattern("user:")
+        await cache.invalidate_pattern("user:")
 
-        assert cache.get("user:1") is None
-        assert cache.get("user:2") is None
-        assert cache.get("post:1") == "value3"  # Should remain
+        assert await cache.get("user:1") is None
+        assert await cache.get("user:2") is None
+        assert await cache.get("post:1") == "value3"  # Should remain
 
-    @patch("src.core.cache_mechanism.cache.redis")
-    def test_dragonfly_cache(self, mock_redis_module):
+    @pytest.mark.asyncio
+    @patch("src.core.cache_mechanism.cache.aioredis")
+    async def test_dragonfly_cache(self, mock_aioredis_module):
         """Test Dragonfly cache backend."""
-        mock_redis_client = Mock()
-        mock_redis_module.Redis.from_url.return_value = mock_redis_client
+        from unittest.mock import AsyncMock
+        mock_redis_client = AsyncMock()
+        mock_aioredis_module.from_url.return_value = mock_redis_client
         mock_redis_client.get.return_value = b"value1"
         mock_redis_client.set.return_value = True
 
         config = CacheConfig(backend="dragonfly", dragonfly_url="redis://localhost:6379/0")
         cache = CacheMechanism(config=config)
 
-        cache.set("key1", "value1")
-        value = cache.get("key1")
+        await cache.set("key1", "value1")
+        value = await cache.get("key1")
         # Dragonfly (Redis-compatible) returns bytes, so we check it's not None
         assert value is not None
 

@@ -49,56 +49,58 @@ class TestEndToEndWorkflows:
 
         return {"cache": cache, "rag": rag, "agent": agent, "gateway": mock_gateway, "db": mock_db}
 
-    def test_complete_qa_workflow(self, mock_system):
+    @pytest.mark.asyncio
+    async def test_complete_qa_workflow(self, mock_system):
         """Test complete Q&A workflow."""
         rag = mock_system["rag"]
         agent = mock_system["agent"]
         cache = mock_system["cache"]
 
         # Step 1: Ingest document
-        with patch.object(rag, "ingest_document") as mock_ingest:
+        with patch.object(rag, "ingest_document_async") as mock_ingest:
             mock_ingest.return_value = "doc-001"
-            doc_id = rag.ingest_document(title="Test Doc", content="Test content")
+            doc_id = await rag.ingest_document_async(title="Test Doc", content="Test content")
             assert doc_id == "doc-001"
 
         # Step 2: Query RAG
-        with patch.object(rag, "query") as mock_query:
+        with patch.object(rag, "query_async") as mock_query:
             mock_query.return_value = {
                 "answer": "Test answer",
                 "retrieved_documents": [{"title": "Test Doc"}],
                 "num_documents": 1,
             }
 
-            result = rag.query("Test question")
+            result = await rag.query_async("Test question")
             assert result["answer"] == "Test answer"
 
         # Step 3: Cache result
-        cache.set("qa:test", result, ttl=3600)
-        cached = cache.get("qa:test")
+        await cache.set("qa:test", result, ttl=3600)
+        cached = await cache.get("qa:test")
         assert cached is not None
 
         # Step 4: Agent uses result
         task_id = agent.add_task(task_type="qa", parameters={"question": "Test question"})
         assert task_id is not None
 
-    def test_agent_with_rag_workflow(self, mock_system):
+    @pytest.mark.asyncio
+    async def test_agent_with_rag_workflow(self, mock_system):
         """Test agent with RAG workflow."""
         agent = mock_system["agent"]
         rag = mock_system["rag"]
 
         # Ingest documents
-        with patch.object(rag, "ingest_document"):
-            rag.ingest_document("Doc1", "Content1")
+        with patch.object(rag, "ingest_document_async"):
+            await rag.ingest_document_async("Doc1", "Content1")
 
         # Agent queries RAG
-        with patch.object(rag, "query") as mock_query:
+        with patch.object(rag, "query_async") as mock_query:
             mock_query.return_value = {
                 "answer": "Answer",
                 "retrieved_documents": [],
                 "num_documents": 0,
             }
 
-            result = rag.query("Question")
+            result = await rag.query_async("Question")
             assert "answer" in result
 
             # Agent processes result

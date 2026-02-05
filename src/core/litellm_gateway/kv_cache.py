@@ -141,11 +141,11 @@ class KVCacheManager:
 
         return f"kv_cache:{model}:{hash_value}"
 
-    def get_kv_cache(
+    async def get_kv_cache(
         self, cache_key: str, tenant_id: Optional[str] = None
     ) -> Optional[KVCacheEntry]:
         """
-        Retrieve KV cache entry.
+        Retrieve KV cache entry asynchronously.
         
         Args:
             cache_key (str): Input parameter for this operation.
@@ -165,7 +165,7 @@ class KVCacheManager:
         # Try persistent cache
         if self.cache:
             try:
-                cached_data = self.cache.get(cache_key, tenant_id=tenant_id)
+                cached_data = await self.cache.get(cache_key, tenant_id=tenant_id)
                 if cached_data and isinstance(cached_data, dict):
                     entry = KVCacheEntry.from_dict(cached_data)
                     # Store in memory cache for faster access
@@ -178,9 +178,9 @@ class KVCacheManager:
         logger.debug(f"KV cache miss: {cache_key}")
         return None
 
-    def set_kv_cache(self, entry: KVCacheEntry, tenant_id: Optional[str] = None) -> bool:
+    async def set_kv_cache(self, entry: KVCacheEntry, tenant_id: Optional[str] = None) -> bool:
         """
-        Store KV cache entry.
+        Store KV cache entry asynchronously.
         
         Args:
             entry (KVCacheEntry): Input parameter for this operation.
@@ -198,7 +198,7 @@ class KVCacheManager:
         # Store in persistent cache if available
         if self.cache:
             try:
-                self.cache.set(
+                await self.cache.set(
                     entry.cache_key, entry.to_dict(), ttl=self.kv_cache_ttl, tenant_id=tenant_id
                 )
                 logger.debug(f"KV cache stored: {entry.cache_key}")
@@ -209,9 +209,9 @@ class KVCacheManager:
 
         return True
 
-    def _invalidate_specific_key(self, cache_key: str, tenant_id: Optional[str]) -> int:
+    async def _invalidate_specific_key(self, cache_key: str, tenant_id: Optional[str]) -> int:
         """
-        Invalidate a specific cache key.
+        Invalidate a specific cache key asynchronously.
         
         Args:
             cache_key (str): Input parameter for this operation.
@@ -227,7 +227,7 @@ class KVCacheManager:
 
         if self.cache:
             try:
-                self.cache.delete(cache_key, tenant_id=tenant_id)
+                await self.cache.delete(cache_key, tenant_id=tenant_id)
                 count += 1
             except Exception as e:
                 logger.warning(f"Error invalidating KV cache: {str(e)}")
@@ -265,14 +265,14 @@ class KVCacheManager:
             del self._memory_cache[key]
         return len(keys_to_delete)
 
-    def invalidate_kv_cache(
+    async def invalidate_kv_cache(
         self,
         cache_key: Optional[str] = None,
         model: Optional[str] = None,
         tenant_id: Optional[str] = None,
     ) -> int:
         """
-        Invalidate KV cache entries.
+        Invalidate KV cache entries asynchronously.
         
         Args:
             cache_key (Optional[str]): Input parameter for this operation.
@@ -283,7 +283,7 @@ class KVCacheManager:
             int: Result of the operation.
         """
         if cache_key:
-            return self._invalidate_specific_key(cache_key, tenant_id)
+            return await self._invalidate_specific_key(cache_key, tenant_id)
 
         # Invalidate all matching entries
         keys_to_delete = self._get_keys_to_invalidate(model)

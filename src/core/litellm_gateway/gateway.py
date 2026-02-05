@@ -498,7 +498,7 @@ class LiteLLMGateway:
 
         return f"gateway:generate:{model}:{key_hash}"
 
-    def record_feedback(
+    async def record_feedback(
         self,
         query: str,
         response: str,
@@ -507,7 +507,7 @@ class LiteLLMGateway:
         tenant_id: Optional[str] = None,
     ) -> Optional[str]:
         """
-        Record feedback for continuous learning.
+        Record feedback for continuous learning asynchronously.
         
         Args:
             query (str): Input parameter for this operation.
@@ -522,7 +522,7 @@ class LiteLLMGateway:
         if not self.feedback_loop:
             return None
 
-        return self.feedback_loop.record_feedback(
+        return await self.feedback_loop.record_feedback(
             query=query,
             response=response,
             feedback_type=feedback_type,
@@ -592,7 +592,7 @@ class LiteLLMGateway:
         else:
             return completion(model=model, messages=messages, stream=stream, **kwargs)
 
-    def generate(
+    async def generate(
         self,
         prompt: str,
         model: str = "gpt-4",
@@ -602,7 +602,7 @@ class LiteLLMGateway:
         **kwargs: Any,
     ) -> GenerateResponse:
         """
-        Generate text completion.
+        Generate text completion asynchronously.
         
         Args:
             prompt (str): Prompt text sent to the model.
@@ -619,7 +619,7 @@ class LiteLLMGateway:
             messages = [{"role": "user", "content": prompt}]
 
         # Check KV cache
-        kv_cache_key = self._check_kv_cache(prompt, model, messages, tenant_id)
+        kv_cache_key = await self._check_kv_cache(prompt, model, messages, tenant_id)
 
         # Execute generation
         response = self._execute_sync_generation(
@@ -644,15 +644,15 @@ class LiteLLMGateway:
 
         # Store KV cache
         if kv_cache_key:
-            self._store_kv_cache(kv_cache_key, prompt, model, tenant_id)
+            await self._store_kv_cache(kv_cache_key, prompt, model, tenant_id)
 
         return result
 
-    def _check_kv_cache(
+    async def _check_kv_cache(
         self, prompt: str, model: str, messages: List[Dict[str, Any]], tenant_id: Optional[str]
     ) -> Optional[str]:
         """
-        Check KV cache for prompt context.
+        Check KV cache for prompt context asynchronously.
         
         Args:
             prompt (str): Prompt text sent to the model.
@@ -669,12 +669,12 @@ class LiteLLMGateway:
         kv_cache_key = self.kv_cache.generate_cache_key(
             prompt=prompt, model=model, messages=messages
         )
-        cached_kv = self.kv_cache.get_kv_cache(kv_cache_key, tenant_id=tenant_id)
+        cached_kv = await self.kv_cache.get_kv_cache(kv_cache_key, tenant_id=tenant_id)
         if cached_kv:
             logger.debug(f"KV cache hit for prompt context: {kv_cache_key[:50]}...")
         return kv_cache_key
 
-    def _check_response_cache(
+    async def _check_response_cache(
         self,
         prompt: str,
         model: str,
@@ -684,7 +684,7 @@ class LiteLLMGateway:
         **kwargs: Any,
     ) -> Optional[GenerateResponse]:
         """
-        Check cache for existing response.
+        Check cache for existing response asynchronously.
         
         Args:
             prompt (str): Prompt text sent to the model.
@@ -703,7 +703,7 @@ class LiteLLMGateway:
         cache_key = self._generate_cache_key(
             prompt=prompt, model=model, messages=messages, tenant_id=tenant_id, **kwargs
         )
-        cached_response = self.cache.get(cache_key, tenant_id=tenant_id)
+        cached_response = await self.cache.get(cache_key, tenant_id=tenant_id)
         if not cached_response:
             return None
         
@@ -875,11 +875,11 @@ class LiteLLMGateway:
         
         return text, model_name, usage, finish_reason, raw_response
 
-    def _store_kv_cache(
+    async def _store_kv_cache(
         self, kv_cache_key: str, prompt: str, model: str, tenant_id: Optional[str]
     ) -> None:
         """
-        Store KV cache entry.
+        Store KV cache entry asynchronously.
         
         Args:
             kv_cache_key (str): Input parameter for this operation.
@@ -906,11 +906,11 @@ class LiteLLMGateway:
                     "timestamp": datetime.now().isoformat(),
                 },
             )
-            self.kv_cache.set_kv_cache(kv_entry, tenant_id=tenant_id)
+            await self.kv_cache.set_kv_cache(kv_entry, tenant_id=tenant_id)
         except Exception as e:
             logger.debug(f"Failed to store KV cache entry: {e}")
 
-    def _store_response_cache(
+    async def _store_response_cache(
         self,
         prompt: str,
         model: str,
@@ -925,7 +925,7 @@ class LiteLLMGateway:
         **kwargs: Any,
     ) -> None:
         """
-        Store response in cache.
+        Store response in cache asynchronously.
         
         Args:
             prompt (str): Prompt text sent to the model.
@@ -960,7 +960,7 @@ class LiteLLMGateway:
             "finish_reason": finish_reason,
             "raw_response": raw_response,
         }
-        self.cache.set(
+        await self.cache.set(
             cache_key,
             cache_data,
             tenant_id=tenant_id,
@@ -994,10 +994,10 @@ class LiteLLMGateway:
             messages = [{"role": "user", "content": prompt}]
 
         # Check KV cache
-        kv_cache_key = self._check_kv_cache(prompt, model, messages, tenant_id)
+        kv_cache_key = await self._check_kv_cache(prompt, model, messages, tenant_id)
 
         # Check response cache
-        cached_response = self._check_response_cache(
+        cached_response = await self._check_response_cache(
             prompt, model, messages, tenant_id, stream, **kwargs
         )
         if cached_response:
@@ -1056,7 +1056,7 @@ class LiteLLMGateway:
         status = status_list[0]
         if self.llmops:
             latency_ms = (time.time() - start_time) * 1000
-            self.llmops.log_operation(
+            await self.llmops.log_operation(
                 operation_type=LLMOperationType.COMPLETION,
                 model=model,
                 prompt_tokens=prompt_tokens[0],
@@ -1083,10 +1083,10 @@ class LiteLLMGateway:
 
         # Store KV cache
         if kv_cache_key:
-            self._store_kv_cache(kv_cache_key, prompt, model, tenant_id)
+            await self._store_kv_cache(kv_cache_key, prompt, model, tenant_id)
 
         # Store response cache
-        self._store_response_cache(
+        await self._store_response_cache(
             prompt=prompt,
             model=model,
             messages=messages,

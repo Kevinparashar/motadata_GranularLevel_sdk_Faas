@@ -22,9 +22,13 @@ class TestRAGMemoryIntegration:
     @pytest.fixture
     def mock_db(self):
         """Create mock database connection."""
-        with patch("src.core.postgresql_database.connection.psycopg2") as mock_psycopg2:
-            mock_conn = MagicMock()
-            mock_psycopg2.connect.return_value = mock_conn
+        with patch("src.core.postgresql_database.connection.asyncpg") as mock_asyncpg:
+            mock_pool = AsyncMock()
+            mock_conn = AsyncMock()
+            mock_pool.acquire.return_value.__aenter__.return_value = mock_conn
+            mock_pool.acquire.return_value.__aexit__.return_value = None
+            mock_asyncpg.create_pool.return_value = mock_pool
+
             db = DatabaseConnection(
                 DatabaseConfig(
                     host="localhost", port=5432, database="test", user="test", password="test"
@@ -70,7 +74,7 @@ class TestRAGMemoryIntegration:
     async def test_memory_retrieval_during_query(self, rag_with_memory):
         """Test that relevant memories are retrieved during query."""
         # Store some memories
-        rag_with_memory.memory.store(
+        await rag_with_memory.memory.store(
             content="Previous query about AI",
             memory_type=MemoryType.EPISODIC,
             metadata={"query": "What is AI?", "answer": "AI is..."},
@@ -99,7 +103,8 @@ class TestRAGMemoryIntegration:
     @pytest.mark.asyncio
     async def test_query_answer_stored_in_memory(self, rag_with_memory):
         """Test that query-answer pairs are stored in episodic memory."""
-        initial_size = len(rag_with_memory.memory.episodic_memory)
+        memory_stats = await rag_with_memory.memory.get_stats()
+        initial_size = memory_stats.get("episodic_count", 0)
 
         # Mock vector search
         with patch.object(rag_with_memory.vector_ops, "similarity_search") as mock_search:
@@ -113,14 +118,15 @@ class TestRAGMemoryIntegration:
             )
 
             # Memory should have stored the query-answer pair
-            final_size = len(rag_with_memory.memory.episodic_memory)
+            memory_stats = await rag_with_memory.memory.get_stats()
+            final_size = memory_stats.get("episodic_count", 0)
             assert final_size > initial_size
 
     @pytest.mark.asyncio
     async def test_memory_context_enhances_prompt(self, rag_with_memory):
         """Test that memory context enhances the prompt sent to LLM."""
         # Store relevant memories
-        rag_with_memory.memory.store(
+        await rag_with_memory.memory.store(
             content="User prefers technical explanations",
             memory_type=MemoryType.SEMANTIC,
             metadata={"preference": "technical"},

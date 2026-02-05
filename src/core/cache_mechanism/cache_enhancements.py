@@ -84,7 +84,7 @@ class CacheWarmer:
             func = self.config.warm_functions[self.config.warm_keys.index(key)]
             try:
                 value = await self._execute_function(func)
-                self.cache.set(key, value, tenant_id=tenant_id)
+                await self.cache.set(key, value, tenant_id=tenant_id)
                 self.warmed_keys.add(key)
             except Exception as e:
                 logger.warning(f"Failed to warm cache key {key}: {e}", exc_info=True)
@@ -104,7 +104,7 @@ class CacheWarmer:
             result = await self._execute_function(func)
             if isinstance(result, tuple) and len(result) == 2:
                 key, value = result
-                self.cache.set(key, value, tenant_id=tenant_id)
+                await self.cache.set(key, value, tenant_id=tenant_id)
                 self.warmed_keys.add(key)
         except Exception:
             pass
@@ -348,9 +348,9 @@ class CacheValidator:
                 return False
         return True
 
-    def validate_and_get(self, key: str, tenant_id: Optional[str] = None) -> Optional[Any]:
+    async def validate_and_get(self, key: str, tenant_id: Optional[str] = None) -> Optional[Any]:
         """
-        Get and validate a cached value.
+        Get and validate a cached value asynchronously.
         
         Args:
             key (str): Input parameter for this operation.
@@ -359,13 +359,13 @@ class CacheValidator:
         Returns:
             Optional[Any]: Result if available, else None.
         """
-        value = self.cache.get(key, tenant_id=tenant_id)
+        value = await self.cache.get(key, tenant_id=tenant_id)
         if value is None:
             return None
 
         if not self.validate(key, value, tenant_id):
             # Invalid, remove from cache
-            self.cache.delete(key, tenant_id=tenant_id)
+            await self.cache.delete(key, tenant_id=tenant_id)
             return None
 
         return value
@@ -484,22 +484,26 @@ def auto_cache(
     def decorator(func: Callable) -> Callable:
         async def async_wrapper(*args, **kwargs) -> Any:
             cache_key = _generate_cache_key(func.__name__, args, kwargs)
-            cached_value = cache.get(cache_key, tenant_id=tenant_id)
+            cached_value = await cache.get(cache_key, tenant_id=tenant_id)
             if cached_value is not None:
                 return cached_value
             
             result = await func(*args, **kwargs)
-            cache.set(cache_key, result, tenant_id=tenant_id, ttl=ttl)
+            await cache.set(cache_key, result, tenant_id=tenant_id, ttl=ttl)
             return result
 
         def sync_wrapper(*args, **kwargs) -> Any:
+            """Sync wrapper that runs async cache operations."""
             cache_key = _generate_cache_key(func.__name__, args, kwargs)
-            cached_value = cache.get(cache_key, tenant_id=tenant_id)
+            
+            # Run async cache operations in event loop
+            loop = asyncio.get_event_loop()
+            cached_value = loop.run_until_complete(cache.get(cache_key, tenant_id=tenant_id))
             if cached_value is not None:
                 return cached_value
             
             result = func(*args, **kwargs)
-            cache.set(cache_key, result, tenant_id=tenant_id, ttl=ttl)
+            loop.run_until_complete(cache.set(cache_key, result, tenant_id=tenant_id, ttl=ttl))
             return result
 
         if asyncio.iscoroutinefunction(func):

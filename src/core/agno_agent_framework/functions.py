@@ -575,12 +575,12 @@ def retry_on_failure(
     return decorator
 
 
-def save_agent_state(agent: Agent, file_path: Optional[str] = None) -> None:
+async def save_agent_state(agent: Agent, file_path: Optional[str] = None) -> None:
     """
-    Save agent state to disk for persistence (utility function).
+    Save agent state to disk for persistence asynchronously (utility function).
     
     Example:
-                            >>> save_agent_state(agent, "/tmp/agent_state.json")
+                            >>> await save_agent_state(agent, "/tmp/agent_state.json")
     
     Args:
         agent (Agent): Input parameter for this operation.
@@ -589,12 +589,12 @@ def save_agent_state(agent: Agent, file_path: Optional[str] = None) -> None:
     Returns:
         None: Result of the operation.
     """
-    agent.save_state(file_path)
+    await agent.save_state(file_path)
 
 
-def load_agent_state(file_path: str, gateway: GatewayProtocol) -> Agent:
+async def load_agent_state(file_path: str, gateway: GatewayProtocol) -> Agent:
     """
-    Load agent state from disk (utility function).
+    Load agent state from disk asynchronously (utility function).
 
     Args:
         file_path: Path to saved state file
@@ -604,9 +604,9 @@ def load_agent_state(file_path: str, gateway: GatewayProtocol) -> Agent:
         Restored Agent instance
 
     Example:
-        >>> agent = load_agent_state("/tmp/agent_state.json", gateway)
+        >>> agent = await load_agent_state("/tmp/agent_state.json", gateway)
     """
-    return Agent.load_state(file_path, gateway)
+    return await Agent.load_state(file_path, gateway)
 
 
 __all__ = [

@@ -145,16 +145,17 @@ class TestConvenienceFunctions:
         assert chunks[0] == "Hello "
         assert chunks[1] == "World"
 
-    def test_generate_embeddings(self, mock_gateway):
+    @pytest.mark.asyncio
+    async def test_generate_embeddings(self, mock_gateway):
         """Test generate_embeddings convenience function."""
         texts = ["Hello", "World"]
-        embeddings = generate_embeddings(
+        embeddings = await generate_embeddings(
             gateway=mock_gateway, texts=texts, model="text-embedding-3-small"
         )
 
         assert len(embeddings) == 2
         assert len(embeddings[0]) == 1536
-        mock_gateway.generate_embeddings.assert_called_once()
+        mock_gateway.generate_embeddings_async.assert_called_once()
 
     @pytest.mark.asyncio
     async def test_generate_embeddings_async(self, mock_gateway):
