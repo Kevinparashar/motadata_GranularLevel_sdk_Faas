@@ -56,7 +56,7 @@ class CacheService:
         self.codec_manager = codec_manager or create_codec_manager()
 
         # Cache instances are created on-demand per request (stateless)
-        # CacheMechanism itself uses Redis/memory backend, so instances are lightweight
+        # CacheMechanism itself uses Dragonfly/memory backend, so instances are lightweight
 
         # Create FastAPI app
         self.app = FastAPI(
@@ -82,10 +82,10 @@ class CacheService:
             CacheMechanism: Result of the operation.
         """
         # Create cache on-demand (stateless)
-        # CacheMechanism uses Redis/memory backend, so instances are lightweight
+        # CacheMechanism uses Dragonfly/memory backend, so instances are lightweight
         cache = create_cache(
-            backend="redis" if self.config.redis_url else "memory",
-            redis_url=self.config.redis_url,
+            backend="dragonfly" if self.config.dragonfly_url else "memory",
+            dragonfly_url=self.config.dragonfly_url,
             namespace=f"cache_{tenant_id}",
         )
         return cache

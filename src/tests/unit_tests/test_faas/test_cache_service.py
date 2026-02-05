@@ -29,7 +29,7 @@ def mock_config():
         data_ingestion_service_url=None,
         prompt_generator_service_url=None,
         llmops_service_url=None,
-        redis_url="redis://localhost:6379",
+        dragonfly_url="dragonfly://localhost:6379/0",
         nats_url=None,
         otel_exporter_otlp_endpoint=None,
         enable_nats=False,
@@ -52,7 +52,7 @@ def cache_service(mock_config):
         service = create_cache_service(
             service_name="cache-service",
             config_overrides={
-                "redis_url": "redis://localhost:6379",
+                "dragonfly_url": "dragonfly://localhost:6379/0",
             },
         )
         

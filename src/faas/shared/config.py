@@ -34,7 +34,7 @@ class ServiceConfig(BaseModel):
 
     # Database
     database_url: str = Field(..., description="Database connection URL")
-    redis_url: Optional[str] = Field(None, description="Redis connection URL")
+    dragonfly_url: Optional[str] = Field(None, description="Dragonfly connection URL (Redis-compatible)")
 
     # Integrations
     nats_url: Optional[str] = Field(None, description="NATS server URL")
@@ -86,7 +86,7 @@ def load_config(service_name: str, **overrides: Any) -> ServiceConfig:
         "prompt_generator_service_url": os.getenv("PROMPT_GENERATOR_SERVICE_URL"),
         "llmops_service_url": os.getenv("LLMOPS_SERVICE_URL"),
         "database_url": os.getenv("DATABASE_URL", "postgresql://user:pass@localhost/db"),
-        "redis_url": os.getenv("REDIS_URL"),
+        "dragonfly_url": os.getenv("DRAGONFLY_URL"),
         "nats_url": os.getenv("NATS_URL"),
         "otel_exporter_otlp_endpoint": os.getenv("OTEL_EXPORTER_OTLP_ENDPOINT"),
         "codec_type": os.getenv("CODEC_TYPE", "json"),

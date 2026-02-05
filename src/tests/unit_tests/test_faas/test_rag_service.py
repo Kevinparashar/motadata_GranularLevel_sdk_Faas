@@ -29,7 +29,7 @@ def mock_config():
         data_ingestion_service_url=None,
         prompt_generator_service_url=None,
         llmops_service_url=None,
-        redis_url=None,
+        dragonfly_url=None,
         nats_url=None,
         otel_exporter_otlp_endpoint=None,
         enable_nats=False,
