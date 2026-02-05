@@ -63,9 +63,9 @@ class Tool(BaseModel):
     class Config:
         arbitrary_types_allowed = True
 
-    def execute(self, **kwargs: Any) -> Any:
+    async def execute(self, **kwargs: Any) -> Any:
         """
-        Execute the tool.
+        Execute the tool asynchronously.
         
         Args:
             **kwargs (Any): Input parameter for this operation.
@@ -78,6 +78,8 @@ class Tool(BaseModel):
             ToolNotImplementedError: Raised when this function detects an invalid state or when an underlying call fails.
             ToolValidationError: Raised when this function detects an invalid state or when an underlying call fails.
         """
+        import asyncio
+        
         if self.function is None:
             raise ToolNotImplementedError(self.name)
 
@@ -90,13 +92,17 @@ class Tool(BaseModel):
                 tool_name=self.name,
                 missing_parameters=[str(e)],
                 original_error=e,
-            )
+            ) from e
 
-        # Execute function
+        # Execute function (async or sync)
         try:
-            return self.function(**kwargs)
+            if asyncio.iscoroutinefunction(self.function):
+                return await self.function(**kwargs)
+            else:
+                # Run sync function in executor to avoid blocking
+                loop = asyncio.get_event_loop()
+                return await loop.run_in_executor(None, lambda: self.function(**kwargs))
         except ToolInvocationError:
-            # Re-raise tool invocation errors as-is
             raise
         except Exception as e:
             raise ToolInvocationError(
@@ -105,7 +111,7 @@ class Tool(BaseModel):
                 arguments=kwargs,
                 error_type="runtime",
                 original_error=e,
-            )
+            ) from e
 
     def _validate_parameters(self, provided: Dict[str, Any]) -> None:
         """
@@ -335,9 +341,9 @@ class ToolExecutor:
         """
         self.registry = registry
 
-    def execute_tool_call(self, tool_name: str, arguments: Dict[str, Any]) -> Any:
+    async def execute_tool_call(self, tool_name: str, arguments: Dict[str, Any]) -> Any:
         """
-        Execute a tool call.
+        Execute a tool call asynchronously.
         
         Args:
             tool_name (str): Input parameter for this operation.
@@ -354,4 +360,4 @@ class ToolExecutor:
         if tool is None:
             raise ToolNotFoundError(tool_name)
 
-        return tool.execute(**arguments)
+        return await tool.execute(**arguments)

@@ -171,7 +171,7 @@ class DataIngestionService:
             ingestion_service = self._get_ingestion_service(standard_headers.tenant_id)
 
             # Process file
-            result = ingestion_service.upload_and_process(
+            result = await ingestion_service.upload_and_process(
                 file_path=temp_path,
                 title=title or file.filename,
                 metadata=metadata_dict,
@@ -295,7 +295,7 @@ class DataIngestionService:
         }
         await self.nats_client.publish(
             f"ingestion.events.{tenant_id}",
-            self.codec_manager.encode(event),
+            await self.codec_manager.encode(event),
         )
 
     async def _handle_get_file(self, file_id: str, headers: dict = Header(...)):  # noqa: S7503

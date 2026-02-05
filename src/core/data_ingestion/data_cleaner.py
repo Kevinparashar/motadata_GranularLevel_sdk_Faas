@@ -36,9 +36,9 @@ class DataCleaner:
         self.remove_control_chars = remove_control_chars
         self.normalize_line_endings = normalize_line_endings
 
-    def clean(self, content: str, metadata: Optional[Dict[str, Any]] = None) -> str:
+    async def clean(self, content: str, metadata: Optional[Dict[str, Any]] = None) -> str:
         """
-        Clean content.
+        Clean content asynchronously.
         
         Args:
             content (str): Content text.
@@ -47,33 +47,41 @@ class DataCleaner:
         Returns:
             str: Returned text value.
         """
+        import asyncio
+        
         if not content:
             return content
 
-        # Normalize line endings
-        if self.normalize_line_endings:
-            content = content.replace("\r\n", "\n").replace("\r", "\n")
+        # Run CPU-intensive operations in thread pool to prevent blocking
+        def _clean_sync() -> str:
+            result = content
+            
+            # Normalize line endings
+            if self.normalize_line_endings:
+                result = result.replace("\r\n", "\n").replace("\r", "\n")
 
-        # Remove control characters
-        if self.remove_control_chars:
-            content = str(re.sub(r"[\x00-\x1f\x7f-\x9f]", "", content))
+            # Remove control characters
+            if self.remove_control_chars:
+                result = str(re.sub(r"[\x00-\x1f\x7f-\x9f]", "", result))
 
-        # Normalize unicode
-        if self.normalize_unicode:
-            try:
-                import unicodedata
+            # Normalize unicode
+            if self.normalize_unicode:
+                try:
+                    import unicodedata
+                    result = unicodedata.normalize("NFKD", result)
+                except ImportError:
+                    pass  # Skip if unicodedata not available
 
-                content = unicodedata.normalize("NFKD", content)
-            except ImportError:
-                pass  # Skip if unicodedata not available
+            # Remove extra whitespace
+            if self.remove_extra_whitespace:
+                # Replace multiple spaces with single space
+                result = str(re.sub(r" +", " ", result))
+                # Replace multiple newlines with double newline
+                result = str(re.sub(r"\n{3,}", "\n\n", result))
+                # Strip leading/trailing whitespace
+                result = result.strip()
 
-        # Remove extra whitespace
-        if self.remove_extra_whitespace:
-            # Replace multiple spaces with single space
-            content = str(re.sub(r" +", " ", content))
-            # Replace multiple newlines with double newline
-            content = str(re.sub(r"\n{3,}", "\n\n", content))
-            # Strip leading/trailing whitespace
-            content = content.strip()
-
-        return content
+            return result
+        
+        # Run in thread pool to avoid blocking the event loop
+        return await asyncio.to_thread(_clean_sync)

@@ -266,9 +266,9 @@ def configure_gateway(
 # ============================================================================
 
 
-def generate_text(gateway: LiteLLMGateway, prompt: str, model: str = "gpt-4", **kwargs: Any) -> str:
+async def generate_text(gateway: LiteLLMGateway, prompt: str, model: str = "gpt-4", **kwargs: Any) -> str:
     """
-    Generate text with simplified interface (high-level convenience).
+    Generate text asynchronously with simplified interface (high-level convenience).
 
     Args:
         gateway: LiteLLMGateway instance
@@ -280,10 +280,10 @@ def generate_text(gateway: LiteLLMGateway, prompt: str, model: str = "gpt-4", **
         Generated text
 
     Example:
-        >>> text = generate_text(gateway, "What is AI?", model="gpt-4")
+        >>> text = await generate_text(gateway, "What is AI?", model="gpt-4")
         >>> print(text)
     """
-    response = gateway.generate(prompt=prompt, model=model, **kwargs)
+    response = await gateway.generate_async(prompt=prompt, model=model, **kwargs)
     return response.text
 
 
@@ -291,7 +291,7 @@ async def generate_text_async(
     gateway: LiteLLMGateway, prompt: str, model: str = "gpt-4", **kwargs: Any
 ) -> str:
     """
-    Generate text asynchronously with simplified interface.
+    Generate text asynchronously with simplified interface (alias for generate_text).
 
     Args:
         gateway: LiteLLMGateway instance
@@ -305,8 +305,8 @@ async def generate_text_async(
     Example:
         >>> text = await generate_text_async(gateway, "What is AI?")
     """
-    response = await gateway.generate_async(prompt=prompt, model=model, **kwargs)
-    return response.text
+    # Delegate to the main async function
+    return await generate_text(gateway, prompt, model, **kwargs)
 
 
 async def stream_text(
@@ -349,11 +349,11 @@ async def stream_text(
                 yield delta.content
 
 
-def generate_embeddings(
+async def generate_embeddings(
     gateway: LiteLLMGateway, texts: List[str], model: str = "text-embedding-3-small", **kwargs: Any
 ) -> List[List[float]]:
     """
-    Generate embeddings with simplified interface (high-level convenience).
+    Generate embeddings asynchronously with simplified interface (high-level convenience).
 
     Args:
         gateway: LiteLLMGateway instance
@@ -365,13 +365,13 @@ def generate_embeddings(
         List of embedding vectors
 
     Example:
-        >>> embeddings = generate_embeddings(
+        >>> embeddings = await generate_embeddings(
         ...     gateway,
         ...     ["Hello", "World"],
         ...     model="text-embedding-3-small"
         ... )
     """
-    response = gateway.embed(texts=texts, model=model, **kwargs)
+    response = await gateway.embed_async(texts=texts, model=model, **kwargs)
     return response.embeddings
 
 
@@ -379,7 +379,7 @@ async def generate_embeddings_async(
     gateway: LiteLLMGateway, texts: List[str], model: str = "text-embedding-3-small", **kwargs: Any
 ) -> List[List[float]]:
     """
-    Generate embeddings asynchronously with simplified interface.
+    Generate embeddings asynchronously with simplified interface (alias for generate_embeddings).
 
     Args:
         gateway: LiteLLMGateway instance
@@ -396,8 +396,8 @@ async def generate_embeddings_async(
         ...     ["Hello", "World"]
         ... )
     """
-    response = await gateway.embed_async(texts=texts, model=model, **kwargs)
-    return response.embeddings
+    # Delegate to the main async function
+    return await generate_embeddings(gateway, texts, model, **kwargs)
 
 
 # ============================================================================

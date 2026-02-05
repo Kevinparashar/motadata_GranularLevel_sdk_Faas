@@ -156,7 +156,7 @@ class AgentService:
                 agent.add_capability(capability, f"Capability: {capability}")
 
             # Store agent in database (stateless)
-            self.agent_storage.save_agent(agent, standard_headers.tenant_id)
+            await self.agent_storage.save_agent(agent, standard_headers.tenant_id)
 
             # Publish event via NATS (if enabled)
             if self.nats_client:
@@ -167,7 +167,7 @@ class AgentService:
                 }
                 await self.nats_client.publish(
                     f"agent.events.{standard_headers.tenant_id}",
-                    self.codec_manager.encode(event),
+                    await self.codec_manager.encode(event),
                 )
 
             return ServiceResponse(
@@ -209,7 +209,7 @@ class AgentService:
 
         # Load agent from database (stateless)
         gateway = self._get_gateway_client(standard_headers.tenant_id)
-        agent = self.agent_storage.load_agent(agent_id, standard_headers.tenant_id, gateway)
+        agent = await self.agent_storage.load_agent(agent_id, standard_headers.tenant_id, gateway)
         if not agent:
             raise NotFoundError("agent", agent_id)
 
@@ -248,7 +248,7 @@ class AgentService:
 
         # Load agent from database (stateless)
         gateway = self._get_gateway_client(standard_headers.tenant_id)
-        agent = self.agent_storage.load_agent(agent_id, standard_headers.tenant_id, gateway)
+        agent = await self.agent_storage.load_agent(agent_id, standard_headers.tenant_id, gateway)
         if not agent:
             raise NotFoundError("agent", agent_id)
 
@@ -301,7 +301,7 @@ class AgentService:
 
         # Load agent from database (stateless)
         gateway = self._get_gateway_client(standard_headers.tenant_id)
-        agent = self.agent_storage.load_agent(agent_id, standard_headers.tenant_id, gateway)
+        agent = await self.agent_storage.load_agent(agent_id, standard_headers.tenant_id, gateway)
         if not agent:
             raise NotFoundError("agent", agent_id)
 
@@ -348,7 +348,7 @@ class AgentService:
         standard_headers = extract_headers(**headers)
 
         # Load agents from database (stateless)
-        agents = self.agent_storage.list_agents(
+        agents = await self.agent_storage.list_agents(
             standard_headers.tenant_id, limit=limit, offset=offset
         )
 
@@ -419,12 +419,33 @@ def create_agent_service(
     config = load_config(service_name, **(config_overrides or {}))
 
     # Get database connection (direct connection for stateless services)
+    import asyncio
     from ....core.postgresql_database.connection import DatabaseConfig, DatabaseConnection
 
     # Parse database URL and create connection
     db_config = DatabaseConfig.from_env()
     db_connection = DatabaseConnection(db_config)
-    db_connection.connect()
+    
+    # Connect to database (async method called from sync factory function)
+    # This factory is typically called at startup before event loop is running
+    try:
+        # Try to get existing event loop
+        loop = asyncio.get_event_loop()
+        if loop.is_running():
+            # If loop is running, we can't use run_until_complete
+            # Connection will be established on first async operation
+            import warnings
+            warnings.warn(
+                "Database connection called from running event loop. "
+                "Connection will be established on first use.",
+                RuntimeWarning
+            )
+        else:
+            # Use existing loop
+            loop.run_until_complete(db_connection.connect())
+    except RuntimeError:
+        # No event loop exists, create a new one
+        asyncio.run(db_connection.connect())
 
     # Initialize integrations
     nats_client = create_nats_client() if config.enable_nats else None

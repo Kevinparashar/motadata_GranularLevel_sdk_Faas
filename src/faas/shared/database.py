@@ -53,19 +53,30 @@ class DatabaseManager:
         """
         Get database connection (creates if not exists).
         
+        Note: Connection pool is created lazily on first use via execute_query().
+        This method only creates the DatabaseConnection instance.
+        
         Returns:
             DatabaseConnection instance
         """
         if self._connection is None:
             config = _parse_database_url(self.database_url)
             self._connection = DatabaseConnection(config)
-            self._connection.connect()
+            # Connection pool will be created lazily on first async operation
+            # via DatabaseConnection.execute_query() which calls connect() if needed
         return self._connection
 
-    def close(self):
-        """Close database connection."""
+    async def close(self):
+        """
+        Close database connection.
+        
+        Note: This should be called from an async context (e.g., FastAPI shutdown event).
+        
+        Returns:
+            None: Result of the operation.
+        """
         if self._connection:
-            self._connection.close()
+            await self._connection.close()
             self._connection = None
 
 

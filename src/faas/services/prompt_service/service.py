@@ -76,6 +76,13 @@ class PromptService:
         # Setup middleware
         setup_middleware(self.app)
 
+        # Register startup event to ensure database connection is ready
+        @self.app.on_event("startup")
+        async def startup_event():
+            """Ensure database connection is ready on service startup."""
+            if hasattr(self.db, "connect"):
+                await self.db.connect()
+
         # Register routes
         self._register_routes()
 
@@ -203,7 +210,7 @@ class PromptService:
         }
         await self.nats_client.publish(
             f"prompt.events.{tenant_id}",
-            self.codec_manager.encode(event),
+            await self.codec_manager.encode(event),
         )
 
     async def _handle_get_template(  # noqa: S7503

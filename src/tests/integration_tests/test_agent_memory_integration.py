@@ -57,11 +57,12 @@ class TestAgentMemoryIntegration:
         assert agent_with_memory.memory is not None
         assert isinstance(agent_with_memory.memory, AgentMemory)
 
-    def test_memory_store_and_retrieve(self, agent_with_memory):
+    @pytest.mark.asyncio
+    async def test_memory_store_and_retrieve(self, agent_with_memory):
         """Test basic memory store and retrieve operations."""
         assert agent_with_memory.memory is not None
-        agent_with_memory.memory.store(content="Test memory", memory_type=MemoryType.EPISODIC)
-        memories = agent_with_memory.memory.retrieve(
+        await agent_with_memory.memory.store(content="Test memory", memory_type=MemoryType.EPISODIC)
+        memories = await agent_with_memory.memory.retrieve(
             query="Test", memory_type=MemoryType.EPISODIC, limit=10
         )
         assert len(memories) > 0
@@ -71,7 +72,7 @@ class TestAgentMemoryIntegration:
         """Test that agent stores memories during task execution."""
         assert agent_with_memory.memory is not None
         # Get initial episodic memory count
-        initial_memories = agent_with_memory.memory.retrieve(
+        initial_memories = await agent_with_memory.memory.retrieve(
             memory_type=MemoryType.EPISODIC, limit=1000
         )
         initial_size = len(initial_memories)
@@ -82,7 +83,7 @@ class TestAgentMemoryIntegration:
         await agent_with_memory.execute_task(task, tenant_id="test_tenant")
 
         # Memory should have stored task information
-        final_memories = agent_with_memory.memory.retrieve(
+        final_memories = await agent_with_memory.memory.retrieve(
             memory_type=MemoryType.EPISODIC, limit=1000
         )
         final_size = len(final_memories)
@@ -93,7 +94,7 @@ class TestAgentMemoryIntegration:
         """Test that agent retrieves relevant memories for context."""
         assert agent_with_memory.memory is not None
         # Store some memories
-        agent_with_memory.memory.store(
+        await agent_with_memory.memory.store(
             content="Previous task about AI",
             memory_type=MemoryType.EPISODIC,
             metadata={"task": "ai_query"},
@@ -121,7 +122,8 @@ class TestAgentMemoryIntegration:
             # Memory should have been retrieved for context
             mock_retrieve.assert_called()
 
-    def test_session_memory_isolation(self, mock_gateway):
+    @pytest.mark.asyncio
+    async def test_session_memory_isolation(self, mock_gateway):
         """Test that different sessions have isolated memories."""
         agent1 = Agent(agent_id="agent_1", name="Agent 1", gateway=mock_gateway)
         agent1.attach_memory(max_episodic=100)
@@ -132,10 +134,10 @@ class TestAgentMemoryIntegration:
         assert agent2.memory is not None
 
         # Store memory in agent1
-        agent1.memory.store(content="Agent 1 memory", memory_type=MemoryType.EPISODIC)
+        await agent1.memory.store(content="Agent 1 memory", memory_type=MemoryType.EPISODIC)
 
         # Agent2 should not have this memory
-        memories = agent2.memory.retrieve(query="Agent 1", memory_type=MemoryType.EPISODIC, limit=5)
+        memories = await agent2.memory.retrieve(query="Agent 1", memory_type=MemoryType.EPISODIC, limit=5)
         assert len(memories) == 0
 
     @pytest.mark.asyncio
@@ -149,10 +151,10 @@ class TestAgentMemoryIntegration:
         assert agent.memory is not None
         # Store more memories than max
         for i in range(max_episodic + 5):
-            agent.memory.store(content=f"Memory {i}", memory_type=MemoryType.EPISODIC)
+            await agent.memory.store(content=f"Memory {i}", memory_type=MemoryType.EPISODIC)
 
         # Memory should be bounded - check by retrieving all episodic memories
-        episodic_memories = agent.memory.retrieve(memory_type=MemoryType.EPISODIC, limit=1000)
+        episodic_memories = await agent.memory.retrieve(memory_type=MemoryType.EPISODIC, limit=1000)
         assert len(episodic_memories) <= max_episodic
 
     @pytest.mark.asyncio
@@ -160,35 +162,36 @@ class TestAgentMemoryIntegration:
         """Test that expired memories are cleaned up."""
         assert agent_with_memory.memory is not None
         # Store memory with short age
-        agent_with_memory.memory.store(
+        await agent_with_memory.memory.store(
             content="Temporary memory",
             memory_type=MemoryType.EPISODIC,
             metadata={"created_at": "2020-01-01"},  # Old date
         )
 
         # Cleanup expired memories
-        agent_with_memory.memory.cleanup_expired(max_age_days=30)
+        await agent_with_memory.memory.cleanup_expired(max_age_days=30)
 
         # Expired memory should be removed
-        memories = agent_with_memory.memory.retrieve(
+        memories = await agent_with_memory.memory.retrieve(
             query="Temporary", memory_type=MemoryType.EPISODIC, limit=10
         )
         assert len(memories) == 0
 
-    def test_memory_types_separation(self, agent_with_memory):
+    @pytest.mark.asyncio
+    async def test_memory_types_separation(self, agent_with_memory):
         """Test that different memory types are stored separately."""
         assert agent_with_memory.memory is not None
         # Store episodic memory
-        agent_with_memory.memory.store(content="Episodic memory", memory_type=MemoryType.EPISODIC)
+        await agent_with_memory.memory.store(content="Episodic memory", memory_type=MemoryType.EPISODIC)
 
         # Store semantic memory
-        agent_with_memory.memory.store(content="Semantic memory", memory_type=MemoryType.SEMANTIC)
+        await agent_with_memory.memory.store(content="Semantic memory", memory_type=MemoryType.SEMANTIC)
 
         # Retrieve each type separately
-        episodic = agent_with_memory.memory.retrieve(
+        episodic = await agent_with_memory.memory.retrieve(
             query="Episodic", memory_type=MemoryType.EPISODIC, limit=10
         )
-        semantic = agent_with_memory.memory.retrieve(
+        semantic = await agent_with_memory.memory.retrieve(
             query="Semantic", memory_type=MemoryType.SEMANTIC, limit=10
         )
 

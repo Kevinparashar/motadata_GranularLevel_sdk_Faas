@@ -135,20 +135,22 @@ class TestAgentSession:
 class TestAgentMemory:
     """Test AgentMemory."""
 
-    def test_store_memory(self):
+    @pytest.mark.asyncio
+    async def test_store_memory(self):
         """Test storing memory."""
         memory = AgentMemory(agent_id="agent-001")
-        memory.store(content="User likes Python", memory_type=MemoryType.SHORT_TERM, importance=0.7)
+        await memory.store(content="User likes Python", memory_type=MemoryType.SHORT_TERM, importance=0.7)
 
-        memories = memory.retrieve(query="Python", limit=5)
+        memories = await memory.retrieve(query="Python", limit=5)
         assert len(memories) >= 1
 
-    def test_retrieve_memory(self):
+    @pytest.mark.asyncio
+    async def test_retrieve_memory(self):
         """Test retrieving memory."""
         memory = AgentMemory(agent_id="agent-001")
-        memory.store("Test memory", MemoryType.LONG_TERM, 0.9)
+        await memory.store("Test memory", MemoryType.LONG_TERM, 0.9)
 
-        memories = memory.retrieve(query="Test", limit=5)
+        memories = await memory.retrieve(query="Test", limit=5)
         assert len(memories) >= 1
 
 

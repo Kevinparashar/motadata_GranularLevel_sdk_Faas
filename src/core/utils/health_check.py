@@ -142,7 +142,8 @@ class HealthCheck:
             if asyncio.iscoroutinefunction(check_func):
                 result = await check_func()
             else:
-                result = check_func()
+                # Run sync function in thread pool to avoid blocking event loop
+                result = await asyncio.to_thread(check_func)
             return _normalize_check_result(result)
         except Exception as e:
             return _create_error_result(e)
@@ -158,8 +159,13 @@ class HealthCheck:
 
         start_time = time.time()
 
-        # Run all check functions
-        results = [await self._run_single_check(check_func) for check_func in self._check_functions]
+        # Run all check functions in parallel for better performance
+        if self._check_functions:
+            results = await asyncio.gather(
+                *[self._run_single_check(check_func) for check_func in self._check_functions]
+            )
+        else:
+            results = []
 
         # Determine overall status
         status, message = _determine_overall_status(results)

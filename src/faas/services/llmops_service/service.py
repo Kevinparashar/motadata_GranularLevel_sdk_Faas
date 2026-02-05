@@ -72,14 +72,20 @@ class LLMOpsService:
         # Setup middleware
         setup_middleware(self.app)
 
+        # Register startup event to initialize LLMOps
+        @self.app.on_event("startup")
+        async def startup_event():
+            """Initialize LLMOps on service startup."""
+            await self.llmops.initialize()
+
         # Register routes
         self._register_routes()
 
-    def _handle_log_operation(
+    async def _handle_log_operation(
         self, request: LogOperationRequest, standard_headers: Any
     ) -> ServiceResponse:
         """
-        Handle log operation business logic.
+        Handle log operation business logic asynchronously.
         
         Args:
             request (LogOperationRequest): Request payload object.
@@ -88,7 +94,7 @@ class LLMOpsService:
         Returns:
             ServiceResponse: Result of the operation.
         """
-        operation_id = self.llmops.log_operation(
+        operation_id = await self.llmops.log_operation(
             operation_type=LLMOperationType(request.operation_type.value),
             model=request.model,
             prompt_tokens=request.prompt_tokens,
@@ -385,7 +391,7 @@ class LLMOpsService:
         """
         standard_headers = extract_headers(**headers)
         try:
-            return self._handle_log_operation(request, standard_headers)
+            return await self._handle_log_operation(request, standard_headers)
         except Exception as e:
             logger.error(f"Error logging operation: {e}", exc_info=True)
             raise HTTPException(

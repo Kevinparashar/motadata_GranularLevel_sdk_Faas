@@ -141,7 +141,7 @@ class CacheService:
             cache = self._get_cache(standard_headers.tenant_id)
 
             # Get value
-            value = cache.get(key, tenant_id=standard_headers.tenant_id)
+            value = await cache.get(key, tenant_id=standard_headers.tenant_id)
 
             if value is None:
                 return ServiceResponse(
@@ -194,7 +194,7 @@ class CacheService:
             cache = self._get_cache(standard_headers.tenant_id)
 
             # Set value
-            cache.set(
+            await cache.set(
                 key=request.key,
                 value=request.value,
                 ttl=request.ttl,
@@ -210,7 +210,7 @@ class CacheService:
                 }
                 await self.nats_client.publish(
                     f"cache.events.{standard_headers.tenant_id}",
-                    self.codec_manager.encode(event),
+                    await self.codec_manager.encode(event),
                 )
 
             return ServiceResponse(
@@ -251,7 +251,7 @@ class CacheService:
             cache = self._get_cache(standard_headers.tenant_id)
 
             # Delete value
-            cache.delete(key, tenant_id=standard_headers.tenant_id)
+            await cache.delete(key, tenant_id=standard_headers.tenant_id)
 
             return None
         except Exception as e:
@@ -286,10 +286,10 @@ class CacheService:
 
             # Invalidate by pattern
             if request.pattern:
-                cache.invalidate_pattern(request.pattern, tenant_id=tenant_id)
+                await cache.invalidate_pattern(request.pattern, tenant_id=tenant_id)
             else:
                 # Clear all cache for tenant by invalidating all patterns
-                cache.invalidate_pattern("*", tenant_id=tenant_id)
+                await cache.invalidate_pattern("*", tenant_id=tenant_id)
 
             return ServiceResponse(
                 success=True,
@@ -328,7 +328,7 @@ class CacheService:
             cache = self._get_cache(tenant_id)
 
             # Clear cache by invalidating all patterns
-            cache.invalidate_pattern("*", tenant_id=tenant_id)
+            await cache.invalidate_pattern("*", tenant_id=tenant_id)
 
             return None
         except Exception as e:

@@ -7,7 +7,7 @@ Measures query performance and vector search speed.
 
 import time
 from typing import Dict, List
-from unittest.mock import MagicMock, patch
+from unittest.mock import AsyncMock, patch
 
 import pytest
 
@@ -51,18 +51,19 @@ class TestDatabaseBenchmarks:
     @pytest.fixture
     def mock_db(self):
         """Mock database connection."""
-        with patch("src.core.postgresql_database.connection.psycopg2") as mock_psycopg2:
-            mock_conn = MagicMock()
-            mock_cursor = MagicMock()
-            mock_conn.cursor.return_value = mock_cursor
-            mock_psycopg2.connect.return_value = mock_conn
+        with patch("src.core.postgresql_database.connection.asyncpg") as mock_asyncpg:
+            mock_pool = AsyncMock()
+            mock_conn = AsyncMock()
+            mock_pool.acquire.return_value.__aenter__.return_value = mock_conn
+            mock_pool.acquire.return_value.__aexit__.return_value = None
+            mock_asyncpg.create_pool.return_value = mock_pool
 
             db = DatabaseConnection(
                 DatabaseConfig(
                     host="localhost", port=5432, database="test", user="test", password="test"
                 )
             )
-            return db, mock_cursor
+            return db, mock_conn
 
     @pytest.fixture
     def vector_ops(self, mock_db):
@@ -70,19 +71,19 @@ class TestDatabaseBenchmarks:
         db, _ = mock_db
         return VectorOperations(db)
 
-    def test_query_latency(self, mock_db):
+    @pytest.mark.asyncio
+    async def test_query_latency(self, mock_db):
         """Benchmark query execution latency."""
-        db, mock_cursor = mock_db
+        db, mock_conn = mock_db
         benchmark = BenchmarkDatabase()
         iterations = 100
 
         # Mock query results
-        mock_cursor.fetchall.return_value = [("result",)]
-        mock_cursor.fetchone.return_value = ("result",)
+        mock_conn.fetch.return_value = [("result",)]
 
         for i in range(iterations):
             start = time.time()
-            db.execute_query(f"SELECT * FROM test WHERE id = {i}")
+            await db.execute_query("SELECT * FROM test WHERE id = $1", (i,))
             latency = time.time() - start
             benchmark.record_latency("query", latency)
 
@@ -92,7 +93,8 @@ class TestDatabaseBenchmarks:
         assert stats["count"] == iterations
         assert stats["avg"] < 0.1  # Should be very fast (mocked)
 
-    def test_vector_search_speed(self, vector_ops):
+    @pytest.mark.asyncio
+    async def test_vector_search_speed(self, vector_ops):
         """Benchmark vector similarity search speed."""
         benchmark = BenchmarkDatabase()
         iterations = 50
@@ -108,7 +110,7 @@ class TestDatabaseBenchmarks:
 
             for _ in range(iterations):
                 start = time.time()
-                vector_ops.similarity_search(
+                await vector_ops.similarity_search(
                     query_vector=query_vector, top_k=5, threshold=0.7, tenant_id="benchmark_tenant"
                 )
                 latency = time.time() - start
@@ -120,7 +122,8 @@ class TestDatabaseBenchmarks:
         assert stats["count"] == iterations
         assert stats["avg"] < 0.1  # Should be fast (mocked)
 
-    def test_batch_insert_performance(self, mock_db):
+    @pytest.mark.asyncio
+    async def test_batch_insert_performance(self, mock_db):
         """Benchmark batch insert performance."""
         db, _ = mock_db
         benchmark = BenchmarkDatabase()
@@ -131,7 +134,7 @@ class TestDatabaseBenchmarks:
             start = time.time()
             # Simulate batch insert
             for i in range(batch_size):
-                db.execute_query(f"INSERT INTO test (id, data) VALUES ({i}, 'data')")
+                await db.execute_query("INSERT INTO test (id, data) VALUES ($1, $2)", (i, "data"))
             elapsed = time.time() - start
             throughput = batch_size / elapsed
 
@@ -144,7 +147,8 @@ class TestDatabaseBenchmarks:
         stats = benchmark.get_stats("batch_insert")
         assert stats["count"] == len(batch_sizes)
 
-    def test_connection_pool_performance(self, mock_db):
+    @pytest.mark.asyncio
+    async def test_connection_pool_performance(self, mock_db):
         """Benchmark connection pool performance."""
         db, _ = mock_db
         benchmark = BenchmarkDatabase()
@@ -154,7 +158,7 @@ class TestDatabaseBenchmarks:
         for _ in range(iterations):
             start = time.time()
             # Simulate getting connection from pool
-            with db.get_connection() as _:
+            async with db.get_connection() as _:
                 # Simulate query
                 pass
             latency = time.time() - start

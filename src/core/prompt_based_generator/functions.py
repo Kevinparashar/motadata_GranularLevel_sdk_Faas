@@ -182,7 +182,7 @@ async def create_tool_from_prompt(
         )
 
 
-def rate_agent(
+async def rate_agent(
     agent_id: str,
     rating: int,
     user_id: str,
@@ -193,7 +193,7 @@ def rate_agent(
     **kwargs: ConfigDict,
 ) -> str:
     """
-    Rate an agent and provide feedback.
+    Rate an agent and provide feedback asynchronously.
 
     Args:
         agent_id: Agent ID
@@ -209,7 +209,7 @@ def rate_agent(
         Feedback ID
 
     Example:
-        >>> rate_agent(
+        >>> await rate_agent(
         ...     agent_id="agent_123",
         ...     rating=5,
         ...     user_id="user_456",
@@ -219,7 +219,7 @@ def rate_agent(
     """
     collector = feedback_collector or _default_feedback_collector
 
-    return collector.collect_agent_feedback(
+    return await collector.collect_agent_feedback(
         agent_id=agent_id,
         rating=rating,
         user_id=user_id,
@@ -230,7 +230,7 @@ def rate_agent(
     )
 
 
-def rate_tool(
+async def rate_tool(
     tool_id: str,
     rating: int,
     user_id: str,
@@ -241,7 +241,7 @@ def rate_tool(
     **kwargs: ConfigDict,
 ) -> str:
     """
-    Rate a tool and provide feedback.
+    Rate a tool and provide feedback asynchronously.
 
     Args:
         tool_id: Tool ID
@@ -257,7 +257,7 @@ def rate_tool(
         Feedback ID
 
     Example:
-        >>> rate_tool(
+        >>> await rate_tool(
         ...     tool_id="tool_123",
         ...     rating=4,
         ...     user_id="user_456",
@@ -267,7 +267,7 @@ def rate_tool(
     """
     collector = feedback_collector or _default_feedback_collector
 
-    return collector.collect_tool_feedback(
+    return await collector.collect_tool_feedback(
         tool_id=tool_id,
         rating=rating,
         user_id=user_id,

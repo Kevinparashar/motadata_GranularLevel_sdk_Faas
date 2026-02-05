@@ -335,9 +335,22 @@ class DocumentProcessor:
             extractors=extractors if extractors else None,
         )
 
-    def load_document(self, file_path: str) -> tuple[str, Dict[str, Any]]:
+    def _read_text_file(self, path: Path) -> str:
         """
-        Load document from file with metadata extraction.
+        Read text file synchronously (helper for async wrapper).
+        
+        Args:
+            path (Path): Input parameter for this operation.
+        
+        Returns:
+            str: Returned text value.
+        """
+        with open(path, "r", encoding="utf-8") as f:
+            return f.read()
+
+    async def load_document(self, file_path: str) -> tuple[str, Dict[str, Any]]:
+        """
+        Load document from file with metadata extraction asynchronously.
         
         Supports multiple formats:
                                         - Text: .txt, .md, .markdown, .html, .json
@@ -356,9 +369,13 @@ class DocumentProcessor:
             DocumentProcessingError: Raised when this function detects an invalid state or when an underlying call fails.
             FileNotFoundError: Raised when this function detects an invalid state or when an underlying call fails.
         """
+        import asyncio
+
         path = Path(file_path)
 
-        if not path.exists():
+        # Check file existence asynchronously
+        exists = await asyncio.to_thread(path.exists)
+        if not exists:
             raise FileNotFoundError(f"Document not found: {file_path}")
 
         # Use multimodal loader if available and file is not basic text
@@ -366,30 +383,30 @@ class DocumentProcessor:
         basic_text_formats = [".txt", ".md", ".markdown", ".html", ".json"]
 
         if self.multimodal_loader and suffix not in basic_text_formats:
-            # Use multimodal loader for complex formats
-            content, file_metadata = self.multimodal_loader.load(str(path), gateway=self.gateway)
+            # Use multimodal loader for complex formats (async)
+            content, file_metadata = await self.multimodal_loader.load(str(path), self.gateway)
         else:
             # Use basic text loading for simple formats
+            # Get file stats asynchronously
+            stat_result = await asyncio.to_thread(path.stat)
             file_metadata = {
                 "source": str(path),
                 "file_name": path.name,
                 "file_extension": suffix,
-                "file_size": path.stat().st_size,
-                "updated_at": datetime.fromtimestamp(path.stat().st_mtime).isoformat(),
+                "file_size": stat_result.st_size,
+                "updated_at": datetime.fromtimestamp(stat_result.st_mtime).isoformat(),
             }
 
             if suffix in [".txt", ".md", ".markdown"]:
-                with open(path, "r", encoding="utf-8") as f:
-                    content = f.read()
+                content = await asyncio.to_thread(self._read_text_file, path)
             elif suffix == ".html":
-                content = self._load_html(path)
+                content = await self._load_html(path)
             elif suffix == ".json":
-                content = self._load_json(path)
+                content = await self._load_json(path)
             else:
                 # Try as text file
                 try:
-                    with open(path, "r", encoding="utf-8") as f:
-                        content = f.read()
+                    content = await asyncio.to_thread(self._read_text_file, path)
                 except UnicodeDecodeError as e:
                     raise DocumentProcessingError(
                         message=f"Unsupported file format: {suffix}. Enable multimodal loader for advanced formats.",
@@ -405,9 +422,9 @@ class DocumentProcessor:
 
         return content, extracted_metadata
 
-    def _load_html(self, path: Path) -> str:
+    async def _load_html(self, path: Path) -> str:
         """
-        Load HTML file and extract text content.
+        Load HTML file and extract text content asynchronously.
         
         Args:
             path (Path): Input parameter for this operation.
@@ -415,6 +432,8 @@ class DocumentProcessor:
         Returns:
             str: Returned text value.
         """
+        import asyncio
+
         try:
             from html.parser import HTMLParser
 
@@ -439,9 +458,10 @@ class DocumentProcessor:
                     if not self.in_script and not self.in_style:
                         self.text.append(data)
 
-            with open(path, "r", encoding="utf-8") as f:
-                html_content = f.read()
+            # Read file asynchronously
+            html_content = await asyncio.to_thread(self._read_text_file, path)
 
+            # Parse HTML (CPU-bound, but lightweight)
             parser = TextExtractor()
             parser.feed(html_content)
             return " ".join(parser.text)
@@ -450,12 +470,11 @@ class DocumentProcessor:
             import logging
             logger = logging.getLogger(__name__)
             logger.debug(f"HTML parsing failed for {path}, falling back to plain text: {e}")
-            with open(path, "r", encoding="utf-8") as f:
-                return f.read()
+            return await asyncio.to_thread(self._read_text_file, path)
 
-    def _load_json(self, path: Path) -> str:
+    async def _load_json(self, path: Path) -> str:
         """
-        Load JSON file and convert to text.
+        Load JSON file and convert to text asynchronously.
         
         Args:
             path (Path): Input parameter for this operation.
@@ -463,14 +482,19 @@ class DocumentProcessor:
         Returns:
             str: Returned text value.
         """
+        import asyncio
         import json
 
-        with open(path, "r", encoding="utf-8") as f:
-            data = json.load(f)
-            # Convert to readable text
-            if isinstance(data, dict):
-                return json.dumps(data, indent=2)
-            return str(data)
+        # Read and parse JSON asynchronously
+        def _read_and_parse_json(p: Path) -> str:
+            with open(p, "r", encoding="utf-8") as f:
+                data = json.load(f)
+                # Convert to readable text
+                if isinstance(data, dict):
+                    return json.dumps(data, indent=2)
+                return str(data)
+
+        return await asyncio.to_thread(_read_and_parse_json, path)
 
     def chunk_document(
         self, content: str, document_id: str, metadata: Optional[Dict[str, Any]] = None

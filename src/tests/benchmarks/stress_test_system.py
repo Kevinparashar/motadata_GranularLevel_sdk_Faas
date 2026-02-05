@@ -7,14 +7,13 @@ Tests system behavior under extreme load and stress conditions.
 
 import asyncio
 import time
-from typing import Dict, List
-from unittest.mock import AsyncMock, MagicMock, Mock, patch
+from typing import Dict, List, Optional
+from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
 from src.core.cache_mechanism import CacheConfig, CacheMechanism
 from src.core.litellm_gateway import GatewayConfig, LiteLLMGateway
-from src.core.postgresql_database.connection import DatabaseConfig, DatabaseConnection
 
 
 class StressTestResults:
@@ -27,7 +26,7 @@ class StressTestResults:
         self.error_count = 0
         self.errors: List[str] = []
 
-    def record_operation(self, latency: float, success: bool, error: str = None):
+    def record_operation(self, latency: float, success: bool, error: Optional[str] = None):
         """Record an operation."""
         self.operation_times.append(latency)
         if success:
@@ -68,7 +67,7 @@ class TestSystemStressTests:
             cache = CacheMechanism(CacheConfig(default_ttl=3600))
             config = GatewayConfig(enable_caching=True, cache=cache)
             gateway = LiteLLMGateway(config=config)
-            gateway._litellm = mock_litellm
+            setattr(gateway, "_litellm", mock_litellm)  # Set private attribute for testing
 
             mock_response = MagicMock()
             mock_response.choices = [MagicMock()]
@@ -111,7 +110,7 @@ class TestSystemStressTests:
         stats["total_time"] = elapsed
         stats["throughput"] = total_requests / elapsed
 
-        print(f"\nGateway Stress Test:")
+        print("\nGateway Stress Test:")
         print(f"  Concurrent workers: {concurrent_requests}")
         print(f"  Requests per worker: {requests_per_worker}")
         print(f"  Total requests: {total_requests}")
@@ -122,7 +121,8 @@ class TestSystemStressTests:
         # Should handle stress with > 90% success
         assert stats["success_rate"] > 90.0
 
-    def test_cache_stress(self):
+    @pytest.mark.asyncio
+    async def test_cache_stress(self):
         """Stress test cache with high volume operations."""
         cache = CacheMechanism(CacheConfig(default_ttl=3600, max_size=1000))
         results = StressTestResults()
@@ -136,13 +136,13 @@ class TestSystemStressTests:
 
                 if i % 3 == 0:
                     # Set operation
-                    cache.set(f"key_{i}", f"value_{i}", ttl=3600)
+                    await cache.set(f"key_{i}", f"value_{i}", ttl=3600)
                 elif i % 3 == 1:
                     # Get operation
-                    cache.get(f"key_{i-1}")
+                    await cache.get(f"key_{i-1}")
                 else:
                     # Delete operation
-                    cache.delete(f"key_{i-2}")
+                    await cache.delete(f"key_{i-2}")
 
                 latency = time.time() - op_start
                 results.record_operation(latency, True)
@@ -154,7 +154,7 @@ class TestSystemStressTests:
         stats["total_time"] = elapsed
         stats["throughput"] = operations / elapsed
 
-        print(f"\nCache Stress Test:")
+        print("\nCache Stress Test:")
         print(f"  Total operations: {operations}")
         print(f"  Success rate: {stats['success_rate']:.1f}%")
         print(f"  Throughput: {stats['throughput']:.0f} ops/sec")
@@ -166,7 +166,7 @@ class TestSystemStressTests:
     @pytest.mark.asyncio
     async def test_memory_pressure(self, mock_gateway):
         """Stress test memory under pressure."""
-        from src.core.agno_agent_framework.memory import AgentMemory
+        from src.core.agno_agent_framework.memory import AgentMemory, MemoryType
 
         memory = AgentMemory(
             agent_id="stress_test",
@@ -182,7 +182,9 @@ class TestSystemStressTests:
         for i in range(operations):
             try:
                 op_start = time.time()
-                memory.store(content=f"Memory {i}", memory_type="episodic", metadata={"index": i})
+                await memory.store(
+                    content=f"Memory {i}", memory_type=MemoryType.EPISODIC, metadata={"index": i}
+                )
                 latency = time.time() - op_start
                 results.record_operation(latency, True)
             except Exception as e:
@@ -190,13 +192,15 @@ class TestSystemStressTests:
 
         elapsed = time.time() - start
         stats = results.get_stats()
+        stats["total_time"] = elapsed
 
         # Check memory size
-        current_size = len(memory.episodic_memory)
+        memory_stats = await memory.get_stats()
+        current_size = memory_stats.get("episodic_count", 0)
 
-        print(f"\nMemory Pressure Test:")
+        print("\nMemory Pressure Test:")
         print(f"  Operations: {operations}")
-        print(f"  Max episodic: 100")
+        print("  Max episodic: 100")
         print(f"  Current size: {current_size}")
         print(f"  Success rate: {stats['success_rate']:.1f}%")
         print(f"  Avg latency: {stats['avg_latency']*1000:.3f}ms")
@@ -240,7 +244,7 @@ class TestSystemStressTests:
         stats = results.get_stats()
         stats["total_time"] = elapsed
 
-        print(f"\nSystem Integration Stress Test:")
+        print("\nSystem Integration Stress Test:")
         print(f"  Concurrent workers: {concurrent_operations}")
         print(f"  Operations per worker: {operations_per_worker}")
         print(f"  Total operations: {stats['total_operations']}")

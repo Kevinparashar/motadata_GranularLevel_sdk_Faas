@@ -96,7 +96,8 @@ class CircuitBreaker:
             if asyncio.iscoroutinefunction(func):
                 result = await func(*args, **kwargs)
             else:
-                result = func(*args, **kwargs)
+                # Run sync function in thread pool to avoid blocking event loop
+                result = await asyncio.to_thread(func, *args, **kwargs)
 
             # Success - update stats
             async with self._lock:

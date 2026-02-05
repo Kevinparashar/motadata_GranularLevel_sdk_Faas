@@ -65,9 +65,9 @@ class ToolProtocol(Protocol):
     name: str
     description: str
 
-    def execute(self, **kwargs: Any) -> Any:
+    async def execute(self, **kwargs: Any) -> Any:
         """
-        Execute the tool.
+        Execute the tool asynchronously.
         
         Args:
             **kwargs (Any): Input parameter for this operation.
@@ -82,9 +82,9 @@ class ToolProtocol(Protocol):
 class CacheProtocol(Protocol):
     """Protocol for Cache interface."""
 
-    def get(self, key: str, tenant_id: Optional[str] = None) -> Optional[Any]:
+    async def get(self, key: str, tenant_id: Optional[str] = None) -> Optional[Any]:
         """
-        Get value from cache.
+        Get value from cache asynchronously.
         
         Args:
             key (str): Input parameter for this operation.
@@ -95,17 +95,43 @@ class CacheProtocol(Protocol):
         """
         ...
 
-    def set(
+    async def set(
         self, key: str, value: Any, tenant_id: Optional[str] = None, ttl: Optional[int] = None
     ) -> None:
         """
-        Set value in cache.
+        Set value in cache asynchronously.
         
         Args:
             key (str): Input parameter for this operation.
             value (Any): Input parameter for this operation.
             tenant_id (Optional[str]): Tenant identifier used for tenant isolation.
             ttl (Optional[int]): Input parameter for this operation.
+        
+        Returns:
+            None: Result of the operation.
+        """
+        ...
+
+    async def delete(self, key: str, tenant_id: Optional[str] = None) -> None:
+        """
+        Delete key from cache asynchronously.
+        
+        Args:
+            key (str): Input parameter for this operation.
+            tenant_id (Optional[str]): Tenant identifier used for tenant isolation.
+        
+        Returns:
+            None: Result of the operation.
+        """
+        ...
+
+    async def invalidate_pattern(self, pattern: str, tenant_id: Optional[str] = None) -> None:
+        """
+        Invalidate cache keys matching pattern asynchronously.
+        
+        Args:
+            pattern (str): Input parameter for this operation.
+            tenant_id (Optional[str]): Tenant identifier used for tenant isolation.
         
         Returns:
             None: Result of the operation.

@@ -94,6 +94,13 @@ class PromptGeneratorService:
         # Setup middleware
         setup_middleware(self.app)
 
+        # Register startup event to ensure database connection is ready
+        @self.app.on_event("startup")
+        async def startup_event():
+            """Ensure database connection is ready on service startup."""
+            if hasattr(self.db, "connect"):
+                await self.db.connect()
+
         # Register routes
         self._register_routes()
 
@@ -235,10 +242,10 @@ class PromptGeneratorService:
         standard_headers = extract_headers(**headers)
 
         try:
-            # rate_agent is synchronous, not async
+            # rate_agent is async
             # user_id is required, provide default if None
             user_id = standard_headers.user_id or standard_headers.tenant_id
-            rate_agent(
+            await rate_agent(
                 agent_id=agent_id,
                 rating=request.rating,
                 feedback_text=request.feedback,
@@ -279,10 +286,10 @@ class PromptGeneratorService:
         standard_headers = extract_headers(**headers)
 
         try:
-            # rate_tool is synchronous, not async
+            # rate_tool is async
             # user_id is required, provide default if None
             user_id = standard_headers.user_id or standard_headers.tenant_id
-            rate_tool(
+            await rate_tool(
                 tool_id=tool_id,
                 rating=request.rating,
                 feedback_text=request.feedback,

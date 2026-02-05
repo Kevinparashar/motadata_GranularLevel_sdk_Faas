@@ -393,11 +393,12 @@ class TestUtilityFunctions:
         with pytest.raises(RuntimeError, match="Always fails"):
             await always_fails()
 
-    def test_save_agent_state(self, mock_agent, tmp_path):
+    @pytest.mark.asyncio
+    async def test_save_agent_state(self, mock_agent, tmp_path):
         """Test save_agent_state utility function."""
         state_file = tmp_path / "agent_state.json"
 
-        save_agent_state(mock_agent, str(state_file))
+        await save_agent_state(mock_agent, str(state_file))
 
         assert state_file.exists()
         import json
@@ -406,15 +407,16 @@ class TestUtilityFunctions:
             state = json.load(f)
             assert state["agent_id"] == "agent1"
 
-    def test_load_agent_state(self, mock_gateway, tmp_path):
+    @pytest.mark.asyncio
+    async def test_load_agent_state(self, mock_gateway, tmp_path):
         """Test load_agent_state utility function."""
         # First save an agent
         agent = create_agent("agent1", "Test Agent", mock_gateway)
         state_file = tmp_path / "agent_state.json"
-        save_agent_state(agent, str(state_file))
+        await save_agent_state(agent, str(state_file))
 
         # Then load it
-        loaded_agent = load_agent_state(str(state_file), mock_gateway)
+        loaded_agent = await load_agent_state(str(state_file), mock_gateway)
 
         assert loaded_agent.agent_id == "agent1"
         assert loaded_agent.name == "Test Agent"

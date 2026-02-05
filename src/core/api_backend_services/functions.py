@@ -520,7 +520,7 @@ def create_gateway_endpoints(router: APIRouter, gateway: Any, prefix: str = "/ga
         prompt = request.get("prompt", "")
         model = request.get("model", "gpt-4")
 
-        text = generate_text(gateway, prompt, model=model)
+        text = await generate_text(gateway, prompt, model=model)
         return {"text": text, "model": model}
 
     @router.post(f"{prefix}/embed")
@@ -529,7 +529,7 @@ def create_gateway_endpoints(router: APIRouter, gateway: Any, prefix: str = "/ga
         texts = request.get("texts", [])
         model = request.get("model", "text-embedding-3-small")
 
-        embeddings = generate_embeddings(gateway, texts, model=model)
+        embeddings = await generate_embeddings(gateway, texts, model=model)
         return {"embeddings": embeddings, "model": model}
 
 

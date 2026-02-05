@@ -70,12 +70,13 @@ class Retriever:
             filters["tenant_id"] = tenant_id
 
         # Perform similarity search
-        results = self.vector_ops.similarity_search(
+        import asyncio
+        results = asyncio.run(self.vector_ops.similarity_search(
             query_embedding=query_embedding,
             limit=top_k,
             threshold=threshold,
             model=self.embedding_model,
-        )
+        ))
 
         # Apply additional filters if provided
         if filters:
@@ -145,12 +146,13 @@ class Retriever:
 
         # Vector-based retrieval
         query_embedding = self._get_embedding(query)
-        vector_results = self.vector_ops.similarity_search(
+        import asyncio
+        vector_results = asyncio.run(self.vector_ops.similarity_search(
             query_embedding=query_embedding,
             limit=top_k * 2,  # Get more for re-ranking
             threshold=threshold * 0.8,  # Lower threshold for hybrid
             model=self.embedding_model,
-        )
+        ))
 
         # Keyword-based retrieval (simple text search)
         keyword_results = self._keyword_search(query, tenant_id=tenant_id, top_k=top_k * 2)

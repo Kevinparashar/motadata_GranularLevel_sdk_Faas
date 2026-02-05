@@ -5,6 +5,7 @@ Ensures LLM outputs are safe, relevant, and compliant with ITSM requirements.
 """
 
 
+import asyncio
 import re
 from datetime import datetime
 from enum import Enum
@@ -73,10 +74,10 @@ class Guardrail:
         self.itsm_status_values = ["open", "in_progress", "resolved", "closed", "cancelled"]
         self.itsm_priority_values = ["low", "medium", "high", "critical"]
 
-        # Custom validators
-        self.custom_validators: List[Callable[[str], Tuple[bool, str]]] = []
+        # Custom validators (can be sync or async)
+        self.custom_validators: List[Callable[[str], Any]] = []
 
-    def _apply_content_validation(
+    async def _apply_content_validation(
         self, output: str, errors: List[str], warnings: List[str], score: float
     ) -> float:
         """
@@ -94,14 +95,14 @@ class Guardrail:
         if not self.enable_content_filter:
             return score
 
-        content_result = self._validate_content(output)
+        content_result = await self._validate_content(output)
         if not content_result["is_valid"]:
             errors.extend(content_result["errors"])
             score *= 0.5
         warnings.extend(content_result["warnings"])
         return score
 
-    def _apply_format_validation(
+    async def _apply_format_validation(
         self, output: str, output_type: Optional[str], errors: List[str], warnings: List[str], score: float
     ) -> float:
         """
@@ -120,14 +121,14 @@ class Guardrail:
         if not self.enable_format_validation or not output_type:
             return score
 
-        format_result = self._validate_format(output, output_type)
+        format_result = await self._validate_format(output, output_type)
         if not format_result["is_valid"]:
             errors.extend(format_result["errors"])
             score *= 0.7
         warnings.extend(format_result["warnings"])
         return score
 
-    def _apply_compliance_validation(
+    async def _apply_compliance_validation(
         self, output: str, context: Optional[Dict[str, Any]], errors: List[str], warnings: List[str], score: float
     ) -> float:
         """
@@ -146,14 +147,14 @@ class Guardrail:
         if not self.enable_compliance_check:
             return score
 
-        compliance_result = self._validate_compliance(output, context)
+        compliance_result = await self._validate_compliance(output, context)
         if not compliance_result["is_valid"]:
             errors.extend(compliance_result["errors"])
             score *= 0.6
         warnings.extend(compliance_result["warnings"])
         return score
 
-    def _apply_custom_validators(
+    async def _apply_custom_validators(
         self, output: str, errors: List[str], warnings: List[str], score: float
     ) -> float:
         """
@@ -173,15 +174,47 @@ class Guardrail:
 
         for validator in self.custom_validators:
             try:
-                is_valid, message = validator(output)
+                result = await self._execute_validator(validator, output)
+                is_valid, message = self._parse_validator_result(result)
+                
                 if not is_valid:
-                    if self.level == ValidationLevel.STRICT:
-                        errors.append(message)
-                        score *= 0.5
-                    else:
-                        warnings.append(message)
+                    score = self._apply_validation_result(
+                        message, errors, warnings, score
+                    )
             except (AttributeError, TypeError, ValueError) as e:
                 logger.debug(f"Validator error ignored: {e}")
+        return score
+
+    async def _execute_validator(self, validator: Callable, output: str) -> Any:
+        """Execute validator (sync or async)."""
+        if asyncio.iscoroutinefunction(validator):
+            return await validator(output)
+        else:
+            # Run sync validator in thread pool to avoid blocking event loop
+            return await asyncio.to_thread(validator, output)
+
+    def _parse_validator_result(self, result: Any) -> Tuple[bool, str]:
+        """Parse validator result into (is_valid, message) tuple."""
+        if isinstance(result, tuple) and len(result) == 2:
+            return result
+        elif isinstance(result, dict):
+            is_valid = result.get("is_valid", False)
+            message = result.get("message", "Validation failed")
+            return is_valid, message
+        else:
+            is_valid = bool(result)
+            message = "Validation failed" if not is_valid else "Validation passed"
+            return is_valid, message
+
+    def _apply_validation_result(
+        self, message: str, errors: List[str], warnings: List[str], score: float
+    ) -> float:
+        """Apply validation result to errors/warnings and adjust score."""
+        if self.level == ValidationLevel.STRICT:
+            errors.append(message)
+            score *= 0.5
+        else:
+            warnings.append(message)
         return score
 
     def _adjust_score_by_level(self, score: float, errors: List[str]) -> float:
@@ -201,14 +234,14 @@ class Guardrail:
             return score * 0.3
         return score
 
-    def validate(
+    async def validate(
         self,
         output: str,
         context: Optional[Dict[str, Any]] = None,
         output_type: Optional[str] = None,
     ) -> ValidationResult:
         """
-        Validate LLM output.
+        Validate LLM output asynchronously.
         
         Args:
             output (str): Input parameter for this operation.
@@ -222,10 +255,10 @@ class Guardrail:
         warnings: List[str] = []
         score = 1.0
 
-        score = self._apply_content_validation(output, errors, warnings, score)
-        score = self._apply_format_validation(output, output_type, errors, warnings, score)
-        score = self._apply_compliance_validation(output, context, errors, warnings, score)
-        score = self._apply_custom_validators(output, errors, warnings, score)
+        score = await self._apply_content_validation(output, errors, warnings, score)
+        score = await self._apply_format_validation(output, output_type, errors, warnings, score)
+        score = await self._apply_compliance_validation(output, context, errors, warnings, score)
+        score = await self._apply_custom_validators(output, errors, warnings, score)
         score = self._adjust_score_by_level(score, errors)
 
         is_valid = len(errors) == 0 or self.level == ValidationLevel.LENIENT
@@ -243,7 +276,7 @@ class Guardrail:
             },
         )
 
-    def _validate_content(self, output: str) -> Dict[str, Any]:
+    async def _validate_content(self, output: str) -> Dict[str, Any]:
         """
         Validate content for safety.
         
@@ -256,32 +289,43 @@ class Guardrail:
         errors = []
         warnings = []
 
-        # Check for blocked patterns
-        for pattern in self.blocked_patterns:
-            if re.search(pattern, output, re.IGNORECASE):
-                errors.append(f"Blocked pattern detected: {pattern}")
+        # Wrap CPU-intensive regex operations in thread pool
+        def _check_patterns() -> tuple[List[str], List[str]]:
+            pattern_errors = []
+            pattern_warnings = []
+            
+            # Check for blocked patterns
+            for pattern in self.blocked_patterns:
+                if re.search(pattern, output, re.IGNORECASE):
+                    pattern_errors.append(f"Blocked pattern detected: {pattern}")
 
-        # Check for empty or too short output
+            # Check for suspicious content
+            suspicious_patterns = [
+                r"<script",
+                r"javascript:",
+                r"onerror\s*=",
+                r"eval\s*\(",
+            ]
+
+            for pattern in suspicious_patterns:
+                if re.search(pattern, output, re.IGNORECASE):
+                    pattern_errors.append(f"Suspicious content detected: {pattern}")
+            
+            return pattern_errors, pattern_warnings
+
+        pattern_errors, pattern_warnings = await asyncio.to_thread(_check_patterns)
+        errors.extend(pattern_errors)
+        warnings.extend(pattern_warnings)
+
+        # Check for empty or too short output (fast operation, no need to wrap)
         if len(output.strip()) == 0:
             errors.append("Output is empty")
         elif len(output.strip()) < 10:
             warnings.append("Output is very short")
 
-        # Check for suspicious content
-        suspicious_patterns = [
-            r"<script",
-            r"javascript:",
-            r"onerror\s*=",
-            r"eval\s*\(",
-        ]
-
-        for pattern in suspicious_patterns:
-            if re.search(pattern, output, re.IGNORECASE):
-                errors.append(f"Suspicious content detected: {pattern}")
-
         return {"is_valid": len(errors) == 0, "errors": errors, "warnings": warnings}
 
-    def _validate_format(self, output: str, output_type: str) -> Dict[str, Any]:
+    async def _validate_format(self, output: str, output_type: str) -> Dict[str, Any]:
         """
         Validate output format.
         
@@ -296,7 +340,7 @@ class Guardrail:
         warnings = []
 
         if output_type == "incident" or output_type == "ticket":
-            # Validate ITSM format
+            # Validate ITSM format (fast string operations, no need to wrap)
             if "incident_id" not in output.lower() and "ticket_id" not in output.lower():
                 warnings.append("Missing incident/ticket ID")
 
@@ -305,18 +349,23 @@ class Guardrail:
             if not has_status:
                 warnings.append("Missing or invalid status")
 
-        # Check for JSON format if expected
+        # Check for JSON format if expected (wrap JSON parsing in thread pool)
         if output_type and "json" in output_type.lower():
-            try:
-                import json
-
-                json.loads(output)
-            except json.JSONDecodeError:
+            def _parse_json() -> bool:
+                try:
+                    import json
+                    json.loads(output)
+                    return True
+                except json.JSONDecodeError:
+                    return False
+            
+            is_valid_json = await asyncio.to_thread(_parse_json)
+            if not is_valid_json:
                 errors.append("Invalid JSON format")
 
         return {"is_valid": len(errors) == 0, "errors": errors, "warnings": warnings}
 
-    def _check_pii_patterns(self, output: str) -> List[str]:
+    async def _check_pii_patterns(self, output: str) -> List[str]:
         """
         Check for PII patterns in output.
         
@@ -326,18 +375,21 @@ class Guardrail:
         Returns:
             List[str]: List result of the operation.
         """
-        warnings = []
-        pii_patterns = [
-            r"\b\d{3}-\d{2}-\d{4}\b",  # SSN
-            r"\b\d{4}\s?\d{4}\s?\d{4}\s?\d{4}\b",  # Credit card
-            r"\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Z|a-z]{2,}\b",  # Email
-        ]
+        def _check_patterns() -> List[str]:
+            warnings = []
+            pii_patterns = [
+                r"\b\d{3}-\d{2}-\d{4}\b",  # SSN
+                r"\b\d{4}\s?\d{4}\s?\d{4}\s?\d{4}\b",  # Credit card
+                r"\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Z|a-z]{2,}\b",  # Email
+            ]
+            
+            for pattern in pii_patterns:
+                if re.search(pattern, output):
+                    warnings.append(f"Potential PII detected: {pattern}")
+            
+            return warnings
         
-        for pattern in pii_patterns:
-            if re.search(pattern, output):
-                warnings.append(f"Potential PII detected: {pattern}")
-        
-        return warnings
+        return await asyncio.to_thread(_check_patterns)
 
     def _check_itil_compliance(self, output: str) -> List[str]:
         """
@@ -349,6 +401,7 @@ class Guardrail:
         Returns:
             List[str]: List result of the operation.
         """
+        # Fast string operations, no need to wrap or make async
         warnings = []
         output_lower = output.lower()
         
@@ -358,7 +411,7 @@ class Guardrail:
         
         return warnings
 
-    def _validate_compliance(
+    async def _validate_compliance(
         self, output: str, context: Optional[Dict[str, Any]]
     ) -> Dict[str, Any]:
         """
@@ -376,7 +429,7 @@ class Guardrail:
 
         # Check for PII if not allowed
         if context and context.get("allow_pii", False) is False:
-            warnings.extend(self._check_pii_patterns(output))
+            warnings.extend(await self._check_pii_patterns(output))
 
         # Check for ITIL compliance if required
         if context and context.get("require_itil_compliance", False):
@@ -459,7 +512,7 @@ class ValidationManager:
         """
         self.guardrails[name] = guardrail
 
-    def validate_output(
+    async def validate_output(
         self,
         output: str,
         context: Optional[Dict[str, Any]] = None,
@@ -467,7 +520,7 @@ class ValidationManager:
         guardrail_name: Optional[str] = None,
     ) -> ValidationResult:
         """
-        Validate output using appropriate guardrail.
+        Validate output using appropriate guardrail asynchronously.
         
         Args:
             output (str): Input parameter for this operation.
@@ -479,4 +532,4 @@ class ValidationManager:
             ValidationResult: Result of the operation.
         """
         guardrail = self.get_guardrail(name=guardrail_name)
-        return guardrail.validate(output, context, output_type)
+        return await guardrail.validate(output, context, output_type)

@@ -61,6 +61,8 @@ class FeedbackLoop:
         """
         Initialize feedback loop.
         
+        Note: Call `await initialize()` after creating the instance to load persisted feedback.
+        
         Args:
             storage_path (Optional[str]): Input parameter for this operation.
             auto_process (bool): Input parameter for this operation.
@@ -77,10 +79,23 @@ class FeedbackLoop:
             FeedbackType.ERROR: [],
         }
 
+    async def initialize(self) -> None:
+        """
+        Initialize feedback loop asynchronously (loads persisted feedback).
+        
+        This should be called after __init__ to load feedback from disk.
+        
+        Example:
+            >>> feedback_loop = FeedbackLoop(storage_path="feedback.json")
+            >>> await feedback_loop.initialize()
+        
+        Returns:
+            None: Result of the operation.
+        """
         if self.storage_path and self.storage_path.exists():
-            self._load()
+            await self._load()
 
-    def record_feedback(
+    async def record_feedback(
         self,
         query: str,
         response: str,
@@ -91,7 +106,7 @@ class FeedbackLoop:
         metadata: Optional[Dict[str, Any]] = None,
     ) -> str:
         """
-        Record user feedback.
+        Record user feedback asynchronously.
         
         Args:
             query (str): Input parameter for this operation.
@@ -122,15 +137,15 @@ class FeedbackLoop:
         self.feedback_queue.append(feedback)
 
         if self.auto_process:
-            self.process_feedback(feedback_id)
+            await self.process_feedback(feedback_id)
 
-        self._persist()
+        await self._persist()
 
         return feedback_id
 
-    def process_feedback(self, feedback_id: str) -> bool:
+    async def process_feedback(self, feedback_id: str) -> bool:
         """
-        Process a feedback item.
+        Process a feedback item asynchronously.
         
         Args:
             feedback_id (str): Input parameter for this operation.
@@ -138,16 +153,22 @@ class FeedbackLoop:
         Returns:
             bool: True if the operation succeeds, else False.
         """
+        import asyncio
+        
         feedback = next((f for f in self.feedback_queue if f.feedback_id == feedback_id), None)
 
         if not feedback:
             return False
 
-        # Call registered callbacks
+        # Call registered callbacks (support both sync and async callbacks)
         callbacks = self.callbacks.get(feedback.feedback_type, [])
         for callback in callbacks:
             try:
-                callback(feedback)
+                if asyncio.iscoroutinefunction(callback):
+                    await callback(feedback)
+                else:
+                    # Run sync callback in thread pool to avoid blocking
+                    await asyncio.to_thread(callback, feedback)
             except Exception:
                 # Log error but continue
                 pass
@@ -156,7 +177,7 @@ class FeedbackLoop:
         self.feedback_queue.remove(feedback)
         self.processed_feedback.append(feedback)
 
-        self._persist()
+        await self._persist()
 
         return True
 
@@ -273,95 +294,109 @@ class FeedbackLoop:
 
         return insights
 
-    def _persist(self) -> None:
+    async def _persist(self) -> None:
         """
-        Persist feedback to disk.
+        Persist feedback to disk asynchronously.
         
         Returns:
             None: Result of the operation.
         """
+        import asyncio
+        
         if not self.storage_path:
             return
 
-        try:
-            data = {
-                "feedback_queue": [
-                    {
-                        "feedback_id": f.feedback_id,
-                        "query": f.query,
-                        "response": f.response,
-                        "feedback_type": f.feedback_type.value,
-                        "content": f.content,
-                        "timestamp": f.timestamp.isoformat(),
-                        "status": f.status.value,
-                        "metadata": f.metadata,
-                        "tenant_id": f.tenant_id,
-                        "agent_id": f.agent_id,
-                    }
-                    for f in self.feedback_queue
-                ],
-                "processed_feedback": [
-                    {
-                        "feedback_id": f.feedback_id,
-                        "query": f.query,
-                        "response": f.response,
-                        "feedback_type": f.feedback_type.value,
-                        "content": f.content,
-                        "timestamp": f.timestamp.isoformat(),
-                        "status": f.status.value,
-                        "metadata": f.metadata,
-                        "tenant_id": f.tenant_id,
-                        "agent_id": f.agent_id,
-                    }
-                    for f in self.processed_feedback[-1000:]  # Keep last 1000
-                ],
-            }
+        def _persist_sync() -> None:
+            try:
+                data = {
+                    "feedback_queue": [
+                        {
+                            "feedback_id": f.feedback_id,
+                            "query": f.query,
+                            "response": f.response,
+                            "feedback_type": f.feedback_type.value,
+                            "content": f.content,
+                            "timestamp": f.timestamp.isoformat(),
+                            "status": f.status.value,
+                            "metadata": f.metadata,
+                            "tenant_id": f.tenant_id,
+                            "agent_id": f.agent_id,
+                        }
+                        for f in self.feedback_queue
+                    ],
+                    "processed_feedback": [
+                        {
+                            "feedback_id": f.feedback_id,
+                            "query": f.query,
+                            "response": f.response,
+                            "feedback_type": f.feedback_type.value,
+                            "content": f.content,
+                            "timestamp": f.timestamp.isoformat(),
+                            "status": f.status.value,
+                            "metadata": f.metadata,
+                            "tenant_id": f.tenant_id,
+                            "agent_id": f.agent_id,
+                        }
+                        for f in self.processed_feedback[-1000:]  # Keep last 1000
+                    ],
+                }
 
-            self.storage_path.parent.mkdir(parents=True, exist_ok=True)
-            with self.storage_path.open("w", encoding="utf-8") as f:
-                json.dump(data, f, default=str, indent=2)
-        except (OSError, IOError) as e:
-            # Silently fail persistence - log for debugging
-            import logging
+                self.storage_path.parent.mkdir(parents=True, exist_ok=True)
+                with self.storage_path.open("w", encoding="utf-8") as f:
+                    json.dump(data, f, default=str, indent=2)
+            except (OSError, IOError) as e:
+                # Silently fail persistence - log for debugging
+                import logging
 
-            logger = logging.getLogger(__name__)
-            logger.warning(f"Failed to persist feedback to {self.storage_path}: {e}", exc_info=True)
+                logger = logging.getLogger(__name__)
+                logger.warning(f"Failed to persist feedback to {self.storage_path}: {e}", exc_info=True)
+        
+        # Run file I/O in thread pool to avoid blocking
+        await asyncio.to_thread(_persist_sync)
 
-    def _load(self) -> None:
+    async def _load(self) -> None:
         """
-        Load feedback from disk.
+        Load feedback from disk asynchronously.
         
         Returns:
             None: Result of the operation.
         """
+        import asyncio
+        
         if not self.storage_path or not self.storage_path.exists():
             return
 
-        try:
-            with self.storage_path.open("r", encoding="utf-8") as f:
-                data = json.load(f)
+        def _load_sync() -> tuple[List[FeedbackItem], List[FeedbackItem]]:
+            try:
+                with self.storage_path.open("r", encoding="utf-8") as f:
+                    data = json.load(f)
 
-            def _parse_feedback(item: Dict[str, Any]) -> FeedbackItem:
-                return FeedbackItem(
-                    feedback_id=item["feedback_id"],
-                    query=item["query"],
-                    response=item["response"],
-                    feedback_type=FeedbackType(item["feedback_type"]),
-                    content=item["content"],
-                    timestamp=datetime.fromisoformat(item["timestamp"]),
-                    status=FeedbackStatus(item["status"]),
-                    metadata=item.get("metadata", {}),
-                    tenant_id=item.get("tenant_id"),
-                    agent_id=item.get("agent_id"),
-                )
+                def _parse_feedback(item: Dict[str, Any]) -> FeedbackItem:
+                    return FeedbackItem(
+                        feedback_id=item["feedback_id"],
+                        query=item["query"],
+                        response=item["response"],
+                        feedback_type=FeedbackType(item["feedback_type"]),
+                        content=item["content"],
+                        timestamp=datetime.fromisoformat(item["timestamp"]),
+                        status=FeedbackStatus(item["status"]),
+                        metadata=item.get("metadata", {}),
+                        tenant_id=item.get("tenant_id"),
+                        agent_id=item.get("agent_id"),
+                    )
 
-            self.feedback_queue = [_parse_feedback(item) for item in data.get("feedback_queue", [])]
-            self.processed_feedback = [
-                _parse_feedback(item) for item in data.get("processed_feedback", [])
-            ]
-        except (OSError, IOError, json.JSONDecodeError, KeyError) as e:
-            # Silently fail loading - log for debugging
-            import logging
+                feedback_queue = [_parse_feedback(item) for item in data.get("feedback_queue", [])]
+                processed_feedback = [
+                    _parse_feedback(item) for item in data.get("processed_feedback", [])
+                ]
+                return feedback_queue, processed_feedback
+            except (OSError, IOError, json.JSONDecodeError, KeyError) as e:
+                # Silently fail loading - log for debugging
+                import logging
 
-            logger = logging.getLogger(__name__)
-            logger.warning(f"Failed to load feedback from {self.storage_path}: {e}", exc_info=True)
+                logger = logging.getLogger(__name__)
+                logger.warning(f"Failed to load feedback from {self.storage_path}: {e}", exc_info=True)
+                return [], []
+        
+        # Run file I/O in thread pool to avoid blocking
+        self.feedback_queue, self.processed_feedback = await asyncio.to_thread(_load_sync)

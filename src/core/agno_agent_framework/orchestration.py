@@ -428,7 +428,7 @@ class AgentOrchestrator:
         # Notify source agent
         source_agent = self.agent_manager.get_agent(from_agent_id)
         if source_agent:
-            source_agent.send_message(
+            await source_agent.send_message(
                 to_agent_id, {"action": "task_delegated", "task_id": task_id}, "delegation"
             )
 

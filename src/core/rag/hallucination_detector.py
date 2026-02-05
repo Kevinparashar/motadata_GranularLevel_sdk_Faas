@@ -149,7 +149,8 @@ class HallucinationDetector:
 
         # LLM-based verification if enabled
         if self.enable_llm_verification and self.gateway and is_hallucination:
-            llm_verification = self._llm_verify_hallucination(response, context_text, query)
+            import asyncio
+            llm_verification = asyncio.run(self._llm_verify_hallucination(response, context_text, query))
             if llm_verification:
                 reasons.extend(llm_verification.get("reasons", []))
                 # Adjust confidence based on LLM verification
@@ -172,7 +173,7 @@ class HallucinationDetector:
             },
         )
 
-    def detect_async(
+    async def detect_async(
         self, response: str, context_documents: List[Dict[str, Any]], query: Optional[str] = None
     ) -> HallucinationResult:
         """
@@ -186,8 +187,67 @@ class HallucinationDetector:
         Returns:
             HallucinationResult: Result of the operation.
         """
-        # Same as sync version for now, but can be extended with async LLM calls
-        return self.detect(response, context_documents, query)
+        reasons = []
+        grounded_sentences = []
+        ungrounded_sentences = []
+
+        # Split response into sentences
+        sentences = self._split_sentences(response)
+
+        # Build context text
+        context_text = self._build_context_text(context_documents)
+
+        # Check each sentence
+        for sentence in sentences:
+            if not sentence.strip():
+                continue
+
+            is_grounded = self._check_sentence_grounding(sentence, context_text)
+
+            if is_grounded:
+                grounded_sentences.append(sentence)
+            else:
+                ungrounded_sentences.append(sentence)
+
+        # Calculate grounded ratio
+        total_sentences = len(grounded_sentences) + len(ungrounded_sentences)
+        grounded_ratio = len(grounded_sentences) / total_sentences if total_sentences > 0 else 0.0
+
+        # Determine if hallucination
+        is_hallucination = grounded_ratio < self.min_grounded_ratio
+
+        # Build reasons
+        if is_hallucination:
+            reasons.append(
+                f"Only {grounded_ratio:.1%} of sentences are grounded in context "
+                f"(minimum required: {self.min_grounded_ratio:.1%})"
+            )
+            reasons.append(f"{len(ungrounded_sentences)} ungrounded sentences detected")
+
+        # LLM-based verification if enabled (async)
+        if self.enable_llm_verification and self.gateway and is_hallucination:
+            llm_verification = await self._llm_verify_hallucination(response, context_text, query)
+            if llm_verification:
+                reasons.extend(llm_verification.get("reasons", []))
+                # Adjust confidence based on LLM verification
+                confidence = llm_verification.get("confidence", 0.5)
+            else:
+                confidence = 0.5 + (1.0 - grounded_ratio) * 0.5
+        else:
+            confidence = 0.5 + (1.0 - grounded_ratio) * 0.5
+
+        return HallucinationResult(
+            is_hallucination=is_hallucination,
+            confidence=min(confidence, 1.0),
+            reasons=reasons,
+            grounded_sentences=grounded_sentences,
+            ungrounded_sentences=ungrounded_sentences,
+            metadata={
+                "grounded_ratio": grounded_ratio,
+                "total_sentences": total_sentences,
+                "context_documents_count": len(context_documents),
+            },
+        )
 
     def _split_sentences(self, text: str) -> List[str]:
         """
@@ -334,11 +394,11 @@ class HallucinationDetector:
 
         return False
 
-    def _llm_verify_hallucination(
+    async def _llm_verify_hallucination(
         self, response: str, context_text: str, query: Optional[str] = None
     ) -> Optional[Dict[str, Any]]:
         """
-        Use LLM to verify hallucination.
+        Use LLM to verify hallucination asynchronously.
         
         Args:
             response (str): Input parameter for this operation.
@@ -376,7 +436,7 @@ Respond in JSON format:
     "ungrounded_claims": ["claim1", "claim2"]
 }}"""
 
-            result = self.gateway.generate(
+            result = await self.gateway.generate_async(
                 prompt=prompt, model="gpt-4", max_tokens=500, temperature=0.0
             )
 

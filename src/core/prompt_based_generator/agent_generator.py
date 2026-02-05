@@ -119,7 +119,7 @@ class AgentGenerator:
             agent.enable_tool_calling = requirements.enable_tool_calling
 
             # Cache agent configuration
-            self.cache.cache_agent_config(
+            await self.cache.cache_agent_config(
                 agent_id=agent_id,
                 config={
                     "name": requirements.name,
@@ -145,11 +145,11 @@ class AgentGenerator:
                 original_error=e,
             )
 
-    def generate_agent_from_cached_config(
+    async def generate_agent_from_cached_config(
         self, agent_id: str, tenant_id: Optional[str] = None
     ) -> Optional[Agent]:
         """
-        Generate an agent from cached configuration.
+        Generate an agent from cached configuration asynchronously.
         
         Args:
             agent_id (str): Input parameter for this operation.
@@ -158,7 +158,7 @@ class AgentGenerator:
         Returns:
             Optional[Agent]: Result if available, else None.
         """
-        config = self.cache.get_cached_agent_config(agent_id, tenant_id=tenant_id)
+        config: Optional[ConfigDict] = await self.cache.get_cached_agent_config(agent_id, tenant_id=tenant_id)
         if not config:
             return None
 

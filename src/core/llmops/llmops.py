@@ -92,10 +92,23 @@ class LLMOps:
             "claude-3-haiku": {"prompt": 0.25, "completion": 1.25},
         }
 
+    async def initialize(self) -> None:
+        """
+        Initialize LLMOps asynchronously (loads persisted operations).
+        
+        This should be called after __init__ to load operations from disk.
+        
+        Example:
+            >>> llmops = LLMOps(storage_path="llmops.json")
+            >>> await llmops.initialize()
+        
+        Returns:
+            None: Result of the operation.
+        """
         if self.storage_path and self.storage_path.exists():
-            self._load()
+            await self._load()
 
-    def log_operation(
+    async def log_operation(
         self,
         operation_type: LLMOperationType,
         model: str,
@@ -109,7 +122,7 @@ class LLMOps:
         metadata: Optional[Dict[str, Any]] = None,
     ) -> str:
         """
-        Log an LLM operation.
+        Log an LLM operation asynchronously.
         
         Args:
             operation_type (LLMOperationType): Input parameter for this operation.
@@ -165,7 +178,7 @@ class LLMOps:
         if len(self.operations) > self.max_operations_in_memory:
             self.operations = self.operations[-self.max_operations_in_memory :]
 
-        self._persist()
+        await self._persist()
 
         return operation_id
 
@@ -297,82 +310,94 @@ class LLMOps:
             "time_range_hours": time_range_hours,
         }
 
-    def _persist(self) -> None:
+    async def _persist(self) -> None:
         """
-        Persist operations to disk.
+        Persist operations to disk asynchronously.
         
         Returns:
             None: Result of the operation.
         """
+        import asyncio
+        
         if not self.storage_path:
             return
 
-        try:
-            # Only persist recent operations
-            recent_ops = self.operations[-1000:]
+        def _persist_sync() -> None:
+            try:
+                # Only persist recent operations
+                recent_ops = self.operations[-1000:]
 
-            data = {
-                "operations": [
-                    {
-                        "operation_id": op.operation_id,
-                        "operation_type": op.operation_type.value,
-                        "model": op.model,
-                        "tenant_id": op.tenant_id,
-                        "agent_id": op.agent_id,
-                        "prompt_tokens": op.prompt_tokens,
-                        "completion_tokens": op.completion_tokens,
-                        "total_tokens": op.total_tokens,
-                        "latency_ms": op.latency_ms,
-                        "cost_usd": op.cost_usd,
-                        "status": op.status.value,
-                        "error_message": op.error_message,
-                        "timestamp": op.timestamp.isoformat(),
-                        "metadata": op.metadata,
-                    }
-                    for op in recent_ops
-                ]
-            }
+                data = {
+                    "operations": [
+                        {
+                            "operation_id": op.operation_id,
+                            "operation_type": op.operation_type.value,
+                            "model": op.model,
+                            "tenant_id": op.tenant_id,
+                            "agent_id": op.agent_id,
+                            "prompt_tokens": op.prompt_tokens,
+                            "completion_tokens": op.completion_tokens,
+                            "total_tokens": op.total_tokens,
+                            "latency_ms": op.latency_ms,
+                            "cost_usd": op.cost_usd,
+                            "status": op.status.value,
+                            "error_message": op.error_message,
+                            "timestamp": op.timestamp.isoformat(),
+                            "metadata": op.metadata,
+                        }
+                        for op in recent_ops
+                    ]
+                }
 
-            self.storage_path.parent.mkdir(parents=True, exist_ok=True)
-            with self.storage_path.open("w", encoding="utf-8") as f:
-                json.dump(data, f, default=str, indent=2)
-        except Exception:
-            # Silently fail persistence
-            pass
+                self.storage_path.parent.mkdir(parents=True, exist_ok=True)
+                with self.storage_path.open("w", encoding="utf-8") as f:
+                    json.dump(data, f, default=str, indent=2)
+            except Exception:
+                # Silently fail persistence
+                pass
+        
+        # Run file I/O in thread pool to avoid blocking
+        await asyncio.to_thread(_persist_sync)
 
-    def _load(self) -> None:
+    async def _load(self) -> None:
         """
-        Load operations from disk.
+        Load operations from disk asynchronously.
         
         Returns:
             None: Result of the operation.
         """
+        import asyncio
+        
         if not self.storage_path or not self.storage_path.exists():
             return
 
-        try:
-            with self.storage_path.open("r", encoding="utf-8") as f:
-                data = json.load(f)
+        def _load_sync() -> List[LLMOperation]:
+            try:
+                with self.storage_path.open("r", encoding="utf-8") as f:
+                    data = json.load(f)
 
-            def _parse_operation(item: Dict[str, Any]) -> LLMOperation:
-                return LLMOperation(
-                    operation_id=item["operation_id"],
-                    operation_type=LLMOperationType(item["operation_type"]),
-                    model=item["model"],
-                    tenant_id=item.get("tenant_id"),
-                    agent_id=item.get("agent_id"),
-                    prompt_tokens=item["prompt_tokens"],
-                    completion_tokens=item["completion_tokens"],
-                    total_tokens=item["total_tokens"],
-                    latency_ms=item["latency_ms"],
-                    cost_usd=item["cost_usd"],
-                    status=LLMOperationStatus(item["status"]),
-                    error_message=item.get("error_message"),
-                    timestamp=datetime.fromisoformat(item["timestamp"]),
-                    metadata=item.get("metadata", {}),
-                )
+                def _parse_operation(item: Dict[str, Any]) -> LLMOperation:
+                    return LLMOperation(
+                        operation_id=item["operation_id"],
+                        operation_type=LLMOperationType(item["operation_type"]),
+                        model=item["model"],
+                        tenant_id=item.get("tenant_id"),
+                        agent_id=item.get("agent_id"),
+                        prompt_tokens=item["prompt_tokens"],
+                        completion_tokens=item["completion_tokens"],
+                        total_tokens=item["total_tokens"],
+                        latency_ms=item["latency_ms"],
+                        cost_usd=item["cost_usd"],
+                        status=LLMOperationStatus(item["status"]),
+                        error_message=item.get("error_message"),
+                        timestamp=datetime.fromisoformat(item["timestamp"]),
+                        metadata=item.get("metadata", {}),
+                    )
 
-            self.operations = [_parse_operation(item) for item in data.get("operations", [])]
-        except Exception:
-            # Silently fail loading
-            pass
+                return [_parse_operation(item) for item in data.get("operations", [])]
+            except Exception:
+                # Silently fail loading
+                return []
+        
+        # Run file I/O in thread pool to avoid blocking
+        self.operations = await asyncio.to_thread(_load_sync)

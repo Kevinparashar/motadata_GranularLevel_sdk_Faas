@@ -36,12 +36,13 @@ class TestAgentRAGIntegration:
 
         return agent, rag, mock_db, mock_gateway
 
-    def test_agent_uses_rag_for_query(self, mock_components):
+    @pytest.mark.asyncio
+    async def test_agent_uses_rag_for_query(self, mock_components):
         """Test agent using RAG for querying."""
         agent, rag, _, _ = mock_components
 
         # Mock RAG query
-        with patch.object(rag, "query") as mock_query:
+        with patch.object(rag, "query_async") as mock_query:
             mock_query.return_value = {
                 "answer": "Test answer",
                 "retrieved_documents": [{"title": "Doc1"}],
@@ -54,27 +55,28 @@ class TestAgentRAGIntegration:
             assert task_id is not None
             assert len(agent.task_queue) == 1
 
-    def test_rag_ingestion_then_agent_query(self, mock_components):
+    @pytest.mark.asyncio
+    async def test_rag_ingestion_then_agent_query(self, mock_components):
         """Test RAG ingestion followed by agent query."""
         _, rag, _, _ = mock_components
 
         # Mock document ingestion
-        with patch.object(rag, "ingest_document") as mock_ingest:
+        with patch.object(rag, "ingest_document_async") as mock_ingest:
             mock_ingest.return_value = "doc-001"
 
-            doc_id = rag.ingest_document(title="Test Doc", content="Test content")
+            doc_id = await rag.ingest_document_async(title="Test Doc", content="Test content")
 
             assert doc_id == "doc-001"
 
         # Mock query
-        with patch.object(rag, "query") as mock_query:
+        with patch.object(rag, "query_async") as mock_query:
             mock_query.return_value = {
                 "answer": "Answer from RAG",
                 "retrieved_documents": [],
                 "num_documents": 0,
             }
 
-            result = rag.query("Test query")
+            result = await rag.query_async("Test query")
             assert result["answer"] == "Answer from RAG"
 
 

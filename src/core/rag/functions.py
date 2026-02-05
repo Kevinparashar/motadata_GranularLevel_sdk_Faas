@@ -393,7 +393,8 @@ def update_document_simple(
         ...     content="Updated content"
         ... )
     """
-    return rag_system.update_document(document_id, title, content, metadata)
+    import asyncio
+    return asyncio.run(rag_system.update_document(document_id, title, content, metadata))
 
 
 def delete_document_simple(rag_system: RAGSystem, document_id: str) -> bool:
@@ -410,7 +411,8 @@ def delete_document_simple(rag_system: RAGSystem, document_id: str) -> bool:
     Example:
         >>> success = delete_document_simple(rag, "doc-123")
     """
-    return rag_system.delete_document(document_id)
+    import asyncio
+    return asyncio.run(rag_system.delete_document(document_id))
 
 
 __all__ = [

@@ -203,9 +203,9 @@ class Agent(BaseModel):
                     agent_id=self.agent_id,
                 )
 
-    def _store_task_result_in_memory(self, task: AgentTask, result: Any) -> None:
+    async def _store_task_result_in_memory(self, task: AgentTask, result: Any) -> None:
         """
-        Store task result in memory if auto-persist is enabled.
+        Store task result in memory if auto-persist is enabled asynchronously.
         
         Args:
             task (AgentTask): Input parameter for this operation.
@@ -215,7 +215,7 @@ class Agent(BaseModel):
             None: Result of the operation.
         """
         if self.memory and self.auto_persist_memory:
-            self.memory.store(
+            await self.memory.store(
                 content=f"Task {task.task_id} result: {result}",
                 memory_type=MemoryType.SHORT_TERM,
                 importance=0.6,
@@ -270,7 +270,7 @@ class Agent(BaseModel):
             try:
                 result = await self._execute_task_internal(task)
                 self.last_active = datetime.now()
-                self._store_task_result_in_memory(task, result)
+                await self._store_task_result_in_memory(task, result)
                 return result
             except AgentExecutionError:
                 self.status = AgentStatus.ERROR
@@ -356,7 +356,7 @@ class Agent(BaseModel):
         model = task.parameters.get("model", self.llm_model or "gpt-4")
 
         # Build and record prompt
-        final_prompt = self._build_prompt_with_context(
+        final_prompt = await self._build_prompt_with_context(
             base_prompt=base_prompt, task=task, task_type=task.task_type
         )
         if self.prompt_manager:
@@ -418,7 +418,7 @@ class Agent(BaseModel):
 
             # Execute function calls
             messages.append({"role": "assistant", "content": response_text})
-            self._execute_function_calls(task, function_calls, messages, tool_calls_made, iteration)
+            await self._execute_function_calls(task, function_calls, messages, tool_calls_made, iteration)
             iteration += 1
 
         # Max iterations reached
@@ -459,7 +459,7 @@ class Agent(BaseModel):
             **llm_kwargs,
         )
 
-    def _execute_function_calls(
+    async def _execute_function_calls(
         self,
         task: AgentTask,
         function_calls: List[Dict[str, Any]],
@@ -468,7 +468,7 @@ class Agent(BaseModel):
         iteration: int,
     ) -> None:
         """
-        Execute all function calls from LLM response.
+        Execute all function calls from LLM response asynchronously.
         
         Args:
             task (AgentTask): Input parameter for this operation.
@@ -485,7 +485,7 @@ class Agent(BaseModel):
             arguments = func_call.get("arguments", {})
 
             try:
-                self._execute_single_tool(
+                await self._execute_single_tool(
                     task, tool_name, arguments, messages, tool_calls_made, func_call, iteration
                 )
             except Exception as e:
@@ -500,7 +500,7 @@ class Agent(BaseModel):
                 )
                 raise
 
-    def _execute_single_tool(
+    async def _execute_single_tool(
         self,
         task: AgentTask,
         tool_name: str,
@@ -511,13 +511,13 @@ class Agent(BaseModel):
         iteration: int,
     ) -> None:
         """
-        Execute a single tool call.
+        Execute a single tool call asynchronously.
         
         Args:
             task (AgentTask): Input parameter for this operation.
             tool_name (str): Input parameter for this operation.
-            arguments (Dict[str, Any]): Input parameter for this operation.
-            messages (List[Dict[str, Any]]): Chat messages in role/content format.
+            arguments: (Dict[str, Any]): Input parameter for this operation.
+            messages: List[Dict[str, Any]]): Chat messages in role/content format.
             tool_calls_made (List[Dict[str, Any]]): Input parameter for this operation.
             func_call (Dict[str, Any]): Input parameter for this operation.
             iteration (int): Input parameter for this operation.
@@ -536,7 +536,7 @@ class Agent(BaseModel):
             )
             return
 
-        tool_result = self.tool_executor.execute_tool_call(tool_name=tool_name, arguments=arguments)
+        tool_result = await self.tool_executor.execute_tool_call(tool_name=tool_name, arguments=arguments)
 
         # Store tool call info
         tool_calls_made.append(
@@ -559,7 +559,7 @@ class Agent(BaseModel):
 
         # Store in memory
         if self.memory:
-            self.memory.store(
+            await self.memory.store(
                 content=f"Tool {tool_name} executed with result: {tool_result}",
                 memory_type=MemoryType.SHORT_TERM,
                 importance=0.7,
@@ -767,9 +767,9 @@ class Agent(BaseModel):
                 return f"Role: {self.description}"
             return None
 
-    def _retrieve_memory_context(self, base_prompt: str) -> str:
+    async def _retrieve_memory_context(self, base_prompt: str) -> str:
         """
-        Retrieve relevant context from memory.
+        Retrieve relevant context from memory asynchronously.
         
         Args:
             base_prompt (str): Input parameter for this operation.
@@ -780,16 +780,16 @@ class Agent(BaseModel):
         if not self.memory:
             return ""
         
-        relevant_memories = self.memory.retrieve(query=base_prompt, limit=5)
+        relevant_memories = await self.memory.retrieve(query=base_prompt, limit=5)
         if not relevant_memories:
             return ""
         
         memory_contents = [mem.content for mem in relevant_memories]
         return "\n".join(memory_contents)
 
-    def _build_context(self, base_prompt: str, task: AgentTask) -> str:
+    async def _build_context(self, base_prompt: str, task: AgentTask) -> str:
         """
-        Build context from history, memory, and task parameters.
+        Build context from history, memory, and task parameters asynchronously.
         
         Args:
             base_prompt (str): Input parameter for this operation.
@@ -803,7 +803,7 @@ class Agent(BaseModel):
         else:
             context = base_prompt
 
-        context_from_memory = self._retrieve_memory_context(base_prompt)
+        context_from_memory = await self._retrieve_memory_context(base_prompt)
         if context_from_memory:
             context = f"{context}\n\nRelevant Context:\n{context_from_memory}"
 
@@ -832,9 +832,9 @@ class Agent(BaseModel):
             )
         return full_prompt
 
-    def _build_prompt_with_context(self, base_prompt: str, task: AgentTask, task_type: str) -> str:
+    async def _build_prompt_with_context(self, base_prompt: str, task: AgentTask, task_type: str) -> str:
         """
-        Build prompt with context management, system prompts, and memory integration.
+        Build prompt with context management, system prompts, and memory integration asynchronously.
         
         Args:
             base_prompt (str): Input parameter for this operation.
@@ -855,7 +855,7 @@ class Agent(BaseModel):
         if role_part:
             prompt_parts.append(role_part)
 
-        context = self._build_context(base_prompt, task)
+        context = await self._build_context(base_prompt, task)
         prompt_parts.append(f"Task: {base_prompt}")
 
         full_prompt = "\n\n".join(prompt_parts)
@@ -1116,9 +1116,9 @@ class Agent(BaseModel):
             name=name, version=version, content=content, metadata=metadata
         )
 
-    def send_message(self, to_agent: str, content: Any, message_type: str = "task") -> None:
+    async def send_message(self, to_agent: str, content: Any, message_type: str = "task") -> None:
         """
-        Send a message to another agent.
+        Send a message to another agent asynchronously.
         
         Args:
             to_agent (str): Input parameter for this operation.
@@ -1134,17 +1134,21 @@ class Agent(BaseModel):
         message = AgentMessage(
             from_agent=self.agent_id, to_agent=to_agent, content=content, message_type=message_type
         )
-        self.message_queue.append(message)
+        # Use asyncio.to_thread for thread-safe queue operations
+        import asyncio
+        await asyncio.to_thread(self.message_queue.append, message)
 
-    def receive_message(self) -> Optional[AgentMessage]:
+    async def receive_message(self) -> Optional[AgentMessage]:
         """
-        Receive a message from the message queue.
+        Receive a message from the message queue asynchronously.
         
         Returns:
             Optional[AgentMessage]: Builder instance (returned for call chaining).
         """
+        import asyncio
         if self.message_queue:
-            return self.message_queue.pop(0)
+            # Use asyncio.to_thread for thread-safe queue operations
+            return await asyncio.to_thread(self.message_queue.pop, 0)
         return None
 
     def get_status(self) -> Dict[str, Any]:
@@ -1164,9 +1168,9 @@ class Agent(BaseModel):
             "last_active": self.last_active.isoformat(),
         }
 
-    def save_state(self, file_path: Optional[str] = None) -> None:
+    async def save_state(self, file_path: Optional[str] = None) -> None:
         """
-        Save complete agent state to disk for persistence.
+        Save complete agent state to disk for persistence asynchronously.
         
         Saves agent configuration, capabilities, task queue, tools, memory,
                                                 prompt manager state, and metadata.
@@ -1192,12 +1196,13 @@ class Agent(BaseModel):
         # Prepare complete state
         state = self._build_state_dict(tools_state, prompt_manager_state)
 
-        # Write state to file
-        with state_path.open("w", encoding="utf-8") as f:
-            json.dump(state, f, indent=2, default=str)
+        # Write state to file asynchronously
+        import aiofiles
+        async with aiofiles.open(str(state_path), "w", encoding="utf-8") as f:
+            await f.write(json.dumps(state, indent=2, default=str))
 
         # Save additional components
-        self._save_prompt_history(state_path)
+        await self._save_prompt_history(state_path)
 
     def _serialize_tools(self) -> Optional[List[Dict[str, Any]]]:
         """
@@ -1310,9 +1315,9 @@ class Agent(BaseModel):
             "prompt_manager": prompt_manager_state,
         }
 
-    def _save_prompt_history(self, state_path: Any) -> None:
+    async def _save_prompt_history(self, state_path: Any) -> None:
         """
-        Save prompt manager history if available.
+        Save prompt manager history if available asynchronously.
         
         Args:
             state_path (Any): Input parameter for this operation.
@@ -1322,12 +1327,14 @@ class Agent(BaseModel):
         """
         if self.prompt_manager and hasattr(self.prompt_manager, "save_history"):
             prompt_history_path = state_path.parent / f"{self.agent_id}_prompt_history.json"
-            self.prompt_manager.save_history(str(prompt_history_path))
+            # Use async file operations
+            import asyncio
+            await asyncio.to_thread(self.prompt_manager.save_history, str(prompt_history_path))
 
     @classmethod
-    def _load_state_file(cls, file_path: str) -> Dict[str, Any]:
+    async def _load_state_file(cls, file_path: str) -> Dict[str, Any]:
         """
-        Load state from file.
+        Load state from file asynchronously.
         
         Args:
             file_path (str): Path of the input file.
@@ -1339,6 +1346,7 @@ class Agent(BaseModel):
             AgentStateError: Raised when this function detects an invalid state or when an underlying call fails.
         """
         from pathlib import Path
+        import aiofiles
 
         state_path = Path(file_path)
         if not state_path.exists():
@@ -1348,8 +1356,9 @@ class Agent(BaseModel):
                 file_path=file_path,
             )
 
-        with state_path.open("r", encoding="utf-8") as f:
-            return json.load(f)
+        async with aiofiles.open(str(state_path), "r", encoding="utf-8") as f:
+            content = await f.read()
+            return json.loads(content)
 
     @classmethod
     def _create_agent_from_state(
@@ -1535,14 +1544,14 @@ class Agent(BaseModel):
             agent.last_active = datetime.fromisoformat(state["last_active"])
 
     @classmethod
-    def load_state(
+    async def load_state(
         cls,
         file_path: str,
         gateway: Optional[Any] = None,
         restore_tools: Optional[Dict[str, Callable]] = None,
     ) -> "Agent":
         """
-        Load complete agent state from disk.
+        Load complete agent state from disk asynchronously.
         
         Args:
             file_path (str): Path of the input file.
@@ -1554,7 +1563,7 @@ class Agent(BaseModel):
         """
         from pathlib import Path
 
-        state = cls._load_state_file(file_path)
+        state = await cls._load_state_file(file_path)
         agent = cls._create_agent_from_state(state, gateway)
         state_path = Path(file_path)
 
@@ -1642,11 +1651,11 @@ class AgentManager:
             if any(cap.name == capability_name for cap in agent.capabilities)
         ]
 
-    def broadcast_message(
+    async def broadcast_message(
         self, from_agent: str, content: Any, message_type: str = "broadcast"
     ) -> None:
         """
-        Broadcast a message to all agents.
+        Broadcast a message to all agents asynchronously.
         
         Args:
             from_agent (str): Input parameter for this operation.
@@ -1658,13 +1667,13 @@ class AgentManager:
         """
         for agent in self._agents.values():
             if agent.agent_id != from_agent:
-                agent.send_message(from_agent, content, message_type)
+                await agent.send_message(from_agent, content, message_type)
 
-    def send_message_to_agent(
+    async def send_message_to_agent(
         self, from_agent: str, to_agent: str, content: Any, message_type: str = "message"
     ) -> None:
         """
-        Send a message from one agent to another.
+        Send a message from one agent to another asynchronously.
         
         Args:
             from_agent (str): Input parameter for this operation.
@@ -1677,7 +1686,7 @@ class AgentManager:
         """
         target = self.get_agent(to_agent)
         if target:
-            target.send_message(from_agent, content, message_type)
+            await target.send_message(from_agent, content, message_type)
 
     def get_agent_statuses(self) -> Dict[str, Dict[str, Any]]:
         """

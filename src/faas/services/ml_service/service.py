@@ -77,6 +77,13 @@ class MLService:
         # Setup middleware
         setup_middleware(self.app)
 
+        # Register startup event to ensure database connection is ready
+        @self.app.on_event("startup")
+        async def startup_event():
+            """Ensure database connection is ready on service startup."""
+            if hasattr(self.db, "connect"):
+                await self.db.connect()
+
         # Register routes
         self._register_routes()
 
@@ -150,15 +157,19 @@ class MLService:
             span.set_attribute("tenant.id", standard_headers.tenant_id)
 
         try:
-            # Get ML system (used for future implementation)
-            self._get_ml_system(standard_headers.tenant_id)
+            # Get ML system
+            ml_system = self._get_ml_system(standard_headers.tenant_id)
 
             # Start training (async)
-            training_id = f"training_{standard_headers.request_id[:8]}"
             model_id = f"model_{standard_headers.request_id[:8]}"
+            training_result = await ml_system.train_model(
+                model_id=model_id,
+                model_type=request.model_type,
+                training_data=request.training_data,
+                hyperparameters=request.hyperparameters,
+            )
 
-            # Training implementation - to be implemented
-            # For now, return placeholder response
+            training_id = f"training_{standard_headers.request_id[:8]}"
 
             # Publish event via NATS
             if self.nats_client:
@@ -170,10 +181,12 @@ class MLService:
                 success=True,
                 data={
                     "training_id": training_id,
-                    "model_id": model_id,
-                    "status": "started",
+                    "model_id": training_result["model_id"],
+                    "version": training_result.get("version"),
+                    "status": "completed",
+                    "metrics": training_result.get("metrics", {}),
                 },
-                message="Model training started",
+                message="Model training completed",
                 correlation_id=standard_headers.correlation_id,
                 request_id=standard_headers.request_id,
             )
@@ -209,7 +222,7 @@ class MLService:
         }
         await self.nats_client.publish(
             f"ml.events.{tenant_id}",
-            self.codec_manager.encode(event),
+            await self.codec_manager.encode(event),
         )
 
     async def _handle_predict(  # noqa: S7503
@@ -238,18 +251,20 @@ class MLService:
             span.set_attribute("tenant.id", standard_headers.tenant_id)
 
         try:
-            # Get ML system (used for future implementation)
-            self._get_ml_system(standard_headers.tenant_id)
+            # Get ML system
+            ml_system = self._get_ml_system(standard_headers.tenant_id)
 
-            # Make prediction - implementation to be added
-            # Placeholder response for now
-            result = {"prediction": "placeholder", "confidence": 0.95}
+            # Make prediction (async)
+            # Use model_id from path parameter (route parameter takes precedence)
+            prediction = await ml_system.predict(
+                model_id=model_id,
+                input_data=request.features,
+            )
 
             return ServiceResponse(
                 success=True,
                 data={
-                    "prediction": result["prediction"],
-                    "confidence": result.get("confidence"),
+                    "prediction": prediction,
                     "model_id": model_id,
                 },
                 correlation_id=standard_headers.correlation_id,
@@ -285,18 +300,21 @@ class MLService:
         standard_headers = extract_headers(**headers)
 
         try:
-            # Get ML system (used for future implementation)
-            self._get_ml_system(standard_headers.tenant_id)
+            # Get ML system
+            ml_system = self._get_ml_system(standard_headers.tenant_id)
 
-            # Make batch predictions - implementation to be added
-            # Placeholder response for now
-            results = [{"prediction": "placeholder"} for _ in request.features_list]
+            # Make batch predictions (async)
+            # Use model_id from path parameter (route parameter takes precedence)
+            predictions = await ml_system.predict_batch(
+                model_id=model_id,
+                input_batch=request.features_list,
+            )
 
             return ServiceResponse(
                 success=True,
                 data={
-                    "predictions": results,
-                    "count": len(results),
+                    "predictions": predictions,
+                    "count": len(predictions),
                     "model_id": model_id,
                 },
                 correlation_id=standard_headers.correlation_id,
@@ -325,14 +343,28 @@ class MLService:
         """
         standard_headers = extract_headers(**headers)
 
-        # Model listing from database - to be implemented
-        # For now, return placeholder response
-        return ServiceResponse(
-            success=True,
-            data={"models": [], "total": 0},
-            correlation_id=standard_headers.correlation_id,
-            request_id=standard_headers.request_id,
-        )
+        try:
+            # Get ML system
+            ml_system = self._get_ml_system(standard_headers.tenant_id)
+
+            # List models (async)
+            all_models = await ml_system.model_manager.list_models(limit=limit)
+            
+            # Apply pagination
+            paginated_models = all_models[offset : offset + limit]
+
+            return ServiceResponse(
+                success=True,
+                data={"models": paginated_models, "total": len(all_models)},
+                correlation_id=standard_headers.correlation_id,
+                request_id=standard_headers.request_id,
+            )
+        except Exception as e:
+            logger.error(f"Error listing models: {str(e)}", exc_info=True)
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail=f"Failed to list models: {str(e)}",
+            )
 
     async def _handle_get_model(self, model_id: str, headers: dict = Header(...)):  # noqa: S7503
         """
@@ -345,13 +377,27 @@ class MLService:
         Raises:
             HTTPException: Raised when this function detects an invalid state or when an underlying call fails.
         """
-        extract_headers(**headers)  # Extract headers for validation
+        standard_headers = extract_headers(**headers)
 
-        # Model retrieval from database - to be implemented
-        raise HTTPException(
-            status_code=status.HTTP_501_NOT_IMPLEMENTED,
-            detail="Model retrieval not yet implemented",
-        )
+        try:
+            # Get ML system
+            ml_system = self._get_ml_system(standard_headers.tenant_id)
+
+            # Get model info (async)
+            model_info = await ml_system.get_model_info(model_id=model_id)
+
+            return ServiceResponse(
+                success=True,
+                data=model_info,
+                correlation_id=standard_headers.correlation_id,
+                request_id=standard_headers.request_id,
+            )
+        except Exception as e:
+            logger.error(f"Error getting model: {str(e)}", exc_info=True)
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail=f"Failed to get model: {str(e)}",
+            )
 
     async def _handle_deploy_model(  # noqa: S7503
         self, model_id: str, request: DeployModelRequest, headers: dict = Header(...)
@@ -373,14 +419,15 @@ class MLService:
         standard_headers = extract_headers(**headers)
 
         try:
-            # Get ML system (used for future implementation)
-            self._get_ml_system(standard_headers.tenant_id)
+            # Get ML system
+            ml_system = self._get_ml_system(standard_headers.tenant_id)
 
-            # Deploy model - implementation to be added
+            # Load model if not already loaded (async)
+            await ml_system.load_model(model_id=model_id, version=request.version)
 
             return ServiceResponse(
                 success=True,
-                data={"model_id": model_id, "status": "deployed"},
+                data={"model_id": model_id, "version": request.version, "status": "deployed"},
                 message="Model deployed successfully",
                 correlation_id=standard_headers.correlation_id,
                 request_id=standard_headers.request_id,

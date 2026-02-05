@@ -279,7 +279,7 @@ class ToolGenerator:
             )
 
             # Cache tool schema and code
-            self.cache.cache_tool_schema(
+            await self.cache.cache_tool_schema(
                 tool_id=tool_id,
                 schema={
                     "name": requirements.name,
@@ -292,7 +292,7 @@ class ToolGenerator:
                 tenant_id=tenant_id,
             )
 
-            self.cache.cache_tool_code(tool_id=tool_id, code=code, tenant_id=tenant_id)
+            await self.cache.cache_tool_code(tool_id=tool_id, code=code, tenant_id=tenant_id)
 
             return tool
 

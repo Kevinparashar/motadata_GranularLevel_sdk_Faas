@@ -1,19 +1,22 @@
 """
 Database Connection Management
 
-Handles PostgreSQL database connections with connection pooling.
+Handles PostgreSQL database connections with async connection pooling.
 """
 
 
 # Standard library imports
+import asyncio
 import os
-from contextlib import contextmanager
-from typing import Optional
+from contextlib import asynccontextmanager
+from typing import Any, List, Optional, Tuple
 
 # Third-party imports
-import psycopg2
-from psycopg2 import pool
-from psycopg2.extras import RealDictCursor
+try:
+    import asyncpg  # type: ignore[import-untyped]
+except ImportError:
+    asyncpg = None
+
 from pydantic import BaseModel, Field
 
 
@@ -50,7 +53,9 @@ class DatabaseConfig(BaseModel):
 
 class DatabaseConnection:
     """
-    PostgreSQL database connection manager with connection pooling.
+    PostgreSQL database connection manager with async connection pooling.
+    
+    Uses asyncpg for async database operations.
     """
 
     def __init__(self, config: DatabaseConfig):
@@ -61,11 +66,12 @@ class DatabaseConnection:
             config (DatabaseConfig): Configuration object or settings.
         """
         self.config = config
-        self.connection_pool: Optional[pool.ThreadedConnectionPool] = None
+        self.pool: Optional[Any] = None  # asyncpg.Pool when asyncpg is available
+        self._loop: Optional[asyncio.AbstractEventLoop] = None
 
-    def connect(self) -> None:
+    async def connect(self) -> None:
         """
-        Create connection pool.
+        Create async connection pool.
         
         Returns:
             None: Result of the operation.
@@ -74,147 +80,211 @@ class DatabaseConnection:
             ConnectionError: Raised when this function detects an invalid state or when an underlying call fails.
         """
         try:
-            self.connection_pool = pool.ThreadedConnectionPool(
-                minconn=self.config.min_connections,
-                maxconn=self.config.max_connections,
+            self.pool = await asyncpg.create_pool(
                 host=self.config.host,
                 port=self.config.port,
                 database=self.config.database,
                 user=self.config.user,
                 password=self.config.password,
+                min_size=self.config.min_connections,
+                max_size=self.config.max_connections,
+                command_timeout=self.config.connection_timeout,
             )
-        except psycopg2.Error as e:
-            raise ConnectionError(f"Failed to create connection pool: {e}")
+        except asyncpg.PostgresError as e:
+            raise ConnectionError(f"Failed to create connection pool: {e}") from e
         except Exception as e:
-            raise ConnectionError(f"Unexpected error creating connection pool: {e}")
+            raise ConnectionError(f"Unexpected error creating connection pool: {e}") from e
 
-    def close(self) -> None:
+    async def close(self) -> None:
         """
         Close all connections in pool.
         
         Returns:
             None: Result of the operation.
         """
-        if self.connection_pool:
-            self.connection_pool.closeall()
-            self.connection_pool = None
+        if self.pool:
+            await self.pool.close()
+            self.pool = None
 
-    @contextmanager
-    def get_connection(self):
+    @asynccontextmanager
+    async def get_connection(self):
         """
         Get a connection from the pool.
         
         Yields:
-                            Database connection
+            asyncpg.Connection: Database connection
         """
-        if not self.connection_pool:
-            self.connect()
+        if not self.pool:
+            await self.connect()
 
-        conn = self.connection_pool.getconn()
-        try:
+        async with self.pool.acquire() as conn:
             yield conn
-        finally:
-            self.connection_pool.putconn(conn)
 
-    @contextmanager
-    def get_cursor(self, cursor_factory=None):
+    def _convert_placeholders(self, query: str, param_count: int) -> str:
         """
-        Get a cursor from the connection pool.
-        
-        Yields:
-                                    Database cursor
+        Convert %s placeholders to $1, $2, etc. for asyncpg.
         
         Args:
-            cursor_factory (Any): Input parameter for this operation.
-        """
-        with self.get_connection() as conn:
-            cursor = conn.cursor(cursor_factory=cursor_factory)
-            try:
-                yield cursor
-                conn.commit()
-            except (
-                psycopg2.IntegrityError,
-                psycopg2.ProgrammingError,
-                psycopg2.OperationalError,
-            ):
-                conn.rollback()
-                raise
-            except Exception:
-                conn.rollback()
-                raise
-            finally:
-                cursor.close()
-
-    def execute_query(
-        self,
-        query: str,
-        params: Optional[tuple] = None,
-        fetch_one: bool = False,
-        fetch_all: bool = True,
-    ):
-        """
-        Execute a query.
-        
-        Args:
-            query (str): Input parameter for this operation.
-            params (Optional[tuple]): Input parameter for this operation.
-            fetch_one (bool): Input parameter for this operation.
-            fetch_all (bool): Input parameter for this operation.
+            query (str): SQL query with %s placeholders.
+            param_count (int): Number of parameters.
         
         Returns:
-            Any: Result of the operation.
+            str: Query with $1, $2, etc. placeholders.
         """
-        with self.get_cursor(cursor_factory=RealDictCursor) as cursor:
-            cursor.execute(query, params)
+        parts = query.split('%s')
+        if len(parts) <= 1:
+            # Query already uses $1, $2 format or has no placeholders
+            return query
+        
+        # Rebuild query with numbered placeholders
+        query_parts = []
+        for i, part in enumerate(parts):
+            query_parts.append(part)
+            if i < len(parts) - 1:
+                query_parts.append(f'${i + 1}')
+        return ''.join(query_parts)
 
-            if fetch_one:
-                return cursor.fetchone()
-            elif fetch_all:
-                return cursor.fetchall()
-            else:
-                return cursor.rowcount
-
-    def execute_transaction(self, queries: list[tuple[str, Optional[tuple]]]) -> None:
+    async def execute_query(
+        self,
+        query: str,
+        params: Optional[Tuple[Any, ...]] = None,
+        fetch_one: bool = False,
+        fetch_all: bool = True,
+    ) -> Any:
         """
-        Execute multiple queries in a transaction.
+        Execute a query asynchronously.
         
         Args:
-            queries (list[tuple[str, Optional[tuple]]]): Input parameter for this operation.
+            query (str): SQL query to execute.
+            params (Optional[Tuple[Any, ...]]): Query parameters.
+            fetch_one (bool): Fetch only one row.
+            fetch_all (bool): Fetch all rows.
+        
+        Returns:
+            Any: Query results (dict, list of dicts, or row count).
+        """
+        if not self.pool:
+            await self.connect()
+
+        async with self.pool.acquire() as conn:
+            query_converted = self._convert_placeholders(query, len(params)) if params else query
+            params_tuple = params or ()
+
+            if fetch_one:
+                result = await conn.fetchrow(query_converted, *params_tuple)
+                return dict(result) if result else None
+            
+            if fetch_all:
+                results = await conn.fetch(query_converted, *params_tuple)
+                return [dict(row) for row in results]
+            
+            # Execute without fetching
+            result = await conn.execute(query_converted, *params_tuple)
+            # Extract row count from result status
+            return int(result.split()[-1]) if result else 0
+
+    async def execute_transaction(
+        self, queries: List[Tuple[str, Optional[Tuple[Any, ...]]]]
+    ) -> None:
+        """
+        Execute multiple queries in a transaction asynchronously.
+        
+        Args:
+            queries (List[Tuple[str, Optional[Tuple[Any, ...]]]]): List of (query, params) tuples.
         
         Returns:
             None: Result of the operation.
+        
+        Raises:
+            asyncpg.PostgresError: Database error during transaction.
         """
-        with self.get_connection() as conn:
-            cursor = conn.cursor()
-            try:
-                for query, params in queries:
-                    cursor.execute(query, params)
-                conn.commit()
-            except (
-                psycopg2.IntegrityError,
-                psycopg2.ProgrammingError,
-                psycopg2.OperationalError,
-            ):
-                conn.rollback()
-                raise
-            except Exception:
-                conn.rollback()
-                raise
-            finally:
-                cursor.close()
+        if not self.pool:
+            await self.connect()
 
-    def check_connection(self) -> bool:
+        async with self.pool.acquire() as conn:
+            async with conn.transaction():
+                for query, params in queries:
+                    if params:
+                        query_converted = self._convert_placeholders(query, len(params))
+                        await conn.execute(query_converted, *params)
+                    else:
+                        await conn.execute(query)
+
+    async def check_connection(self) -> bool:
         """
-        Check if database connection is working.
+        Check if database connection is working asynchronously.
         
         Returns:
             bool: True if the operation succeeds, else False.
         """
         try:
-            with self.get_cursor() as cursor:
-                cursor.execute("SELECT 1")
+            if not self.pool:
+                await self.connect()
+            async with self.pool.acquire() as conn:
+                await conn.fetchval("SELECT 1")
                 return True
-        except (psycopg2.OperationalError, ConnectionError):
+        except (asyncpg.PostgresError, ConnectionError):
             return False
         except Exception:
             return False
+
+    # Synchronous wrappers for backward compatibility (will be deprecated)
+    def execute_query_sync(
+        self,
+        query: str,
+        params: Optional[Tuple[Any, ...]] = None,
+        fetch_one: bool = False,
+        fetch_all: bool = True,
+    ) -> Any:
+        """
+        Synchronous wrapper for execute_query (DEPRECATED).
+        
+        Use execute_query() directly with await instead.
+        This wrapper is provided for backward compatibility only.
+        
+        Args:
+            query (str): SQL query to execute.
+            params (Optional[Tuple[Any, ...]]): Query parameters.
+            fetch_one (bool): Fetch only one row.
+            fetch_all (bool): Fetch all rows.
+        
+        Returns:
+            Any: Query results.
+        """
+        loop = self._get_or_create_event_loop()
+        return loop.run_until_complete(
+            self.execute_query(query, params, fetch_one, fetch_all)
+        )
+
+    def _get_or_create_event_loop(self) -> asyncio.AbstractEventLoop:
+        """
+        Get existing event loop or create new one.
+        
+        Returns:
+            asyncio.AbstractEventLoop: Event loop instance.
+        
+        Raises:
+            RuntimeError: If called from within an async context.
+        """
+        try:
+            # Check if we're already in an async context
+            loop = asyncio.get_running_loop()
+            # If we're already in an async context, we can't use run_until_complete
+            # This is a safety check to prevent nested event loops
+            raise RuntimeError(
+                "Cannot use sync methods from async context. Use async methods instead."
+            )
+        except RuntimeError as e:
+            # Check if this is our custom error or a "no running loop" error
+            if "Cannot use sync methods" in str(e):
+                raise  # Re-raise our custom error
+            # Not in async context, safe to create/get event loop
+            try:
+                loop = asyncio.get_event_loop()
+                if loop.is_closed():
+                    loop = asyncio.new_event_loop()
+                    asyncio.set_event_loop(loop)
+            except RuntimeError:
+                loop = asyncio.new_event_loop()
+                asyncio.set_event_loop(loop)
+            return loop
