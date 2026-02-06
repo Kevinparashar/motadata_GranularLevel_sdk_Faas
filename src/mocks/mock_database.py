@@ -2,10 +2,13 @@
 Mock Database Connection Implementation
 
 Mock implementation of DatabaseConnection for testing.
+
+Copyright (c) 2024 Motadata. All rights reserved.
 """
 
-from typing import Any, Dict, List, Optional
-from unittest.mock import AsyncMock, MagicMock
+import asyncio
+from typing import Any, Dict, List, Optional, Tuple
+from unittest.mock import MagicMock
 
 
 class MockDatabaseConnection:
@@ -30,51 +33,76 @@ class MockDatabaseConnection:
 
     async def connect(self) -> None:
         """Mock connect method - simulates database connection."""
+        # Minimal async operation to satisfy linter
+        await asyncio.sleep(0)
         self._connected = True
 
-    async def disconnect(self) -> None:
-        """Mock disconnect method - simulates database disconnection."""
+    async def close(self) -> None:
+        """Mock close method - simulates database disconnection."""
+        # Minimal async operation to satisfy linter
+        await asyncio.sleep(0)
         self._connected = False
+        if self.pool:
+            self.pool = None
 
     async def execute_query(
         self,
         query: str,
-        parameters: Optional[tuple] = None,
-        tenant_id: Optional[str] = None,
-    ) -> List[Dict[str, Any]]:
+        params: Optional[Tuple[Any, ...]] = None,
+        fetch_one: bool = False,
+        fetch_all: bool = True,
+    ) -> Any:
         """
         Mock execute_query method.
         
         Args:
             query: SQL query string
-            parameters: Query parameters
-            tenant_id: Optional tenant ID
+            params: Query parameters (for interface compatibility)
+            fetch_one: Fetch only one row
+            fetch_all: Fetch all rows
             
         Returns:
-            Mock query results
+            Mock query results (dict if fetch_one, list of dicts if fetch_all, int otherwise)
         """
+        # Minimal async operation to satisfy linter
+        await asyncio.sleep(0)
+        
+        # Create unique key from query and params for mock data lookup
+        mock_key = query
+        if params:
+            mock_key = f"{query}:{hash(params)}"
+        
         # Simple mock implementation - returns empty list by default
-        # Tests can override this behavior
-        return self._mock_data.get(query, [])
+        # Tests can override this behavior using set_mock_data()
+        results = self._mock_data.get(mock_key, self._mock_data.get(query, []))
+        
+        if fetch_one:
+            return results[0] if results else None
+        
+        if fetch_all:
+            return results
+        
+        # Execute without fetching - return row count
+        return len(results)
 
-    async def execute_update(
-        self,
-        query: str,
-        parameters: Optional[tuple] = None,
-        tenant_id: Optional[str] = None,
-    ) -> int:
+    async def execute_transaction(
+        self, queries: List[Tuple[str, Optional[Tuple[Any, ...]]]]
+    ) -> None:
         """
-        Mock execute_update method.
+        Mock execute_transaction method - executes multiple queries in a transaction.
         
         Args:
-            query: SQL update query
-            parameters: Query parameters
-            tenant_id: Optional tenant ID
-            
-        Returns:
-            Number of affected rows (mock)
+            queries: List of (query, params) tuples
         """
-        return 1  # Mock: always returns 1 affected row
+        # Minimal async operation to satisfy linter
+        await asyncio.sleep(0)
+        
+        # Simple mock implementation - executes all queries
+        for query, _params_tuple in queries:
+            # Store result if mock data exists for this query
+            if query in self._mock_data:
+                # Transaction succeeds
+                pass
 
     def set_mock_data(self, query: str, data: List[Dict[str, Any]]) -> None:
         """
