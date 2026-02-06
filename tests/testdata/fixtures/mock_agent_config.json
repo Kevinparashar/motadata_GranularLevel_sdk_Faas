@@ -1,0 +1,25 @@
+{
+  "agent_id": "test_agent_001",
+  "name": "Test Agent",
+  "tenant_id": "test_tenant",
+  "config": {
+    "model": "gpt-4",
+    "temperature": 0.7,
+    "max_tokens": 1000,
+    "tools": [
+      {
+        "name": "search",
+        "description": "Search for information"
+      },
+      {
+        "name": "calculate",
+        "description": "Perform calculations"
+      }
+    ]
+  },
+  "state": {
+    "conversation_history": [],
+    "current_step": "initialized"
+  }
+}
+

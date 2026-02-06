@@ -1,0 +1,43 @@
+OpenTelemetry Instrumentation Packages - Python SDK
+
+INSTRUMENTATION PACKAGES (7 packages):
+
+REQUIRED (5 packages):
+1. opentelemetry-instrumentation-httpx
+2. opentelemetry-instrumentation-requests
+3. opentelemetry-instrumentation-fastapi
+4. opentelemetry-instrumentation-asyncpg
+5. opentelemetry-instrumentation-redis (works with Dragonfly - Redis-compatible)
+
+RECOMMENDED (2 packages):
+6. opentelemetry-instrumentation-sqlalchemy
+7. opentelemetry-instrumentation-uvicorn
+
+EXPORTER PACKAGES (1 required):
+
+REQUIRED:
+8. opentelemetry-exporter-otlp - OTLP exporter to send traces/metrics to backend
+
+INSTALLATION:
+pip install opentelemetry-instrumentation-httpx opentelemetry-instrumentation-requests opentelemetry-instrumentation-fastapi opentelemetry-instrumentation-asyncpg opentelemetry-instrumentation-redis opentelemetry-instrumentation-sqlalchemy opentelemetry-instrumentation-uvicorn opentelemetry-exporter-otlp
+
+TOTAL: 8 packages (6 required + 2 recommended)
+
+NOTE: 
+- LLM API calls (OpenAI, Anthropic) are automatically traced via HTTP instrumentation
+- Vector database (PostgreSQL + pgvector) is ALREADY COVERED by asyncpg instrumentation
+- Custom AI components (Agents Framework, RAG System, ML Framework) need MANUAL instrumentation using OpenTelemetry SDK (no pre-built packages exist)
+- OTLP exporter is required to send traces to your observability backend (OTEL Collector, Jaeger, etc.)
+
+WHAT'S COVERED:
+✅ Vector database operations - Covered by opentelemetry-instrumentation-asyncpg (pgvector is PostgreSQL extension)
+✅ LLM API calls - Covered by HTTP instrumentation (httpx/requests)
+✅ Database queries - Covered by asyncpg instrumentation
+✅ Cache operations (Dragonfly) - Covered by opentelemetry-instrumentation-redis (Dragonfly is Redis-compatible, uses aioredis)
+
+WHAT NEEDS MANUAL INSTRUMENTATION:
+⚠️ Agents Framework - Custom framework, use OpenTelemetry SDK directly
+⚠️ RAG System - Custom implementation, use OpenTelemetry SDK directly
+⚠️ ML Framework - Custom implementation, use OpenTelemetry SDK directly
+⚠️ Prompt Management - Custom component, use OpenTelemetry SDK directly
+

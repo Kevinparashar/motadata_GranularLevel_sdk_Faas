@@ -91,26 +91,26 @@ pip install pytest-benchmark
 
 ```bash
 # Run all benchmarks
-pytest src/tests/benchmarks/ -v
+pytest tests/benchmarks/ -v
 
 # Run with benchmark output
-pytest src/tests/benchmarks/ --benchmark-only
+pytest tests/benchmarks/ --benchmark-only
 
 # Run specific benchmark
-pytest src/tests/benchmarks/benchmark_gateway.py -v
+pytest tests/benchmarks/benchmark_gateway.py -v
 ```
 
 ### Run Specific Benchmark Types
 
 ```bash
 # Run only load tests
-pytest src/tests/benchmarks/load_test_api.py -v
+pytest tests/benchmarks/load_test_api.py -v
 
 # Run only stress tests
-pytest src/tests/benchmarks/stress_test_system.py -v
+pytest tests/benchmarks/stress_test_system.py -v
 
 # Run component benchmarks
-pytest src/tests/benchmarks/benchmark_*.py -v
+pytest tests/benchmarks/benchmark_*.py -v
 ```
 
 ### Benchmark Output
@@ -174,10 +174,10 @@ Benchmarks can be integrated into CI/CD pipelines:
 
 ```bash
 # Run benchmarks and save results
-pytest src/tests/benchmarks/ --benchmark-json=benchmark_results.json
+pytest tests/benchmarks/ --benchmark-json=benchmark_results.json
 
 # Compare with previous results
-pytest src/tests/benchmarks/ --benchmark-compare
+pytest tests/benchmarks/ --benchmark-compare
 ```
 
 ## Best Practices

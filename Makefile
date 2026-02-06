@@ -9,7 +9,7 @@ PIP := pip3
 
 # Project directories
 SRC_DIR := src
-TESTS_DIR := src/tests
+TESTS_DIR := tests
 EXAMPLES_DIR := examples
 DOCS_DIR := docs
 

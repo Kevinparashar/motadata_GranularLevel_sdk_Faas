@@ -8,10 +8,10 @@
 
 ## 🚀 Quick Start
 
-- **[Onboarding Guide](ONBOARDING_GUIDE.md)** - **START HERE** - Complete guide for new team members
-- **[Documentation Index](DOCUMENTATION_INDEX.md)** - Complete navigation guide
-- **[Quick Reference](QUICK_REFERENCE.md)** - Common tasks and APIs
-- **[Navigation Helper](NAVIGATION_HELPER.md)** - Find information fast
+- **[Onboarding Guide](integration-onboarding/ONBOARDING_GUIDE.md)** - **START HERE** - Complete guide for new team members
+- **[Documentation Index](reference/DOCUMENTATION_INDEX.md)** - Complete navigation guide
+- **[Quick Reference](reference/QUICK_REFERENCE.md)** - Common tasks and APIs
+- **[Navigation Helper](reference/NAVIGATION_HELPER.md)** - Find information fast
 - **[Main README](../../README.md)** - Project overview and installation
 
 ---
@@ -19,7 +19,7 @@
 ## 📚 Documentation Structure
 
 ### Getting Started
-- **[Onboarding Guide](ONBOARDING_GUIDE.md)** - **START HERE** - Complete guide for understanding the SDK
+- **[Onboarding Guide](integration-onboarding/ONBOARDING_GUIDE.md)** - **START HERE** - Complete guide for understanding the SDK
 - **[Quick Start Guide](../../README.md#quick-start-5-minutes)** - Get up and running in 5 minutes
 - **[Installation Guide](../../README.md#installation)** - Detailed installation
 - **[Hello World Example](../../examples/hello_world.py)** - Simplest example
@@ -27,8 +27,9 @@
 ### Core Documentation
 
 #### 📖 Guides
-- **[Onboarding Guide](ONBOARDING_GUIDE.md)** - Complete guide for new team members
-- **[Developer Integration Guide](DEVELOPER_INTEGRATION_GUIDE.md)** - **FOR DEVELOPERS** - Component development and integration patterns
+- **[Onboarding Guide](integration-onboarding/ONBOARDING_GUIDE.md)** - Complete guide for new team members
+- **[Developer Integration Guide](integration-onboarding/DEVELOPER_INTEGRATION_GUIDE.md)** - **FOR DEVELOPERS** - Component development and integration patterns
+- **[Building New Use Case Guide](integration-onboarding/BUILDING_NEW_USECASE_GUIDE.md)** - Guide for building new use cases
 - **[Prompt-Based Creation Guide](../components/prompt_based_creation_guide.md)** - Create agents/tools from prompts
 
 #### 🏗️ Architecture
@@ -68,20 +69,20 @@
 ## 🔍 Finding Information
 
 ### By Topic
-Use the **[Documentation Index](DOCUMENTATION_INDEX.md)** to find documentation by:
+Use the **[Documentation Index](reference/DOCUMENTATION_INDEX.md)** to find documentation by:
 - Functionality (creating agents, configuration, error handling)
 - Use case (customer support, document Q&A, multi-agent systems)
 - Component type (core, infrastructure)
 
 ### By Task
-Use the **[Quick Reference](QUICK_REFERENCE.md)** for:
+Use the **[Quick Reference](reference/QUICK_REFERENCE.md)** for:
 - Common code snippets
 - Configuration examples
 - Error handling patterns
 - API quick lookup
 
 ### By Navigation
-Use the **[Navigation Helper](NAVIGATION_HELPER.md)** for:
+Use the **[Navigation Helper](reference/NAVIGATION_HELPER.md)** for:
 - Document maps and sizes
 - Search strategies
 - Cross-reference maps
@@ -92,11 +93,38 @@ Use the **[Navigation Helper](NAVIGATION_HELPER.md)** for:
 ## 📋 Quick Links
 
 ### Most Used
-- **[Documentation Index](DOCUMENTATION_INDEX.md)** - Complete navigation
-- **[Quick Reference](QUICK_REFERENCE.md)** - Common tasks
-- **[Navigation Helper](NAVIGATION_HELPER.md)** - Find information fast
+- **[Documentation Index](reference/DOCUMENTATION_INDEX.md)** - Complete navigation
+- **[Quick Reference](reference/QUICK_REFERENCE.md)** - Common tasks
+- **[Navigation Helper](reference/NAVIGATION_HELPER.md)** - Find information fast
 - **[Troubleshooting Index](../troubleshooting/README.md)** - Fix issues
 - **[Main README](../../README.md)** - Project overview
+
+### Documentation Categories
+
+#### 🧪 Quality & Testing
+- **[Testing Guide](quality-testing/Testing_guide.md)** - Complete testing guide
+- **[Coverage Exclusions](quality-testing/PYTHON_COVERAGE_EXCLUSIONS.md)** - Coverage exclusion patterns
+- **[SonarQube Quality Gate](quality-testing/sonarqube-quality-gate.md)** - Quality gate rules
+- **[Quality Gate Rules](quality-testing/PYTHON_SDK_QUALITY_GATE_RULES_AND_DEVELOPMENT_GUIDELINE_DOCUMENT.md)** - Development guidelines
+- **[Dev Environment Setup](quality-testing/PYTHON_SDK_Q_&_DEV_ENVIRONMENT_SETUP_GUIDE.md)** - Development setup
+
+#### 👨‍💻 Developer Guides
+- **[Developer Guidelines](developer-guides/PYTHON_SDK_DEVELOPER_GUIDELINES.md)** - Mandatory development standards
+
+#### 🔌 Integration & Onboarding
+- **[Onboarding Guide](integration-onboarding/ONBOARDING_GUIDE.md)** - New team member guide
+- **[Developer Integration Guide](integration-onboarding/DEVELOPER_INTEGRATION_GUIDE.md)** - Integration patterns
+- **[Building New Use Case](integration-onboarding/BUILDING_NEW_USECASE_GUIDE.md)** - Use case development
+
+#### 📚 Reference
+- **[Documentation Index](reference/DOCUMENTATION_INDEX.md)** - Complete index
+- **[Quick Reference](reference/QUICK_REFERENCE.md)** - Quick lookup
+- **[Navigation Helper](reference/NAVIGATION_HELPER.md)** - Navigation guide
+- **[Changelog](reference/CHANGELOG.md)** - Version history
+
+#### 📦 Dependencies
+- **[SDK Dependencies](dependencies/SDK_DEPENDENCIES_AND_LIBRARIES..md)** - Dependency list
+- **[Compatibility Matrix](dependencies/COMPATIBILITY_MATRIX_FINAL.md)** - Version compatibility
 
 ### Component Documentation
 - [Agent Framework](../../src/core/agno_agent_framework/README.md)
@@ -171,11 +199,11 @@ except AgentExecutionError as e:
 
 ## 🆘 Need Help?
 
-1. **New to the SDK?** Start with [Onboarding Guide](ONBOARDING_GUIDE.md)
+1. **New to the SDK?** Start with [Onboarding Guide](integration-onboarding/ONBOARDING_GUIDE.md)
 2. **Quick Start:** [README Quick Start](../../README.md#quick-start-5-minutes)
 3. **Examples:** [Examples Directory](../../examples/)
 4. **Troubleshooting:** [Troubleshooting Index](../troubleshooting/README.md)
-5. **Search:** [Documentation Index](DOCUMENTATION_INDEX.md)
+5. **Search:** [Documentation Index](reference/DOCUMENTATION_INDEX.md)
 
 ---
 

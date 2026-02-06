@@ -1,0 +1,33 @@
+{
+  "sample_documents": [
+    {
+      "id": "doc_001",
+      "content": "This is a sample document for testing RAG systems. It contains information about artificial intelligence and machine learning.",
+      "metadata": {
+        "title": "AI and ML Overview",
+        "author": "Test Author",
+        "created_at": "2024-01-01T00:00:00Z"
+      }
+    },
+    {
+      "id": "doc_002",
+      "content": "Python is a high-level programming language known for its simplicity and readability. It is widely used in data science and AI applications.",
+      "metadata": {
+        "title": "Python Programming",
+        "author": "Test Author",
+        "created_at": "2024-01-02T00:00:00Z"
+      }
+    }
+  ],
+  "sample_queries": [
+    "What is artificial intelligence?",
+    "How does Python work?",
+    "Explain machine learning concepts"
+  ],
+  "sample_embeddings": {
+    "model": "text-embedding-3-small",
+    "dimension": 1536,
+    "sample_vector": [0.1, 0.2, 0.3]
+  }
+}
+
