@@ -112,13 +112,13 @@ def test_complete_workflow():
 
 ```bash
 # Run all integration tests
-pytest src/tests/integration_tests/ -m integration
+pytest tests/integration_tests/ -m integration
 
 # Run with external services
-pytest src/tests/integration_tests/ --external-services
+pytest tests/integration_tests/ --external-services
 
 # Run specific integration test
-pytest src/tests/integration_tests/test_rag_integration.py
+pytest tests/integration_tests/test_rag_integration.py
 ```
 
 ## Test Environment

@@ -18,25 +18,25 @@ pip install -e .
 
 ```bash
 # Run all unit tests
-pytest src/tests/unit_tests/
+pytest tests/unit_tests/
 
 # Run specific test file
-pytest src/tests/unit_tests/test_litellm_gateway.py
+pytest tests/unit_tests/test_litellm_gateway.py
 
 # Run function-driven API tests
-pytest src/tests/unit_tests/test_agent_functions.py
-pytest src/tests/unit_tests/test_rag_functions.py
-pytest src/tests/unit_tests/test_cache_functions.py
-pytest src/tests/unit_tests/test_api_functions.py
+pytest tests/unit_tests/test_agent_functions.py
+pytest tests/unit_tests/test_rag_functions.py
+pytest tests/unit_tests/test_cache_functions.py
+pytest tests/unit_tests/test_api_functions.py
 
 # Run all function-driven API tests
-pytest src/tests/unit_tests/ -k "functions"
+pytest tests/unit_tests/ -k "functions"
 
 # Run with coverage
-pytest src/tests/unit_tests/ --cov=src --cov-report=html
+pytest tests/unit_tests/ --cov=src --cov-report=html
 
 # Run in verbose mode
-pytest src/tests/unit_tests/ -v
+pytest tests/unit_tests/ -v
 ```
 
 ### Test Structure

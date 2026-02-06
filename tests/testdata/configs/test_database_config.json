@@ -1,0 +1,11 @@
+{
+  "host": "localhost",
+  "port": 5432,
+  "database": "test_db",
+  "user": "test_user",
+  "password": "test_password",
+  "min_connections": 1,
+  "max_connections": 5,
+  "connection_timeout": 30
+}
+

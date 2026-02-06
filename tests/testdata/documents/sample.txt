@@ -1,0 +1,14 @@
+Sample Document for Testing
+
+This is a sample text document used for testing the data ingestion pipeline
+and RAG system. It contains multiple paragraphs of text that can be processed
+and embedded for vector search operations.
+
+The document includes:
+- Basic text content
+- Multiple sentences
+- Various topics and concepts
+
+This document is used in integration tests to verify that the SDK can properly
+ingest, process, and retrieve documents.
+
