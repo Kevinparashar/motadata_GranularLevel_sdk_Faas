@@ -1,3 +1,7 @@
+# Copyright (c) 2024. All rights reserved.
+# This source code is licensed under the MIT license and a copy
+# of the license can be found in the LICENSE file in the root directory.
+
 """
 API Backend Services - High-Level Functions
 
@@ -80,7 +84,6 @@ def create_api_router(
         >>> router = create_api_router(prefix="/api/v1", tags=["agents"])
     """
     # FastAPI accepts list[str | Enum] | None, but we only use str
-    # Type ignore needed due to FastAPI's type system
     tags_list: List[str] = tags if tags is not None else []
     return APIRouter(prefix=prefix, tags=tags_list if tags_list else None, **kwargs)  # type: ignore[arg-type]
 
@@ -203,7 +206,7 @@ def create_rag_endpoints(router: APIRouter, rag_system: Any, prefix: str = "/rag
     Returns:
         None: Result of the operation.
     """
-    from ..rag import ingest_document_simple, quick_rag_query
+    from ..rag import ingest_document_simple_async, quick_rag_query_async
 
     @router.post(f"{prefix}/query")
     async def query_rag(request: Dict[str, Any]) -> Dict[str, Any]:
@@ -211,12 +214,12 @@ def create_rag_endpoints(router: APIRouter, rag_system: Any, prefix: str = "/rag
         query = request.get("query", "")
         top_k = request.get("top_k", 5)
         threshold = request.get("threshold", 0.7)
-        return quick_rag_query(rag_system, query, top_k=top_k, threshold=threshold)
+        return await quick_rag_query_async(rag_system, query, top_k=top_k, threshold=threshold)
 
     @router.post(f"{prefix}/ingest")
     async def ingest_document(request: Dict[str, Any]) -> Dict[str, Any]:
         """Ingest a document into the RAG system."""
-        doc_id = ingest_document_simple(
+        doc_id = await ingest_document_simple_async(
             rag_system,
             title=request.get("title", ""),
             content=request.get("content", ""),
@@ -323,7 +326,7 @@ def _determine_processing_mode(mode: str, query: str) -> tuple[bool, bool]:
     return use_rag, use_agent
 
 
-def _process_rag_query(
+async def _process_rag_query(
     rag_system: Any, query: str, request: Dict[str, Any], tenant_id: Optional[str]
 ) -> Dict[str, Any]:
     """
@@ -338,10 +341,10 @@ def _process_rag_query(
     Returns:
         Dict[str, Any]: Dictionary result of the operation.
     """
-    from ..rag import quick_rag_query
+    from ..rag import quick_rag_query_async
 
     try:
-        rag_result = quick_rag_query(
+        rag_result = await quick_rag_query_async(
             rag_system,
             query=query,
             top_k=request.get("top_k", 5),
@@ -479,7 +482,7 @@ def create_unified_query_endpoint(
         }
 
         if use_rag:
-            result.update(_process_rag_query(rag_system, query, request, tenant_id))
+            result.update(await _process_rag_query(rag_system, query, request, tenant_id))
 
         if use_agent:
             rag_context = result.get("rag_response", {}).get("answer") if use_rag else None

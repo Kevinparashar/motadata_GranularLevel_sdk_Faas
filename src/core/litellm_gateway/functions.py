@@ -342,6 +342,7 @@ async def stream_text(
     )
 
     # Response is a CustomStreamWrapper that implements async iteration
+    # Type ignore needed because litellm's streaming response types are incomplete
     async for chunk in response:  # type: ignore[attr-defined]
         if hasattr(chunk, "choices") and len(chunk.choices) > 0:
             delta = chunk.choices[0].delta

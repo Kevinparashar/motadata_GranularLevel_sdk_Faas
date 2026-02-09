@@ -818,6 +818,7 @@ class LiteLLMGateway:
         """
         try:
             if self.router:
+                # Type ignore needed because litellm's router type stubs are incomplete
                 response = await self.router.acompletion(
                     model=model, messages=messages, stream=stream, **kwargs  # type: ignore[arg-type]
                 )
