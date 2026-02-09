@@ -224,6 +224,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Resolved import errors in FaaS services
 - Fixed service-to-service communication patterns
 - Corrected configuration management across services
+- **Document Processor**: Fixed infinite loop in `_chunk_fixed` method when `chunk_overlap >= chunk_size`
+  - Added validation to prevent `chunk_overlap >= chunk_size` and `chunk_size <= 0`
+  - Ensures `chunk_overlap` is always less than `chunk_size` to prevent infinite loops
+- **Middleware**: Fixed JSON serialization error in `error_handler` for datetime objects
+  - Changed `model_dump()` to `model_dump(mode='json')` to properly serialize datetime fields
+  - Removed unused `async` keyword from error handler function
+- **Gateway Config**: Fixed Pydantic schema generation error for `CacheMechanism` type
+  - Added `Field` with `validate_default=False` to allow arbitrary types in Pydantic V2
+  - Resolves `PydanticSchemaGenerationError` during test collection
+- **Tests**: Fixed all async/await mismatches and mocking issues across test suite
+  - Corrected mock patches to target correct import paths
+  - Fixed `AsyncMock` usage for async functions
+  - Updated LiteLLMGateway and DatabaseConnection mocking patterns
+  - All 384 tests now passing
 
 ### Security
 
