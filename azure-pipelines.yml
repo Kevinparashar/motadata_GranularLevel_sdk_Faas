@@ -6,14 +6,12 @@ pool:
   demands: 
   - Agent.Name -equals ubuntu24
 
-steps:
-- task: UsePythonVersion@0
-  inputs:
-    versionSpec: '3.12' # Specify the exact version or a range like '3.x' or '>=3.7'
-  displayName: 'Use Python 3.12'
+- script: |
+    echo "##vso[task.prependpath]/opt/myagent/_work/_tool/Python/3.12/bin"
+  displayName: 'Add Python 3.12 to PATH'
 
 - script: |
-    python --version
+    python3 --version ; which python3
     pip install --upgrade pip
     pip install -r requirements.txt
   displayName: 'Install dependencies and run script'
