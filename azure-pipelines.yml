@@ -48,6 +48,7 @@ steps:
   displayName: 'Publish Test Results'
   inputs:
     testResultsFiles: '$(System.DefaultWorkingDirectory)/test-results.xml'
+    failTaskOnMissingResultsFile: true
     failTaskOnFailedTests: true
     testRunTitle: 'Unit Tests'
     publishRunAttachments: false
