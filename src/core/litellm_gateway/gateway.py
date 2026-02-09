@@ -71,7 +71,7 @@ class GatewayConfig(BaseModel):
     rate_limit_config: Optional[RateLimitConfig] = None
     circuit_breaker_config: Optional[CircuitBreakerConfig] = None
     validation_level: ValidationLevel = ValidationLevel.MODERATE
-    cache: Optional[CacheMechanism] = None
+    cache: Optional[CacheMechanism] = Field(default=None, description="Cache mechanism instance", validate_default=False)
     cache_config: Optional[CacheConfig] = None
     batch_size: Optional[int] = None
     batch_timeout: Optional[float] = None
