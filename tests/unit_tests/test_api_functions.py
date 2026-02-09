@@ -169,8 +169,8 @@ class TestConvenienceFunctions:
         # Verify no routes were added when handler is None
         assert len(router.routes) == initial_routes
 
-    @patch("src.core.api_backend_services.functions.quick_rag_query")
-    @patch("src.core.api_backend_services.functions.ingest_document_simple")
+    @patch("src.core.rag.quick_rag_query_async", new_callable=AsyncMock)
+    @patch("src.core.rag.ingest_document_simple_async", new_callable=AsyncMock)
     def test_create_rag_endpoints(self, mock_ingest, mock_query, router):
         """Test create_rag_endpoints convenience function."""
         mock_rag_system = Mock()
@@ -182,9 +182,7 @@ class TestConvenienceFunctions:
         # Verify endpoints were added
         assert len(router.routes) > 0
 
-    @patch("src.core.api_backend_services.functions.execute_task")
-    @patch("src.core.api_backend_services.functions.chat_with_agent")
-    def test_create_agent_endpoints(self, mock_chat, mock_execute, router):
+    def test_create_agent_endpoints(self, router):
         """Test create_agent_endpoints convenience function."""
         mock_agent_manager = Mock()
         mock_agent = Mock()
@@ -194,21 +192,16 @@ class TestConvenienceFunctions:
         mock_agent_manager.list_agents = Mock(return_value=["agent1"])
         mock_agent_manager.get_agent_statuses = Mock(return_value={"agent1": "idle"})
 
-        mock_chat.return_value = {"answer": "Hello"}
-        mock_execute.return_value = {"result": "Task completed"}
-
         create_agent_endpoints(router, mock_agent_manager, prefix="/api/agents")
 
         # Verify endpoints were added
         assert len(router.routes) > 0
 
-    @patch("src.core.api_backend_services.functions.generate_text")
-    @patch("src.core.api_backend_services.functions.generate_embeddings")
-    def test_create_gateway_endpoints(self, mock_embed, mock_generate, router):
+    def test_create_gateway_endpoints(self, router):
         """Test create_gateway_endpoints convenience function."""
         mock_gateway = Mock()
-        mock_generate.return_value = "Generated text"
-        mock_embed.return_value = [[0.1] * 1536]
+        mock_gateway.generate = Mock(return_value=Mock(text="Generated text"))
+        mock_gateway.generate_embeddings = Mock(return_value=Mock(embeddings=[[0.1] * 1536]))
 
         create_gateway_endpoints(router, mock_gateway, prefix="/api/gateway")
 
@@ -294,7 +287,7 @@ class TestUnifiedQueryEndpoint:
         self, router, mock_agent_manager, mock_rag_system, mock_gateway
     ):
         """Test creating unified query endpoint."""
-        with patch("src.core.api_backend_services.functions.quick_rag_query") as mock_rag_query:
+        with patch("src.core.rag.quick_rag_query_async", new_callable=AsyncMock) as mock_rag_query:
             mock_rag_query.return_value = {
                 "answer": "RAG answer",
                 "sources": [],
@@ -318,7 +311,7 @@ class TestUnifiedQueryEndpoint:
         """Test unified endpoint in auto mode routing to RAG."""
         from fastapi.testclient import TestClient
 
-        with patch("src.core.api_backend_services.functions.quick_rag_query") as mock_rag_query:
+        with patch("src.core.rag.quick_rag_query_async", new_callable=AsyncMock) as mock_rag_query:
             mock_rag_query.return_value = {
                 "answer": "RAG answer",
                 "sources": [],
@@ -352,30 +345,39 @@ class TestUnifiedQueryEndpoint:
         """Test unified endpoint in agent mode."""
         from fastapi.testclient import TestClient
 
-        create_unified_query_endpoint(
-            router=router,
-            agent_manager=mock_agent_manager,
-            rag_system=mock_rag_system,
-        )
+        with patch("src.core.agno_agent_framework.chat_with_agent", new_callable=AsyncMock) as mock_chat:
+            mock_chat.return_value = {"answer": "Agent response", "session_id": "session_123"}
 
-        app = create_api_app()
-        app.include_router(router)
-        client = TestClient(app)
+            # Setup proper agent mock
+            mock_agent = MagicMock()
+            mock_agent.agent_id = "agent_1"
+            mock_agent_manager.get_agent.return_value = mock_agent
+            mock_agent_manager.list_agents.return_value = ["agent_1"]
 
-        # Agent mode should use agent
-        response = client.post(
-            "/query",
-            json={
-                "query": "Create a ticket",
-                "mode": "agent",
-                "agent_id": "agent_1",
-                "tenant_id": "test_tenant",
-            },
-        )
+            create_unified_query_endpoint(
+                router=router,
+                agent_manager=mock_agent_manager,
+                rag_system=mock_rag_system,
+            )
 
-        assert response.status_code == 200
-        data = response.json()
-        assert "agent_response" in data or "result" in data
+            app = create_api_app()
+            app.include_router(router)
+            client = TestClient(app)
+
+            # Agent mode should use agent
+            response = client.post(
+                "/query",
+                json={
+                    "query": "Create a ticket",
+                    "mode": "agent",
+                    "agent_id": "agent_1",
+                    "tenant_id": "test_tenant",
+                },
+            )
+
+            assert response.status_code == 200
+            data = response.json()
+            assert "agent_response" in data or "result" in data
 
     @pytest.mark.asyncio
     async def test_unified_endpoint_both_mode(
@@ -384,7 +386,7 @@ class TestUnifiedQueryEndpoint:
         """Test unified endpoint in both mode (Agent + RAG)."""
         from fastapi.testclient import TestClient
 
-        with patch("src.core.api_backend_services.functions.quick_rag_query") as mock_rag_query:
+        with patch("src.core.rag.quick_rag_query_async", new_callable=AsyncMock) as mock_rag_query:
             mock_rag_query.return_value = {
                 "answer": "RAG answer",
                 "sources": [],
@@ -418,7 +420,7 @@ class TestUnifiedQueryEndpoint:
         """Test unified endpoint with custom prefix."""
         from fastapi.testclient import TestClient
 
-        with patch("src.core.api_backend_services.functions.quick_rag_query") as mock_rag_query:
+        with patch("src.core.rag.quick_rag_query_async") as mock_rag_query:
             mock_rag_query.return_value = {"answer": "RAG answer", "sources": []}
 
             create_unified_query_endpoint(

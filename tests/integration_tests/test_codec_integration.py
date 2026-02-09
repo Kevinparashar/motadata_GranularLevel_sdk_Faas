@@ -118,6 +118,13 @@ class TestCodecAgentIntegration:
         # Encode
         encoded = mock_codec.encode(envelope)
 
+        # Mock decode to return the task data
+        mock_codec.decode.return_value = {
+            "schema_version": "1.0",
+            "message_type": "agent_task",
+            "data": task,
+        }
+
         # Decode
         decoded_envelope = mock_codec.decode(encoded)
         decoded_task = decoded_envelope["data"]

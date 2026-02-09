@@ -8,7 +8,7 @@ from unittest.mock import AsyncMock, Mock, patch
 import httpx
 import pytest
 
-from src.core.utils.circuit_breaker import CircuitBreakerConfig
+from src.core.utils.circuit_breaker import CircuitBreakerConfig, CircuitState
 from src.faas.shared.http_client import (
     ServiceClientError,
     ServiceHTTPClient,
@@ -156,7 +156,11 @@ async def test_request_error(http_client, mock_httpx_client):
 async def test_circuit_breaker_open(http_client, mock_httpx_client):
     """Test circuit breaker open error."""
     # Force circuit breaker to open state
-    http_client.circuit_breaker.state = "OPEN"
+    # Need to set _opened_at to prevent automatic transition to HALF_OPEN
+    from datetime import datetime, timedelta
+    http_client.circuit_breaker.state = CircuitState.OPEN
+    http_client.circuit_breaker._opened_at = datetime.now() - timedelta(seconds=1)
+    http_client.circuit_breaker.stats.last_failure_time = datetime.now()
     
     with pytest.raises(ServiceUnavailableError):
         await http_client.get("/api/v1/test")

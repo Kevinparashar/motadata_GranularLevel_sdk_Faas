@@ -5,7 +5,7 @@ Tests caching operations for LLM responses and embeddings.
 """
 
 
-from unittest.mock import patch
+from unittest.mock import AsyncMock, patch
 
 import pytest
 
@@ -74,11 +74,11 @@ class TestCacheMechanism:
     @patch("src.core.cache_mechanism.cache.aioredis")
     async def test_dragonfly_cache(self, mock_aioredis_module):
         """Test Dragonfly cache backend."""
-        from unittest.mock import AsyncMock
         mock_redis_client = AsyncMock()
-        mock_aioredis_module.from_url.return_value = mock_redis_client
-        mock_redis_client.get.return_value = b"value1"
-        mock_redis_client.set.return_value = True
+        # from_url is an async function, so it should return a coroutine
+        mock_aioredis_module.from_url = AsyncMock(return_value=mock_redis_client)
+        mock_redis_client.get = AsyncMock(return_value=b"value1")
+        mock_redis_client.set = AsyncMock(return_value=True)
 
         config = CacheConfig(backend="dragonfly", dragonfly_url="dragonfly://localhost:6379/0")
         cache = CacheMechanism(config=config)

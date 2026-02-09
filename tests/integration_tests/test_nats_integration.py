@@ -99,6 +99,15 @@ class TestNATSAgentIntegration:
         # Mock message handler
         received_messages = []
 
+        # Update mock_codec.decode to return proper structure for this test
+        mock_codec.decode.return_value = {
+            "message_id": "msg_123",
+            "source_agent_id": "agent_456",
+            "target_agent_id": agent.agent_id,
+            "content": "Test message",
+            "message_type": "text",
+        }
+
         def message_handler(msg):
             decoded = mock_codec.decode(msg.data)
             if decoded["target_agent_id"] == agent.agent_id:

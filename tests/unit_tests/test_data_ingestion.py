@@ -31,9 +31,9 @@ def data_cleaner():
 @pytest.fixture
 def ingestion_service():
     """Create DataIngestionService instance."""
-    with patch("src.core.data_ingestion.ingestion_service.create_rag_system"), \
-         patch("src.core.data_ingestion.ingestion_service.create_cache"), \
-         patch("src.core.data_ingestion.ingestion_service.create_multimodal_loader"):
+    with patch("src.core.rag.create_rag_system"), \
+         patch("src.core.cache_mechanism.create_cache"), \
+         patch("src.core.rag.multimodal_loader.create_multimodal_loader"):
         service = DataIngestionService(
             rag_system=None,
             cache=None,

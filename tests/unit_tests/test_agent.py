@@ -54,17 +54,19 @@ class TestAgent:
         assert len(agent.task_queue) == 1
         assert agent.task_queue[0].task_type == "test_task"
 
-    def test_send_message(self, agent):
+    @pytest.mark.asyncio
+    async def test_send_message(self, agent):
         """Test sending message."""
-        agent.send_message(to_agent="agent-002", content="Hello", message_type="message")
+        await agent.send_message(to_agent="agent-002", content="Hello", message_type="message")
 
         assert len(agent.message_queue) == 1
         assert agent.message_queue[0].to_agent == "agent-002"
 
-    def test_receive_message(self, agent):
+    @pytest.mark.asyncio
+    async def test_receive_message(self, agent):
         """Test receiving message."""
-        agent.send_message("agent-002", "Hello")
-        message = agent.receive_message()
+        await agent.send_message("agent-002", "Hello")
+        message = await agent.receive_message()
 
         assert message is not None
         assert message.content == "Hello"
@@ -157,6 +159,11 @@ class TestAgentMemory:
 class TestToolRegistry:
     """Test ToolRegistry."""
 
+    @pytest.fixture
+    def agent(self):
+        """Create a test agent."""
+        return Agent(agent_id="test-agent-001", name="Test Agent", description="A test agent")
+
     def test_register_tool(self):
         """Test tool registration."""
 
@@ -175,7 +182,8 @@ class TestToolRegistry:
 
         assert registry.get_tool("test_tool") == tool
 
-    def test_execute_tool(self):
+    @pytest.mark.asyncio
+    async def test_execute_tool(self):
         """Test tool execution."""
 
         def add(a: int, b: int) -> int:
@@ -193,7 +201,7 @@ class TestToolRegistry:
         registry.register_tool(tool)
 
         executor = ToolExecutor(registry)
-        result = executor.execute_tool_call("add", {"a": 5, "b": 3})
+        result = await executor.execute_tool_call("add", {"a": 5, "b": 3})
         assert result == 8
 
     @patch("src.core.agno_agent_framework.agent.create_prompt_manager")
@@ -235,8 +243,9 @@ class TestToolRegistry:
 
         mock_pm.add_template.assert_called_once()
 
+    @pytest.mark.asyncio
     @patch("src.core.agno_agent_framework.agent.create_prompt_manager")
-    def test_build_prompt_with_context(self, mock_create_pm, agent):
+    async def test_build_prompt_with_context(self, mock_create_pm, agent):
         """Test building prompt with context management."""
         mock_pm = Mock()
         mock_pm.history = []
@@ -254,7 +263,7 @@ class TestToolRegistry:
             task_id="task1", task_type="llm_query", parameters={"prompt": "What is AI?"}
         )
 
-        prompt = agent._build_prompt_with_context(
+        prompt = await agent._build_prompt_with_context(
             base_prompt="What is AI?", task=task, task_type="llm_query"
         )
 

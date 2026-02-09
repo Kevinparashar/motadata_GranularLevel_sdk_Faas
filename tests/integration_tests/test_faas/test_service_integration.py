@@ -22,20 +22,19 @@ async def test_agent_service_calls_gateway_service():
         "usage": {"total_tokens": 15},
     }
 
-    with patch("httpx.AsyncClient") as mock_client_class:
-        # Setup mock response
-        mock_response = Mock()
-        mock_response.json = Mock(return_value=mock_response_data)
-        mock_response.raise_for_status = Mock()
-        mock_response.status_code = 200
+    # Setup mock response
+    mock_response = Mock()
+    mock_response.json = Mock(return_value=mock_response_data)
+    mock_response.raise_for_status = Mock()
+    mock_response.status_code = 200
 
-        # Setup mock client
-        mock_client_instance = AsyncMock()
-        mock_client_instance.post = AsyncMock(return_value=mock_response)
-        mock_client_instance.__aenter__ = AsyncMock(return_value=mock_client_instance)
-        mock_client_instance.__aexit__ = AsyncMock(return_value=None)
-        mock_client_class.return_value = mock_client_instance
+    # Setup mock client
+    mock_client_instance = AsyncMock()
+    mock_client_instance.request = AsyncMock(return_value=mock_response)
+    mock_client_instance.aclose = AsyncMock()
 
+    # Patch httpx.AsyncClient to return our mock
+    with patch("src.faas.shared.http_client.httpx.AsyncClient", return_value=mock_client_instance):
         # Create service client
         gateway_client = ServiceHTTPClient(
             service_name="gateway",
@@ -52,6 +51,9 @@ async def test_agent_service_calls_gateway_service():
         assert response == mock_response_data
         assert response["text"] == "Hello, I'm an AI assistant."
         assert response["model"] == "gpt-4"
+        
+        # Cleanup
+        await gateway_client.close()
 
 
 @pytest.mark.asyncio
@@ -63,20 +65,19 @@ async def test_rag_service_calls_gateway_service():
         "model": "text-embedding-3-small",
     }
 
-    with patch("httpx.AsyncClient") as mock_client_class:
-        # Setup mock response
-        mock_response = Mock()
-        mock_response.json = Mock(return_value=mock_response_data)
-        mock_response.raise_for_status = Mock()
-        mock_response.status_code = 200
+    # Setup mock response
+    mock_response = Mock()
+    mock_response.json = Mock(return_value=mock_response_data)
+    mock_response.raise_for_status = Mock()
+    mock_response.status_code = 200
 
-        # Setup mock client
-        mock_client_instance = AsyncMock()
-        mock_client_instance.post = AsyncMock(return_value=mock_response)
-        mock_client_instance.__aenter__ = AsyncMock(return_value=mock_client_instance)
-        mock_client_instance.__aexit__ = AsyncMock(return_value=None)
-        mock_client_class.return_value = mock_client_instance
+    # Setup mock client
+    mock_client_instance = AsyncMock()
+    mock_client_instance.request = AsyncMock(return_value=mock_response)
+    mock_client_instance.aclose = AsyncMock()
 
+    # Patch httpx.AsyncClient to return our mock
+    with patch("src.faas.shared.http_client.httpx.AsyncClient", return_value=mock_client_instance):
         # Create service client
         gateway_client = ServiceHTTPClient(
             service_name="gateway",
@@ -94,6 +95,9 @@ async def test_rag_service_calls_gateway_service():
         assert "embeddings" in response
         assert len(response["embeddings"]) > 0
         assert response["model"] == "text-embedding-3-small"
+        
+        # Cleanup
+        await gateway_client.close()
 
 
 @pytest.mark.asyncio
@@ -105,20 +109,19 @@ async def test_data_ingestion_service_calls_rag_service():
         "data": {"document_id": "doc_123"},
     }
 
-    with patch("httpx.AsyncClient") as mock_client_class:
-        # Setup mock response
-        mock_response = Mock()
-        mock_response.json = Mock(return_value=mock_response_data)
-        mock_response.raise_for_status = Mock()
-        mock_response.status_code = 200
+    # Setup mock response
+    mock_response = Mock()
+    mock_response.json = Mock(return_value=mock_response_data)
+    mock_response.raise_for_status = Mock()
+    mock_response.status_code = 200
 
-        # Setup mock client
-        mock_client_instance = AsyncMock()
-        mock_client_instance.post = AsyncMock(return_value=mock_response)
-        mock_client_instance.__aenter__ = AsyncMock(return_value=mock_client_instance)
-        mock_client_instance.__aexit__ = AsyncMock(return_value=None)
-        mock_client_class.return_value = mock_client_instance
+    # Setup mock client
+    mock_client_instance = AsyncMock()
+    mock_client_instance.request = AsyncMock(return_value=mock_response)
+    mock_client_instance.aclose = AsyncMock()
 
+    # Patch httpx.AsyncClient to return our mock
+    with patch("src.faas.shared.http_client.httpx.AsyncClient", return_value=mock_client_instance):
         # Create service client
         rag_client = ServiceHTTPClient(
             service_name="rag",
@@ -136,3 +139,6 @@ async def test_data_ingestion_service_calls_rag_service():
         assert response["success"] is True
         assert "document_id" in response["data"]
         assert response["data"]["document_id"] == "doc_123"
+        
+        # Cleanup
+        await rag_client.close()

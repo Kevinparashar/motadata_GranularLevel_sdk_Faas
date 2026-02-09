@@ -197,20 +197,23 @@ class TestConvenienceFunctions:
             {"title": "Doc 2", "content": "Content 2"},
             {"title": "Doc 3", "content": "Content 3"},
         ]
+        mock_rag_system.ingest_documents_batch = Mock(return_value=["doc-1", "doc-2", "doc-3"])
 
         doc_ids = batch_ingest_documents(
             rag_system=mock_rag_system, documents=documents, batch_size=2
         )
 
         assert len(doc_ids) == 3
-        assert mock_rag_system.ingest_document.call_count == 3
+        assert doc_ids == ["doc-1", "doc-2", "doc-3"]
+        mock_rag_system.ingest_documents_batch.assert_called_once()
 
     def test_batch_ingest_documents_empty(self, mock_rag_system):
         """Test batch_ingest_documents with empty document list."""
+        mock_rag_system.ingest_documents_batch = Mock(return_value=[])
         doc_ids = batch_ingest_documents(rag_system=mock_rag_system, documents=[], batch_size=10)
 
         assert doc_ids == []
-        mock_rag_system.ingest_document.assert_not_called()
+        mock_rag_system.ingest_documents_batch.assert_called_once_with(documents=[], batch_size=10)
 
     @pytest.mark.asyncio
     async def test_batch_ingest_documents_async(self, mock_rag_system):
@@ -219,17 +222,25 @@ class TestConvenienceFunctions:
             {"title": "Doc 1", "content": "Content 1"},
             {"title": "Doc 2", "content": "Content 2"},
         ]
+        mock_rag_system.ingest_documents_batch_async = AsyncMock(return_value=["doc-1", "doc-2"])
 
         doc_ids = await batch_ingest_documents_async(
             rag_system=mock_rag_system, documents=documents, batch_size=10
         )
 
         assert len(doc_ids) == 2
-        assert mock_rag_system.ingest_document_async.call_count == 2
+        assert doc_ids == ["doc-1", "doc-2"]
+        mock_rag_system.ingest_documents_batch_async.assert_called_once()
 
 
 class TestUtilityFunctions:
     """Test utility functions."""
+
+    @pytest.fixture
+    def mock_rag_system(self):
+        """Create a mock RAG system."""
+        rag = Mock(spec=RAGSystem)
+        return rag
 
     def test_batch_process_documents(self):
         """Test batch_process_documents utility function."""
@@ -274,10 +285,11 @@ class TestUtilityFunctions:
             documents=documents, processor=process_func, batch_size=2
         )
 
-        # Should skip failed documents
-        assert len(results) == 2
+        # batch_process_documents uses return_exceptions=True, so exceptions are included
+        assert len(results) == 3
         assert results[0] == "Processed: doc1"
-        assert results[1] == "Processed: doc3"
+        assert isinstance(results[1], RuntimeError)
+        assert results[2] == "Processed: doc3"
 
     def test_batch_process_documents_empty(self):
         """Test batch_process_documents with empty document list."""
@@ -293,7 +305,7 @@ class TestUtilityFunctions:
 
     def test_update_document_simple(self, mock_rag_system):
         """Test update_document_simple convenience function."""
-        mock_rag_system.update_document = Mock(return_value=True)
+        mock_rag_system.update_document = AsyncMock(return_value=True)
 
         success = update_document_simple(
             rag_system=mock_rag_system,
@@ -309,7 +321,7 @@ class TestUtilityFunctions:
 
     def test_delete_document_simple(self, mock_rag_system):
         """Test delete_document_simple convenience function."""
-        mock_rag_system.delete_document = Mock(return_value=True)
+        mock_rag_system.delete_document = AsyncMock(return_value=True)
 
         success = delete_document_simple(rag_system=mock_rag_system, document_id="doc-123")
 

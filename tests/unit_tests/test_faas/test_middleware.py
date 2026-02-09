@@ -92,7 +92,7 @@ async def test_error_handler_generic_exception(app):
     """Test error handler with generic exception."""
     app.add_exception_handler(Exception, error_handler)
     
-    client = TestClient(app)
+    client = TestClient(app, raise_server_exceptions=False)
     
     response = client.get(
         "/error",
@@ -116,7 +116,7 @@ async def test_error_handler_service_exception(app):
     """Test error handler with ServiceException."""
     app.add_exception_handler(Exception, error_handler)
     
-    client = TestClient(app)
+    client = TestClient(app, raise_server_exceptions=False)
     
     response = client.get(
         "/service_error",
@@ -143,7 +143,7 @@ async def test_error_handler_validation_error():
     
     app.add_exception_handler(Exception, error_handler)
     
-    client = TestClient(app)
+    client = TestClient(app, raise_server_exceptions=False)
     
     response = client.get(
         "/validation_error",

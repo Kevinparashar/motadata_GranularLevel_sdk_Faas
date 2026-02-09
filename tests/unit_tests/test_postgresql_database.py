@@ -31,15 +31,26 @@ class TestDatabaseConnection:
     @pytest.fixture
     def mock_db(self, db_config):
         """Mock database connection."""
-        with patch("src.core.postgresql_database.connection.asyncpg") as mock_asyncpg:
-            mock_pool = AsyncMock()
-            mock_conn = AsyncMock()
-            mock_pool.acquire.return_value.__aenter__.return_value = mock_conn
-            mock_pool.acquire.return_value.__aexit__.return_value = None
-            mock_asyncpg.create_pool.return_value = mock_pool
+        mock_pool = MagicMock()
+        mock_pool.close = AsyncMock()
+        mock_conn = AsyncMock()
+        
+        # Set up async context manager for pool.acquire()
+        # acquire() should return a context manager, not be async
+        mock_context = MagicMock()
+        mock_context.__aenter__ = AsyncMock(return_value=mock_conn)
+        mock_context.__aexit__ = AsyncMock(return_value=None)
+        mock_pool.acquire = MagicMock(return_value=mock_context)
+        
+        mock_asyncpg_patcher = patch("src.core.postgresql_database.connection.asyncpg")
+        mock_asyncpg = mock_asyncpg_patcher.start()
+        mock_asyncpg.create_pool = AsyncMock(return_value=mock_pool)
+        # Mock PostgresError for exception handling
+        mock_asyncpg.PostgresError = Exception
 
-            db = DatabaseConnection(config=db_config)
-            return db, mock_conn, mock_pool
+        db = DatabaseConnection(config=db_config)
+        yield db, mock_conn, mock_pool
+        mock_asyncpg_patcher.stop()
 
     def test_initialization(self, db_config):
         """Test database initialization."""
@@ -51,15 +62,29 @@ class TestDatabaseConnection:
     @pytest.mark.asyncio
     async def test_connect(self, mock_db):
         """Test database connection."""
-        db, _, _ = mock_db
+        db, _, mock_pool = mock_db
         await db.connect()
-        assert db._connection is not None
+        assert db.pool is not None
+        assert db.pool == mock_pool
 
     @pytest.mark.asyncio
     async def test_execute_query(self, mock_db):
         """Test query execution."""
         db, mock_conn, _ = mock_db
-        mock_conn.fetchrow.return_value = {"id": 1, "name": "test"}
+        # Set up the pool first
+        await db.connect()
+        # Create a dict-like object that can be converted with dict()
+        class MockRow:
+            def __init__(self, data):
+                self._data = data
+            def __getitem__(self, key):
+                return self._data[key]
+            def keys(self):
+                return self._data.keys()
+            def __iter__(self):
+                return iter(self._data)
+        
+        mock_conn.fetchrow = AsyncMock(return_value=MockRow({"id": 1, "name": "test"}))
 
         result = await db.execute_query("SELECT * FROM test WHERE id = $1", (1,), fetch_one=True)
 
@@ -70,7 +95,23 @@ class TestDatabaseConnection:
     async def test_execute_query_fetch_all(self, mock_db):
         """Test query execution with fetch_all."""
         db, mock_conn, _ = mock_db
-        mock_conn.fetch.return_value = [{"id": 1, "name": "test1"}, {"id": 2, "name": "test2"}]
+        # Set up the pool first
+        await db.connect()
+        # Create dict-like objects that can be converted with dict()
+        class MockRow:
+            def __init__(self, data):
+                self._data = data
+            def __getitem__(self, key):
+                return self._data[key]
+            def keys(self):
+                return self._data.keys()
+            def __iter__(self):
+                return iter(self._data)
+        
+        mock_conn.fetch = AsyncMock(return_value=[
+            MockRow({"id": 1, "name": "test1"}),
+            MockRow({"id": 2, "name": "test2"})
+        ])
 
         results = await db.execute_query("SELECT * FROM test", fetch_all=True)
 
@@ -81,6 +122,8 @@ class TestDatabaseConnection:
     async def test_disconnect(self, mock_db):
         """Test database disconnection."""
         db, _, mock_pool = mock_db
+        # Set up the pool first
+        await db.connect()
         await db.close()
         mock_pool.close.assert_called_once()
 
@@ -93,6 +136,7 @@ class TestVectorOperations:
         """Mock database for vector operations."""
         mock_db = MagicMock()
         mock_db.execute_query = AsyncMock()
+        mock_db.execute_transaction = AsyncMock()
         return mock_db
 
     @pytest.mark.asyncio
@@ -130,13 +174,13 @@ class TestVectorOperations:
     @pytest.mark.asyncio
     async def test_batch_insert_embeddings(self, mock_db):
         """Test batch embedding insertion."""
-        mock_db.execute_query.return_value = None
+        mock_db.execute_transaction.return_value = None
 
         vector_ops = VectorOperations(mock_db)
         embeddings_data = [(1, [0.1] * 1536, "model1"), (2, [0.2] * 1536, "model2")]
 
         await vector_ops.batch_insert_embeddings(embeddings_data)
-        mock_db.execute_query.assert_called()
+        mock_db.execute_transaction.assert_called()
 
 
 if __name__ == "__main__":

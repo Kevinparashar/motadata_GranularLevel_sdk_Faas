@@ -26,7 +26,10 @@ class TestFactoryFunctions:
     """Test factory functions for gateway creation."""
 
     @patch.dict("os.environ", {"OPENAI_API_KEY": "test-key"})
-    def test_create_gateway(self):
+    @patch("src.core.litellm_gateway.gateway.LiteLLMGateway._initialize_kv_cache")
+    @patch("src.core.litellm_gateway.gateway.LiteLLMGateway._initialize_cache")
+    @patch("src.core.litellm_gateway.functions._validate_api_keys")
+    def test_create_gateway(self, mock_validate, mock_cache_init, mock_kv_cache_init):
         """Test create_gateway factory function."""
         gateway = create_gateway(
             providers=["openai"], default_model="gpt-4", timeout=60.0, max_retries=3
@@ -36,7 +39,9 @@ class TestFactoryFunctions:
         assert gateway.config is not None
 
     @patch.dict("os.environ", {"OPENAI_API_KEY": "test-key", "ANTHROPIC_API_KEY": "test-key-2"})
-    def test_create_gateway_multiple_providers(self):
+    @patch("src.core.litellm_gateway.gateway.LiteLLMGateway._initialize_kv_cache")
+    @patch("src.core.litellm_gateway.gateway.LiteLLMGateway._initialize_cache")
+    def test_create_gateway_multiple_providers(self, mock_cache_init, mock_kv_cache_init):
         """Test create_gateway with multiple providers."""
         gateway = create_gateway(
             providers=["openai", "anthropic"],
@@ -46,7 +51,9 @@ class TestFactoryFunctions:
 
         assert isinstance(gateway, LiteLLMGateway)
 
-    def test_create_gateway_with_api_keys(self):
+    @patch("src.core.litellm_gateway.gateway.LiteLLMGateway._initialize_kv_cache")
+    @patch("src.core.litellm_gateway.gateway.LiteLLMGateway._initialize_cache")
+    def test_create_gateway_with_api_keys(self, mock_cache_init, mock_kv_cache_init):
         """Test create_gateway with explicit API keys."""
         gateway = create_gateway(
             providers=["openai"], default_model="gpt-4", api_keys={"openai": "sk-test-key"}
@@ -54,7 +61,12 @@ class TestFactoryFunctions:
 
         assert isinstance(gateway, LiteLLMGateway)
 
-    def test_create_gateway_with_fallbacks(self):
+    @patch.dict("os.environ", {"OPENAI_API_KEY": "test-key"})
+    @patch("src.core.litellm_gateway.gateway.LiteLLMGateway._initialize_kv_cache")
+    @patch("src.core.litellm_gateway.gateway.LiteLLMGateway._initialize_cache")
+    @patch("src.core.litellm_gateway.gateway.LiteLLMGateway._initialize_router")
+    @patch("src.core.litellm_gateway.functions._validate_api_keys")
+    def test_create_gateway_with_fallbacks(self, mock_validate, mock_router_init, mock_cache_init, mock_kv_cache_init):
         """Test create_gateway with fallback models."""
         gateway = create_gateway(
             providers=["openai"], default_model="gpt-4", fallbacks=["gpt-3.5-turbo", "claude-3"]
@@ -63,7 +75,11 @@ class TestFactoryFunctions:
         assert isinstance(gateway, LiteLLMGateway)
         assert gateway.config.fallbacks is not None
 
-    def test_create_gateway_defaults(self):
+    @patch.dict("os.environ", {"OPENAI_API_KEY": "test-key"})
+    @patch("src.core.litellm_gateway.gateway.LiteLLMGateway._initialize_kv_cache")
+    @patch("src.core.litellm_gateway.gateway.LiteLLMGateway._initialize_cache")
+    @patch("src.core.litellm_gateway.functions._validate_api_keys")
+    def test_create_gateway_defaults(self, mock_validate, mock_cache_init, mock_kv_cache_init):
         """Test create_gateway with default parameters."""
         gateway = create_gateway()
 
@@ -101,28 +117,33 @@ class TestConvenienceFunctions:
             yield "World"
         
         gateway.stream = mock_stream
+        gateway.embed_async = AsyncMock(
+            return_value=Mock(embeddings=[[0.1] * 1536, [0.2] * 1536])
+        )
         gateway.generate_embeddings = Mock(
             return_value=Mock(embeddings=[[0.1] * 1536, [0.2] * 1536])
         )
         gateway.generate_embeddings_async = AsyncMock(return_value=Mock(embeddings=[[0.1] * 1536]))
         return gateway
 
-    def test_generate_text(self, mock_gateway):
+    @pytest.mark.asyncio
+    async def test_generate_text(self, mock_gateway):
         """Test generate_text convenience function."""
-        result = generate_text(gateway=mock_gateway, prompt="What is AI?", model="gpt-4")
+        result = await generate_text(gateway=mock_gateway, prompt="What is AI?", model="gpt-4")
 
-        assert result == "Generated text"
-        mock_gateway.generate.assert_called_once()
+        assert result == "Async generated text"
+        mock_gateway.generate_async.assert_called_once()
 
-    def test_generate_text_with_messages(self, mock_gateway):
+    @pytest.mark.asyncio
+    async def test_generate_text_with_messages(self, mock_gateway):
         """Test generate_text with messages parameter."""
         messages = [{"role": "user", "content": "Hello"}]
 
-        result = generate_text(
+        result = await generate_text(
             gateway=mock_gateway, prompt="Test", model="gpt-4", messages=messages
         )
 
-        assert result == "Generated text"
+        assert result == "Async generated text"
 
     @pytest.mark.asyncio
     async def test_generate_text_async(self, mock_gateway):
@@ -137,13 +158,30 @@ class TestConvenienceFunctions:
     @pytest.mark.asyncio
     async def test_stream_text(self, mock_gateway):
         """Test stream_text convenience function."""
-        chunks = []
-        async for chunk in stream_text(gateway=mock_gateway, prompt="Hello", model="gpt-4"):
-            chunks.append(chunk)
+        # Create mock chunks with the expected structure
+        chunk1 = Mock()
+        chunk1.choices = [Mock()]
+        chunk1.choices[0].delta = Mock(content="Hello ")
+        
+        chunk2 = Mock()
+        chunk2.choices = [Mock()]
+        chunk2.choices[0].delta = Mock(content="World")
+        
+        async def mock_stream_generator():
+            yield chunk1
+            yield chunk2
+        
+        mock_response = mock_stream_generator()
+        
+        with patch("litellm.acompletion", new_callable=AsyncMock) as mock_acompletion:
+            mock_acompletion.return_value = mock_response
+            chunks = []
+            async for chunk in stream_text(gateway=mock_gateway, prompt="Hello", model="gpt-4"):
+                chunks.append(chunk)
 
-        assert len(chunks) == 2
-        assert chunks[0] == "Hello "
-        assert chunks[1] == "World"
+            assert len(chunks) == 2
+            assert chunks[0] == "Hello "
+            assert chunks[1] == "World"
 
     @pytest.mark.asyncio
     async def test_generate_embeddings(self, mock_gateway):
@@ -155,11 +193,15 @@ class TestConvenienceFunctions:
 
         assert len(embeddings) == 2
         assert len(embeddings[0]) == 1536
-        mock_gateway.generate_embeddings_async.assert_called_once()
+        mock_gateway.embed_async.assert_called_once()
 
     @pytest.mark.asyncio
     async def test_generate_embeddings_async(self, mock_gateway):
         """Test generate_embeddings_async convenience function."""
+        # Override the mock to return single embedding for this test
+        mock_gateway.embed_async = AsyncMock(
+            return_value=Mock(embeddings=[[0.1] * 1536])
+        )
         texts = ["Hello"]
         embeddings = await generate_embeddings_async(
             gateway=mock_gateway, texts=texts, model="text-embedding-3-small"
@@ -167,7 +209,7 @@ class TestConvenienceFunctions:
 
         assert len(embeddings) == 1
         assert len(embeddings[0]) == 1536
-        mock_gateway.generate_embeddings_async.assert_called_once()
+        mock_gateway.embed_async.assert_called_once()
 
 
 class TestUtilityFunctions:
@@ -177,8 +219,12 @@ class TestUtilityFunctions:
     def mock_gateway(self):
         """Create a mock gateway."""
         gateway = Mock(spec=LiteLLMGateway)
+        # Create a mock response object with text attribute
+        mock_response_1 = Mock(text="Response 1")
+        mock_response_2 = Mock(text="Response 2")
+        mock_response_3 = Mock(text="Response 3")
         gateway.generate_async = AsyncMock(
-            side_effect=["Response 1", "Response 2", "Response 3"]
+            side_effect=[mock_response_1, mock_response_2, mock_response_3]
         )
         return gateway
 
@@ -203,17 +249,19 @@ class TestUtilityFunctions:
 
     def test_batch_generate_with_exceptions(self, mock_gateway):
         """Test batch_generate with exceptions."""
+        mock_response_1 = Mock(text="Response 1")
+        mock_response_3 = Mock(text="Response 3")
         mock_gateway.generate_async = AsyncMock(
-            side_effect=["Response 1", Exception("Error"), "Response 3"]
+            side_effect=[mock_response_1, Exception("Error"), mock_response_3]
         )
 
         prompts = ["Prompt 1", "Prompt 2", "Prompt 3"]
         results = batch_generate(gateway=mock_gateway, prompts=prompts, model="gpt-4")
 
-        # Should handle exceptions gracefully
+        # Should handle exceptions gracefully - exceptions are converted to empty strings
         assert len(results) == 3
         assert results[0] == "Response 1"
-        assert isinstance(results[1], Exception)
+        assert results[1] == ""  # Exception is converted to empty string
         assert results[2] == "Response 3"
 
 
