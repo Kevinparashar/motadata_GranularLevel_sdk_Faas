@@ -6,6 +6,8 @@ pool:
   demands: 
   - Agent.Name -equals ubuntu24
 
+steps:
+
 - script: |
     echo "##vso[task.prependpath]/opt/myagent/_work/_tool/Python/3.12/bin"
   displayName: 'Add Python 3.12 to PATH'
