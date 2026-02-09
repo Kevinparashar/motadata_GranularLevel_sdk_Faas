@@ -21,6 +21,7 @@ htmlcov/
 build/
 dist/
 *.egg-info/
+*.zip
 
 # OS / editor
 .DS_Store
