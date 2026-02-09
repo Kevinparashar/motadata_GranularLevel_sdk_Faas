@@ -17,7 +17,7 @@ from typing import Any, Dict, List, Optional
 
 # Third-party imports
 from litellm import acompletion, aembedding, completion, embedding
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, ConfigDict, Field
 
 try:
     from litellm.router import Router
@@ -45,6 +45,8 @@ from .rate_limiter import (
 
 class GatewayConfig(BaseModel):
     """Configuration for LiteLLM Gateway."""
+
+    model_config = ConfigDict(arbitrary_types_allowed=True)
 
     model_list: List[Dict[str, Any]] = Field(
         default_factory=list, description="List of model configurations"
