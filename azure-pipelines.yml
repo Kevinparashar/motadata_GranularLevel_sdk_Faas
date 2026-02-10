@@ -41,7 +41,8 @@ steps:
     # Run pytest and generate reports in compatible formats
     # Use Cobertura for Azure DevOps native coverage display
     # Generate an XML report for SonarQube to pick up
-    pytest -v --junitxml=test-results.xml --cov=src --cov-report=xml:coverage.xml --cov-report=html -s tests/ -c /dev/null
+    rm -rf pyproject.toml
+    pytest -v --junitxml=test-results.xml --cov=src --cov-report=xml:coverage.xml --cov-report=html -s tests/ 
   displayName: 'Run Pytest with Coverage'
   
 - task: PublishTestResults@2
