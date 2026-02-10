@@ -128,8 +128,9 @@ class CacheMechanism:
             return
 
         async with self._lock:
-            to_delete = [k for k in self._store if pattern in k]
-            for k in to_delete:
+            # More efficient: iterate once and delete in place
+            keys_to_delete = [k for k in self._store.keys() if pattern in k]
+            for k in keys_to_delete:
                 self._store.pop(k, None)
 
     def _evict_if_needed(self) -> None:
@@ -155,7 +156,7 @@ class CacheMechanism:
                 if isinstance(cached, str):
                     return json.loads(cached)
                 return cached
-            except Exception:
+            except (json.JSONDecodeError, TypeError):
                 return None
         return None
 

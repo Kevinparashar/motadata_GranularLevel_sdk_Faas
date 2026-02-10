@@ -282,12 +282,12 @@ class LiteLLMGateway:
         self._initialize_rate_limiter()
         self._initialize_deduplicator()
         self._initialize_batcher()
+        self._initialize_cache()  # Initialize cache before KV cache (KV cache depends on cache)
         self._initialize_kv_cache()
         self._initialize_health_check()
         self._initialize_llmops()
         self._initialize_validation_manager()
         self._initialize_feedback_loop()
-        self._initialize_cache()
 
     def _setup_health_checks(self) -> None:
         """
@@ -833,7 +833,15 @@ class LiteLLMGateway:
             self._update_provider_health_success(model)
             return response
 
+        except (ValueError, TypeError, KeyError, AttributeError) as e:
+            # Handle validation/parsing errors specifically
+            error_classification = self._classify_error(e)
+            error_message[0] = str(e)
+            status[0] = self._determine_error_status(error_message[0])
+            self._update_provider_health_error(model, error_message[0], error_classification)
+            raise
         except Exception as e:
+            # Catch-all for other exceptions (network, API errors, etc.)
             error_classification = self._classify_error(e)
             error_message[0] = str(e)
             status[0] = self._determine_error_status(error_message[0])
@@ -910,8 +918,12 @@ class LiteLLMGateway:
                 },
             )
             await self.kv_cache.set_kv_cache(kv_entry, tenant_id=tenant_id)
-        except Exception as e:
+        except (AttributeError, ValueError, TypeError) as e:
+            # Handle cache-related errors specifically
             logger.debug(f"Failed to store KV cache entry: {e}")
+        except Exception as e:
+            # Catch-all for unexpected errors (should not happen, but log for debugging)
+            logger.warning(f"Unexpected error storing KV cache entry: {e}", exc_info=True)
 
     async def _store_response_cache(
         self,
