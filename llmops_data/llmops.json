@@ -1,0 +1,58 @@
+{
+  "operations": [
+    {
+      "operation_id": "436201f0-5b15-43bd-83a5-9dde47c80570",
+      "operation_type": "completion",
+      "model": "gpt-4",
+      "tenant_id": "test_tenant",
+      "agent_id": null,
+      "prompt_tokens": 0,
+      "completion_tokens": 0,
+      "total_tokens": 0,
+      "latency_ms": 0.12612342834472656,
+      "cost_usd": 0.0,
+      "status": "success",
+      "error_message": null,
+      "timestamp": "2026-02-11T12:18:49.021752",
+      "metadata": {
+        "stream": false
+      }
+    },
+    {
+      "operation_id": "5ca3378d-839c-4ce8-9d2f-1109d4c8e6ba",
+      "operation_type": "completion",
+      "model": "gpt-4",
+      "tenant_id": "test_tenant",
+      "agent_id": null,
+      "prompt_tokens": 0,
+      "completion_tokens": 0,
+      "total_tokens": 0,
+      "latency_ms": 0.11920928955078125,
+      "cost_usd": 0.0,
+      "status": "success",
+      "error_message": null,
+      "timestamp": "2026-02-11T12:18:49.023349",
+      "metadata": {
+        "stream": false
+      }
+    },
+    {
+      "operation_id": "bc1260b5-41d3-4fef-b10e-00ae5a061536",
+      "operation_type": "completion",
+      "model": "gpt-4",
+      "tenant_id": "test_tenant",
+      "agent_id": null,
+      "prompt_tokens": 0,
+      "completion_tokens": 0,
+      "total_tokens": 0,
+      "latency_ms": 0.08845329284667969,
+      "cost_usd": 0.0,
+      "status": "success",
+      "error_message": null,
+      "timestamp": "2026-02-11T12:18:49.024511",
+      "metadata": {
+        "stream": false
+      }
+    }
+  ]
+}
