@@ -231,6 +231,15 @@ class TestCacheMechanism:
         assert result == {"already": "dict"}
 
     @pytest.mark.asyncio
+    async def test_get_prompt_interpretation_not_found(self):
+        """Test getting prompt interpretation when not cached - covers line 161."""
+        cache = CacheMechanism(config=CacheConfig(backend="memory"))
+        
+        # Try to get non-existent interpretation
+        result = await cache.get_prompt_interpretation("nonexistent_hash")
+        assert result is None
+
+    @pytest.mark.asyncio
     async def test_clear_memory_with_tenant(self):
         """Test clearing cache with tenant_id for memory backend."""
         cache = CacheMechanism(config=CacheConfig(backend="memory", namespace="test"))

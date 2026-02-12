@@ -11,11 +11,12 @@ Factory functions, convenience functions, and utilities for API backend services
 
 from typing import Any, Callable, Dict, List, Optional
 
-from fastapi import APIRouter, FastAPI
+from fastapi import APIRouter, Body, FastAPI, Path
 from fastapi.middleware.cors import CORSMiddleware
 
 # Constants
 AGENT_NOT_FOUND_ERROR = "Agent not found"
+AGENT_ID_DESCRIPTION = "Agent identifier"
 
 # ============================================================================
 # Factory Functions
@@ -208,6 +209,7 @@ def create_rag_endpoints(router: APIRouter, rag_system: Any, prefix: str = "/rag
     """
     from ..rag import ingest_document_simple_async, quick_rag_query_async
 
+    # nosonar: prefix is a function parameter used to build path, not a path parameter
     @router.post(f"{prefix}/query")
     async def query_rag(request: Dict[str, Any]) -> Dict[str, Any]:
         """Query the RAG system."""
@@ -216,6 +218,7 @@ def create_rag_endpoints(router: APIRouter, rag_system: Any, prefix: str = "/rag
         threshold = request.get("threshold", 0.7)
         return await quick_rag_query_async(rag_system, query, top_k=top_k, threshold=threshold)
 
+    # nosonar: prefix is a function parameter used to build path, not a path parameter
     @router.post(f"{prefix}/ingest")
     async def ingest_document(request: Dict[str, Any]) -> Dict[str, Any]:
         """Ingest a document into the RAG system."""
@@ -247,6 +250,7 @@ def create_agent_endpoints(router: APIRouter, agent_manager: Any, prefix: str = 
     """
     from ..agno_agent_framework import chat_with_agent, execute_task
 
+    # nosonar: prefix is a function parameter used to build path, not a path parameter
     @router.get(f"{prefix}")
     async def list_agents() -> Dict[str, Any]:
         """List all agents."""
@@ -256,7 +260,7 @@ def create_agent_endpoints(router: APIRouter, agent_manager: Any, prefix: str = 
         }
 
     @router.get(f"{prefix}/{{agent_id}}")
-    async def get_agent(agent_id: str) -> Dict[str, Any]:
+    async def get_agent(agent_id: str = Path(..., description=AGENT_ID_DESCRIPTION)) -> Dict[str, Any]:
         """Get agent by ID."""
         agent = agent_manager.get_agent(agent_id)
         if not agent:
@@ -264,7 +268,10 @@ def create_agent_endpoints(router: APIRouter, agent_manager: Any, prefix: str = 
         return agent.get_status()
 
     @router.post(f"{prefix}/{{agent_id}}/chat")
-    async def chat_agent(agent_id: str, request: Dict[str, Any]) -> Dict[str, Any]:
+    async def chat_agent(
+        agent_id: str = Path(..., description=AGENT_ID_DESCRIPTION),
+        request: Dict[str, Any] = Body(...),
+    ) -> Dict[str, Any]:
         """Chat with an agent."""
         agent = agent_manager.get_agent(agent_id)
         if not agent:
@@ -277,7 +284,10 @@ def create_agent_endpoints(router: APIRouter, agent_manager: Any, prefix: str = 
         return response
 
     @router.post(f"{prefix}/{{agent_id}}/task")
-    async def submit_task(agent_id: str, request: Dict[str, Any]) -> Dict[str, Any]:
+    async def submit_task(
+        agent_id: str = Path(..., description=AGENT_ID_DESCRIPTION),
+        request: Dict[str, Any] = Body(...),
+    ) -> Dict[str, Any]:
         """Submit a task to an agent."""
         agent = agent_manager.get_agent(agent_id)
         if not agent:
@@ -455,6 +465,7 @@ def create_unified_query_endpoint(
         None: Result of the operation.
     """
 
+    # nosonar: prefix is a function parameter used to build path, not a path parameter
     @router.post(f"{prefix}")
     async def unified_query(request: Dict[str, Any]) -> Dict[str, Any]:
         """
@@ -517,6 +528,7 @@ def create_gateway_endpoints(router: APIRouter, gateway: Any, prefix: str = "/ga
     """
     from ..litellm_gateway import generate_embeddings, generate_text
 
+    # nosonar: prefix is a function parameter used to build path, not a path parameter
     @router.post(f"{prefix}/generate")
     async def generate(request: Dict[str, Any]) -> Dict[str, Any]:
         """Generate text using the gateway."""
@@ -526,6 +538,7 @@ def create_gateway_endpoints(router: APIRouter, gateway: Any, prefix: str = "/ga
         text = await generate_text(gateway, prompt, model=model)
         return {"text": text, "model": model}
 
+    # nosonar: prefix is a function parameter used to build path, not a path parameter
     @router.post(f"{prefix}/embed")
     async def embed(request: Dict[str, Any]) -> Dict[str, Any]:
         """Generate embeddings using the gateway."""

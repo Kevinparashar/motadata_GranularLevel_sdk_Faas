@@ -908,7 +908,8 @@ class DocumentProcessor:
             List[DocumentChunk]: List result of the operation.
         """
         # Look for markdown headers or HTML-like headers
-        header_pattern = r"^(#{1,6}\s+.+)$|^(<h[1-6]>.+</h[1-6]>)$"
+        # Use [^\n]+ and [^<]+ instead of .+ to prevent ReDoS (catastrophic backtracking)
+        header_pattern = r"^(#{1,6}\s+[^\n]+)$|^(<h[1-6]>[^<]+</h[1-6]>)$"
 
         lines = content.split("\n")
         chunks = []
@@ -1023,7 +1024,8 @@ class DocumentProcessor:
             str: Returned text value.
         """
         content = f"{document_id}_{chunk_index}"
-        return hashlib.md5(content.encode()).hexdigest()[:16]
+        # Use SHA-256 instead of MD5 for better security (MD5 is cryptographically broken)
+        return hashlib.sha256(content.encode()).hexdigest()[:16]
 
     def _estimate_tokens(self, text: str) -> int:
         """

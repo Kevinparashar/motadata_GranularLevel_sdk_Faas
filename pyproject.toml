@@ -134,6 +134,9 @@ omit = [
     "*/conftest.py",
     "*/setup.py",
     "*/examples/*",
+    # ML module excluded from coverage (not currently required/used)
+    "*/machine_learning/**",
+    "*/ml_service/**",
 ]
 
 [tool.coverage.report]

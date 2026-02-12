@@ -10,6 +10,7 @@ All methods are async-first for production scalability.
 
 # Standard library imports
 import logging
+import re
 from enum import Enum
 from typing import Any, Dict, List, Optional
 
@@ -516,12 +517,23 @@ class VectorIndexManager:
         
         Returns:
             int: Row count.
+        
+        Raises:
+            DatabaseError: If table_name contains invalid characters.
         """
+        # Validate table_name to prevent SQL injection
+        # Allow only alphanumeric, underscore, and dot characters
+        if not re.match(r"^[a-zA-Z0-9_.]+$", table_name):
+            raise DatabaseError(
+                message=f"Invalid table name: {table_name}. Only alphanumeric, underscore, and dot characters allowed.",
+                operation="get_table_row_count",
+            )
+        
         if tenant_id:
-            query = f"SELECT COUNT(*) as count FROM {table_name} WHERE tenant_id = $1;"
+            query = f'SELECT COUNT(*) as count FROM "{table_name}" WHERE tenant_id = $1;'
             result = await self.db.execute_query(query, (tenant_id,), fetch_one=True)
         else:
-            query = f"SELECT COUNT(*) as count FROM {table_name};"
+            query = f'SELECT COUNT(*) as count FROM "{table_name}";'
             result = await self.db.execute_query(query, fetch_one=True)
 
         return result.get("count", 0) if result else 0

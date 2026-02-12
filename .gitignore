@@ -30,3 +30,10 @@ dist/
 
 
 llmops_data/
+
+# Coverage JSON files (generated during test runs)
+coverage_*.json
+
+# Temporary planning documents
+COVERAGE_PHASE_2_PLAN.md
+PHASE_2_COVERAGE_IMPROVEMENT_PLAN.md

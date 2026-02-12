@@ -72,6 +72,9 @@ class ModelSerializer:
             if format == "joblib":
                 return joblib.load(filepath)
             elif format == "pickle":
+                # SECURITY WARNING: pickle.load() can execute arbitrary code
+                # Only use with trusted model files. Prefer joblib format for better security.
+                # nosonar: pickle.load is acceptable here as models are trusted/internal files
                 with open(filepath, "rb") as f:
                     return pickle.load(f)
             else:

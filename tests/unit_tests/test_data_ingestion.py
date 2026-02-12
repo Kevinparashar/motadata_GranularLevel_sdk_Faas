@@ -6,13 +6,20 @@ Unit tests for Data Ingestion components.
 import asyncio
 import tempfile
 from pathlib import Path
-from unittest.mock import AsyncMock, patch
+from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
 from src.core.data_ingestion.data_cleaner import DataCleaner
 from src.core.data_ingestion.data_validator import DataValidator
-from src.core.data_ingestion.exceptions import DataIngestionError
+from src.core.data_ingestion.exceptions import DataIngestionError, ValidationError
+from src.core.data_ingestion.functions import (
+    batch_upload_and_process,
+    batch_upload_and_process_async,
+    create_ingestion_service,
+    upload_and_process,
+    upload_and_process_async,
+)
 from src.core.data_ingestion.ingestion_service import DataIngestionService
 
 
@@ -285,4 +292,799 @@ async def test_data_cleaner_custom_options():
     
     # Should not modify content with all options disabled
     assert result == content
+
+
+@pytest.mark.asyncio
+async def test_ingestion_service_init_with_gateway_and_db():
+    """Test DataIngestionService initialization with gateway and db (creates RAG)."""
+    mock_gateway = MagicMock()
+    mock_db = MagicMock()
+    
+    with patch("src.core.data_ingestion.ingestion_service.create_rag_system") as mock_create_rag, \
+         patch("src.core.cache_mechanism.create_cache") as mock_create_cache, \
+         patch("src.core.rag.multimodal_loader.create_multimodal_loader") as mock_create_loader:
+        
+        mock_rag = MagicMock()
+        mock_create_rag.return_value = mock_rag
+        mock_cache = MagicMock()
+        mock_create_cache.return_value = mock_cache
+        mock_loader = MagicMock()
+        mock_create_loader.return_value = mock_loader
+        
+        service = DataIngestionService(
+            gateway=mock_gateway,
+            db=mock_db,
+            enable_validation=True,
+            enable_cleansing=True,
+        )
+        
+        assert service.rag_system == mock_rag
+        assert service.gateway == mock_gateway
+        mock_create_rag.assert_called_once()
+
+
+@pytest.mark.asyncio
+async def test_ingestion_service_init_gateway_from_rag():
+    """Test DataIngestionService gets gateway from RAG system."""
+    mock_rag = MagicMock()
+    mock_gateway = MagicMock()
+    mock_rag.gateway = mock_gateway
+    
+    with patch("src.core.cache_mechanism.create_cache") as mock_create_cache, \
+         patch("src.core.rag.multimodal_loader.create_multimodal_loader") as mock_create_loader:
+        
+        mock_cache = MagicMock()
+        mock_create_cache.return_value = mock_cache
+        mock_loader = MagicMock()
+        mock_create_loader.return_value = mock_loader
+        
+        service = DataIngestionService(
+            rag_system=mock_rag,
+            gateway=None,
+        )
+        
+        assert service.gateway == mock_gateway
+
+
+@pytest.mark.asyncio
+async def test_ingestion_service_upload_and_process_generate_title(ingestion_service):
+    """Test upload_and_process generates title from filename."""
+    def _create_temp_file():
+        with tempfile.NamedTemporaryFile(mode="w", suffix=".txt", delete=False) as f:
+            f.write("Test content")
+            return f.name
+    
+    file_path = await asyncio.to_thread(_create_temp_file)
+    
+    try:
+        with patch.object(ingestion_service.validator, "validate_file", new_callable=AsyncMock) as mock_validate, \
+             patch.object(ingestion_service.multimodal_loader, "load", new_callable=AsyncMock) as mock_load, \
+             patch.object(ingestion_service.cleaner, "clean", new_callable=AsyncMock) as mock_clean, \
+             patch.object(ingestion_service.cache, "set", new_callable=AsyncMock) as mock_cache_set:
+            
+            mock_validate.return_value = {"valid": True, "file_size": 100, "format": ".txt"}
+            mock_load.return_value = ("Test content", {})
+            mock_clean.return_value = "Test content"
+            mock_cache_set.return_value = None
+            
+            result = await ingestion_service.upload_and_process(
+                file_path=file_path,
+                title=None,  # Should be generated from filename
+            )
+            
+            assert result["title"] == Path(file_path).stem
+    finally:
+        await asyncio.to_thread(Path(file_path).unlink)
+
+
+@pytest.mark.asyncio
+async def test_ingestion_service_upload_and_process_validation_error(ingestion_service):
+    """Test upload_and_process with validation error."""
+    def _create_temp_file():
+        with tempfile.NamedTemporaryFile(mode="w", suffix=".txt", delete=False) as f:
+            f.write("Test content")
+            return f.name
+    
+    file_path = await asyncio.to_thread(_create_temp_file)
+    
+    try:
+        with patch.object(ingestion_service.validator, "validate_file", new_callable=AsyncMock) as mock_validate:
+            mock_validate.return_value = {"valid": False, "error": "File too large"}
+            
+            with pytest.raises(ValidationError, match="File too large"):
+                await ingestion_service.upload_and_process(
+                    file_path=file_path,
+                    title="Test",
+                )
+    finally:
+        await asyncio.to_thread(Path(file_path).unlink)
+
+
+@pytest.mark.asyncio
+async def test_ingestion_service_upload_and_process_load_error(ingestion_service):
+    """Test upload_and_process with file loading error."""
+    def _create_temp_file():
+        with tempfile.NamedTemporaryFile(mode="w", suffix=".txt", delete=False) as f:
+            f.write("Test content")
+            return f.name
+    
+    file_path = await asyncio.to_thread(_create_temp_file)
+    
+    try:
+        with patch.object(ingestion_service.validator, "validate_file", new_callable=AsyncMock) as mock_validate, \
+             patch.object(ingestion_service.multimodal_loader, "load", new_callable=AsyncMock) as mock_load:
+            
+            mock_validate.return_value = {"valid": True, "file_size": 100, "format": ".txt"}
+            mock_load.side_effect = ValueError("Load error")
+            
+            with pytest.raises(DataIngestionError, match="Error loading file"):
+                await ingestion_service.upload_and_process(
+                    file_path=file_path,
+                    title="Test",
+                )
+    finally:
+        await asyncio.to_thread(Path(file_path).unlink)
+
+
+@pytest.mark.asyncio
+async def test_ingestion_service_upload_and_process_merge_metadata(ingestion_service):
+    """Test upload_and_process merges metadata."""
+    def _create_temp_file():
+        with tempfile.NamedTemporaryFile(mode="w", suffix=".txt", delete=False) as f:
+            f.write("Test content")
+            return f.name
+    
+    file_path = await asyncio.to_thread(_create_temp_file)
+    
+    try:
+        with patch.object(ingestion_service.validator, "validate_file", new_callable=AsyncMock) as mock_validate, \
+             patch.object(ingestion_service.multimodal_loader, "load", new_callable=AsyncMock) as mock_load, \
+             patch.object(ingestion_service.cleaner, "clean", new_callable=AsyncMock) as mock_clean, \
+             patch.object(ingestion_service.cache, "set", new_callable=AsyncMock) as mock_cache_set:
+            
+            mock_validate.return_value = {"valid": True, "file_size": 100, "format": ".txt"}
+            mock_load.return_value = ("Test content", {"type": "text", "size": 100})
+            mock_clean.return_value = "Test content"
+            mock_cache_set.return_value = None
+            
+            result = await ingestion_service.upload_and_process(
+                file_path=file_path,
+                title="Test",
+                metadata={"custom": "value"},
+            )
+            
+            assert result["metadata"]["type"] == "text"
+            assert result["metadata"]["custom"] == "value"
+    finally:
+        await asyncio.to_thread(Path(file_path).unlink)
+
+
+@pytest.mark.asyncio
+async def test_ingestion_service_upload_and_process_with_rag_ingestion(ingestion_service):
+    """Test upload_and_process with RAG ingestion enabled."""
+    mock_rag = MagicMock()
+    mock_rag.ingest_document = MagicMock(return_value="doc-123")
+    ingestion_service.rag_system = mock_rag
+    
+    def _create_temp_file():
+        with tempfile.NamedTemporaryFile(mode="w", suffix=".txt", delete=False) as f:
+            f.write("Test content")
+            return f.name
+    
+    file_path = await asyncio.to_thread(_create_temp_file)
+    
+    try:
+        with patch.object(ingestion_service.validator, "validate_file", new_callable=AsyncMock) as mock_validate, \
+             patch.object(ingestion_service.multimodal_loader, "load", new_callable=AsyncMock) as mock_load, \
+             patch.object(ingestion_service.cleaner, "clean", new_callable=AsyncMock) as mock_clean, \
+             patch.object(ingestion_service.cache, "set", new_callable=AsyncMock) as mock_cache_set:
+            
+            mock_validate.return_value = {"valid": True, "file_size": 100, "format": ".txt"}
+            mock_load.return_value = ("Test content", {})
+            mock_clean.return_value = "Test content"
+            mock_cache_set.return_value = None
+            
+            result = await ingestion_service.upload_and_process(
+                file_path=file_path,
+                title="Test",
+                auto_ingest=True,
+            )
+            
+            assert result["document_id"] == "doc-123"
+            assert result["ingested"] is True
+            mock_rag.ingest_document.assert_called_once()
+    finally:
+        await asyncio.to_thread(Path(file_path).unlink)
+
+
+@pytest.mark.asyncio
+async def test_ingestion_service_upload_and_process_rag_ingestion_error(ingestion_service):
+    """Test upload_and_process with RAG ingestion error."""
+    mock_rag = MagicMock()
+    mock_rag.ingest_document = MagicMock(side_effect=ValueError("RAG error"))
+    ingestion_service.rag_system = mock_rag
+    
+    def _create_temp_file():
+        with tempfile.NamedTemporaryFile(mode="w", suffix=".txt", delete=False) as f:
+            f.write("Test content")
+            return f.name
+    
+    file_path = await asyncio.to_thread(_create_temp_file)
+    
+    try:
+        with patch.object(ingestion_service.validator, "validate_file", new_callable=AsyncMock) as mock_validate, \
+             patch.object(ingestion_service.multimodal_loader, "load", new_callable=AsyncMock) as mock_load, \
+             patch.object(ingestion_service.cleaner, "clean", new_callable=AsyncMock) as mock_clean, \
+             patch.object(ingestion_service.cache, "set", new_callable=AsyncMock) as mock_cache_set:
+            
+            mock_validate.return_value = {"valid": True, "file_size": 100, "format": ".txt"}
+            mock_load.return_value = ("Test content", {})
+            mock_clean.return_value = "Test content"
+            mock_cache_set.return_value = None
+            
+            with pytest.raises(DataIngestionError, match="Error ingesting into RAG"):
+                await ingestion_service.upload_and_process(
+                    file_path=file_path,
+                    title="Test",
+                    auto_ingest=True,
+                )
+    finally:
+        await asyncio.to_thread(Path(file_path).unlink)
+
+
+@pytest.mark.asyncio
+async def test_ingestion_service_upload_and_process_no_caching(ingestion_service):
+    """Test upload_and_process with caching disabled."""
+    ingestion_service.enable_caching = False
+    
+    def _create_temp_file():
+        with tempfile.NamedTemporaryFile(mode="w", suffix=".txt", delete=False) as f:
+            f.write("Test content")
+            return f.name
+    
+    file_path = await asyncio.to_thread(_create_temp_file)
+    
+    try:
+        with patch.object(ingestion_service.validator, "validate_file", new_callable=AsyncMock) as mock_validate, \
+             patch.object(ingestion_service.multimodal_loader, "load", new_callable=AsyncMock) as mock_load, \
+             patch.object(ingestion_service.cleaner, "clean", new_callable=AsyncMock) as mock_clean, \
+             patch.object(ingestion_service.cache, "set", new_callable=AsyncMock) as mock_cache_set:
+            
+            mock_validate.return_value = {"valid": True, "file_size": 100, "format": ".txt"}
+            mock_load.return_value = ("Test content", {})
+            mock_clean.return_value = "Test content"
+            
+            result = await ingestion_service.upload_and_process(
+                file_path=file_path,
+                title="Test",
+            )
+            
+            assert result["cached"] is False
+            mock_cache_set.assert_not_called()
+    finally:
+        await asyncio.to_thread(Path(file_path).unlink)
+
+
+@pytest.mark.asyncio
+async def test_ingestion_service_upload_and_process_no_cleansing(ingestion_service):
+    """Test upload_and_process with cleansing disabled."""
+    ingestion_service.cleaner = None
+    
+    def _create_temp_file():
+        with tempfile.NamedTemporaryFile(mode="w", suffix=".txt", delete=False) as f:
+            f.write("Test content")
+            return f.name
+    
+    file_path = await asyncio.to_thread(_create_temp_file)
+    
+    try:
+        with patch.object(ingestion_service.validator, "validate_file", new_callable=AsyncMock) as mock_validate, \
+             patch.object(ingestion_service.multimodal_loader, "load", new_callable=AsyncMock) as mock_load, \
+             patch.object(ingestion_service.cache, "set", new_callable=AsyncMock) as mock_cache_set:
+            
+            mock_validate.return_value = {"valid": True, "file_size": 100, "format": ".txt"}
+            mock_load.return_value = ("Test content", {})
+            mock_cache_set.return_value = None
+            
+            result = await ingestion_service.upload_and_process(
+                file_path=file_path,
+                title="Test",
+            )
+            
+            assert "content_preview" in result
+    finally:
+        await asyncio.to_thread(Path(file_path).unlink)
+
+
+@pytest.mark.asyncio
+async def test_ingestion_service_upload_and_process_async(ingestion_service):
+    """Test upload_and_process_async (alias method)."""
+    def _create_temp_file():
+        with tempfile.NamedTemporaryFile(mode="w", suffix=".txt", delete=False) as f:
+            f.write("Test content")
+            return f.name
+    
+    file_path = await asyncio.to_thread(_create_temp_file)
+    
+    try:
+        with patch.object(ingestion_service.validator, "validate_file", new_callable=AsyncMock) as mock_validate, \
+             patch.object(ingestion_service.multimodal_loader, "load", new_callable=AsyncMock) as mock_load, \
+             patch.object(ingestion_service.cleaner, "clean", new_callable=AsyncMock) as mock_clean, \
+             patch.object(ingestion_service.cache, "set", new_callable=AsyncMock) as mock_cache_set:
+            
+            mock_validate.return_value = {"valid": True, "file_size": 100, "format": ".txt"}
+            mock_load.return_value = ("Test content", {})
+            mock_clean.return_value = "Test content"
+            mock_cache_set.return_value = None
+            
+            result = await ingestion_service.upload_and_process_async(
+                file_path=file_path,
+                title="Test",
+            )
+            
+            assert "success" in result
+            assert result["success"] is True
+    finally:
+        await asyncio.to_thread(Path(file_path).unlink)
+
+
+@pytest.mark.asyncio
+async def test_ingestion_service_batch_upload_and_process(ingestion_service):
+    """Test batch_upload_and_process."""
+    def _create_temp_files():
+        files = []
+        for i in range(2):
+            with tempfile.NamedTemporaryFile(mode="w", suffix=".txt", delete=False) as f:
+                f.write(f"Test content {i}")
+                files.append(f.name)
+        return files
+    
+    file_paths = await asyncio.to_thread(_create_temp_files)
+    
+    try:
+        with patch.object(ingestion_service.validator, "validate_file", new_callable=AsyncMock) as mock_validate, \
+             patch.object(ingestion_service.multimodal_loader, "load", new_callable=AsyncMock) as mock_load, \
+             patch.object(ingestion_service.cleaner, "clean", new_callable=AsyncMock) as mock_clean, \
+             patch.object(ingestion_service.cache, "set", new_callable=AsyncMock) as mock_cache_set:
+            
+            mock_validate.return_value = {"valid": True, "file_size": 100, "format": ".txt"}
+            mock_load.return_value = ("Test content", {})
+            mock_clean.return_value = "Test content"
+            mock_cache_set.return_value = None
+            
+            results = await ingestion_service.batch_upload_and_process(
+                file_paths=file_paths,
+                titles=["File 1", "File 2"],
+            )
+            
+            assert len(results) == 2
+            assert all(r["success"] for r in results)
+    finally:
+        for file_path in file_paths:
+            await asyncio.to_thread(Path(file_path).unlink)
+
+
+@pytest.mark.asyncio
+async def test_ingestion_service_batch_upload_with_errors(ingestion_service):
+    """Test batch_upload_and_process with some files failing."""
+    def _create_temp_file():
+        with tempfile.NamedTemporaryFile(mode="w", suffix=".txt", delete=False) as f:
+            f.write("Test content")
+            return f.name
+    
+    file_path = await asyncio.to_thread(_create_temp_file)
+    
+    try:
+        # Mock upload_and_process to raise error for second file
+        original_method = ingestion_service.upload_and_process
+        
+        async def mock_upload(*args, **kwargs):
+            if "nonexistent" in str(kwargs.get("file_path", "")):
+                raise DataIngestionError(message="File not found", file_path="/nonexistent/file.txt")
+            return await original_method(*args, **kwargs)
+        
+        ingestion_service.upload_and_process = mock_upload
+        
+        with patch.object(ingestion_service.validator, "validate_file", new_callable=AsyncMock) as mock_validate, \
+             patch.object(ingestion_service.multimodal_loader, "load", new_callable=AsyncMock) as mock_load, \
+             patch.object(ingestion_service.cleaner, "clean", new_callable=AsyncMock) as mock_clean, \
+             patch.object(ingestion_service.cache, "set", new_callable=AsyncMock) as mock_cache_set:
+            
+            mock_validate.return_value = {"valid": True, "file_size": 100, "format": ".txt"}
+            mock_load.return_value = ("Test content", {})
+            mock_clean.return_value = "Test content"
+            mock_cache_set.return_value = None
+            
+            results = await ingestion_service.batch_upload_and_process(
+                file_paths=[file_path, "/nonexistent/file.txt"],
+            )
+            
+            assert len(results) == 2
+            assert results[0]["success"] is True
+            assert results[1]["success"] is False
+            assert "error" in results[1]
+    finally:
+        await asyncio.to_thread(Path(file_path).unlink)
+
+
+@pytest.mark.asyncio
+async def test_ingestion_service_batch_upload_unexpected_type(ingestion_service):
+    """Test batch_upload_and_process handles unexpected result types."""
+    def _create_temp_file():
+        with tempfile.NamedTemporaryFile(mode="w", suffix=".txt", delete=False) as f:
+            f.write("Test content")
+            return f.name
+    
+    file_path = await asyncio.to_thread(_create_temp_file)
+    
+    try:
+        # Mock upload_and_process to return unexpected type
+        original_method = ingestion_service.upload_and_process
+        
+        async def mock_upload(*args, **kwargs):
+            if "unexpected" in str(kwargs.get("file_path", "")):
+                return "unexpected_string"  # Not a dict
+            return await original_method(*args, **kwargs)
+        
+        ingestion_service.upload_and_process = mock_upload
+        
+        with patch.object(ingestion_service.validator, "validate_file", new_callable=AsyncMock) as mock_validate, \
+             patch.object(ingestion_service.multimodal_loader, "load", new_callable=AsyncMock) as mock_load, \
+             patch.object(ingestion_service.cleaner, "clean", new_callable=AsyncMock) as mock_clean, \
+             patch.object(ingestion_service.cache, "set", new_callable=AsyncMock) as mock_cache_set:
+            
+            mock_validate.return_value = {"valid": True, "file_size": 100, "format": ".txt"}
+            mock_load.return_value = ("Test content", {})
+            mock_clean.return_value = "Test content"
+            mock_cache_set.return_value = None
+            
+            # Create a file path that will trigger unexpected type
+            unexpected_path = file_path.replace(".txt", "_unexpected.txt")
+            
+            results = await ingestion_service.batch_upload_and_process(
+                file_paths=[file_path, unexpected_path],
+            )
+            
+            assert len(results) == 2
+            assert results[0]["success"] is True
+            assert results[1]["success"] is False
+            assert "Unexpected result type" in results[1]["error"]
+    finally:
+        await asyncio.to_thread(Path(file_path).unlink)
+
+
+@pytest.mark.asyncio
+async def test_ingestion_service_batch_upload_and_process_async(ingestion_service):
+    """Test batch_upload_and_process_async (alias method)."""
+    def _create_temp_file():
+        with tempfile.NamedTemporaryFile(mode="w", suffix=".txt", delete=False) as f:
+            f.write("Test content")
+            return f.name
+    
+    file_path = await asyncio.to_thread(_create_temp_file)
+    
+    try:
+        with patch.object(ingestion_service.validator, "validate_file", new_callable=AsyncMock) as mock_validate, \
+             patch.object(ingestion_service.multimodal_loader, "load", new_callable=AsyncMock) as mock_load, \
+             patch.object(ingestion_service.cleaner, "clean", new_callable=AsyncMock) as mock_clean, \
+             patch.object(ingestion_service.cache, "set", new_callable=AsyncMock) as mock_cache_set:
+            
+            mock_validate.return_value = {"valid": True, "file_size": 100, "format": ".txt"}
+            mock_load.return_value = ("Test content", {})
+            mock_clean.return_value = "Test content"
+            mock_cache_set.return_value = None
+            
+            results = await ingestion_service.batch_upload_and_process_async(
+                file_paths=[file_path],
+            )
+            
+            assert len(results) == 1
+            assert results[0]["success"] is True
+    finally:
+        await asyncio.to_thread(Path(file_path).unlink)
+
+
+@pytest.mark.asyncio
+async def test_ingestion_service_upload_and_process_auto_ingest_override(ingestion_service):
+    """Test upload_and_process with auto_ingest parameter override."""
+    mock_rag = MagicMock()
+    mock_rag.ingest_document = MagicMock(return_value="doc-123")
+    ingestion_service.rag_system = mock_rag
+    ingestion_service.enable_auto_ingest = False  # Disabled by default
+    
+    def _create_temp_file():
+        with tempfile.NamedTemporaryFile(mode="w", suffix=".txt", delete=False) as f:
+            f.write("Test content")
+            return f.name
+    
+    file_path = await asyncio.to_thread(_create_temp_file)
+    
+    try:
+        with patch.object(ingestion_service.validator, "validate_file", new_callable=AsyncMock) as mock_validate, \
+             patch.object(ingestion_service.multimodal_loader, "load", new_callable=AsyncMock) as mock_load, \
+             patch.object(ingestion_service.cleaner, "clean", new_callable=AsyncMock) as mock_clean, \
+             patch.object(ingestion_service.cache, "set", new_callable=AsyncMock) as mock_cache_set:
+            
+            mock_validate.return_value = {"valid": True, "file_size": 100, "format": ".txt"}
+            mock_load.return_value = ("Test content", {})
+            mock_clean.return_value = "Test content"
+            mock_cache_set.return_value = None
+            
+            # Override with auto_ingest=True
+            result = await ingestion_service.upload_and_process(
+                file_path=file_path,
+                title="Test",
+                auto_ingest=True,  # Override default
+            )
+            
+            assert result["document_id"] == "doc-123"
+            mock_rag.ingest_document.assert_called_once()
+    finally:
+        await asyncio.to_thread(Path(file_path).unlink)
+
+
+@pytest.mark.asyncio
+async def test_ingestion_service_upload_and_process_auto_ingest_false(ingestion_service):
+    """Test upload_and_process with auto_ingest=False."""
+    mock_rag = MagicMock()
+    ingestion_service.rag_system = mock_rag
+    ingestion_service.enable_auto_ingest = True  # Enabled by default
+    
+    def _create_temp_file():
+        with tempfile.NamedTemporaryFile(mode="w", suffix=".txt", delete=False) as f:
+            f.write("Test content")
+            return f.name
+    
+    file_path = await asyncio.to_thread(_create_temp_file)
+    
+    try:
+        with patch.object(ingestion_service.validator, "validate_file", new_callable=AsyncMock) as mock_validate, \
+             patch.object(ingestion_service.multimodal_loader, "load", new_callable=AsyncMock) as mock_load, \
+             patch.object(ingestion_service.cleaner, "clean", new_callable=AsyncMock) as mock_clean, \
+             patch.object(ingestion_service.cache, "set", new_callable=AsyncMock) as mock_cache_set:
+            
+            mock_validate.return_value = {"valid": True, "file_size": 100, "format": ".txt"}
+            mock_load.return_value = ("Test content", {})
+            mock_clean.return_value = "Test content"
+            mock_cache_set.return_value = None
+            
+            # Override with auto_ingest=False
+            result = await ingestion_service.upload_and_process(
+                file_path=file_path,
+                title="Test",
+                auto_ingest=False,  # Override default
+            )
+            
+            assert result["document_id"] is None
+            assert result["ingested"] is False
+            mock_rag.ingest_document.assert_not_called()
+    finally:
+        await asyncio.to_thread(Path(file_path).unlink)
+
+
+@pytest.mark.asyncio
+async def test_ingestion_service_batch_upload_with_metadata_list(ingestion_service):
+    """Test batch_upload_and_process with metadata_list."""
+    def _create_temp_file():
+        with tempfile.NamedTemporaryFile(mode="w", suffix=".txt", delete=False) as f:
+            f.write("Test content")
+            return f.name
+    
+    file_path = await asyncio.to_thread(_create_temp_file)
+    
+    try:
+        with patch.object(ingestion_service.validator, "validate_file", new_callable=AsyncMock) as mock_validate, \
+             patch.object(ingestion_service.multimodal_loader, "load", new_callable=AsyncMock) as mock_load, \
+             patch.object(ingestion_service.cleaner, "clean", new_callable=AsyncMock) as mock_clean, \
+             patch.object(ingestion_service.cache, "set", new_callable=AsyncMock) as mock_cache_set:
+            
+            mock_validate.return_value = {"valid": True, "file_size": 100, "format": ".txt"}
+            mock_load.return_value = ("Test content", {"type": "text"})
+            mock_clean.return_value = "Test content"
+            mock_cache_set.return_value = None
+            
+            results = await ingestion_service.batch_upload_and_process(
+                file_paths=[file_path],
+                metadata_list=[{"custom": "value"}],
+            )
+            
+            assert len(results) == 1
+            assert results[0]["metadata"]["type"] == "text"
+            assert results[0]["metadata"]["custom"] == "value"
+    finally:
+        await asyncio.to_thread(Path(file_path).unlink)
+
+
+class TestDataIngestionFunctions:
+    """Tests for data_ingestion/functions.py convenience functions."""
+
+    @pytest.mark.asyncio
+    async def test_create_ingestion_service_basic(self):
+        """Test create_ingestion_service with basic parameters."""
+        with patch("src.core.data_ingestion.functions.DataIngestionService") as mock_service_class:
+            mock_service = MagicMock()
+            mock_service_class.return_value = mock_service
+
+            service = create_ingestion_service()
+
+            assert service == mock_service
+            mock_service_class.assert_called_once()
+
+    @pytest.mark.asyncio
+    async def test_create_ingestion_service_with_all_params(self):
+        """Test create_ingestion_service with all parameters."""
+        mock_rag = MagicMock()
+        mock_cache = MagicMock()
+        mock_gateway = MagicMock()
+        mock_db = MagicMock()
+
+        with patch("src.core.data_ingestion.functions.DataIngestionService") as mock_service_class:
+            mock_service = MagicMock()
+            mock_service_class.return_value = mock_service
+
+            service = create_ingestion_service(
+                rag_system=mock_rag,
+                cache=mock_cache,
+                gateway=mock_gateway,
+                db=mock_db,
+                enable_validation=False,
+                enable_cleansing=False,
+                enable_auto_ingest=False,
+                enable_caching=False,
+                tenant_id="tenant-1",
+                custom_param="value",
+            )
+
+            assert service == mock_service
+            mock_service_class.assert_called_once_with(
+                rag_system=mock_rag,
+                cache=mock_cache,
+                gateway=mock_gateway,
+                db=mock_db,
+                enable_validation=False,
+                enable_cleansing=False,
+                enable_auto_ingest=False,
+                enable_caching=False,
+                tenant_id="tenant-1",
+                custom_param="value",
+            )
+
+    @pytest.mark.asyncio
+    async def test_upload_and_process(self):
+        """Test upload_and_process convenience function."""
+        mock_rag = MagicMock()
+        mock_cache = MagicMock()
+
+        with patch("src.core.data_ingestion.functions.create_ingestion_service") as mock_create:
+            mock_service = MagicMock()
+            mock_service.upload_and_process = AsyncMock(return_value={"success": True, "document_id": "doc-123"})
+            mock_create.return_value = mock_service
+
+            result = await upload_and_process(
+                file_path="test.txt",
+                rag_system=mock_rag,
+                cache=mock_cache,
+                title="Test Document",
+                metadata={"key": "value"},
+                tenant_id="tenant-1",
+            )
+
+            assert result["success"] is True
+            assert result["document_id"] == "doc-123"
+            mock_create.assert_called_once_with(
+                rag_system=mock_rag,
+                cache=mock_cache,
+                gateway=None,
+                db=None,
+                tenant_id="tenant-1",
+            )
+            mock_service.upload_and_process.assert_called_once_with(
+                file_path="test.txt",
+                title="Test Document",
+                metadata={"key": "value"},
+            )
+
+    @pytest.mark.asyncio
+    async def test_upload_and_process_async(self):
+        """Test upload_and_process_async alias function."""
+        mock_rag = MagicMock()
+        mock_cache = MagicMock()
+
+        with patch("src.core.data_ingestion.functions.upload_and_process") as mock_upload:
+            mock_upload.return_value = {"success": True, "document_id": "doc-123"}
+
+            result = await upload_and_process_async(
+                file_path="test.txt",
+                rag_system=mock_rag,
+                cache=mock_cache,
+                title="Test Document",
+                metadata={"key": "value"},
+                tenant_id="tenant-1",
+            )
+
+            assert result["success"] is True
+            mock_upload.assert_called_once_with(
+                "test.txt",
+                mock_rag,
+                mock_cache,
+                None,
+                None,
+                "Test Document",
+                {"key": "value"},
+                "tenant-1",
+            )
+
+    @pytest.mark.asyncio
+    async def test_batch_upload_and_process(self):
+        """Test batch_upload_and_process convenience function."""
+        mock_rag = MagicMock()
+        mock_cache = MagicMock()
+
+        with patch("src.core.data_ingestion.functions.create_ingestion_service") as mock_create:
+            mock_service = MagicMock()
+            mock_service.batch_upload_and_process = AsyncMock(
+                return_value=[
+                    {"success": True, "document_id": "doc-1"},
+                    {"success": True, "document_id": "doc-2"},
+                ]
+            )
+            mock_create.return_value = mock_service
+
+            result = await batch_upload_and_process(
+                file_paths=["test1.txt", "test2.txt"],
+                rag_system=mock_rag,
+                cache=mock_cache,
+                titles=["Title 1", "Title 2"],
+                metadata_list=[{"key1": "value1"}, {"key2": "value2"}],
+                tenant_id="tenant-1",
+            )
+
+            assert len(result) == 2
+            assert result[0]["success"] is True
+            assert result[1]["success"] is True
+            mock_create.assert_called_once_with(
+                rag_system=mock_rag,
+                cache=mock_cache,
+                gateway=None,
+                db=None,
+                tenant_id="tenant-1",
+            )
+            mock_service.batch_upload_and_process.assert_called_once_with(
+                file_paths=["test1.txt", "test2.txt"],
+                titles=["Title 1", "Title 2"],
+                metadata_list=[{"key1": "value1"}, {"key2": "value2"}],
+            )
+
+    @pytest.mark.asyncio
+    async def test_batch_upload_and_process_async(self):
+        """Test batch_upload_and_process_async alias function."""
+        mock_rag = MagicMock()
+        mock_cache = MagicMock()
+
+        with patch("src.core.data_ingestion.functions.batch_upload_and_process") as mock_batch:
+            mock_batch.return_value = [
+                {"success": True, "document_id": "doc-1"},
+                {"success": True, "document_id": "doc-2"},
+            ]
+
+            result = await batch_upload_and_process_async(
+                file_paths=["test1.txt", "test2.txt"],
+                rag_system=mock_rag,
+                cache=mock_cache,
+                titles=["Title 1", "Title 2"],
+                metadata_list=[{"key1": "value1"}, {"key2": "value2"}],
+                tenant_id="tenant-1",
+            )
+
+            assert len(result) == 2
+            mock_batch.assert_called_once_with(
+                ["test1.txt", "test2.txt"],
+                mock_rag,
+                mock_cache,
+                None,
+                None,
+                ["Title 1", "Title 2"],
+                [{"key1": "value1"}, {"key2": "value2"}],
+                "tenant-1",
+            )
 

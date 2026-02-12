@@ -479,7 +479,8 @@ def auto_cache(
             sort_keys=True,
             default=str,
         )
-        return hashlib.md5(key_data.encode()).hexdigest()
+        # Use SHA-256 instead of MD5 for better security (MD5 is cryptographically broken)
+        return hashlib.sha256(key_data.encode()).hexdigest()
 
     def decorator(func: Callable) -> Callable:
         async def async_wrapper(*args, **kwargs) -> Any:

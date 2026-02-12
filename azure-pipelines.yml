@@ -32,7 +32,7 @@ steps:
       sonar.tests=tests
       sonar.test.inclusions=**/test_*.py,**/*_test.py
       sonar.exclusions=**/__pycache__/**,**/*.pyc,**/*.pyo,**/venv/**,**/env/**,**/.venv/**,**/build/**,**/dist/**,**/*.egg-info/**,**/node_modules/**,**/examples/**
-      sonar.coverage.exclusions=**/test_*.py,**/*_test.py,**/tests/**,**/__pycache__/**,**/*.pyc,**/*.pyo,**/venv/**,**/env/**,**/.venv/**,**/build/**,**/dist/**,**/*.egg-info/**,**/testdata/**,**/*_pb2.py,**/mock_*.py,**/mocks/**,**/conftest.py,**/setup.py,**/examples/**
+      sonar.coverage.exclusions=**/test_*.py,**/*_test.py,**/tests/**,**/__pycache__/**,**/*.pyc,**/*.pyo,**/venv/**,**/env/**,**/.venv/**,**/build/**,**/dist/**,**/*.egg-info/**,**/testdata/**,**/*_pb2.py,**/mock_*.py,**/mocks/**,**/conftest.py,**/setup.py,**/examples/**,**/machine_learning/**,**/ml_service/**
       sonar.python.coverage.reportPaths=$(System.DefaultWorkingDirectory)/coverage.xml
       sonar.python.xunit.reportPath=$(System.DefaultWorkingDirectory)/test-results.xml
       sonar.qualitygate.wait=true

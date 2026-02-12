@@ -19,6 +19,7 @@ from src.core.cache_mechanism import (  # Core classes; Factory functions; High-
     cache_set,
     configure_cache,
     create_cache,
+    create_dragonfly_cache,
     create_memory_cache,
 )
 
@@ -65,6 +66,29 @@ class TestFactoryFunctions:
         assert cache.config.backend == "memory"
         assert cache.config.default_ttl == 300
         assert cache.config.max_size == 1024
+
+    def test_create_dragonfly_cache(self):
+        """Test create_dragonfly_cache factory function - covers line 103."""
+        cache = create_dragonfly_cache(
+            dragonfly_url="dragonfly://localhost:6379/0",
+            default_ttl=600,
+            namespace="dragonfly_cache"
+        )
+
+        assert isinstance(cache, CacheMechanism)
+        assert cache.config.backend == "dragonfly"
+        assert cache.config.dragonfly_url == "dragonfly://localhost:6379/0"
+        assert cache.config.default_ttl == 600
+        assert cache.config.namespace == "dragonfly_cache"
+
+    def test_create_dragonfly_cache_defaults(self):
+        """Test create_dragonfly_cache with default parameters."""
+        cache = create_dragonfly_cache()
+
+        assert isinstance(cache, CacheMechanism)
+        assert cache.config.backend == "dragonfly"
+        assert cache.config.dragonfly_url == "dragonfly://localhost:6379/0"
+        assert cache.config.default_ttl == 300
 
     def test_configure_cache(self):
         """Test configure_cache factory function."""
@@ -190,6 +214,38 @@ class TestUtilityFunctions:
 
         # Value should be cached
         assert await cache.get("key1") == "computed_value"
+
+    @pytest.mark.asyncio
+    async def test_cache_or_compute_async_function(self, cache):
+        """Test cache_or_compute with async compute function - covers line 257."""
+        import asyncio
+
+        async def async_compute_func():
+            await asyncio.sleep(0.01)  # Simulate async work
+            return "async_computed_value"
+
+        value = await cache_or_compute(cache, "key1", async_compute_func, ttl=600)
+
+        assert value == "async_computed_value"
+        # Verify value was cached
+        assert await cache.get("key1") == "async_computed_value"
+
+    @pytest.mark.asyncio
+    async def test_cache_or_compute_async_function_cache_hit(self, cache):
+        """Test cache_or_compute with async compute function when cache hit."""
+        import asyncio
+
+        # Pre-populate cache
+        await cache.set("key1", "cached_value")
+
+        async def async_compute_func():
+            await asyncio.sleep(0.01)
+            return "async_computed_value"  # Should not be called
+
+        value = await cache_or_compute(cache, "key1", async_compute_func, ttl=600)
+
+        # Should return cached value, not computed value
+        assert value == "cached_value"
 
     @pytest.mark.asyncio
     async def test_batch_cache_set(self, cache):

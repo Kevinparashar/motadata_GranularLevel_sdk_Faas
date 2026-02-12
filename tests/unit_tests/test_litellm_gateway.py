@@ -5,11 +5,13 @@ Tests LLM operations across multiple providers.
 """
 
 
+from typing import List, Optional
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
 from src.core.litellm_gateway import GatewayConfig, LiteLLMGateway
+from src.core.llmops import LLMOperationStatus
 
 
 class TestLiteLLMGateway:
@@ -265,7 +267,7 @@ class TestLiteLLMGateway:
         with patch("src.core.litellm_gateway.gateway.LiteLLMGateway._initialize_kv_cache"), \
              patch("src.core.litellm_gateway.gateway.LiteLLMGateway._initialize_cache"), \
              patch("src.core.litellm_gateway.gateway.Router") as mock_router_class:
-            gateway = LiteLLMGateway(config=config)
+            LiteLLMGateway(config=config)
             mock_router_class.assert_called_once()
 
     def test_initialize_router_with_fallbacks(self):
@@ -277,7 +279,7 @@ class TestLiteLLMGateway:
         with patch("src.core.litellm_gateway.gateway.LiteLLMGateway._initialize_kv_cache"), \
              patch("src.core.litellm_gateway.gateway.LiteLLMGateway._initialize_cache"), \
              patch("src.core.litellm_gateway.gateway.Router") as mock_router_class:
-            gateway = LiteLLMGateway(config=config)
+            LiteLLMGateway(config=config)
             call_kwargs = mock_router_class.call_args[1]
             assert "fallbacks" in call_kwargs
 
@@ -611,7 +613,7 @@ class TestLiteLLMGateway:
         mock_usage = UsageObj()
         mock_response.usage = mock_usage
 
-        text, model, usage, finish_reason, raw = gateway._extract_response_data(mock_response, "gpt-4")
+        text, model, usage, finish_reason, _ = gateway._extract_response_data(mock_response, "gpt-4")
         assert text == "Response text"
         assert model == "gpt-4"
         assert finish_reason == "stop"
@@ -626,7 +628,7 @@ class TestLiteLLMGateway:
             "usage": {"prompt_tokens": 10, "completion_tokens": 20}
         }
 
-        text, model, usage, finish_reason, raw = gateway._extract_response_data(response, "gpt-4")
+        text, model, usage, finish_reason, _ = gateway._extract_response_data(response, "gpt-4")
         assert text == "Response text"
         assert model == "gpt-4"
         assert finish_reason == "stop"
@@ -637,7 +639,7 @@ class TestLiteLLMGateway:
         gateway = mock_gateway
         response = "Simple string response"
 
-        text, model, usage, finish_reason, raw = gateway._extract_response_data(response, "gpt-4")
+        text, model, usage, finish_reason, _ = gateway._extract_response_data(response, "gpt-4")
         assert text == "Simple string response"
         assert model == "gpt-4"
         assert usage is None
@@ -673,6 +675,818 @@ class TestLiteLLMGateway:
 
         # Should not raise
         await gateway._store_kv_cache("key", "prompt", "model", "tenant1")
+
+    @pytest.mark.asyncio
+    async def test_get_health(self):
+        """Test get_health method."""
+        config = GatewayConfig(enable_health_monitoring=True, enable_llmops=True, enable_feedback_loop=True)
+        with patch("src.core.litellm_gateway.gateway.LiteLLMGateway._initialize_kv_cache"), \
+             patch("src.core.litellm_gateway.gateway.LiteLLMGateway._initialize_cache"), \
+             patch("src.core.litellm_gateway.gateway.LiteLLMGateway._initialize_router"):
+            gateway = LiteLLMGateway(config=config)
+            mock_health_check = MagicMock()
+            mock_health_check.check = AsyncMock()
+            mock_health_check.get_health.return_value = {"status": "healthy"}
+            gateway.health_check = mock_health_check
+            gateway.circuit_breaker = MagicMock()
+            gateway.circuit_breaker.get_stats.return_value = {"state": "closed"}
+            gateway.rate_limiters = {}
+            gateway.provider_health = {}
+            gateway.llmops = MagicMock()
+            gateway.llmops.get_metrics.return_value = {"total_requests": 10}
+            gateway.feedback_loop = MagicMock()
+            gateway.feedback_loop.get_feedback_stats.return_value = {"total": 5}
+
+            health = await gateway.get_health()
+            assert "status" in health
+            assert "circuit_breaker" in health
+            assert "rate_limiters" in health
+
+    def test_get_health_disabled(self, mock_gateway):
+        """Test get_health when health monitoring is disabled."""
+        gateway = mock_gateway
+        gateway.health_check = None
+        import asyncio
+        health = asyncio.run(gateway.get_health())
+        assert health == {"status": "health_monitoring_disabled"}
+
+    @pytest.mark.asyncio
+    async def test_setup_health_checks_router_not_configured(self):
+        """Test health check setup with router not configured."""
+        config = GatewayConfig(enable_health_monitoring=True)
+        with patch("src.core.litellm_gateway.gateway.LiteLLMGateway._initialize_kv_cache"), \
+             patch("src.core.litellm_gateway.gateway.LiteLLMGateway._initialize_cache"), \
+             patch("src.core.litellm_gateway.gateway.LiteLLMGateway._initialize_router"):
+            gateway = LiteLLMGateway(config=config)
+            # Set router to None for testing (router can be None in practice)
+            setattr(gateway, 'router', None)
+            # Trigger health check setup
+            gateway._setup_health_checks()
+            # Health check should be set up
+            assert gateway.health_check is not None
+
+    @pytest.mark.asyncio
+    async def test_setup_health_checks_circuit_breaker_open(self):
+        """Test health check setup with circuit breaker open."""
+        from src.core.utils.circuit_breaker import CircuitState
+        config = GatewayConfig(enable_health_monitoring=True, enable_circuit_breaker=True)
+        with patch("src.core.litellm_gateway.gateway.LiteLLMGateway._initialize_kv_cache"), \
+             patch("src.core.litellm_gateway.gateway.LiteLLMGateway._initialize_cache"), \
+             patch("src.core.litellm_gateway.gateway.LiteLLMGateway._initialize_router"):
+            gateway = LiteLLMGateway(config=config)
+            # Health check is already set up in __init__, just verify it works
+            assert gateway.health_check is not None
+            # Verify circuit breaker is set
+            assert gateway.circuit_breaker is not None
+            # Mock get_stats to return OPEN state
+            gateway.circuit_breaker.get_stats = MagicMock(return_value={"state": CircuitState.OPEN.value})
+            # Health check should still be functional
+            assert gateway.health_check is not None
+
+    def test_setup_health_checks_provider_health(self):
+        """Test health check setup with provider health data."""
+        config = GatewayConfig(enable_health_monitoring=True)
+        with patch("src.core.litellm_gateway.gateway.LiteLLMGateway._initialize_kv_cache"), \
+             patch("src.core.litellm_gateway.gateway.LiteLLMGateway._initialize_cache"), \
+             patch("src.core.litellm_gateway.gateway.LiteLLMGateway._initialize_router"):
+            gateway = LiteLLMGateway(config=config)
+            gateway.provider_health = {
+                "gpt-4": {"status": "healthy"},
+                "claude-3": {"status": "unhealthy"}
+            }
+            gateway._setup_health_checks()
+            assert gateway.health_check is not None
+
+    def test_setup_health_checks_no_provider_health(self):
+        """Test health check setup with no provider health data."""
+        config = GatewayConfig(enable_health_monitoring=True)
+        with patch("src.core.litellm_gateway.gateway.LiteLLMGateway._initialize_kv_cache"), \
+             patch("src.core.litellm_gateway.gateway.LiteLLMGateway._initialize_cache"), \
+             patch("src.core.litellm_gateway.gateway.LiteLLMGateway._initialize_router"):
+            gateway = LiteLLMGateway(config=config)
+            gateway.provider_health = {}
+            gateway._setup_health_checks()
+            assert gateway.health_check is not None
+
+    @pytest.mark.asyncio
+    async def test_record_feedback(self, mock_gateway):
+        """Test record_feedback method."""
+        gateway = mock_gateway
+        from src.core.feedback_loop import FeedbackType
+        mock_feedback_loop = MagicMock()
+        mock_feedback_loop.record_feedback = AsyncMock(return_value="feedback_id_123")
+        gateway.feedback_loop = mock_feedback_loop
+
+        # Use a valid FeedbackType value (RATING is one of the valid types)
+        result = await gateway.record_feedback(
+            query="test query",
+            response="test response",
+            feedback_type=FeedbackType.RATING,
+            content="test content",
+            tenant_id="tenant1"
+        )
+        assert result == "feedback_id_123"
+        mock_feedback_loop.record_feedback.assert_called_once()
+
+    @pytest.mark.asyncio
+    async def test_record_feedback_disabled(self, mock_gateway):
+        """Test record_feedback when feedback loop is disabled."""
+        gateway = mock_gateway
+        gateway.feedback_loop = None
+
+        result = await gateway.record_feedback(
+            query="test query",
+            response="test response",
+            feedback_type=None,
+            content=None
+        )
+        assert result is None
+
+    def test_get_llmops_metrics(self, mock_gateway):
+        """Test get_llmops_metrics method."""
+        gateway = mock_gateway
+        mock_llmops = MagicMock()
+        mock_llmops.get_metrics.return_value = {"total_requests": 100}
+        gateway.llmops = mock_llmops
+
+        metrics = gateway.get_llmops_metrics(tenant_id="tenant1", time_range_hours=24)
+        assert metrics["total_requests"] == 100
+        mock_llmops.get_metrics.assert_called_once_with(tenant_id="tenant1", time_range_hours=24)
+
+    def test_get_llmops_metrics_disabled(self, mock_gateway):
+        """Test get_llmops_metrics when LLMOps is disabled."""
+        gateway = mock_gateway
+        gateway.llmops = None
+
+        metrics = gateway.get_llmops_metrics()
+        assert metrics == {"error": "LLMOps not enabled"}
+
+    def test_get_cost_summary(self, mock_gateway):
+        """Test get_cost_summary method."""
+        gateway = mock_gateway
+        mock_llmops = MagicMock()
+        mock_llmops.get_cost_summary.return_value = {"total_cost": 10.50}
+        gateway.llmops = mock_llmops
+
+        cost = gateway.get_cost_summary(tenant_id="tenant1", time_range_hours=48)
+        assert abs(cost["total_cost"] - 10.50) < 0.01  # Use approximate comparison for float
+        mock_llmops.get_cost_summary.assert_called_once_with(tenant_id="tenant1", time_range_hours=48)
+
+    def test_get_cost_summary_disabled(self, mock_gateway):
+        """Test get_cost_summary when LLMOps is disabled."""
+        gateway = mock_gateway
+        gateway.llmops = None
+
+        cost = gateway.get_cost_summary()
+        assert cost == {"error": "LLMOps not enabled"}
+
+    @pytest.mark.asyncio
+    async def test_check_kv_cache_hit(self, mock_gateway):
+        """Test _check_kv_cache with cache hit."""
+        gateway = mock_gateway
+        mock_kv_cache = MagicMock()
+        mock_kv_cache.get_kv_cache = AsyncMock(return_value={"keys": [], "values": []})
+        gateway.kv_cache = mock_kv_cache
+
+        result = await gateway._check_kv_cache("prompt", "model", [{"role": "user", "content": "test"}], "tenant1")
+        assert result is not None
+        mock_kv_cache.get_kv_cache.assert_called_once()
+
+    @pytest.mark.asyncio
+    async def test_check_kv_cache_miss(self, mock_gateway):
+        """Test _check_kv_cache with cache miss."""
+        gateway = mock_gateway
+        mock_kv_cache = MagicMock()
+        mock_kv_cache.get_kv_cache = AsyncMock(return_value=None)
+        gateway.kv_cache = mock_kv_cache
+
+        result = await gateway._check_kv_cache("prompt", "model", [{"role": "user", "content": "test"}], "tenant1")
+        assert result is not None  # Returns key even on miss
+
+    @pytest.mark.asyncio
+    async def test_check_response_cache_hit(self, mock_gateway):
+        """Test _check_response_cache with cache hit."""
+        gateway = mock_gateway
+        from src.core.cache_mechanism import CacheConfig, CacheMechanism
+        cache = CacheMechanism(CacheConfig())
+        gateway.cache = cache
+        gateway.config.enable_caching = True
+        
+        # Store a cached response using the same key generation logic
+        messages = [{"role": "user", "content": "test"}]
+        cache_key = gateway._generate_cache_key("test prompt", "gpt-4", messages, "tenant1")
+        cached_data = {
+            "text": "Cached response",
+            "model": "gpt-4",
+            "usage": {"prompt_tokens": 10},
+            "finish_reason": "stop"
+        }
+        await cache.set(cache_key, cached_data, ttl=3600, tenant_id="tenant1")
+
+        result = await gateway._check_response_cache(
+            "test prompt", "gpt-4", messages, "tenant1", False
+        )
+        assert result is not None
+        assert result.text == "Cached response"
+
+    @pytest.mark.asyncio
+    async def test_check_response_cache_miss(self, mock_gateway):
+        """Test _check_response_cache with cache miss."""
+        gateway = mock_gateway
+        from src.core.cache_mechanism import CacheConfig, CacheMechanism
+        cache = CacheMechanism(CacheConfig())
+        gateway.cache = cache
+
+        result = await gateway._check_response_cache(
+            "different prompt", "gpt-4", [{"role": "user", "content": "different"}], "tenant1", False
+        )
+        assert result is None
+
+    @pytest.mark.asyncio
+    async def test_check_response_cache_disabled(self, mock_gateway):
+        """Test _check_response_cache when cache is disabled."""
+        gateway = mock_gateway
+        gateway.cache = None
+
+        result = await gateway._check_response_cache(
+            "test prompt", "gpt-4", [{"role": "user", "content": "test"}], "tenant1", False
+        )
+        assert result is None
+
+    def test_extract_token_usage(self, mock_gateway):
+        """Test _extract_token_usage method."""
+        gateway = mock_gateway
+        mock_response = MagicMock()
+        mock_usage = MagicMock()
+        mock_usage.prompt_tokens = 10
+        mock_usage.completion_tokens = 20
+        mock_response.usage = mock_usage
+
+        prompt_tokens = [0]
+        completion_tokens = [0]
+        gateway._extract_token_usage(mock_response, prompt_tokens, completion_tokens)
+        assert prompt_tokens[0] == 10
+        assert completion_tokens[0] == 20
+
+    def test_extract_token_usage_no_usage(self, mock_gateway):
+        """Test _extract_token_usage with no usage attribute."""
+        gateway = mock_gateway
+        mock_response = MagicMock()
+        mock_response.usage = None
+
+        prompt_tokens = [0]
+        completion_tokens = [0]
+        gateway._extract_token_usage(mock_response, prompt_tokens, completion_tokens)
+        assert prompt_tokens[0] == 0
+        assert completion_tokens[0] == 0
+
+    def test_update_provider_health_success(self, mock_gateway):
+        """Test _update_provider_health_success method."""
+        gateway = mock_gateway
+        gateway.provider_health = {}
+
+        gateway._update_provider_health_success("gpt-4")
+        # Provider name is extracted from model (uses "default" if no "/" in model)
+        assert "default" in gateway.provider_health
+        assert gateway.provider_health["default"]["status"] == "healthy"
+
+    def test_determine_error_status_rate_limit(self, mock_gateway):
+        """Test _determine_error_status for rate limit errors."""
+        gateway = mock_gateway
+        from src.core.llmops import LLMOperationStatus
+        status = gateway._determine_error_status("Rate limit exceeded")
+        assert status == LLMOperationStatus.RATE_LIMITED
+
+    def test_determine_error_status_timeout(self, mock_gateway):
+        """Test _determine_error_status for timeout errors."""
+        gateway = mock_gateway
+        from src.core.llmops import LLMOperationStatus
+        status = gateway._determine_error_status("Request timeout")
+        assert status == LLMOperationStatus.TIMEOUT
+
+    def test_determine_error_status_generic(self, mock_gateway):
+        """Test _determine_error_status for generic errors."""
+        gateway = mock_gateway
+        from src.core.llmops import LLMOperationStatus
+        status = gateway._determine_error_status("Some other error")
+        assert status == LLMOperationStatus.ERROR
+
+    @pytest.mark.asyncio
+    async def test_generate_async_with_circuit_breaker(self):
+        """Test generate_async with circuit breaker enabled."""
+        config = GatewayConfig(enable_circuit_breaker=True)
+        with patch("src.core.litellm_gateway.gateway.LiteLLMGateway._initialize_kv_cache"), \
+             patch("src.core.litellm_gateway.gateway.LiteLLMGateway._initialize_cache"), \
+             patch("src.core.litellm_gateway.gateway.LiteLLMGateway._initialize_router"), \
+             patch("src.core.litellm_gateway.gateway.acompletion", new_callable=AsyncMock) as mock_acompletion:
+            gateway = LiteLLMGateway(config=config)
+            setattr(gateway, 'kv_cache', None)
+            setattr(gateway, 'router', None)
+            setattr(gateway, 'cache', None)
+            setattr(gateway, 'deduplicator', None)
+            setattr(gateway, 'llmops', None)
+
+            mock_response = MagicMock()
+            mock_choice = MagicMock()
+            mock_choice.message.content = "Response"
+            mock_choice.finish_reason = "stop"
+            mock_response.choices = [mock_choice]
+            mock_response.model = "gpt-4"
+            mock_acompletion.return_value = mock_response
+
+            gateway.circuit_breaker.call = AsyncMock(return_value=mock_response)
+            response = await gateway.generate_async(prompt="Test", model="gpt-4")
+            assert response.text == "Response"
+
+    @pytest.mark.asyncio
+    async def test_generate_async_streaming(self, mock_gateway):
+        """Test generate_async with streaming enabled."""
+        gateway = mock_gateway
+        gateway.cache = None
+        gateway.kv_cache = None
+        gateway.llmops = None
+
+        async def mock_stream():
+            yield MagicMock(choices=[MagicMock(delta=MagicMock(content="Hello"))])
+            yield MagicMock(choices=[MagicMock(delta=MagicMock(content=" World"))])
+
+        with patch("src.core.litellm_gateway.gateway.acompletion", new_callable=AsyncMock) as mock_acompletion:
+            mock_acompletion.return_value = mock_stream()
+            response = await gateway.generate_async(prompt="Test", model="gpt-4", stream=True)
+            # Should return the stream generator
+            assert response is not None
+            chunks = []
+            async for chunk in response:
+                chunks.append(chunk)
+            assert len(chunks) > 0
+
+    def test_extract_embeddings_from_object_no_data(self, mock_gateway):
+        """Test _extract_embeddings_from_object with no data attribute."""
+        gateway = mock_gateway
+        mock_response = MagicMock()
+        mock_response.data = None
+
+        embeddings, model, usage = gateway._extract_embeddings_from_object(mock_response, "default_model")
+        assert embeddings == []
+        assert model == "default_model"
+        assert usage is None
+
+    def test_extract_embeddings_from_object_empty_data(self, mock_gateway):
+        """Test _extract_embeddings_from_object with empty data."""
+        gateway = mock_gateway
+        mock_response = MagicMock()
+        mock_response.data = []
+
+        embeddings, model, usage = gateway._extract_embeddings_from_object(mock_response, "default_model")
+        assert embeddings == []
+        assert model == "default_model"
+        assert usage is None
+
+    def test_setup_health_checks_disabled(self, gateway_config):
+        """Test _setup_health_checks when health monitoring is disabled."""
+        config = GatewayConfig(enable_health_monitoring=False)
+        with patch("src.core.litellm_gateway.gateway.LiteLLMGateway._initialize_kv_cache"), \
+             patch("src.core.litellm_gateway.gateway.LiteLLMGateway._initialize_cache"), \
+             patch("src.core.litellm_gateway.gateway.LiteLLMGateway._initialize_router"):
+            gateway = LiteLLMGateway(config=config)
+            # Health check should not be set up
+            assert gateway.health_check is None
+            # Calling _setup_health_checks should return early
+            gateway._setup_health_checks()
+            assert gateway.health_check is None
+
+    def test_get_rate_limiter_disabled(self, gateway_config):
+        """Test _get_rate_limiter when rate limiting is disabled."""
+        config = GatewayConfig(enable_rate_limiting=False)
+        with patch("src.core.litellm_gateway.gateway.LiteLLMGateway._initialize_kv_cache"), \
+             patch("src.core.litellm_gateway.gateway.LiteLLMGateway._initialize_cache"), \
+             patch("src.core.litellm_gateway.gateway.LiteLLMGateway._initialize_router"):
+            gateway = LiteLLMGateway(config=config)
+            limiter = gateway._get_rate_limiter("tenant-1")
+            assert limiter is None
+
+    @pytest.mark.asyncio
+    async def test_generate_with_router(self, gateway_config):
+        """Test generate with router enabled."""
+        config = GatewayConfig()
+        with patch("src.core.litellm_gateway.gateway.LiteLLMGateway._initialize_kv_cache"), \
+             patch("src.core.litellm_gateway.gateway.LiteLLMGateway._initialize_cache"), \
+             patch("src.core.litellm_gateway.gateway.LiteLLMGateway._initialize_router"):
+            gateway = LiteLLMGateway(config=config)
+            mock_router = MagicMock()
+            mock_response = MagicMock()
+            mock_choice = MagicMock()
+            mock_choice.message.content = "Test"
+            mock_choice.finish_reason = "stop"
+            mock_response.choices = [mock_choice]
+            mock_response.model = "gpt-4"  # String, not MagicMock
+            # generate uses _execute_sync_generation which calls router.completion
+            mock_router.completion = MagicMock(return_value=mock_response)
+            gateway.router = mock_router
+            gateway.cache = None
+            gateway.kv_cache = None
+            gateway.llmops = None
+            gateway.deduplicator = None
+            gateway.batcher = None
+            gateway.circuit_breaker = None
+
+            response = await gateway.generate(
+                prompt="test",
+                model="gpt-4",
+                messages=[{"role": "user", "content": "test"}],
+                stream=False
+            )
+
+            assert response is not None
+            assert response.text == "Test"
+            mock_router.completion.assert_called_once()
+
+    @pytest.mark.asyncio
+    async def test_store_kv_cache_success(self, mock_gateway):
+        """Test _store_kv_cache with successful storage."""
+        gateway = mock_gateway
+        mock_kv_cache = MagicMock()
+        mock_kv_cache.set_kv_cache = AsyncMock(return_value=True)
+        gateway.kv_cache = mock_kv_cache
+
+        await gateway._store_kv_cache("cache-key", "prompt", "model", "tenant1")
+
+        mock_kv_cache.set_kv_cache.assert_called_once()
+
+    @pytest.mark.asyncio
+    async def test_store_kv_cache_attribute_error(self, mock_gateway):
+        """Test _store_kv_cache handles AttributeError."""
+        gateway = mock_gateway
+        mock_kv_cache = MagicMock()
+        mock_kv_cache.set_kv_cache = AsyncMock(side_effect=AttributeError("Cache error"))
+        gateway.kv_cache = mock_kv_cache
+
+        # Should not raise, just log
+        await gateway._store_kv_cache("cache-key", "prompt", "model", "tenant1")
+
+    @pytest.mark.asyncio
+    async def test_store_kv_cache_value_error(self, mock_gateway):
+        """Test _store_kv_cache handles ValueError."""
+        gateway = mock_gateway
+        mock_kv_cache = MagicMock()
+        mock_kv_cache.set_kv_cache = AsyncMock(side_effect=ValueError("Invalid value"))
+        gateway.kv_cache = mock_kv_cache
+
+        # Should not raise, just log
+        await gateway._store_kv_cache("cache-key", "prompt", "model", "tenant1")
+
+    @pytest.mark.asyncio
+    async def test_store_kv_cache_type_error(self, mock_gateway):
+        """Test _store_kv_cache handles TypeError."""
+        gateway = mock_gateway
+        mock_kv_cache = MagicMock()
+        mock_kv_cache.set_kv_cache = AsyncMock(side_effect=TypeError("Type error"))
+        gateway.kv_cache = mock_kv_cache
+
+        # Should not raise, just log
+        await gateway._store_kv_cache("cache-key", "prompt", "model", "tenant1")
+
+    @pytest.mark.asyncio
+    async def test_store_kv_cache_generic_exception(self, mock_gateway):
+        """Test _store_kv_cache handles generic Exception."""
+        gateway = mock_gateway
+        mock_kv_cache = MagicMock()
+        mock_kv_cache.set_kv_cache = AsyncMock(side_effect=RuntimeError("Unexpected error"))
+        gateway.kv_cache = mock_kv_cache
+
+        # Should not raise, just log
+        await gateway._store_kv_cache("cache-key", "prompt", "model", "tenant1")
+
+    @pytest.mark.asyncio
+    async def test_check_kv_cache_returns_key(self, mock_gateway):
+        """Test _check_kv_cache returns cache key when cache is available."""
+        gateway = mock_gateway
+        mock_kv_cache = MagicMock()
+        mock_entry = MagicMock()
+        mock_entry.keys = [[[0.1, 0.2]]]
+        mock_entry.values = [[[0.3, 0.4]]]
+        mock_kv_cache.get_kv_cache = AsyncMock(return_value=mock_entry)
+        mock_kv_cache.generate_cache_key = MagicMock(return_value="cache-key-123")
+        gateway.kv_cache = mock_kv_cache
+
+        result = await gateway._check_kv_cache("prompt", "model", [{"role": "user", "content": "test"}], "tenant1")
+
+        assert result == "cache-key-123"
+        mock_kv_cache.generate_cache_key.assert_called_once()
+        mock_kv_cache.get_kv_cache.assert_called_once()
+
+    @pytest.mark.asyncio
+    async def test_execute_generation_with_router(self, gateway_config):
+        """Test _execute_generation with router enabled."""
+        config = GatewayConfig()
+        with patch("src.core.litellm_gateway.gateway.LiteLLMGateway._initialize_kv_cache"), \
+             patch("src.core.litellm_gateway.gateway.LiteLLMGateway._initialize_cache"), \
+             patch("src.core.litellm_gateway.gateway.LiteLLMGateway._initialize_router"):
+            gateway = LiteLLMGateway(config=config)
+            mock_router = MagicMock()
+            mock_response = MagicMock()
+            mock_choice = MagicMock()
+            mock_choice.message.content = "Test"
+            mock_response.choices = [mock_choice]
+            mock_router.acompletion = AsyncMock(return_value=mock_response)
+            gateway.router = mock_router
+            gateway.llmops = None
+
+            prompt_tokens: List[int] = [0]
+            completion_tokens: List[int] = [0]
+            error_message: List[Optional[str]] = [None]
+            status: List[LLMOperationStatus] = [LLMOperationStatus.SUCCESS]
+
+            response = await gateway._execute_generation(
+                model="gpt-4",
+                messages=[{"role": "user", "content": "test"}],
+                stream=False,
+                prompt_tokens=prompt_tokens,
+                completion_tokens=completion_tokens,
+                error_message=error_message,
+                status=status
+            )
+
+            assert response is not None
+            mock_router.acompletion.assert_called_once()
+
+    @pytest.mark.asyncio
+    async def test_execute_generation_validation_error(self, gateway_config):
+        """Test _execute_generation handles ValueError."""
+        config = GatewayConfig()
+        with patch("src.core.litellm_gateway.gateway.LiteLLMGateway._initialize_kv_cache"), \
+             patch("src.core.litellm_gateway.gateway.LiteLLMGateway._initialize_cache"), \
+             patch("src.core.litellm_gateway.gateway.LiteLLMGateway._initialize_router"), \
+             patch("src.core.litellm_gateway.gateway.acompletion", new_callable=AsyncMock) as mock_acompletion:
+            gateway = LiteLLMGateway(config=config)
+            setattr(gateway, 'router', None)  
+            gateway.llmops = None
+            mock_acompletion.side_effect = ValueError("Validation error")
+
+            prompt_tokens: List[int] = [0]
+            completion_tokens: List[int] = [0]
+            error_message: List[Optional[str]] = [None]
+            status: List[LLMOperationStatus] = [LLMOperationStatus.SUCCESS]
+
+            with pytest.raises(ValueError):
+                await gateway._execute_generation(
+                    model="gpt-4",
+                    messages=[{"role": "user", "content": "test"}],
+                    stream=False,
+                    prompt_tokens=prompt_tokens,
+                    completion_tokens=completion_tokens,
+                    error_message=error_message,
+                    status=status
+                )
+
+            assert error_message[0] is not None
+            assert status[0] is not None
+
+    @pytest.mark.asyncio
+    async def test_execute_generation_type_error(self, gateway_config):
+        """Test _execute_generation handles TypeError."""
+        config = GatewayConfig()
+        with patch("src.core.litellm_gateway.gateway.LiteLLMGateway._initialize_kv_cache"), \
+             patch("src.core.litellm_gateway.gateway.LiteLLMGateway._initialize_cache"), \
+             patch("src.core.litellm_gateway.gateway.LiteLLMGateway._initialize_router"), \
+             patch("src.core.litellm_gateway.gateway.acompletion", new_callable=AsyncMock) as mock_acompletion:
+            gateway = LiteLLMGateway(config=config)
+            setattr(gateway, 'router', None)  
+            gateway.llmops = None
+            mock_acompletion.side_effect = TypeError("Type error")
+
+            prompt_tokens: List[int] = [0]
+            completion_tokens: List[int] = [0]
+            error_message: List[Optional[str]] = [None]
+            status: List[LLMOperationStatus] = [LLMOperationStatus.SUCCESS]
+
+            with pytest.raises(TypeError):
+                await gateway._execute_generation(
+                    model="gpt-4",
+                    messages=[{"role": "user", "content": "test"}],
+                    stream=False,
+                    prompt_tokens=prompt_tokens,
+                    completion_tokens=completion_tokens,
+                    error_message=error_message,
+                    status=status
+                )
+
+    @pytest.mark.asyncio
+    async def test_execute_generation_key_error(self, gateway_config):
+        """Test _execute_generation handles KeyError."""
+        config = GatewayConfig()
+        with patch("src.core.litellm_gateway.gateway.LiteLLMGateway._initialize_kv_cache"), \
+             patch("src.core.litellm_gateway.gateway.LiteLLMGateway._initialize_cache"), \
+             patch("src.core.litellm_gateway.gateway.LiteLLMGateway._initialize_router"), \
+             patch("src.core.litellm_gateway.gateway.acompletion", new_callable=AsyncMock) as mock_acompletion:
+            gateway = LiteLLMGateway(config=config)
+            setattr(gateway, 'router', None)  # typ
+            gateway.llmops = None
+            mock_acompletion.side_effect = KeyError("Key error")
+
+            prompt_tokens: List[int] = [0]
+            completion_tokens: List[int] = [0]
+            error_message: List[Optional[str]] = [None]
+            status: List[LLMOperationStatus] = [LLMOperationStatus.SUCCESS]
+
+            with pytest.raises(KeyError):
+                await gateway._execute_generation(
+                    model="gpt-4",
+                    messages=[{"role": "user", "content": "test"}],
+                    stream=False,
+                    prompt_tokens=prompt_tokens,
+                    completion_tokens=completion_tokens,
+                    error_message=error_message,
+                    status=status
+                )
+
+    @pytest.mark.asyncio
+    async def test_execute_generation_attribute_error(self, gateway_config):
+        """Test _execute_generation handles AttributeError."""
+        config = GatewayConfig()
+        with patch("src.core.litellm_gateway.gateway.LiteLLMGateway._initialize_kv_cache"), \
+             patch("src.core.litellm_gateway.gateway.LiteLLMGateway._initialize_cache"), \
+             patch("src.core.litellm_gateway.gateway.LiteLLMGateway._initialize_router"), \
+             patch("src.core.litellm_gateway.gateway.acompletion", new_callable=AsyncMock) as mock_acompletion:
+            gateway = LiteLLMGateway(config=config)
+            setattr(gateway, 'router', None)
+            gateway.llmops = None
+            mock_acompletion.side_effect = AttributeError("Attribute error")
+
+            prompt_tokens: List[int] = [0]
+            completion_tokens: List[int] = [0]
+            error_message: List[Optional[str]] = [None]
+            status: List[LLMOperationStatus] = [LLMOperationStatus.SUCCESS]
+
+            with pytest.raises(AttributeError):
+                await gateway._execute_generation(
+                    model="gpt-4",
+                    messages=[{"role": "user", "content": "test"}],
+                    stream=False,
+                    prompt_tokens=prompt_tokens,
+                    completion_tokens=completion_tokens,
+                    error_message=error_message,
+                    status=status
+                )
+
+    @pytest.mark.asyncio
+    async def test_execute_generation_generic_exception(self, gateway_config):
+        """Test _execute_generation handles generic Exception."""
+        config = GatewayConfig()
+        with patch("src.core.litellm_gateway.gateway.LiteLLMGateway._initialize_kv_cache"), \
+             patch("src.core.litellm_gateway.gateway.LiteLLMGateway._initialize_cache"), \
+             patch("src.core.litellm_gateway.gateway.LiteLLMGateway._initialize_router"), \
+             patch("src.core.litellm_gateway.gateway.acompletion", new_callable=AsyncMock) as mock_acompletion:
+            gateway = LiteLLMGateway(config=config)
+            setattr(gateway, 'router', None)
+            gateway.llmops = None
+            mock_acompletion.side_effect = RuntimeError("Runtime error")
+
+            prompt_tokens: List[int] = [0]
+            completion_tokens: List[int] = [0]
+            error_message: List[Optional[str]] = [None]
+            status: List[LLMOperationStatus] = [LLMOperationStatus.SUCCESS]
+
+            with pytest.raises(RuntimeError):
+                await gateway._execute_generation(
+                    model="gpt-4",
+                    messages=[{"role": "user", "content": "test"}],
+                    stream=False,
+                    prompt_tokens=prompt_tokens,
+                    completion_tokens=completion_tokens,
+                    error_message=error_message,
+                    status=status
+                )
+
+    @pytest.mark.asyncio
+    async def test_generate_async_with_deduplicator(self, gateway_config):
+        """Test generate_async with deduplicator enabled."""
+        config = GatewayConfig(enable_request_deduplication=True)
+        with patch("src.core.litellm_gateway.gateway.LiteLLMGateway._initialize_kv_cache"), \
+             patch("src.core.litellm_gateway.gateway.LiteLLMGateway._initialize_cache"), \
+             patch("src.core.litellm_gateway.gateway.LiteLLMGateway._initialize_router"):
+            gateway = LiteLLMGateway(config=config)
+            # Mock deduplicator to avoid kwargs issue
+            mock_deduplicator = MagicMock()
+            mock_deduplicator.get_or_execute = AsyncMock()
+            gateway.deduplicator = mock_deduplicator
+            gateway.circuit_breaker = None
+            gateway.batcher = None
+            gateway.llmops = None
+            gateway.kv_cache = None
+            gateway.cache = None
+
+            mock_response = MagicMock()
+            mock_choice = MagicMock()
+            mock_choice.message.content = "Response"
+            mock_choice.finish_reason = "stop"
+            mock_response.choices = [mock_choice]
+            mock_response.model = "gpt-4"
+
+            # Mock the response that deduplicator returns
+            mock_deduplicator.get_or_execute.return_value = mock_response
+
+            with patch("src.core.litellm_gateway.gateway.acompletion", new_callable=AsyncMock) as mock_acompletion:
+                mock_acompletion.return_value = mock_response
+                response = await gateway.generate_async(prompt="Test", model="gpt-4", stream=False)
+                assert response.text == "Response"
+                # Verify deduplicator was called
+                mock_deduplicator.get_or_execute.assert_called_once()
+
+    @pytest.mark.asyncio
+    async def test_generate_async_with_batcher(self, gateway_config):
+        """Test generate_async with batcher enabled."""
+        config = GatewayConfig(enable_request_batching=True)
+        with patch("src.core.litellm_gateway.gateway.LiteLLMGateway._initialize_kv_cache"), \
+             patch("src.core.litellm_gateway.gateway.LiteLLMGateway._initialize_cache"), \
+             patch("src.core.litellm_gateway.gateway.LiteLLMGateway._initialize_router"):
+            gateway = LiteLLMGateway(config=config)
+            # Mock batcher to avoid kwargs issue
+            mock_batcher = MagicMock()
+            mock_batcher.batch_execute = AsyncMock()
+            gateway.batcher = mock_batcher
+            gateway.deduplicator = None
+            gateway.circuit_breaker = None
+            gateway.llmops = None
+            gateway.kv_cache = None
+            gateway.cache = None
+
+            mock_response = MagicMock()
+            mock_choice = MagicMock()
+            mock_choice.message.content = "Response"
+            mock_choice.finish_reason = "stop"
+            mock_response.choices = [mock_choice]
+            mock_response.model = "gpt-4"
+
+            # Mock the response that batcher returns
+            mock_batcher.batch_execute.return_value = mock_response
+
+            with patch("src.core.litellm_gateway.gateway.acompletion", new_callable=AsyncMock) as mock_acompletion:
+                mock_acompletion.return_value = mock_response
+                response = await gateway.generate_async(prompt="Test", model="gpt-4", stream=False, tenant_id="tenant-1")
+                assert response.text == "Response"
+                # Verify batcher was called
+                mock_batcher.batch_execute.assert_called_once()
+
+    @pytest.mark.asyncio
+    async def test_generate_async_direct_call(self, gateway_config):
+        """Test generate_async with direct call (no deduplicator, batcher, or circuit breaker)."""
+        config = GatewayConfig()
+        with patch("src.core.litellm_gateway.gateway.LiteLLMGateway._initialize_kv_cache"), \
+             patch("src.core.litellm_gateway.gateway.LiteLLMGateway._initialize_cache"), \
+             patch("src.core.litellm_gateway.gateway.LiteLLMGateway._initialize_router"):
+            gateway = LiteLLMGateway(config=config)
+            gateway.deduplicator = None
+            gateway.batcher = None
+            gateway.circuit_breaker = None
+            setattr(gateway, 'router', None)  # Explicitly set router to None
+            gateway.llmops = None
+            gateway.kv_cache = None
+            gateway.cache = None
+
+            mock_response = MagicMock()
+            mock_choice = MagicMock()
+            mock_choice.message.content = "Response"
+            mock_choice.finish_reason = "stop"
+            mock_response.choices = [mock_choice]
+            mock_response.model = "gpt-4"
+
+            with patch("src.core.litellm_gateway.gateway.acompletion", new_callable=AsyncMock) as mock_acompletion:
+                mock_acompletion.return_value = mock_response
+                response = await gateway.generate_async(prompt="Test", model="gpt-4", stream=False)
+                assert response.text == "Response"
+
+    @pytest.mark.asyncio
+    async def test_embed_async_empty_response(self, mock_gateway):
+        """Test embed_async with empty response (no data attribute, not a dict)."""
+        gateway = mock_gateway
+        setattr(gateway, 'router', None)
+        gateway.llmops = None
+
+        # Create a mock response that doesn't have data attribute and isn't a dict
+        # This triggers the else branch in embed_async
+        class EmptyResponse:
+            pass
+        
+        mock_response = EmptyResponse()
+
+        # Patch aembedding from gateway module (it's imported as aembedding)
+        with patch("src.core.litellm_gateway.gateway.aembedding", new_callable=AsyncMock) as mock_aembedding:
+            mock_aembedding.return_value = mock_response
+            response = await gateway.embed_async(texts=["test"], model="text-embedding-ada-002")
+
+            assert response.embeddings == []
+            assert response.model == "text-embedding-ada-002"
+            assert response.usage is None
+            mock_aembedding.assert_called_once()
+
+    def test_classify_error_retryable_patterns(self, mock_gateway):
+        """Test _classify_error with retryable patterns."""
+        gateway = mock_gateway
+        error = Exception("Connection error occurred")
+        classification = gateway._classify_error(error)
+        assert classification["retryable"] is True
+        assert classification["category"] == "network"
 
 
 if __name__ == "__main__":

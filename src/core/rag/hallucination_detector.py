@@ -381,9 +381,10 @@ class HallucinationDetector:
             bool: True if the operation succeeds, else False.
         """
         # Check for citation patterns
+        # Use bounded character classes to prevent ReDoS
         citation_patterns = [
-            r"\[.*?\]",  # [1], [source], etc.
-            r"\(.*?\)",  # (source), etc.
+            r"\[[^\]]+\]",  # [1], [source], etc. - bounded to prevent backtracking
+            r"\([^)]+\)",  # (source), etc. - bounded to prevent backtracking
             r"according to",
             r"as stated in",
             r"as mentioned in",
@@ -449,11 +450,24 @@ Respond in JSON format:
 
             response_text = result.text.strip()
 
-            # Extract JSON from response
-            json_match = re.search(r"\{.*\}", response_text, re.DOTALL)
-            if json_match:
-                verification = json.loads(json_match.group())
+            # Extract JSON from response - use safer approach to prevent ReDoS
+            # Try parsing entire response first
+            try:
+                verification = json.loads(response_text)
                 return verification
+            except json.JSONDecodeError:
+                # Fallback: find JSON object by locating first { and trying to parse
+                # This avoids ReDoS by not using complex regex patterns
+                start_idx = response_text.find("{")
+                if start_idx != -1:
+                    # Try parsing from the first { character
+                    for end_idx in range(len(response_text), start_idx, -1):
+                        try:
+                            json_str = response_text[start_idx:end_idx]
+                            verification = json.loads(json_str)
+                            return verification
+                        except json.JSONDecodeError:
+                            continue
         except Exception as e:
             logger.warning(f"Error in LLM verification: {str(e)}")
 
