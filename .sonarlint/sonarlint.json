@@ -1,0 +1,11 @@
+{
+  "sonarQubeConnections": [
+    {
+      "serverId": "sonarcloud",
+      "serverUrl": "https://sonarcloud.io",
+      "organizationKey": "motadata"
+    }
+  ],
+  "projectKey": "motadata_motadata-python-sdk"
+}
+

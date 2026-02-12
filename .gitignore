@@ -26,7 +26,10 @@ dist/
 # OS / editor
 .DS_Store
 .idea/
-.vscode/
+# Keep .vscode/settings.json and .vscode/extensions.json for SonarLint config
+.vscode/*
+!.vscode/settings.json
+!.vscode/extensions.json
 
 
 llmops_data/

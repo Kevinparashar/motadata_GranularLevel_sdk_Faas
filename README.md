@@ -191,7 +191,6 @@ The **Motadata Python AI SDK** is a production-ready, modular framework for buil
 - **Want to reduce API costs?** → Use [Cache Mechanism](src/core/cache_mechanism/README.md)
 - **Need monitoring and debugging?** → Use [Observability](src/core/evaluation_observability/README.md)
 - **Managing prompts and templates?** → Use [Prompt Context Management](src/core/prompt_context_management/README.md)
-- **Building REST APIs?** → Use [API Backend Services](src/core/api_backend_services/README.md)
 - **Deploying as microservices?** → Use [FaaS Services](src/faas/README.md)
 
 **For detailed guidance on each component, see their individual README files which include:**
@@ -224,7 +223,6 @@ The SDK follows a layered architecture with clear separation of concerns:
 
 ### Application Layer
 - **RAG System**: Document processing, retrieval, and generation
-- **API Backend Services**: RESTful API endpoints exposing SDK functionality
 
 ### Design Principles
 - **Interface-Based Design**: Components implement interfaces defined in `src/core/interfaces.py` for easy swapping
@@ -258,7 +256,6 @@ motadata-python-ai-sdk/
 │   │   ├── prompt_context_management/
 │   │   ├── prompt_based_generator/  # Prompt-based agent/tool creation
 │   │   ├── evaluation_observability/
-│   │   ├── api_backend_services/
 │   │   └── cache_mechanism/
 │   ├── faas/                    # FaaS Services (API Layer)
 │   │   ├── services/            # AI Component Services
@@ -392,11 +389,7 @@ motadata-python-ai-sdk/
    - Structured logging
    - Metrics collection
 
-8. **API Backend Services** (`src/core/api_backend_services/`)
-   - RESTful API endpoints
-   - Backend integration
-
-9. **Cache Mechanism** (`src/core/cache_mechanism/`)
+8. **Cache Mechanism** (`src/core/cache_mechanism/`)
    - Response, embedding, and query result caching
    - In-memory (LRU + TTL) and optional Dragonfly backend
    - Pattern-based invalidation and max-size enforcement
@@ -496,8 +489,6 @@ Each AI component is also available as an independent REST API service for micro
 ```
 User Request
     ↓
-API Backend Services
-    ↓
     ├─→ Agent Framework → LiteLLM Gateway → LLM Providers
     ├─→ RAG System → Vector Database → PostgreSQL
     └─→ Other Components
@@ -539,7 +530,7 @@ The SDK requires the following key libraries (automatically installed with requi
 - **pydantic**: Data validation and settings management
 - **litellm**: Unified LLM gateway
 - **psycopg2-binary**: PostgreSQL database adapter
-- **fastapi/uvicorn**: API framework (for API Backend component)
+- **fastapi/uvicorn**: API framework (for FaaS Services)
 - **opentelemetry**: Observability and tracing
 - **httpx/aiohttp**: Async HTTP clients
 - **dragonfly**: Caching backend (optional, Redis-compatible)
@@ -727,12 +718,6 @@ from src.core.cache_mechanism import create_memory_cache, create_dragonfly_cache
 
 cache = create_memory_cache(default_ttl=600, max_size=2048)
 dragonfly_cache = create_dragonfly_cache(dragonfly_url="dragonfly://localhost:6379/0")
-
-# API Backend Services
-from src.core.api_backend_services import create_api_app, create_api_router
-
-app = create_api_app(title="AI SDK API", enable_cors=True)
-router = create_api_router(prefix="/api/v1", tags=["agents"])
 ```
 
 ### High-Level Convenience Functions
@@ -814,19 +799,6 @@ from src.core.cache_mechanism import cache_get, cache_set, cache_delete
 cache_set(cache, "user:123", {"name": "John"}, ttl=600)
 value = cache_get(cache, "user:123")
 cache_delete(cache, "user:123")
-
-# API Operations
-from src.core.api_backend_services import (
-    register_router,
-    create_rag_endpoints,
-    create_agent_endpoints,
-    add_health_check
-)
-
-create_rag_endpoints(router, rag, prefix="/api/rag")
-create_agent_endpoints(router, agent_manager, prefix="/api/agents")
-register_router(app, router)
-add_health_check(app, path="/health")
 ```
 
 ### Utility Functions
@@ -906,18 +878,6 @@ print(result["answer"])
 from src.core.cache_mechanism import create_memory_cache, cache_set
 cache = create_memory_cache(default_ttl=600)
 cache_set(cache, "result", result, ttl=300)
-
-# Create API app
-from src.core.api_backend_services import (
-    create_api_app,
-    create_api_router,
-    create_rag_endpoints,
-    register_router
-)
-app = create_api_app(title="AI SDK API")
-router = create_api_router(prefix="/api/v1")
-create_rag_endpoints(router, rag)
-register_router(app, router)
 ```
 
 See component-specific README files for detailed function documentation.
@@ -959,7 +919,6 @@ The SDK includes comprehensive working examples and tutorials:
   - `05_agent_basic.py` - Agent framework
   - `06_prompt_context_basic.py` - Prompt management
   - `07_rag_basic.py` - RAG system
-  - `08_api_backend_basic.py` - REST API endpoints
 
 ### Integration Examples
 - **Component Integration**: See `examples/integration/` for multi-component examples
@@ -1007,14 +966,12 @@ The SDK includes comprehensive test suites:
   - `test_agent_functions.py` - Agent framework functions tests
   - `test_rag_functions.py` - RAG system functions tests
   - `test_cache_functions.py` - Cache mechanism functions tests
-  - `test_api_functions.py` - API backend functions tests
   - `test_litellm_gateway_functions.py` - LiteLLM Gateway functions tests
   - `test_prompt_context_functions.py` - Prompt context functions tests
 
 ### Integration Tests
 - **Component Integration**: See `src/tests/integration_tests/` for integration tests
   - `test_agent_rag_integration.py` - Agent-RAG integration
-  - `test_api_agent_integration.py` - API-Agent integration
   - `test_end_to_end_workflows.py` - Complete workflow tests
   - `test_nats_integration.py` - NATS messaging integration
   - `test_otel_integration.py` - OpenTelemetry observability integration
