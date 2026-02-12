@@ -908,8 +908,12 @@ class DocumentProcessor:
             List[DocumentChunk]: List result of the operation.
         """
         # Look for markdown headers or HTML-like headers
-        # Use [^\n]+ and [^<]+ instead of .+ to prevent ReDoS (catastrophic backtracking)
-        header_pattern = r"^(#{1,6}\s+[^\n]+)$|^(<h[1-6]>[^<]+</h[1-6]>)$"
+        # Use bounded quantifiers to prevent ReDoS (polynomial runtime due to backtracking)
+        # Markdown header: 1-6 # followed by space and up to 500 chars (bounded)
+        # HTML header: <h1-6> with up to 500 chars content (bounded)
+        # Split into separate checks to avoid alternation backtracking
+        markdown_header_pattern = r"^#{1,6}\s+[^\n]{1,500}$"
+        html_header_pattern = r"^<h[1-6]>[^<]{1,500}</h[1-6]>$"
 
         lines = content.split("\n")
         chunks = []
@@ -920,8 +924,14 @@ class DocumentProcessor:
         for line in lines:
             line_size = len(line)
 
-            # Check if line is a header
-            if re.match(header_pattern, line.strip(), re.MULTILINE):
+            # Check if line is a header (strip before matching to avoid whitespace issues)
+            # Use separate checks instead of alternation to prevent backtracking
+            stripped_line = line.strip()
+            is_header = (
+                re.match(markdown_header_pattern, stripped_line)
+                or re.match(html_header_pattern, stripped_line)
+            )
+            if is_header:
                 # If we have content, create a chunk
                 if current_section and current_size > 0:
                     chunk_index = self._finalize_section(

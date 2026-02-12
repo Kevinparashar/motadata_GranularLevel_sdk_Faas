@@ -264,8 +264,17 @@ class HallucinationDetector:
             List[str]: List result of the operation.
         """
         # Simple sentence splitting (can be improved with NLTK/spaCy)
-        sentences = re.split(r"[.!?]+\s+", text)
-        return [s.strip() for s in sentences if s.strip()]
+        # Use multiple passes to prevent ReDoS (SonarQube recommendation for re.split)
+        # First split by punctuation only (bounded quantifier), then trim whitespace
+        # This avoids quadratic runtime from \s+ failing and backtracking
+        sentences = re.split(r"[.!?]{1,10}", text)
+        # Filter and strip whitespace in separate step (multiple passes approach)
+        result = []
+        for s in sentences:
+            stripped = s.strip()
+            if stripped:
+                result.append(stripped)
+        return result
 
     def _build_context_text(self, documents: List[Dict[str, Any]]) -> str:
         """
