@@ -533,7 +533,8 @@ class TestRequestBatcher:
         assert results[0] == 10
         assert isinstance(results[1], ValueError)
 
-    def test_execute_sync_batch(self):
+    @pytest.mark.asyncio
+    async def test_execute_sync_batch(self):
         """Test _execute_sync_batch()."""
         batcher = RequestBatcher()
 
@@ -549,7 +550,8 @@ class TestRequestBatcher:
 
         assert results == [10, 20]
 
-    def test_execute_sync_batch_with_exceptions(self):
+    @pytest.mark.asyncio
+    async def test_execute_sync_batch_with_exceptions(self):
         """Test _execute_sync_batch() handles exceptions."""
         batcher = RequestBatcher()
 
@@ -568,7 +570,8 @@ class TestRequestBatcher:
         assert results[0] == 10
         assert isinstance(results[1], ValueError)
 
-    def test_set_batch_results_success(self):
+    @pytest.mark.asyncio
+    async def test_set_batch_results_success(self):
         """Test _set_batch_results() with successful results."""
         batcher = RequestBatcher()
 
@@ -587,7 +590,8 @@ class TestRequestBatcher:
         assert future1.result() == 10
         assert future2.result() == 20
 
-    def test_set_batch_results_with_exceptions(self):
+    @pytest.mark.asyncio
+    async def test_set_batch_results_with_exceptions(self):
         """Test _set_batch_results() with exceptions."""
         batcher = RequestBatcher()
 

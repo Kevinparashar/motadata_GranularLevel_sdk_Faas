@@ -163,11 +163,13 @@ class TestCreateNATSClient:
     @pytest.mark.asyncio
     async def test_create_nats_client_with_url(self):
         """Test create_nats_client() with explicit URL."""
-        client = create_nats_client(nats_url="nats://localhost:4222")
+        # Ensure get_config raises RuntimeError to test the fallback path
+        with patch("src.faas.shared.config.get_config", side_effect=RuntimeError("Config not loaded")):
+            client = create_nats_client(nats_url="nats://localhost:4222")
 
-        assert client is not None
-        assert isinstance(client, NATSClient)
-        assert client.nats_url == "nats://localhost:4222"
+            assert client is not None
+            assert isinstance(client, NATSClient)
+            assert client.nats_url == "nats://localhost:4222"
 
     @pytest.mark.asyncio
     async def test_create_nats_client_with_config_enabled(self):

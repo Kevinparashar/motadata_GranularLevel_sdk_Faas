@@ -157,12 +157,14 @@ class TestCreateOTELTracer:
 
     def test_create_otel_tracer_with_params(self):
         """Test create_otel_tracer with explicit parameters."""
-        tracer = create_otel_tracer(service_name="test-service", otlp_endpoint="http://otel:4317")
+        # Ensure get_config raises RuntimeError to test the fallback path
+        with patch("src.faas.shared.config.get_config", side_effect=RuntimeError("Config not loaded")):
+            tracer = create_otel_tracer(service_name="test-service", otlp_endpoint="http://otel:4317")
 
-        assert tracer is not None
-        assert isinstance(tracer, OTELTracer)
-        assert tracer.service_name == "test-service"
-        assert tracer.otlp_endpoint == "http://otel:4317"
+            assert tracer is not None
+            assert isinstance(tracer, OTELTracer)
+            assert tracer.service_name == "test-service"
+            assert tracer.otlp_endpoint == "http://otel:4317"
 
     def test_create_otel_tracer_with_config_enabled(self):
         """Test create_otel_tracer with config when OTEL is enabled."""
