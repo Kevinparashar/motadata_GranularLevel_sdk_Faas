@@ -14,7 +14,10 @@ from dataclasses import dataclass, field
 from datetime import datetime
 from typing import Any, Callable, Dict, List, Optional
 
-import psutil
+try:
+    import psutil
+except ImportError:
+    psutil = None
 
 logger = logging.getLogger(__name__)
 
@@ -179,6 +182,18 @@ class CacheMonitor:
         Returns:
             Dict[str, Any]: Dictionary result of the operation.
         """
+        if psutil is None:
+            # Fallback if psutil is not available
+            self.metrics.update(
+                {
+                    "memory_usage_bytes": 0,
+                    "cache_size": len(self.cache._store) if hasattr(self.cache, "_store") else 0,
+                    "cache_memory_bytes": 0,
+                    "last_check": datetime.now().isoformat(),
+                }
+            )
+            return self.metrics
+        
         process = psutil.Process(os.getpid())
         memory_info = process.memory_info()
 

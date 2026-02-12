@@ -606,14 +606,10 @@ async def test_handle_generate_stream_error_handling(gateway_service):
     """Test generate stream error handling - covers lines 255-260."""
     from src.faas.services.gateway_service.models import GenerateStreamRequest
     
-    # Make generate_async raise an exception during streaming to test error handling
-    # This tests the exception handling inside the stream_generator
-    async def mock_stream():
-        raise RuntimeError("Stream error")
-    yield  # This will never execute
-    
-    async_gen = mock_stream()
-    gateway_service._get_gateway.return_value.generate_async = AsyncMock(return_value=async_gen)
+    # Make generate_async raise an exception to test error handling
+    gateway_service._get_gateway.return_value.generate_async = AsyncMock(
+        side_effect=RuntimeError("Stream error")
+    )
     
     request = GenerateStreamRequest(prompt="Hello, world!", model=None, max_tokens=None, temperature=None)
     headers = {
