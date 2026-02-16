@@ -83,7 +83,7 @@ def get_agent_config_options() -> Dict[str, Any]:
                 "type": "dict",
                 "description": "Memory configuration",
                 "example": {
-                    "persistence_path": "/tmp/memory.json",
+                    "persistence_path": None,  # Use None or tempfile.gettempdir() for secure temp files
                     "max_short_term": 50,
                     "max_long_term": 1000,
                 },

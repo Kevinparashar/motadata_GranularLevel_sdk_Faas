@@ -337,6 +337,14 @@ except ChunkingError as e:
    - Verify chunk_size is appropriate
    - Check chunk_overlap settings
    - Review chunking strategy
+   - **Important**: `chunk_overlap` must be less than `chunk_size` (validation added to prevent infinite loops)
+     ```python
+     # ❌ Invalid - will raise ValidationError
+     processor = DocumentProcessor(chunk_size=1000, chunk_overlap=1000)
+     
+     # ✅ Valid
+     processor = DocumentProcessor(chunk_size=1000, chunk_overlap=200)
+     ```
 
 ## Performance Issues
 

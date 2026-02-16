@@ -7,6 +7,7 @@ Provides authentication, logging, error handling, and observability.
 
 import logging
 import time
+from datetime import datetime
 from typing import Callable
 
 from fastapi import Request, Response, status
@@ -112,46 +113,64 @@ def error_handler(request: Request, exc: Exception) -> JSONResponse:
     Returns:
         JSON error response
     """
-    correlation_id = request.headers.get("X-Correlation-ID", "unknown")
-    request_id = request.headers.get("X-Request-ID", "unknown")
+    try:
+        correlation_id = request.headers.get("X-Correlation-ID", "unknown")
+        request_id = request.headers.get("X-Request-ID", "unknown")
 
-    if isinstance(exc, ServiceException):
-        status_code = exc.status_code
-        error_code = exc.error_code
-        error_message = exc.message
-        error_details = exc.details
-    else:
-        status_code = status.HTTP_500_INTERNAL_SERVER_ERROR
-        error_code = "INTERNAL_SERVER_ERROR"
-        error_message = "An unexpected error occurred"
-        error_details = {"type": type(exc).__name__, "message": str(exc)}
+        if isinstance(exc, ServiceException):
+            status_code = exc.status_code
+            error_code = exc.error_code
+            error_message = exc.message
+            error_details = exc.details
+        else:
+            status_code = status.HTTP_500_INTERNAL_SERVER_ERROR
+            error_code = "INTERNAL_SERVER_ERROR"
+            error_message = "An unexpected error occurred"
+            error_details = {"type": type(exc).__name__, "message": str(exc)}
 
-    logger.error(
-        f"Error: {error_code} - {error_message}",
-        exc_info=exc,
-        extra={
-            "correlation_id": correlation_id,
-            "request_id": request_id,
-            "error_code": error_code,
-            "status_code": status_code,
-        },
-    )
+        logger.error(
+            f"Error: {error_code} - {error_message}",
+            exc_info=exc,
+            extra={
+                "correlation_id": correlation_id,
+                "request_id": request_id,
+                "error_code": error_code,
+                "status_code": status_code,
+            },
+        )
 
-    error_response = ErrorResponse(
-        success=False,
-        error={
-            "code": error_code,
-            "message": error_message,
-            "details": error_details,
-        },
-        correlation_id=correlation_id,
-        request_id=request_id,
-    )
+        error_response = ErrorResponse(
+            success=False,
+            error={
+                "code": error_code,
+                "message": error_message,
+                "details": error_details,
+            },
+            correlation_id=correlation_id,
+            request_id=request_id,
+        )
 
-    return JSONResponse(
-        status_code=status_code,
-        content=error_response.model_dump(),
-    )
+        return JSONResponse(
+            status_code=status_code,
+            content=error_response.model_dump(mode='json'),
+        )
+    except Exception as handler_error:
+        # If the error handler itself fails, return a simple error response
+        logger.exception("Error handler failed", exc_info=handler_error)
+        return JSONResponse(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            content={
+                "success": False,
+                "error": {
+                    "code": "INTERNAL_SERVER_ERROR",
+                    "message": "An error occurred while processing the error",
+                    "details": {"original_error": str(exc), "handler_error": str(handler_error)},
+                },
+                "correlation_id": request.headers.get("X-Correlation-ID", "unknown"),
+                "request_id": request.headers.get("X-Request-ID", "unknown"),
+                "timestamp": str(datetime.now().isoformat()),
+            },
+        )
 
 
 def setup_middleware(app):

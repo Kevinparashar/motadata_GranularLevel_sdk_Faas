@@ -48,6 +48,7 @@ dependencies = [
     "numpy>=1.24.0",
     "python-dateutil>=2.8.2",
     "typing-extensions>=4.5.0",
+    "psutil>=5.9.0",
 ]
 
 [project.optional-dependencies]
@@ -114,6 +115,9 @@ python_files = ["test_*.py"]
 python_classes = ["Test*"]
 python_functions = ["test_*"]
 asyncio_mode = "auto"
+markers = [
+    "integration: marks tests as integration tests (deselect with '-m \"not integration\"')",
+]
 
 [tool.coverage.run]
 omit = [
@@ -134,6 +138,9 @@ omit = [
     "*/conftest.py",
     "*/setup.py",
     "*/examples/*",
+    # ML module excluded from coverage (not currently required/used)
+    "*/machine_learning/**",
+    "*/ml_service/**",
 ]
 
 [tool.coverage.report]

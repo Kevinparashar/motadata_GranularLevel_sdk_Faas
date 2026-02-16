@@ -1,3 +1,7 @@
+# Copyright (c) 2024. All rights reserved.
+# This source code is licensed under the MIT license and a copy
+# of the license can be found in the LICENSE file in the root directory.
+
 """
 NATS Integration for FaaS services.
 
@@ -41,7 +45,7 @@ class NATSClient:
         # from nats.aio.client import Client as NATS
         # self._client = NATS()
         # await self._client.connect(self.nats_url)
-        await asyncio.sleep(0)  # Make function truly async for placeholder
+        await asyncio.sleep(0, result=None)  # Make function truly async for placeholder
         self._connected = True
         logger.info("NATS client connected (placeholder)")
 
@@ -51,7 +55,7 @@ class NATSClient:
         # Placeholder implementation - replace with actual NATS client when integration is ready
         # if self._client:
         #     await self._client.close()
-        await asyncio.sleep(0)  # Make function truly async for placeholder
+        await asyncio.sleep(0, result=None)  # Make function truly async for placeholder
         self._connected = False
         logger.info("NATS client disconnected (placeholder)")
 

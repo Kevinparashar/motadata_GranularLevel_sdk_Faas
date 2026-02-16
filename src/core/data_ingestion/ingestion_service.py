@@ -153,7 +153,7 @@ class DataIngestionService:
         # Load and process content
         try:
             content, loaded_metadata = await self.multimodal_loader.load(str(path), gateway=self.gateway)
-        except Exception as e:
+        except (ValueError, TypeError, OSError, AttributeError) as e:
             raise DataIngestionError(
                 message=f"Error loading file: {str(e)}", file_path=str(file_path), original_error=e
             )
@@ -191,7 +191,7 @@ class DataIngestionService:
                     source=str(path),
                     metadata=metadata,
                 )
-            except Exception as e:
+            except (ValueError, TypeError, AttributeError, ConnectionError, TimeoutError) as e:
                 raise DataIngestionError(
                     message=f"Error ingesting into RAG: {str(e)}",
                     file_path=str(file_path),

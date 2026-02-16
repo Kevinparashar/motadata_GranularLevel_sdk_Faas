@@ -276,7 +276,8 @@ class PromptContextManager:
         """
         patterns = patterns or [
             r"[A-Za-z0-9]{32,}",  # generic key-like strings
-            r"[\\w\\.-]+@[\\w\\.-]+",  # emails
+            # Safer email regex to prevent ReDoS - use bounded character classes
+            r"[a-zA-Z0-9._-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}",  # emails - bounded pattern
         ]
         redacted = text
         for pat in patterns:

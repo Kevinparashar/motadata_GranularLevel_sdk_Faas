@@ -22,24 +22,33 @@ class TestAgentMemoryIntegration:
     def mock_gateway(self):
         """Create mock gateway."""
         config = GatewayConfig()
-        gateway = LiteLLMGateway(config=config)
-
-        # Mock the router's acompletion method if router exists
-        if gateway.router:
-            mock_response = MagicMock()
-            mock_response.choices = [MagicMock()]
-            mock_response.choices[0].message = MagicMock()
-            mock_response.choices[0].message.content = "Agent response"
-            mock_response.model = "gpt-4"
-            gateway.router.acompletion = AsyncMock(return_value=mock_response)
-        else:
-            # Create a mock router if none exists
+        
+        # Patch internal initialization methods to prevent errors during instantiation
+        with patch.object(LiteLLMGateway, "_initialize_kv_cache"), \
+             patch.object(LiteLLMGateway, "_initialize_cache"), \
+             patch.object(LiteLLMGateway, "_initialize_deduplicator"):
+            gateway = LiteLLMGateway(config=config)
+            
+            # Set required attributes that were skipped by patching
+            gateway.kv_cache = None
+            gateway.cache = None
+            gateway.deduplicator = None
+            
+            # Create a mock router
             mock_router = MagicMock()
             mock_response = MagicMock()
             mock_response.choices = [MagicMock()]
             mock_response.choices[0].message = MagicMock()
             mock_response.choices[0].message.content = "Agent response"
+            mock_response.choices[0].finish_reason = "stop"
             mock_response.model = "gpt-4"
+            # Usage needs to be an object with __dict__ attribute
+            class UsageObject:
+                def __init__(self):
+                    self.prompt_tokens = 10
+                    self.completion_tokens = 20
+                    self.total_tokens = 30
+            mock_response.usage = UsageObject()
             mock_router.acompletion = AsyncMock(return_value=mock_response)
             gateway.router = mock_router
 
@@ -160,13 +169,30 @@ class TestAgentMemoryIntegration:
     @pytest.mark.asyncio
     async def test_memory_cleanup_expired(self, agent_with_memory):
         """Test that expired memories are cleaned up."""
+        from datetime import datetime, timedelta
+        
         assert agent_with_memory.memory is not None
-        # Store memory with short age
+        # Store memory with old timestamp
         await agent_with_memory.memory.store(
             content="Temporary memory",
             memory_type=MemoryType.EPISODIC,
-            metadata={"created_at": "2020-01-01"},  # Old date
         )
+        
+        # Manually set an old timestamp on the stored memory
+        # Find the memory we just stored and update its timestamp
+        all_memories = await agent_with_memory.memory.retrieve(
+            query="Temporary", memory_type=MemoryType.EPISODIC, limit=10
+        )
+        if all_memories:
+            # Update the timestamp to be old (more than 30 days ago)
+            old_date = datetime.now() - timedelta(days=31)
+            # Since we can't directly modify the timestamp, we'll test by storing
+            # a memory and then manually manipulating the episodic list
+            async with agent_with_memory.memory._lock:
+                for memory in agent_with_memory.memory._episodic:
+                    if memory.content == "Temporary memory":
+                        memory.timestamp = old_date
+                        break
 
         # Cleanup expired memories
         await agent_with_memory.memory.cleanup_expired(max_age_days=30)

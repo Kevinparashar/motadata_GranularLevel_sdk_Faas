@@ -8,9 +8,10 @@ from unittest.mock import AsyncMock, Mock, patch
 import httpx
 import pytest
 
-from src.core.utils.circuit_breaker import CircuitBreakerConfig
+from src.core.utils.circuit_breaker import CircuitBreakerConfig, CircuitState
 from src.faas.shared.http_client import (
     ServiceClientError,
+    ServiceClientManager,
     ServiceHTTPClient,
     ServiceTimeoutError,
     ServiceUnavailableError,
@@ -156,7 +157,11 @@ async def test_request_error(http_client, mock_httpx_client):
 async def test_circuit_breaker_open(http_client, mock_httpx_client):
     """Test circuit breaker open error."""
     # Force circuit breaker to open state
-    http_client.circuit_breaker.state = "OPEN"
+    # Need to set _opened_at to prevent automatic transition to HALF_OPEN
+    from datetime import datetime, timedelta
+    http_client.circuit_breaker.state = CircuitState.OPEN
+    http_client.circuit_breaker._opened_at = datetime.now() - timedelta(seconds=1)
+    http_client.circuit_breaker.stats.last_failure_time = datetime.now()
     
     with pytest.raises(ServiceUnavailableError):
         await http_client.get("/api/v1/test")
@@ -253,4 +258,449 @@ async def test_custom_circuit_breaker_config():
     assert client.circuit_breaker.config.failure_threshold == 10
     assert client.circuit_breaker.config.success_threshold == 5
     assert abs(client.circuit_breaker.config.timeout - 120.0) < 0.001
+
+
+@pytest.mark.asyncio
+async def test_make_request_circuit_breaker_runtime_error(http_client, mock_httpx_client):
+    """Test _make_request with RuntimeError that is not circuit breaker open - covers line 157."""
+    # Make circuit breaker call raise a RuntimeError that is not "is OPEN"
+    http_client.circuit_breaker.call = AsyncMock(side_effect=RuntimeError("Some other error"))
+    
+    with pytest.raises(ServiceClientError) as exc_info:
+        await http_client._make_request("GET", "/api/v1/test")
+    
+    assert "error" in str(exc_info.value).lower()
+
+
+@pytest.mark.asyncio
+async def test_get_max_retries_exceeded(http_client, mock_httpx_client):
+    """Test get() with max retries exceeded - covers lines 201-203."""
+    mock_httpx_client.request.side_effect = httpx.RequestError("Request failed")
+    
+    with patch("asyncio.sleep", new_callable=AsyncMock):
+        with pytest.raises(ServiceClientError):
+            await http_client.get("/api/v1/test")
+        
+        # Should have tried max_retries times
+        assert mock_httpx_client.request.call_count == http_client.max_retries
+
+
+@pytest.mark.asyncio
+async def test_get_no_last_error(http_client, mock_httpx_client):
+    """Test get() when no last_error is set - covers line 203."""
+    # This scenario is hard to trigger, but we can test by making max_retries=0
+    http_client.max_retries = 0
+    
+    # Make request fail immediately
+    mock_httpx_client.request.side_effect = httpx.RequestError("Request failed")
+    
+    with pytest.raises(ServiceClientError, match="Failed to make GET request"):
+        await http_client.get("/api/v1/test")
+
+
+@pytest.mark.asyncio
+async def test_post_retry_logic(http_client, mock_httpx_client):
+    """Test post() retry logic - covers lines 237-250."""
+    # First call fails, second succeeds
+    mock_response = Mock()
+    mock_response.json = Mock(return_value={"success": True})
+    mock_response.raise_for_status = Mock()
+    mock_response.status_code = 200
+    
+    mock_httpx_client.request.side_effect = [
+        httpx.RequestError("Request failed"),
+        mock_response,
+    ]
+    
+    with patch("asyncio.sleep", new_callable=AsyncMock):
+        response = await http_client.post("/api/v1/test", json_data={"key": "value"})
+        assert response == {"success": True}
+        assert mock_httpx_client.request.call_count == 2
+
+
+@pytest.mark.asyncio
+async def test_post_max_retries_exceeded(http_client, mock_httpx_client):
+    """Test post() with max retries exceeded - covers lines 248-250."""
+    mock_httpx_client.request.side_effect = httpx.RequestError("Request failed")
+    
+    with patch("asyncio.sleep", new_callable=AsyncMock):
+        with pytest.raises(ServiceClientError):
+            await http_client.post("/api/v1/test", json_data={"key": "value"})
+        
+        assert mock_httpx_client.request.call_count == http_client.max_retries
+
+
+@pytest.mark.asyncio
+async def test_post_no_last_error(http_client, mock_httpx_client):
+    """Test post() when no last_error is set - covers line 250."""
+    http_client.max_retries = 0
+    mock_httpx_client.request.side_effect = httpx.RequestError("Request failed")
+    
+    with pytest.raises(ServiceClientError, match="Failed to make POST request"):
+        await http_client.post("/api/v1/test", json_data={"key": "value"})
+
+
+@pytest.mark.asyncio
+async def test_put_retry_logic(http_client, mock_httpx_client):
+    """Test put() retry logic - covers lines 284-297."""
+    # First call fails, second succeeds
+    mock_response = Mock()
+    mock_response.json = Mock(return_value={"success": True})
+    mock_response.raise_for_status = Mock()
+    mock_response.status_code = 200
+    
+    mock_httpx_client.request.side_effect = [
+        httpx.RequestError("Request failed"),
+        mock_response,
+    ]
+    
+    with patch("asyncio.sleep", new_callable=AsyncMock):
+        response = await http_client.put("/api/v1/test", json_data={"key": "value"})
+        assert response == {"success": True}
+        assert mock_httpx_client.request.call_count == 2
+
+
+@pytest.mark.asyncio
+async def test_put_max_retries_exceeded(http_client, mock_httpx_client):
+    """Test put() with max retries exceeded - covers lines 295-297."""
+    mock_httpx_client.request.side_effect = httpx.RequestError("Request failed")
+    
+    with patch("asyncio.sleep", new_callable=AsyncMock):
+        with pytest.raises(ServiceClientError):
+            await http_client.put("/api/v1/test", json_data={"key": "value"})
+        
+        assert mock_httpx_client.request.call_count == http_client.max_retries
+
+
+@pytest.mark.asyncio
+async def test_put_no_last_error(http_client, mock_httpx_client):
+    """Test put() when no last_error is set - covers line 297."""
+    http_client.max_retries = 0
+    mock_httpx_client.request.side_effect = httpx.RequestError("Request failed")
+    
+    with pytest.raises(ServiceClientError, match="Failed to make PUT request"):
+        await http_client.put("/api/v1/test", json_data={"key": "value"})
+
+
+@pytest.mark.asyncio
+async def test_delete_retry_logic(http_client, mock_httpx_client):
+    """Test delete() retry logic - covers lines 329-342."""
+    # First call fails, second succeeds
+    mock_response = Mock()
+    mock_response.json = Mock(return_value={"success": True})
+    mock_response.raise_for_status = Mock()
+    mock_response.status_code = 200
+    
+    mock_httpx_client.request.side_effect = [
+        httpx.RequestError("Request failed"),
+        mock_response,
+    ]
+    
+    with patch("asyncio.sleep", new_callable=AsyncMock):
+        response = await http_client.delete("/api/v1/test")
+        assert response == {"success": True}
+        assert mock_httpx_client.request.call_count == 2
+
+
+@pytest.mark.asyncio
+async def test_delete_max_retries_exceeded(http_client, mock_httpx_client):
+    """Test delete() with max retries exceeded - covers lines 340-342."""
+    mock_httpx_client.request.side_effect = httpx.RequestError("Request failed")
+    
+    with patch("asyncio.sleep", new_callable=AsyncMock):
+        with pytest.raises(ServiceClientError):
+            await http_client.delete("/api/v1/test")
+        
+        assert mock_httpx_client.request.call_count == http_client.max_retries
+
+
+@pytest.mark.asyncio
+async def test_delete_no_last_error(http_client, mock_httpx_client):
+    """Test delete() when no last_error is set - covers line 342."""
+    http_client.max_retries = 0
+    mock_httpx_client.request.side_effect = httpx.RequestError("Request failed")
+    
+    with pytest.raises(ServiceClientError, match="Failed to make DELETE request"):
+        await http_client.delete("/api/v1/test")
+
+
+@pytest.mark.asyncio
+async def test_post_wait_time_capped(http_client, mock_httpx_client):
+    """Test post() wait time is capped at 10 seconds - covers line 243."""
+    # Make multiple failures to test exponential backoff capping
+    mock_httpx_client.request.side_effect = httpx.RequestError("Request failed")
+    http_client.max_retries = 5  # More retries to test capping
+    
+    with patch("asyncio.sleep", new_callable=AsyncMock) as mock_sleep:
+        with pytest.raises(ServiceClientError):
+            await http_client.post("/api/v1/test", json_data={"key": "value"})
+        
+        # Check that sleep was called with capped values
+        sleep_calls = [call[0][0] for call in mock_sleep.call_args_list]
+        # All wait times should be <= 10
+        assert all(wait <= 10 for wait in sleep_calls)
+
+
+@pytest.mark.asyncio
+async def test_put_wait_time_capped(http_client, mock_httpx_client):
+    """Test put() wait time is capped at 10 seconds - covers line 290."""
+    mock_httpx_client.request.side_effect = httpx.RequestError("Request failed")
+    http_client.max_retries = 5
+    
+    with patch("asyncio.sleep", new_callable=AsyncMock) as mock_sleep:
+        with pytest.raises(ServiceClientError):
+            await http_client.put("/api/v1/test", json_data={"key": "value"})
+        
+        sleep_calls = [call[0][0] for call in mock_sleep.call_args_list]
+        assert all(wait <= 10 for wait in sleep_calls)
+
+
+@pytest.mark.asyncio
+async def test_delete_wait_time_capped(http_client, mock_httpx_client):
+    """Test delete() wait time is capped at 10 seconds - covers line 335."""
+    mock_httpx_client.request.side_effect = httpx.RequestError("Request failed")
+    http_client.max_retries = 5
+    
+    with patch("asyncio.sleep", new_callable=AsyncMock) as mock_sleep:
+        with pytest.raises(ServiceClientError):
+            await http_client.delete("/api/v1/test")
+        
+        sleep_calls = [call[0][0] for call in mock_sleep.call_args_list]
+        assert all(wait <= 10 for wait in sleep_calls)
+
+
+@pytest.mark.asyncio
+async def test_make_request_with_full_url(http_client, mock_httpx_client):
+    """Test _make_request with full URL - covers line 124."""
+    await http_client._make_request("GET", "http://full-url.com/api/test")
+    
+    # Verify the full URL was used
+    call_args = mock_httpx_client.request.call_args
+    assert call_args[1]["url"] == "http://full-url.com/api/test"
+
+
+@pytest.mark.asyncio
+async def test_make_request_with_json_data(http_client, mock_httpx_client):
+    """Test _make_request with json_data - covers line 133."""
+    await http_client._make_request("POST", "/api/v1/test", json_data={"key": "value"})
+    
+    call_args = mock_httpx_client.request.call_args
+    assert call_args[1]["json"] == {"key": "value"}
+
+
+def test_service_client_manager_initialization():
+    """Test ServiceClientManager initialization - covers lines 399-400."""
+    from src.faas.shared.config import ServiceConfig
+    
+    config = ServiceConfig(
+        service_name="test-manager",
+        service_version="1.0.0",
+        service_port=8080,
+        database_url="",
+        gateway_service_url="http://gateway:8080",
+        cache_service_url="http://cache:8080",
+        rag_service_url=None,
+        agent_service_url=None,
+        ml_service_url=None,
+        prompt_service_url=None,
+        data_ingestion_service_url=None,
+        prompt_generator_service_url=None,
+        llmops_service_url=None,
+        dragonfly_url=None,
+        nats_url=None,
+        otel_exporter_otlp_endpoint=None,
+        enable_nats=False,
+        enable_otel=False,
+    )
+    
+    manager = ServiceClientManager(config)
+    assert manager.config == config
+    assert manager._clients == {}
+
+
+def test_service_client_manager_get_client_existing():
+    """Test ServiceClientManager.get_client with existing client - covers line 413."""
+    from src.faas.shared.config import ServiceConfig
+    
+    config = ServiceConfig(
+        service_name="test-manager",
+        service_version="1.0.0",
+        service_port=8080,
+        database_url="",
+        gateway_service_url="http://gateway:8080",
+        cache_service_url=None,
+        rag_service_url=None,
+        agent_service_url=None,
+        ml_service_url=None,
+        prompt_service_url=None,
+        data_ingestion_service_url=None,
+        prompt_generator_service_url=None,
+        llmops_service_url=None,
+        dragonfly_url=None,
+        nats_url=None,
+        otel_exporter_otlp_endpoint=None,
+        enable_nats=False,
+        enable_otel=False,
+    )
+    
+    manager = ServiceClientManager(config)
+    
+    # Get client first time (creates it)
+    client1 = manager.get_client("gateway")
+    assert client1 is not None
+    
+    # Get client second time (returns cached)
+    client2 = manager.get_client("gateway")
+    assert client1 is client2
+
+
+def test_service_client_manager_get_client_new():
+    """Test ServiceClientManager.get_client creating new client - covers lines 412-430."""
+    from src.faas.shared.config import ServiceConfig
+    
+    config = ServiceConfig(
+        service_name="test-manager",
+        service_version="1.0.0",
+        service_port=8080,
+        database_url="",
+        gateway_service_url="http://gateway:8080",
+        cache_service_url="http://cache:8080",
+        rag_service_url=None,
+        agent_service_url=None,
+        ml_service_url=None,
+        prompt_service_url=None,
+        data_ingestion_service_url=None,
+        prompt_generator_service_url=None,
+        llmops_service_url=None,
+        dragonfly_url=None,
+        nats_url=None,
+        otel_exporter_otlp_endpoint=None,
+        enable_nats=False,
+        enable_otel=False,
+    )
+    
+    manager = ServiceClientManager(config)
+    
+    client = manager.get_client("gateway")
+    assert client is not None
+    assert client.service_name == "gateway"
+    assert client.service_url == "http://gateway:8080"
+
+
+def test_service_client_manager_get_client_no_url():
+    """Test ServiceClientManager.get_client when URL not configured - covers lines 419-421."""
+    from src.faas.shared.config import ServiceConfig
+    
+    config = ServiceConfig(
+        service_name="test-manager",
+        service_version="1.0.0",
+        service_port=8080,
+        database_url="",
+        gateway_service_url=None,
+        cache_service_url=None,
+        rag_service_url=None,
+        agent_service_url=None,
+        ml_service_url=None,
+        prompt_service_url=None,
+        data_ingestion_service_url=None,
+        prompt_generator_service_url=None,
+        llmops_service_url=None,
+        dragonfly_url=None,
+        nats_url=None,
+        otel_exporter_otlp_endpoint=None,
+        enable_nats=False,
+        enable_otel=False,
+    )
+    
+    manager = ServiceClientManager(config)
+    
+    client = manager.get_client("unknown_service")
+    assert client is None
+
+
+@pytest.mark.asyncio
+async def test_service_client_manager_close_all():
+    """Test ServiceClientManager.close_all - covers lines 434-436."""
+    from src.faas.shared.config import ServiceConfig
+    
+    config = ServiceConfig(
+        service_name="test-manager",
+        service_version="1.0.0",
+        service_port=8080,
+        database_url="",
+        gateway_service_url="http://gateway:8080",
+        cache_service_url="http://cache:8080",
+        rag_service_url=None,
+        agent_service_url=None,
+        ml_service_url=None,
+        prompt_service_url=None,
+        data_ingestion_service_url=None,
+        prompt_generator_service_url=None,
+        llmops_service_url=None,
+        dragonfly_url=None,
+        nats_url=None,
+        otel_exporter_otlp_endpoint=None,
+        enable_nats=False,
+        enable_otel=False,
+    )
+    
+    manager = ServiceClientManager(config)
+    
+    # Create some clients
+    manager.get_client("gateway")
+    manager.get_client("cache")
+    
+    # Close all
+    await manager.close_all()
+    
+    # Verify clients are closed and cleared
+    assert manager._clients == {}
+
+
+def test_create_service_client():
+    """Test create_service_client factory function - covers line 455."""
+    from src.faas.shared.http_client import create_service_client
+    
+    client = create_service_client(
+        service_name="test-service",
+        service_url="http://test-service:8080",
+    )
+    
+    assert client.service_name == "test-service"
+    assert client.service_url == "http://test-service:8080"
+
+
+def test_create_service_client_with_config():
+    """Test create_service_client with config - covers line 455."""
+    from src.faas.shared.config import ServiceConfig
+    from src.faas.shared.http_client import create_service_client
+    
+    config = ServiceConfig(
+        service_name="test-service",
+        service_version="1.0.0",
+        service_port=8080,
+        database_url="",
+        gateway_service_url=None,
+        cache_service_url=None,
+        rag_service_url=None,
+        agent_service_url=None,
+        ml_service_url=None,
+        prompt_service_url=None,
+        data_ingestion_service_url=None,
+        prompt_generator_service_url=None,
+        llmops_service_url=None,
+        dragonfly_url=None,
+        nats_url=None,
+        otel_exporter_otlp_endpoint=None,
+        enable_nats=False,
+        enable_otel=False,
+    )
+    
+    client = create_service_client(
+        service_name="test-service",
+        service_url="http://test-service:8080",
+        config=config,
+    )
+    
+    assert client.config == config
 

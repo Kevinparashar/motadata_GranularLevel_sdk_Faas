@@ -88,7 +88,6 @@ class ConfigValidator:
                 message=f"Missing required configuration for {component_name}: {', '.join(missing_keys)}",
                 suggestion=f"Required configuration keys:\n{suggestion_text}",
                 config_key=",".join(missing_keys),
-                component_name=component_name,
             )
 
     @staticmethod
@@ -141,7 +140,6 @@ class ConfigValidator:
                 suggestion=f"Type conversion:\n{suggestion_text}",
                 config_key=key,
                 invalid_value=value,
-                component_name=component_name,
             )
 
     @staticmethod
@@ -183,7 +181,6 @@ class ConfigValidator:
                 config_key=key,
                 invalid_value=value,
                 valid_options=valid_values,
-                component_name=component_name,
             )
 
     @staticmethod
@@ -236,7 +233,6 @@ class ConfigValidator:
                 suggestion=suggestion_text,
                 config_key=key,
                 invalid_value=value,
-                component_name=component_name,
             )
 
     @staticmethod
@@ -411,7 +407,6 @@ class ConfigHelper:
                     ConfigurationError,
                     message=f"Unknown configuration keys for {component_name}: {', '.join(unknown_keys)}",
                     suggestion=suggestion_text,
-                    component_name=component_name,
                 )
 
         return config

@@ -1,3 +1,7 @@
+# Copyright (c) 2024. All rights reserved.
+# This source code is licensed under the MIT license and a copy
+# of the license can be found in the LICENSE file in the root directory.
+
 """
 Document Processing
 
@@ -293,6 +297,31 @@ class DocumentProcessor:
             multimodal_loader (Optional[MultiModalLoader]): Input parameter for this operation.
             gateway (Optional[Any]): Gateway client used for LLM calls.
         """
+        # Validate chunk configuration to prevent infinite loops and performance issues
+        # Check basic constraints first
+        if chunk_size <= 0:
+            raise ValidationError(
+                message=f"chunk_size must be greater than 0, got {chunk_size}",
+                field="chunk_size",
+                value=chunk_size,
+            )
+        
+        if chunk_overlap < 0:
+            raise ValidationError(
+                message=f"chunk_overlap must be non-negative, got {chunk_overlap}",
+                field="chunk_overlap",
+                value=chunk_overlap,
+            )
+        
+        # Check overlap constraint after basic validation
+        if chunk_overlap >= chunk_size:
+            raise ValidationError(
+                message=f"chunk_overlap ({chunk_overlap}) must be less than chunk_size ({chunk_size}). "
+                f"Otherwise, chunking will create excessive chunks and cause performance issues.",
+                field="chunk_overlap",
+                value=chunk_overlap,
+            )
+        
         self.chunk_size = chunk_size
         self.chunk_overlap = chunk_overlap
         self.chunking_strategy = chunking_strategy
@@ -603,7 +632,10 @@ class DocumentProcessor:
             )
             chunks.append(chunk)
 
-            start = end - self.chunk_overlap
+            # Calculate next start position with overlap
+            # Ensure we always advance by at least 1 to prevent infinite loops
+            next_start = end - self.chunk_overlap
+            start = max(start + 1, next_start)  # Always advance by at least 1
             chunk_index += 1
 
         return chunks
@@ -876,7 +908,12 @@ class DocumentProcessor:
             List[DocumentChunk]: List result of the operation.
         """
         # Look for markdown headers or HTML-like headers
-        header_pattern = r"^(#{1,6}\s+.+)$|^(<h[1-6]>.+</h[1-6]>)$"
+        # Use bounded quantifiers to prevent ReDoS (polynomial runtime due to backtracking)
+        # Markdown header: 1-6 # followed by space and up to 500 chars (bounded)
+        # HTML header: <h1-6> with up to 500 chars content (bounded)
+        # Split into separate checks to avoid alternation backtracking
+        markdown_header_pattern = r"^#{1,6}\s+[^\n]{1,500}$"
+        html_header_pattern = r"^<h[1-6]>[^<]{1,500}</h[1-6]>$"
 
         lines = content.split("\n")
         chunks = []
@@ -887,8 +924,14 @@ class DocumentProcessor:
         for line in lines:
             line_size = len(line)
 
-            # Check if line is a header
-            if re.match(header_pattern, line.strip(), re.MULTILINE):
+            # Check if line is a header (strip before matching to avoid whitespace issues)
+            # Use separate checks instead of alternation to prevent backtracking
+            stripped_line = line.strip()
+            is_header = (
+                re.match(markdown_header_pattern, stripped_line)
+                or re.match(html_header_pattern, stripped_line)
+            )
+            if is_header:
                 # If we have content, create a chunk
                 if current_section and current_size > 0:
                     chunk_index = self._finalize_section(
@@ -991,7 +1034,8 @@ class DocumentProcessor:
             str: Returned text value.
         """
         content = f"{document_id}_{chunk_index}"
-        return hashlib.md5(content.encode()).hexdigest()[:16]
+        # Use SHA-256 instead of MD5 for better security (MD5 is cryptographically broken)
+        return hashlib.sha256(content.encode()).hexdigest()[:16]
 
     def _estimate_tokens(self, text: str) -> int:
         """

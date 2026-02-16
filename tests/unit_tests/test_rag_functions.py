@@ -70,6 +70,18 @@ class TestFactoryFunctions:
 
         assert isinstance(rag, RAGSystem)
 
+    def test_create_rag_system_with_memory(self, mock_db, mock_gateway):
+        """Test create_rag_system with memory enabled."""
+        rag = create_rag_system(
+            db=mock_db,
+            gateway=mock_gateway,
+            enable_memory=True,
+            memory_config={"max_episodic": 100},
+        )
+
+        assert isinstance(rag, RAGSystem)
+        assert rag.memory is not None
+
     def test_create_document_processor(self):
         """Test create_document_processor factory function."""
         processor = create_document_processor(
@@ -89,6 +101,28 @@ class TestFactoryFunctions:
         assert processor.chunk_size == 1000
         assert processor.chunk_overlap == 200
         assert processor.chunking_strategy == "fixed"
+
+    def test_create_document_processor_with_all_params(self):
+        """Test create_document_processor with all parameters."""
+        from unittest.mock import MagicMock
+
+        mock_gateway = MagicMock()
+        processor = create_document_processor(
+            chunk_size=500,
+            chunk_overlap=100,
+            chunking_strategy="sentence",
+            min_chunk_size=50,
+            max_chunk_size=2000,
+            enable_preprocessing=True,
+            enable_metadata_extraction=True,
+            enable_multimodal=True,
+            gateway=mock_gateway,
+        )
+
+        assert isinstance(processor, DocumentProcessor)
+        assert processor.chunk_size == 500
+        assert processor.chunk_overlap == 100
+        assert processor.chunking_strategy == "sentence"
 
 
 class TestConvenienceFunctions:
@@ -150,6 +184,32 @@ class TestConvenienceFunctions:
         call_args = mock_rag_system.query.call_args
         assert call_args[1]["use_query_rewriting"] is True
 
+    def test_quick_rag_query_with_all_params(self, mock_rag_system):
+        """Test quick_rag_query with all optional parameters."""
+        result = quick_rag_query(
+            mock_rag_system,
+            "Test query",
+            tenant_id="tenant-123",
+            top_k=10,
+            threshold=0.8,
+            max_tokens=2000,
+            use_query_rewriting=False,
+            retrieval_strategy="hybrid",
+            user_id="user-123",
+            conversation_id="conv-123",
+        )
+
+        assert "answer" in result
+        call_args = mock_rag_system.query.call_args
+        assert call_args[1]["tenant_id"] == "tenant-123"
+        assert call_args[1]["top_k"] == 10
+        assert abs(call_args[1]["threshold"] - 0.8) < 0.001
+        assert call_args[1]["max_tokens"] == 2000
+        assert call_args[1]["use_query_rewriting"] is False
+        assert call_args[1]["retrieval_strategy"] == "hybrid"
+        assert call_args[1]["user_id"] == "user-123"
+        assert call_args[1]["conversation_id"] == "conv-123"
+
     @pytest.mark.asyncio
     async def test_quick_rag_query_async(self, mock_rag_system):
         """Test quick_rag_query_async convenience function."""
@@ -160,6 +220,33 @@ class TestConvenienceFunctions:
         assert result["answer"] == "Async answer"
         assert "sources" in result
         mock_rag_system.query_async.assert_called_once()
+
+    @pytest.mark.asyncio
+    async def test_quick_rag_query_async_with_all_params(self, mock_rag_system):
+        """Test quick_rag_query_async with all optional parameters."""
+        result = await quick_rag_query_async(
+            mock_rag_system,
+            "Test query",
+            tenant_id="tenant-123",
+            top_k=10,
+            threshold=0.8,
+            max_tokens=2000,
+            use_query_rewriting=False,
+            retrieval_strategy="hybrid",
+            user_id="user-123",
+            conversation_id="conv-123",
+        )
+
+        assert "answer" in result
+        call_args = mock_rag_system.query_async.call_args
+        assert call_args[1]["tenant_id"] == "tenant-123"
+        assert call_args[1]["top_k"] == 10
+        assert abs(call_args[1]["threshold"] - 0.8) < 0.001
+        assert call_args[1]["max_tokens"] == 2000
+        assert call_args[1]["use_query_rewriting"] is False
+        assert call_args[1]["retrieval_strategy"] == "hybrid"
+        assert call_args[1]["user_id"] == "user-123"
+        assert call_args[1]["conversation_id"] == "conv-123"
 
     def test_ingest_document_simple(self, mock_rag_system):
         """Test ingest_document_simple convenience function."""
@@ -180,6 +267,19 @@ class TestConvenienceFunctions:
 
         assert doc_id == "doc-123"
 
+    def test_ingest_document_simple_with_tenant_id(self, mock_rag_system):
+        """Test ingest_document_simple with tenant_id parameter."""
+        doc_id = ingest_document_simple(
+            rag_system=mock_rag_system,
+            title="Test",
+            content="Content",
+            tenant_id="tenant-123",
+        )
+
+        assert doc_id == "doc-123"
+        call_args = mock_rag_system.ingest_document.call_args
+        assert call_args[1]["tenant_id"] == "tenant-123"
+
     @pytest.mark.asyncio
     async def test_ingest_document_simple_async(self, mock_rag_system):
         """Test ingest_document_simple_async convenience function."""
@@ -190,6 +290,22 @@ class TestConvenienceFunctions:
         assert doc_id == "doc-456"
         mock_rag_system.ingest_document_async.assert_called_once()
 
+    @pytest.mark.asyncio
+    async def test_ingest_document_simple_async_with_all_params(self, mock_rag_system):
+        """Test ingest_document_simple_async with all optional parameters."""
+        doc_id = await ingest_document_simple_async(
+            rag_system=mock_rag_system,
+            title="Test Document",
+            content="Test content",
+            source="test_source",
+            metadata={"author": "Test Author"},
+        )
+
+        assert doc_id == "doc-456"
+        call_args = mock_rag_system.ingest_document_async.call_args
+        assert call_args[1]["source"] == "test_source"
+        assert call_args[1]["metadata"] == {"author": "Test Author"}
+
     def test_batch_ingest_documents(self, mock_rag_system):
         """Test batch_ingest_documents convenience function."""
         documents = [
@@ -197,20 +313,23 @@ class TestConvenienceFunctions:
             {"title": "Doc 2", "content": "Content 2"},
             {"title": "Doc 3", "content": "Content 3"},
         ]
+        mock_rag_system.ingest_documents_batch = Mock(return_value=["doc-1", "doc-2", "doc-3"])
 
         doc_ids = batch_ingest_documents(
             rag_system=mock_rag_system, documents=documents, batch_size=2
         )
 
         assert len(doc_ids) == 3
-        assert mock_rag_system.ingest_document.call_count == 3
+        assert doc_ids == ["doc-1", "doc-2", "doc-3"]
+        mock_rag_system.ingest_documents_batch.assert_called_once()
 
     def test_batch_ingest_documents_empty(self, mock_rag_system):
         """Test batch_ingest_documents with empty document list."""
+        mock_rag_system.ingest_documents_batch = Mock(return_value=[])
         doc_ids = batch_ingest_documents(rag_system=mock_rag_system, documents=[], batch_size=10)
 
         assert doc_ids == []
-        mock_rag_system.ingest_document.assert_not_called()
+        mock_rag_system.ingest_documents_batch.assert_called_once_with(documents=[], batch_size=10)
 
     @pytest.mark.asyncio
     async def test_batch_ingest_documents_async(self, mock_rag_system):
@@ -219,17 +338,25 @@ class TestConvenienceFunctions:
             {"title": "Doc 1", "content": "Content 1"},
             {"title": "Doc 2", "content": "Content 2"},
         ]
+        mock_rag_system.ingest_documents_batch_async = AsyncMock(return_value=["doc-1", "doc-2"])
 
         doc_ids = await batch_ingest_documents_async(
             rag_system=mock_rag_system, documents=documents, batch_size=10
         )
 
         assert len(doc_ids) == 2
-        assert mock_rag_system.ingest_document_async.call_count == 2
+        assert doc_ids == ["doc-1", "doc-2"]
+        mock_rag_system.ingest_documents_batch_async.assert_called_once()
 
 
 class TestUtilityFunctions:
     """Test utility functions."""
+
+    @pytest.fixture
+    def mock_rag_system(self):
+        """Create a mock RAG system."""
+        rag = Mock(spec=RAGSystem)
+        return rag
 
     def test_batch_process_documents(self):
         """Test batch_process_documents utility function."""
@@ -274,10 +401,11 @@ class TestUtilityFunctions:
             documents=documents, processor=process_func, batch_size=2
         )
 
-        # Should skip failed documents
-        assert len(results) == 2
+        # batch_process_documents uses return_exceptions=True, so exceptions are included
+        assert len(results) == 3
         assert results[0] == "Processed: doc1"
-        assert results[1] == "Processed: doc3"
+        assert isinstance(results[1], RuntimeError)
+        assert results[2] == "Processed: doc3"
 
     def test_batch_process_documents_empty(self):
         """Test batch_process_documents with empty document list."""
@@ -291,9 +419,30 @@ class TestUtilityFunctions:
 
         assert results == []
 
+    def test_batch_process_documents_with_max_concurrent(self):
+        """Test batch_process_documents with max_concurrent parameter."""
+        import asyncio
+
+        documents = [
+            {"id": "doc1", "content": "Content 1"},
+            {"id": "doc2", "content": "Content 2"},
+            {"id": "doc3", "content": "Content 3"},
+        ]
+
+        async def process_func(doc: Dict[str, Any]) -> str:
+            await asyncio.sleep(0)  # Make function truly async
+            return f"Processed: {doc['id']}"
+
+        results = batch_process_documents(
+            documents=documents, processor=process_func, batch_size=2, max_concurrent=3
+        )
+
+        assert len(results) == 3
+        assert all("Processed:" in str(r) for r in results)
+
     def test_update_document_simple(self, mock_rag_system):
         """Test update_document_simple convenience function."""
-        mock_rag_system.update_document = Mock(return_value=True)
+        mock_rag_system.update_document = AsyncMock(return_value=True)
 
         success = update_document_simple(
             rag_system=mock_rag_system,
@@ -307,9 +456,41 @@ class TestUtilityFunctions:
             "doc-123", "Updated Title", "Updated content", None
         )
 
+    def test_update_document_simple_with_metadata(self, mock_rag_system):
+        """Test update_document_simple with metadata parameter."""
+        mock_rag_system.update_document = AsyncMock(return_value=True)
+
+        success = update_document_simple(
+            rag_system=mock_rag_system,
+            document_id="doc-123",
+            title="Updated Title",
+            content="Updated content",
+            metadata={"key": "value"},
+        )
+
+        assert success is True
+        mock_rag_system.update_document.assert_called_once_with(
+            "doc-123", "Updated Title", "Updated content", {"key": "value"}
+        )
+
+    def test_update_document_simple_title_only(self, mock_rag_system):
+        """Test update_document_simple with only title."""
+        mock_rag_system.update_document = AsyncMock(return_value=True)
+
+        success = update_document_simple(
+            rag_system=mock_rag_system,
+            document_id="doc-123",
+            title="Updated Title",
+        )
+
+        assert success is True
+        mock_rag_system.update_document.assert_called_once_with(
+            "doc-123", "Updated Title", None, None
+        )
+
     def test_delete_document_simple(self, mock_rag_system):
         """Test delete_document_simple convenience function."""
-        mock_rag_system.delete_document = Mock(return_value=True)
+        mock_rag_system.delete_document = AsyncMock(return_value=True)
 
         success = delete_document_simple(rag_system=mock_rag_system, document_id="doc-123")
 

@@ -275,7 +275,7 @@ class Agent(BaseModel):
             except AgentExecutionError:
                 self.status = AgentStatus.ERROR
                 raise
-            except Exception as e:
+            except (ValueError, TypeError, AttributeError, KeyError, ConnectionError, TimeoutError) as e:
                 self.status = AgentStatus.ERROR
                 attempt += 1
                 if attempt < max_attempts:
@@ -488,7 +488,7 @@ class Agent(BaseModel):
                 await self._execute_single_tool(
                     task, tool_name, arguments, messages, tool_calls_made, func_call, iteration
                 )
-            except Exception as e:
+            except (ValueError, TypeError, AttributeError, KeyError, RuntimeError) as e:
                 tool_calls_made.append(
                     {
                         "tool": tool_name,
