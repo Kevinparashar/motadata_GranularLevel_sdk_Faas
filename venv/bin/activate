@@ -13,6 +13,13 @@ deactivate () {
         export PYTHONHOME
         unset _OLD_VIRTUAL_PYTHONHOME
     fi
+    if [ -n "${_OLD_VIRTUAL_PYTHONDONTWRITEBYTECODE:-}" ] ; then
+        PYTHONDONTWRITEBYTECODE="${_OLD_VIRTUAL_PYTHONDONTWRITEBYTECODE:-}"
+        export PYTHONDONTWRITEBYTECODE
+        unset _OLD_VIRTUAL_PYTHONDONTWRITEBYTECODE
+    else
+        unset PYTHONDONTWRITEBYTECODE
+    fi
 
     # Call hash to forget past commands. Without forgetting
     # past commands the $PATH changes we made may not be respected
@@ -64,6 +71,10 @@ if [ -z "${VIRTUAL_ENV_DISABLE_PROMPT:-}" ] ; then
     VIRTUAL_ENV_PROMPT='(venv) '
     export VIRTUAL_ENV_PROMPT
 fi
+
+# Disable Python bytecode cache generation for cleaner development environment
+_OLD_VIRTUAL_PYTHONDONTWRITEBYTECODE="${PYTHONDONTWRITEBYTECODE:-}"
+export PYTHONDONTWRITEBYTECODE=1
 
 # Call hash to forget past commands. Without forgetting
 # past commands the $PATH changes we made may not be respected
