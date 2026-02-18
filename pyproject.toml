@@ -48,6 +48,7 @@ dependencies = [
     "numpy>=1.24.0",
     "python-dateutil>=2.8.2",
     "typing-extensions>=4.5.0",
+    "psutil>=5.9.0",
 ]
 
 [project.optional-dependencies]
@@ -68,6 +69,7 @@ Repository = "https://github.com/motadata/motadata-python-ai-sdk"
 
 [tool.setuptools]
 packages = ["src"]
+# Tests are at root level (tests/), not in src/, so they're automatically excluded from package distribution
 
 [tool.setuptools.package-dir]
 "" = "src"
@@ -108,9 +110,52 @@ module = [
 ignore_missing_imports = true
 
 [tool.pytest.ini_options]
-testpaths = ["src/tests"]
+testpaths = ["tests"]
 python_files = ["test_*.py"]
 python_classes = ["Test*"]
 python_functions = ["test_*"]
 asyncio_mode = "auto"
+markers = [
+    "integration: marks tests as integration tests (deselect with '-m \"not integration\"')",
+]
+
+[tool.coverage.run]
+omit = [
+    "*/test_*.py",
+    "*/*_test.py",
+    "*/tests/*",
+    "*/__pycache__/*",
+    "*/venv/*",
+    "*/env/*",
+    "*/.venv/*",
+    "*/build/*",
+    "*/dist/*",
+    "*/*.egg-info/*",
+    "*/testdata/*",
+    "*/*_pb2.py",
+    "*/mock_*.py",
+    "*/mocks/*",
+    "*/conftest.py",
+    "*/setup.py",
+    "*/examples/*",
+    # ML module excluded from coverage (not currently required/used)
+    "*/machine_learning/**",
+    "*/ml_service/**",
+]
+
+[tool.coverage.report]
+exclude_lines = [
+    "pragma: no cover",
+    "def __repr__",
+    "raise AssertionError",
+    "raise NotImplementedError",
+    "if __name__ == .__main__.:",
+    "if TYPE_CHECKING:",
+    "class .*\\bProtocol\\):",
+    "@(abc\\.)?abstractmethod",
+]
+fail_under = 85
+precision = 2
+show_missing = true
+skip_covered = false
 

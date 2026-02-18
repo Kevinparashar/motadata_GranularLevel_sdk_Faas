@@ -16,36 +16,48 @@ The Motadata AI SDK is a comprehensive, modular framework designed for integrati
 
 ```
 ┌─────────────────────────────────────────────────────────────────┐
-│                    SaaS Platform Layer                           │
+│                  SAAS PLATFORM LAYER                             │
 │  ┌──────────────────────────────────────────────────────────┐  │
-│  │         AWS API Gateway (Routing, Auth, Rate Limiting)     │  │
+│  │         API Gateway                                       │  │
+│  │         Routing, Auth, Rate Limiting                      │  │
 │  └──────────────────────────────────────────────────────────┘  │
 │                            │                                     │
 │                            ▼                                     │
 │  ┌──────────────────────────────────────────────────────────┐  │
-│  │         SaaS Backend Services (Your Business Logic)       │  │
-│  │  - Incident Management  - Change Management               │  │
-│  │  - Asset Management     - Problem Management               │  │
-│  │  - CMDB                 - Service Catalog                  │  │
+│  │         SaaS Backend Services                             │  │
+│  │         - Incident Management  - Change Management       │  │
+│  │         - Asset Management     - Problem Management       │  │
+│  │         - CMDB                 - Service Catalog          │  │
 │  └──────────────────────────────────────────────────────────┘  │
 │                            │                                     │
 │                            ▼                                     │
 │  ┌──────────────────────────────────────────────────────────┐  │
-│  │              Motadata AI SDK (This Framework)             │  │
+│  │              MOTADATA AI SDK                              │  │
 │  │  ┌──────────────┐  ┌──────────────┐  ┌──────────────┐    │  │
-│  │  │   Agents     │  │     RAG      │  │      ML      │    │  │
-│  │  └──────────────┘  └──────────────┘  └──────────────┘    │  │
-│  │  ┌──────────────┐  ┌──────────────┐  ┌──────────────┐    │  │
-│  │  │   Gateway    │  │   Database   │  │   Observability│  │  │
-│  │  └──────────────┘  └──────────────┘  └──────────────┘    │  │
+│  │  │   Agents     │  │     RAG     │  │      ML      │    │  │
+│  │  │  Framework   │  │   System    │  │  Framework   │    │  │
+│  │  └──────┬───────┘  └──────┬──────┘  └──────┬──────┘    │  │
+│  │         │                 │                 │            │  │
+│  │         └─────────────────┼─────────────────┘            │  │
+│  │                           │                              │  │
+│  │                           ▼                              │  │
+│  │  ┌──────────────┐  ┌──────────────┐  ┌──────────────┐  │  │
+│  │  │   Gateway    │  │   Database   │  │Observability │  │  │
+│  │  │  (LiteLLM)   │  │ (PostgreSQL) │  │              │  │  │
+│  │  └──────────────┘  └──────────────┘  └──────────────┘  │  │
 │  └──────────────────────────────────────────────────────────┘  │
 │                            │                                     │
 │                            ▼                                     │
 │  ┌──────────────────────────────────────────────────────────┐  │
-│  │         Infrastructure Layer                              │  │
-│  │  - PostgreSQL (with pgvector)  - Dragonfly (Cache)           │  │
-│  │  - NATS (Messaging)            - OTEL (Observability)     │  │
-│  │  - CODEC (Serialization)                                 │  │
+│  │         INFRASTRUCTURE LAYER                              │  │
+│  │  ┌──────────────┐  ┌──────────────┐  ┌──────────────┐  │  │
+│  │  │ PostgreSQL   │  │  Dragonfly   │  │     NATS     │  │  │
+│  │  │ (pgvector)   │  │    Cache     │  │  Messaging   │  │  │
+│  │  └──────────────┘  └──────────────┘  └──────────────┘  │  │
+│  │  ┌──────────────┐  ┌──────────────┐                      │  │
+│  │  │     OTEL     │  │    CODEC    │                      │  │
+│  │  │Observability │  │Serialization│                      │  │
+│  │  └──────────────┘  └──────────────┘                      │  │
 │  └──────────────────────────────────────────────────────────┘  │
 └─────────────────────────────────────────────────────────────────┘
 ```
@@ -88,6 +100,66 @@ The Motadata AI SDK is a comprehensive, modular framework designed for integrati
 - Automatic caching
 - Data validation and cleansing
 
+**Data Ingestion Flow Diagram:**
+
+```
+┌─────────────────────────────────────────────────────────────────┐
+│              DATA INGESTION WORKFLOW                            │
+└─────────────────────────────────────────────────────────────────┘
+
+    [File Upload]
+           │
+           ▼
+    ┌──────────────┐
+    │   Validate   │
+    │ File Format, │
+    │ Size, Content│
+    └──────┬───────┘
+           │
+    ┌──────┴───────┐
+    │              │
+    │ Invalid      │ Valid
+    │              │
+    ▼              ▼
+┌────────┐   ┌──────────┐
+│ Error  │   │  Detect  │
+│ Return │   │File Type │
+└────────┘   └────┬─────┘
+                  │
+                  ▼
+          ┌──────────────┐
+          │   Process    │
+          │ Multi-Modal  │
+          │   Loader     │
+          └──────┬───────┘
+                 │
+                 ▼
+          ┌──────────────┐
+          │   Cleanse    │
+          │ & Normalize  │
+          └──────┬───────┘
+                 │
+        ┌─────────┼─────────┐
+        │         │         │
+        ▼         ▼         ▼
+    ┌──────┐ ┌──────┐ ┌──────┐
+    │  RAG │ │Cache │ │      │
+    │Ingest│ │Results│ │      │
+    └───┬──┘ └───┬──┘ └──────┘
+        │        │
+        └───┬────┘
+            │
+            ▼
+    ┌──────────────┐
+    │ Store in DB  │
+    └──────┬───────┘
+           │
+           ▼
+    ┌──────────────┐
+    │   Complete   │
+    └──────────────┘
+```
+
 ---
 
 #### 2.1.2 LiteLLM Gateway
@@ -115,6 +187,49 @@ The Motadata AI SDK is a comprehensive, modular framework designed for integrati
 - LLMOps tracking
 - Cache key generation with tenant isolation
 
+**Gateway Request Flow Diagram:**
+
+```
+┌─────────────────────────────────────────────────────────────────┐
+│              GATEWAY REQUEST FLOW                               │
+└─────────────────────────────────────────────────────────────────┘
+
+Client                    Gateway              Cache         CircuitBreaker    LLMProvider    Observability
+  │                          │                   │                │                 │              │
+  │──Request (tenant_id)───>│                   │                │                 │              │
+  │                          │                   │                │                 │              │
+  │                          │──Check Cache────>│                │                 │              │
+  │                          │                   │                │                 │              │
+  │                    ┌─────┴─────┐            │                │                 │              │
+  │                    │           │            │                │                 │              │
+  │              Cache Hit    Cache Miss        │                │                 │              │
+  │                    │           │            │                │                 │              │
+  │                    │           │            │                │                 │              │
+  │                    │           │            │                │                 │              │
+  │<──Cached Response──│           │            │                │                 │              │
+  │                    │           │            │                │                 │              │
+  │                    │           │            │                │                 │              │
+  │                    │           │──Check Circuit State───────>│                 │              │
+  │                    │           │            │                │                 │              │
+  │                    │      ┌─────┴─────┐     │                │                 │              │
+  │                    │      │           │     │                │                 │              │
+  │                    │  Circuit      Circuit  │                │                 │              │
+  │                    │   Open         Closed  │                │                 │              │
+  │                    │      │           │     │                │                 │              │
+  │                    │      │           │     │                │                 │              │
+  │<──Error Response───│      │           │     │                │                 │              │
+  │                    │      │           │     │                │                 │              │
+  │                    │      │           │──API Call───────────>│                 │              │
+  │                    │      │           │     │                │                 │              │
+  │                    │      │           │     │<──Response──────│                 │              │
+  │                    │      │           │     │                │                 │              │
+  │                    │      │           │──Store Response────>│                 │              │
+  │                    │      │           │     │                │                 │              │
+  │                    │      │           │──Log Metrics──────────────────────────>│              │
+  │                    │      │           │     │                │                 │              │
+  │<──Response─────────│      │           │     │                │                 │              │
+```
+
 ---
 
 #### 2.1.3 Agno Agent Framework
@@ -140,6 +255,77 @@ The Motadata AI SDK is a comprehensive, modular framework designed for integrati
 - Session management
 - Multi-agent orchestration
 - Health checks and circuit breakers
+
+**Agent Task Execution Flow Diagram:**
+
+```
+┌─────────────────────────────────────────────────────────────────┐
+│              AGENT TASK EXECUTION FLOW                          │
+└─────────────────────────────────────────────────────────────────┘
+
+    [Task Received]
+           │
+           ▼
+    ┌──────────────┐
+    │ Load Agent   │
+    │    State     │
+    └──────┬───────┘
+           │
+           ▼
+    ┌──────────────┐
+    │  Retrieve    │
+    │   Memory     │
+    │              │
+    │ - Short-term │
+    │ - Long-term  │
+    │ - Episodic   │
+    └──────┬───────┘
+           │
+           ▼
+    ┌──────────────┐
+    │ Build Context│
+    │ (with RAG if │
+    │   needed)    │
+    └──────┬───────┘
+           │
+           ▼
+    ┌──────────────┐
+    │ Call LLM via │
+    │   Gateway    │
+    └──────┬───────┘
+           │
+           ▼
+    ┌──────────────┐
+    │ Tools Needed?│
+    └──────┬───────┘
+           │
+    ┌──────┴───────┐
+    │              │
+   Yes            No
+    │              │
+    ▼              ▼
+┌────────┐   ┌──────────┐
+│Execute │   │ Process  │
+│ Tools  │   │ Response │
+└───┬────┘   └────┬─────┘
+    │             │
+    └──────┬──────┘
+           │
+           ▼
+    ┌──────────────┐
+    │ Update Memory│
+    └──────┬───────┘
+           │
+           ▼
+    ┌──────────────┐
+    │ Store State  │
+    └──────┬───────┘
+           │
+           ▼
+    ┌──────────────┐
+    │Task Complete │
+    └──────────────┘
+```
 
 ---
 
@@ -167,6 +353,77 @@ The Motadata AI SDK is a comprehensive, modular framework designed for integrati
 - Incremental document updates
 - Real-time synchronization
 - Memory-enhanced query processing (episodic and semantic memory)
+
+**RAG Query Processing Flow Diagram:**
+
+```
+┌─────────────────────────────────────────────────────────────────┐
+│              RAG QUERY PROCESSING FLOW                         │
+└─────────────────────────────────────────────────────────────────┘
+
+[User Query]───┐
+               │
+               │ Check Cache
+               │
+               ▼
+        ┌──────────────┐
+        │  Cache Hit?  │
+        └──────┬───────┘
+               │
+        ┌──────┴───────┐
+        │              │
+       Yes            No
+        │              │
+        │              ▼
+        │      ┌──────────────┐
+        │      │   Rewrite    │
+        │      │    Query     │
+        │      └──────┬───────┘
+        │             │
+        │             ▼
+        │      ┌──────────────┐
+        │      │   Generate   │
+        │      │  Embedding   │
+        │      │ via Gateway  │
+        │      └──────┬───────┘
+        │             │
+        │             ▼
+        │      ┌──────────────┐
+        │      │    Vector    │
+        │      │ Similarity   │
+        │      │   Search     │
+        │      └──────┬───────┘
+        │             │
+        │             ▼
+        │      ┌──────────────┐
+        │      │   Retrieve   │
+        │      │ Top-K Docs   │
+        │      └──────┬───────┘
+        │             │
+        │             ▼
+        │      ┌──────────────┐
+        │      │Build Context │
+        │      └──────┬───────┘
+        │             │
+        │             ▼
+        │      ┌──────────────┐
+        │      │   Generate   │
+        │      │   Response   │
+        │      │ via Gateway  │
+        │      └──────┬───────┘
+        │             │
+        │             ▼
+        │      ┌──────────────┐
+        │      │Cache Result  │
+        │      └──────┬───────┘
+        │             │
+        └─────────────┼─────────┐
+                      │         │
+                      ▼         │
+            [Return Response]   │
+                                │
+                                └───(if cache miss, continue flow)
+```
 
 ---
 

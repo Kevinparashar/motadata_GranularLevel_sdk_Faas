@@ -4,6 +4,7 @@ Model Manager
 Manages model lifecycle: create, update, delete, archive, and load models.
 """
 
+
 import logging
 import os
 from datetime import datetime, timezone
@@ -32,11 +33,11 @@ class ModelManager:
     ):
         """
         Initialize model manager.
-
+        
         Args:
-            db: Database connection for metadata
-            storage_path: Base path for model storage
-            tenant_id: Optional tenant ID for multi-tenant support
+            db (DatabaseConnection): Database connection/handle.
+            storage_path (str): Input parameter for this operation.
+            tenant_id (Optional[str]): Tenant identifier used for tenant isolation.
         """
         self.db = db
         self.tenant_id = tenant_id
@@ -45,10 +46,26 @@ class ModelManager:
             self.storage_path = self.storage_path / tenant_id
         self.storage_path.mkdir(parents=True, exist_ok=True)
 
-        self._ensure_tables()
+        # Note: _ensure_tables() is now async, so it should be called externally after __init__
+        # await self._ensure_tables()  # Cannot await in __init__
         logger.info(f"ModelManager initialized for tenant: {tenant_id}")
 
-    def register_model(
+    async def initialize(self) -> None:
+        """
+        Initialize ModelManager asynchronously (creates database tables).
+        
+        This should be called after __init__ to ensure database tables exist.
+        
+        Example:
+            >>> model_manager = ModelManager(db, storage_path="./models")
+            >>> await model_manager.initialize()
+        
+        Returns:
+            None: Result of the operation.
+        """
+        await self._ensure_tables()
+
+    async def register_model(
         self,
         model_id: str,
         model_type: str,
@@ -57,25 +74,25 @@ class ModelManager:
         version: str = "1.0.0",
     ) -> str:
         """
-        Register a new model.
-
+        Register a new model asynchronously.
+        
         Args:
-            model_id: Unique model identifier
-            model_type: Type of model (classification, regression, etc.)
-            model_path: Path to model file
-            metadata: Optional model metadata
-            version: Model version
-
+            model_id (str): Input parameter for this operation.
+            model_type (str): Input parameter for this operation.
+            model_path (str): Input parameter for this operation.
+            metadata (Optional[Dict[str, Any]]): Extra metadata for the operation.
+            version (str): Input parameter for this operation.
+        
         Returns:
-            Registered model ID
+            str: Returned text value.
         """
         query = """
         INSERT INTO ml_models (model_id, model_type, model_path, metadata, version, tenant_id, created_at)
-        VALUES (%s, %s, %s, %s::jsonb, %s, %s, %s)
+        VALUES ($1, $2, $3, $4::jsonb, $5, $6, $7)
         ON CONFLICT (model_id, version, tenant_id) DO UPDATE
         SET model_path = EXCLUDED.model_path,
             metadata = EXCLUDED.metadata,
-            updated_at = %s
+            updated_at = $8
         RETURNING id;
         """
 
@@ -84,7 +101,7 @@ class ModelManager:
         metadata_json = json.dumps(metadata or {})
         now = datetime.now(timezone.utc)
 
-        result = self.db.execute_query(
+        result = await self.db.execute_query(
             query,
             (model_id, model_type, model_path, metadata_json, version, self.tenant_id, now, now),
             fetch_one=True,
@@ -93,24 +110,24 @@ class ModelManager:
         logger.info(f"Model registered: {model_id} v{version}")
         return str(result["id"])
 
-    def get_model(self, model_id: str, version: Optional[str] = None) -> Dict[str, Any]:
+    async def get_model(self, model_id: str, version: Optional[str] = None) -> Dict[str, Any]:
         """
-        Get model information.
-
+        Get model information asynchronously.
+        
         Args:
-            model_id: Model ID
-            version: Optional version (uses latest if not specified)
-
+            model_id (str): Input parameter for this operation.
+            version (Optional[str]): Input parameter for this operation.
+        
         Returns:
-            Model information dictionary
-
+            Dict[str, Any]: Dictionary result of the operation.
+        
         Raises:
-            ModelNotFoundError: If model not found
+            ModelNotFoundError: Raised when this function detects an invalid state or when an underlying call fails.
         """
         if version:
             query = """
             SELECT * FROM ml_models
-            WHERE model_id = %s AND version = %s AND tenant_id = %s
+            WHERE model_id = $1 AND version = $2 AND tenant_id = $3
             ORDER BY created_at DESC
             LIMIT 1;
             """
@@ -118,13 +135,13 @@ class ModelManager:
         else:
             query = """
             SELECT * FROM ml_models
-            WHERE model_id = %s AND tenant_id = %s
+            WHERE model_id = $1 AND tenant_id = $2
             ORDER BY created_at DESC
             LIMIT 1;
             """
             params = (model_id, self.tenant_id)
 
-        result = self.db.execute_query(query, params, fetch_one=True)
+        result = await self.db.execute_query(query, params, fetch_one=True)
 
         if not result:
             raise ModelNotFoundError(
@@ -133,52 +150,55 @@ class ModelManager:
 
         return dict(result)
 
-    def list_models(
+    async def list_models(
         self, model_type: Optional[str] = None, limit: int = 100
     ) -> List[Dict[str, Any]]:
         """
-        List all models.
-
+        List all models asynchronously.
+        
         Args:
-            model_type: Optional filter by model type
-            limit: Maximum number of results
-
+            model_type (Optional[str]): Input parameter for this operation.
+            limit (int): Input parameter for this operation.
+        
         Returns:
-            List of model information dictionaries
+            List[Dict[str, Any]]: Dictionary result of the operation.
         """
         if model_type:
             query = """
             SELECT * FROM ml_models
-            WHERE model_type = %s AND tenant_id = %s
+            WHERE model_type = $1 AND tenant_id = $2
             ORDER BY created_at DESC
-            LIMIT %s;
+            LIMIT $3;
             """
             params = (model_type, self.tenant_id, limit)
         else:
             query = """
             SELECT * FROM ml_models
-            WHERE tenant_id = %s
+            WHERE tenant_id = $1
             ORDER BY created_at DESC
-            LIMIT %s;
+            LIMIT $2;
             """
             params = (self.tenant_id, limit)
 
-        results = self.db.execute_query(query, params)
+        results = await self.db.execute_query(query, params)
         return [dict(row) for row in results]
 
-    def update_model(
+    async def update_model(
         self,
         model_id: str,
         metadata: Optional[Dict[str, Any]] = None,
         version: Optional[str] = None,
     ) -> None:
         """
-        Update model metadata.
-
+        Update model metadata asynchronously.
+        
         Args:
-            model_id: Model ID
-            metadata: Updated metadata
-            version: Optional version
+            model_id (str): Input parameter for this operation.
+            metadata (Optional[Dict[str, Any]]): Extra metadata for the operation.
+            version (Optional[str]): Input parameter for this operation.
+        
+        Returns:
+            None: Result of the operation.
         """
         import json
 
@@ -188,100 +208,115 @@ class ModelManager:
         if version:
             query = """
             UPDATE ml_models
-            SET metadata = %s::jsonb, updated_at = %s
-            WHERE model_id = %s AND version = %s AND tenant_id = %s;
+            SET metadata = $1::jsonb, updated_at = $2
+            WHERE model_id = $3 AND version = $4 AND tenant_id = $5;
             """
             params = (metadata_json, now, model_id, version, self.tenant_id)
         else:
             query = """
             UPDATE ml_models
-            SET metadata = %s::jsonb, updated_at = %s
-            WHERE model_id = %s AND tenant_id = %s
-            AND created_at = (SELECT MAX(created_at) FROM ml_models WHERE model_id = %s AND tenant_id = %s);
+            SET metadata = $1::jsonb, updated_at = $2
+            WHERE model_id = $3 AND tenant_id = $4
+            AND created_at = (SELECT MAX(created_at) FROM ml_models WHERE model_id = $5 AND tenant_id = $6);
             """
             params = (metadata_json, now, model_id, self.tenant_id, model_id, self.tenant_id)
 
-        self.db.execute_query(query, params)
+        await self.db.execute_query(query, params)
         logger.info(f"Model updated: {model_id}")
 
-    def delete_model(self, model_id: str, version: Optional[str] = None) -> None:
+    async def delete_model(self, model_id: str, version: Optional[str] = None) -> None:
         """
-        Delete a model.
-
+        Delete a model asynchronously.
+        
         Args:
-            model_id: Model ID
-            version: Optional version (deletes all versions if not specified)
+            model_id (str): Input parameter for this operation.
+            version (Optional[str]): Input parameter for this operation.
+        
+        Returns:
+            None: Result of the operation.
         """
         if version:
             query = """
             DELETE FROM ml_models
-            WHERE model_id = %s AND version = %s AND tenant_id = %s;
+            WHERE model_id = $1 AND version = $2 AND tenant_id = $3;
             """
             params = (model_id, version, self.tenant_id)
         else:
             query = """
             DELETE FROM ml_models
-            WHERE model_id = %s AND tenant_id = %s;
+            WHERE model_id = $1 AND tenant_id = $2;
             """
             params = (model_id, self.tenant_id)
 
-        self.db.execute_query(query, params)
+        await self.db.execute_query(query, params)
         logger.info(f"Model deleted: {model_id}")
 
-    def archive_model(self, model_id: str, version: Optional[str] = None) -> None:
+    async def archive_model(self, model_id: str, version: Optional[str] = None) -> None:
         """
-        Archive a model (soft delete).
-
+        Archive a model (soft delete) asynchronously.
+        
         Args:
-            model_id: Model ID
-            version: Optional version
+            model_id (str): Input parameter for this operation.
+            version (Optional[str]): Input parameter for this operation.
+        
+        Returns:
+            None: Result of the operation.
         """
-        query = """
-        UPDATE ml_models
-        SET archived = true, updated_at = %s
-        WHERE model_id = %s AND tenant_id = %s
-        """
-        params = [datetime.now(timezone.utc), model_id, self.tenant_id]
-
+        now = datetime.now(timezone.utc)
+        
         if version:
-            query += " AND version = %s;"
-            params.append(version)
+            query = """
+            UPDATE ml_models
+            SET archived = true, updated_at = $1
+            WHERE model_id = $2 AND tenant_id = $3 AND version = $4;
+            """
+            params = (now, model_id, self.tenant_id, version)
         else:
-            query += ";"
+            query = """
+            UPDATE ml_models
+            SET archived = true, updated_at = $1
+            WHERE model_id = $2 AND tenant_id = $3;
+            """
+            params = (now, model_id, self.tenant_id)
 
-        self.db.execute_query(query, tuple(params))
+        await self.db.execute_query(query, params)
         logger.info(f"Model archived: {model_id}")
 
-    def load_model(self, model_id: str, version: Optional[str] = None) -> Any:
+    async def load_model(self, model_id: str, version: Optional[str] = None) -> Any:
         """
-        Load model from storage.
-
+        Load model from storage asynchronously.
+        
         Args:
-            model_id: Model ID
-            version: Optional version
-
+            model_id (str): Input parameter for this operation.
+            version (Optional[str]): Input parameter for this operation.
+        
         Returns:
-            Loaded model object
-
+            Any: Result of the operation.
+        
         Raises:
-            ModelLoadError: If loading fails
+            ModelLoadError: Raised when this function detects an invalid state or when an underlying call fails.
         """
+        import asyncio
+        
         try:
-            model_info = self.get_model(model_id, version)
+            model_info = await self.get_model(model_id, version)
             model_path = model_info["model_path"]
 
             # Load model using joblib (standard for scikit-learn)
             import joblib
 
-            if not os.path.exists(model_path):
-                raise ModelLoadError(
-                    f"Model file not found: {model_path}",
-                    model_id=model_id,
-                    model_path=model_path,
-                    version=version,
-                )
+            def _load_sync() -> Any:
+                if not os.path.exists(model_path):
+                    raise ModelLoadError(
+                        f"Model file not found: {model_path}",
+                        model_id=model_id,
+                        model_path=model_path,
+                        version=version,
+                    )
+                return joblib.load(model_path)
 
-            model = joblib.load(model_path)
+            # Run file I/O in thread pool to avoid blocking
+            model = await asyncio.to_thread(_load_sync)
             logger.info(f"Model loaded: {model_id}")
             return model
 
@@ -295,21 +330,23 @@ class ModelManager:
                 original_error=e,
             )
 
-    def save_model(self, model: Any, model_id: str, version: str = "1.0.0") -> str:
+    async def save_model(self, model: Any, model_id: str, version: str = "1.0.0") -> str:
         """
-        Save model to storage.
-
+        Save model to storage asynchronously.
+        
         Args:
-            model: Model object to save
-            model_id: Model ID
-            version: Model version
-
+            model (Any): Model name or identifier to use.
+            model_id (str): Input parameter for this operation.
+            version (str): Input parameter for this operation.
+        
         Returns:
-            Path to saved model file
-
+            str: Returned text value.
+        
         Raises:
-            ModelSaveError: If saving fails
+            ModelSaveError: Raised when this function detects an invalid state or when an underlying call fails.
         """
+        import asyncio
+        
         try:
             import joblib
 
@@ -317,7 +354,12 @@ class ModelManager:
             model_dir.mkdir(parents=True, exist_ok=True)
 
             model_path = model_dir / f"model_v{version}.joblib"
-            joblib.dump(model, model_path)
+            
+            def _save_sync() -> None:
+                joblib.dump(model, model_path)
+            
+            # Run file I/O in thread pool to avoid blocking
+            await asyncio.to_thread(_save_sync)
 
             logger.info(f"Model saved: {model_path}")
             return str(model_path)
@@ -327,8 +369,13 @@ class ModelManager:
                 f"Failed to save model {model_id}: {str(e)}", model_id=model_id, original_error=e
             )
 
-    def _ensure_tables(self) -> None:
-        """Ensure required database tables exist."""
+    async def _ensure_tables(self) -> None:
+        """
+        Ensure required database tables exist asynchronously.
+        
+        Returns:
+            None: Result of the operation.
+        """
         query = """
         CREATE TABLE IF NOT EXISTS ml_models (
             id SERIAL PRIMARY KEY,
@@ -349,4 +396,4 @@ class ModelManager:
         CREATE INDEX IF NOT EXISTS idx_ml_models_created ON ml_models(created_at DESC);
         """
 
-        self.db.execute_query(query)
+        await self.db.execute_query(query)

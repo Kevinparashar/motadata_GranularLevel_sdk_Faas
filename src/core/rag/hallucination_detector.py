@@ -1,9 +1,14 @@
+# Copyright (c) 2024. All rights reserved.
+# This source code is licensed under the MIT license and a copy
+# of the license can be found in the LICENSE file in the root directory.
+
 """
 Hallucination Detection
 
 Detects hallucinations in LLM-generated responses by checking if
 the response is grounded in the retrieved context documents.
 """
+
 
 # Standard library imports
 import logging
@@ -30,14 +35,14 @@ class HallucinationResult:
     ):
         """
         Initialize hallucination result.
-
+        
         Args:
-            is_hallucination: Whether hallucination was detected
-            confidence: Confidence score (0.0-1.0)
-            reasons: List of reasons for the detection
-            grounded_sentences: Sentences that are grounded in context
-            ungrounded_sentences: Sentences that are not grounded
-            metadata: Optional metadata
+            is_hallucination (bool): Flag to indicate whether hallucination is true.
+            confidence (float): Input parameter for this operation.
+            reasons (List[str]): Input parameter for this operation.
+            grounded_sentences (List[str]): Input parameter for this operation.
+            ungrounded_sentences (List[str]): Input parameter for this operation.
+            metadata (Optional[Dict[str, Any]]): Extra metadata for the operation.
         """
         self.is_hallucination = is_hallucination
         self.confidence = confidence
@@ -47,7 +52,12 @@ class HallucinationResult:
         self.metadata = metadata or {}
 
     def to_dict(self) -> Dict[str, Any]:
-        """Convert to dictionary."""
+        """
+        Convert to dictionary.
+        
+        Returns:
+            Dict[str, Any]: Dictionary result of the operation.
+        """
         return {
             "is_hallucination": self.is_hallucination,
             "confidence": self.confidence,
@@ -78,12 +88,12 @@ class HallucinationDetector:
     ):
         """
         Initialize hallucination detector.
-
+        
         Args:
-            gateway: Optional gateway for LLM-based verification
-            enable_llm_verification: Whether to use LLM for verification
-            similarity_threshold: Minimum similarity for grounding
-            min_grounded_ratio: Minimum ratio of sentences that must be grounded
+            gateway (Optional[LiteLLMGateway]): Gateway client used for LLM calls.
+            enable_llm_verification (bool): Flag to enable or disable llm verification.
+            similarity_threshold (float): Input parameter for this operation.
+            min_grounded_ratio (float): Input parameter for this operation.
         """
         self.gateway = gateway
         self.enable_llm_verification = enable_llm_verification
@@ -95,14 +105,14 @@ class HallucinationDetector:
     ) -> HallucinationResult:
         """
         Detect hallucinations in a response.
-
+        
         Args:
-            response: Generated response text
-            context_documents: Retrieved context documents
-            query: Original query (optional)
-
+            response (str): Input parameter for this operation.
+            context_documents (List[Dict[str, Any]]): Input parameter for this operation.
+            query (Optional[str]): Input parameter for this operation.
+        
         Returns:
-            HallucinationResult with detection results
+            HallucinationResult: Result of the operation.
         """
         reasons = []
         grounded_sentences = []
@@ -143,7 +153,8 @@ class HallucinationDetector:
 
         # LLM-based verification if enabled
         if self.enable_llm_verification and self.gateway and is_hallucination:
-            llm_verification = self._llm_verify_hallucination(response, context_text, query)
+            import asyncio
+            llm_verification = asyncio.run(self._llm_verify_hallucination(response, context_text, query))
             if llm_verification:
                 reasons.extend(llm_verification.get("reasons", []))
                 # Adjust confidence based on LLM verification
@@ -166,46 +177,114 @@ class HallucinationDetector:
             },
         )
 
-    def detect_async(
+    async def detect_async(
         self, response: str, context_documents: List[Dict[str, Any]], query: Optional[str] = None
     ) -> HallucinationResult:
         """
         Detect hallucinations asynchronously.
-
+        
         Args:
-            response: Generated response text
-            context_documents: Retrieved context documents
-            query: Original query (optional)
-
+            response (str): Input parameter for this operation.
+            context_documents (List[Dict[str, Any]]): Input parameter for this operation.
+            query (Optional[str]): Input parameter for this operation.
+        
         Returns:
-            HallucinationResult with detection results
+            HallucinationResult: Result of the operation.
         """
-        # Same as sync version for now, but can be extended with async LLM calls
-        return self.detect(response, context_documents, query)
+        reasons = []
+        grounded_sentences = []
+        ungrounded_sentences = []
+
+        # Split response into sentences
+        sentences = self._split_sentences(response)
+
+        # Build context text
+        context_text = self._build_context_text(context_documents)
+
+        # Check each sentence
+        for sentence in sentences:
+            if not sentence.strip():
+                continue
+
+            is_grounded = self._check_sentence_grounding(sentence, context_text)
+
+            if is_grounded:
+                grounded_sentences.append(sentence)
+            else:
+                ungrounded_sentences.append(sentence)
+
+        # Calculate grounded ratio
+        total_sentences = len(grounded_sentences) + len(ungrounded_sentences)
+        grounded_ratio = len(grounded_sentences) / total_sentences if total_sentences > 0 else 0.0
+
+        # Determine if hallucination
+        is_hallucination = grounded_ratio < self.min_grounded_ratio
+
+        # Build reasons
+        if is_hallucination:
+            reasons.append(
+                f"Only {grounded_ratio:.1%} of sentences are grounded in context "
+                f"(minimum required: {self.min_grounded_ratio:.1%})"
+            )
+            reasons.append(f"{len(ungrounded_sentences)} ungrounded sentences detected")
+
+        # LLM-based verification if enabled (async)
+        if self.enable_llm_verification and self.gateway and is_hallucination:
+            llm_verification = await self._llm_verify_hallucination(response, context_text, query)
+            if llm_verification:
+                reasons.extend(llm_verification.get("reasons", []))
+                # Adjust confidence based on LLM verification
+                confidence = llm_verification.get("confidence", 0.5)
+            else:
+                confidence = 0.5 + (1.0 - grounded_ratio) * 0.5
+        else:
+            confidence = 0.5 + (1.0 - grounded_ratio) * 0.5
+
+        return HallucinationResult(
+            is_hallucination=is_hallucination,
+            confidence=min(confidence, 1.0),
+            reasons=reasons,
+            grounded_sentences=grounded_sentences,
+            ungrounded_sentences=ungrounded_sentences,
+            metadata={
+                "grounded_ratio": grounded_ratio,
+                "total_sentences": total_sentences,
+                "context_documents_count": len(context_documents),
+            },
+        )
 
     def _split_sentences(self, text: str) -> List[str]:
         """
         Split text into sentences.
-
+        
         Args:
-            text: Input text
-
+            text (str): Input parameter for this operation.
+        
         Returns:
-            List of sentences
+            List[str]: List result of the operation.
         """
         # Simple sentence splitting (can be improved with NLTK/spaCy)
-        sentences = re.split(r"[.!?]+\s+", text)
-        return [s.strip() for s in sentences if s.strip()]
+        # Use multiple passes to prevent ReDoS (SonarQube recommendation for re.split)
+        # First split by punctuation only (bounded quantifier), then trim whitespace
+        # This avoids quadratic runtime from \s+ failing and backtracking
+        sentences = re.split(r"[.!?]{1,10}", text)
+        # Filter and strip whitespace in separate step (multiple passes approach)
+        result = []
+        for s in sentences:
+            stripped = s.strip()
+            if stripped:
+                result.append(stripped)
+        return result
 
     def _build_context_text(self, documents: List[Dict[str, Any]]) -> str:
         """
         Build context text from documents.
-
+        
         Args:
-            documents: Context documents
-
+            documents (List[Dict[str, Any]]): Input parameter for this operation.
+        
         Returns:
-            Combined context text
+            str: Returned text value.
         """
         context_parts = []
         for doc in documents:
@@ -219,13 +298,13 @@ class HallucinationDetector:
     ) -> bool:
         """
         Check if a sentence is grounded in context.
-
+        
         Args:
-            sentence: Sentence to check
-            context_text: Full context text
-
+            sentence (str): Input parameter for this operation.
+            context_text (str): Input parameter for this operation.
+        
         Returns:
-            True if sentence is grounded
+            bool: True if the operation succeeds, else False.
         """
         # Strategy 1: Check for direct text overlap
         sentence_lower = sentence.lower()
@@ -266,13 +345,13 @@ class HallucinationDetector:
     def _check_semantic_similarity(self, sentence: str, context: str) -> float:
         """
         Check semantic similarity using embeddings.
-
+        
         Args:
-            sentence: Sentence to check
-            context: Context text
-
+            sentence (str): Input parameter for this operation.
+            context (str): Input parameter for this operation.
+        
         Returns:
-            Similarity score (0.0-1.0)
+            float: Result of the operation.
         """
         if not self.gateway:
             return 0.0
@@ -303,17 +382,18 @@ class HallucinationDetector:
     def _has_citations(self, sentence: str) -> bool:
         """
         Check if sentence has citations.
-
+        
         Args:
-            sentence: Sentence to check
-
+            sentence (str): Input parameter for this operation.
+        
         Returns:
-            True if citations found
+            bool: True if the operation succeeds, else False.
         """
         # Check for citation patterns
+        # Use bounded character classes to prevent ReDoS
         citation_patterns = [
-            r"\[.*?\]",  # [1], [source], etc.
-            r"\(.*?\)",  # (source), etc.
+            r"\[[^\]]+\]",  # [1], [source], etc. - bounded to prevent backtracking
+            r"\([^)]+\)",  # (source), etc. - bounded to prevent backtracking
             r"according to",
             r"as stated in",
             r"as mentioned in",
@@ -328,19 +408,19 @@ class HallucinationDetector:
 
         return False
 
-    def _llm_verify_hallucination(
+    async def _llm_verify_hallucination(
         self, response: str, context_text: str, query: Optional[str] = None
     ) -> Optional[Dict[str, Any]]:
         """
-        Use LLM to verify hallucination.
-
+        Use LLM to verify hallucination asynchronously.
+        
         Args:
-            response: Generated response
-            context_text: Context text
-            query: Original query
-
+            response (str): Input parameter for this operation.
+            context_text (str): Input parameter for this operation.
+            query (Optional[str]): Input parameter for this operation.
+        
         Returns:
-            Verification result dictionary or None
+            Optional[Dict[str, Any]]: Dictionary result of the operation.
         """
         if not self.gateway:
             return None
@@ -370,7 +450,7 @@ Respond in JSON format:
     "ungrounded_claims": ["claim1", "claim2"]
 }}"""
 
-            result = self.gateway.generate(
+            result = await self.gateway.generate_async(
                 prompt=prompt, model="gpt-4", max_tokens=500, temperature=0.0
             )
 
@@ -379,11 +459,24 @@ Respond in JSON format:
 
             response_text = result.text.strip()
 
-            # Extract JSON from response
-            json_match = re.search(r"\{.*\}", response_text, re.DOTALL)
-            if json_match:
-                verification = json.loads(json_match.group())
+            # Extract JSON from response - use safer approach to prevent ReDoS
+            # Try parsing entire response first
+            try:
+                verification = json.loads(response_text)
                 return verification
+            except json.JSONDecodeError:
+                # Fallback: find JSON object by locating first { and trying to parse
+                # This avoids ReDoS by not using complex regex patterns
+                start_idx = response_text.find("{")
+                if start_idx != -1:
+                    # Try parsing from the first { character
+                    for end_idx in range(len(response_text), start_idx, -1):
+                        try:
+                            json_str = response_text[start_idx:end_idx]
+                            verification = json.loads(json_str)
+                            return verification
+                        except json.JSONDecodeError:
+                            continue
         except Exception as e:
             logger.warning(f"Error in LLM verification: {str(e)}")
 

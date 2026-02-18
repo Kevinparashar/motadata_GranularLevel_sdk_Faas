@@ -6,6 +6,60 @@
 
 The Agno Agent Framework is a comprehensive system for creating, managing, and orchestrating autonomous AI agents. It provides a complete infrastructure for building multi-agent systems with capabilities including task execution, memory management, tool integration, session handling, and complex workflow orchestration.
 
+**Agent Framework Architecture Diagram:**
+
+```
+┌─────────────────────────────────────────────────────────────────┐
+│                      AGENT FRAMEWORK                            │
+│  ┌──────────────────────────────────────────────────────────┐  │
+│  │                    Agent Instance                         │  │
+│  └──────────────────────────────────────────────────────────┘  │
+│                            │                                     │
+│        ┌───────────────────┼───────────────────┐               │
+│        │                   │                   │               │
+│        ▼                   ▼                   ▼               │
+│  ┌──────────┐      ┌──────────┐      ┌──────────┐              │
+│  │ Memory   │      │  Tools  │      │ Session │              │
+│  │ System   │      │Registry │      │ Manager │              │
+│  │          │      │         │      │         │              │
+│  │- Short   │      │         │      │         │              │
+│  │- Long    │      │         │      │         │              │
+│  │- Episodic│      │         │      │         │              │
+│  │- Semantic│      │         │      │         │              │
+│  └──────────┘      └──────────┘      └──────────┘              │
+│        │                   │                   │               │
+│        └───────────────────┼───────────────────┘               │
+│                            │                                     │
+│                            ▼                                     │
+│                  ┌──────────────────┐                            │
+│                  │   Orchestrator   │                            │
+│                  └──────────────────┘                            │
+│                            │                                     │
+│        ┌───────────────────┼───────────────────┐               │
+│        │                   │                   │               │
+│        ▼                   ▼                   ▼               │
+│  ┌──────────┐      ┌──────────┐      ┌──────────┐              │
+│  │ Agent 1  │◄────►│ Agent 2  │◄────►│ Agent N  │              │
+│  │          │      │          │      │          │              │
+│  │ Messages │      │ Messages │      │ Messages │              │
+│  └──────────┘      └──────────┘      └──────────┘              │
+└─────────────────────────────────────────────────────────────────┘
+                            │
+        ┌───────────────────┼───────────────────┐
+        │                   │                   │
+        ▼                   ▼                   ▼
+┌──────────────┐    ┌──────────────┐    ┌──────────────┐
+│   Gateway    │    │  RAG System │    │  Database    │
+│  (LiteLLM)   │    │             │    │              │
+└──────────────┘    └──────────────┘    └──────────────┘
+        │                   │                   │
+        ▼                   ▼                   ▼
+┌──────────────┐    ┌──────────────┐    ┌──────────────┐
+│    Cache     │    │     NATS     │    │              │
+│              │    │   Messaging  │    │              │
+└──────────────┘    └──────────────┘    └──────────────┘
+```
+
 ## Table of Contents
 
 1. [Agents](#agents)

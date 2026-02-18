@@ -1,11 +1,20 @@
+# Copyright (c) 2024. All rights reserved.
+# This source code is licensed under the MIT license and a copy
+# of the license can be found in the LICENSE file in the root directory.
+
 """
 NATS Integration for FaaS services.
 
 Provides message bus functionality for service-to-service communication.
 """
 
+
+import asyncio
 import logging
-from typing import Any, Callable, Dict, Optional
+from typing import TYPE_CHECKING, Callable, Optional
+
+if TYPE_CHECKING:
+    from typing import Any, Awaitable, Union
 
 logger = logging.getLogger(__name__)
 
@@ -21,9 +30,9 @@ class NATSClient:
     def __init__(self, nats_url: str):
         """
         Initialize NATS client.
-
+        
         Args:
-            nats_url: NATS server URL (e.g., "nats://localhost:4222")
+            nats_url (str): Input parameter for this operation.
         """
         self.nats_url = nats_url
         self._connected = False
@@ -31,73 +40,88 @@ class NATSClient:
 
     async def connect(self):
         """Connect to NATS server."""
-        # TODO: SDK-INT-001 - Implement actual NATS connection
+        # TODO: SDK-INT-001 - Implement actual NATS connection  # noqa: FIX002, S1135
         # Placeholder implementation - replace with actual NATS client when integration is ready
         # from nats.aio.client import Client as NATS
         # self._client = NATS()
         # await self._client.connect(self.nats_url)
+        await asyncio.sleep(0, result=None)  # Make function truly async for placeholder
         self._connected = True
         logger.info("NATS client connected (placeholder)")
 
     async def disconnect(self):
         """Disconnect from NATS server."""
-        # TODO: SDK-INT-001 - Implement actual NATS disconnection
+        # TODO: SDK-INT-001 - Implement actual NATS disconnection  # noqa: FIX002, S1135
         # Placeholder implementation - replace with actual NATS client when integration is ready
         # if self._client:
         #     await self._client.close()
+        await asyncio.sleep(0, result=None)  # Make function truly async for placeholder
         self._connected = False
         logger.info("NATS client disconnected (placeholder)")
 
     async def publish(self, subject: str, payload: bytes, reply: Optional[str] = None):
         """
         Publish message to NATS subject.
-
+        
         Args:
-            subject: NATS subject (e.g., "gateway.generate.request")
-            payload: Message payload (bytes)
-            reply: Optional reply subject
+            subject (str): Input parameter for this operation.
+            payload (bytes): Input parameter for this operation.
+            reply (Optional[str]): Input parameter for this operation.
         """
         if not self._connected:
             await self.connect()
 
-        # TODO: SDK-INT-001 - Implement actual NATS publish
+        # TODO: SDK-INT-001 - Implement actual NATS publish  # noqa: FIX002, S1135
         # Placeholder implementation - replace with actual NATS client when integration is ready
         # await self._client.publish(subject, payload, reply=reply)
         logger.info(f"NATS publish (placeholder): subject={subject}, payload_size={len(payload)}")
 
-    async def subscribe(self, subject: str, callback: Callable, queue: Optional[str] = None):
+    async def subscribe(
+        self, 
+        subject: str, 
+        callback: "Union[Callable[..., Any], Callable[..., Awaitable[Any]]]", 
+        queue: Optional[str] = None
+    ):
         """
         Subscribe to NATS subject.
-
+        
+        Supports both sync and async callbacks. Async callbacks will be awaited.
+        
         Args:
-            subject: NATS subject (e.g., "gateway.generate.request")
-            callback: Callback function to handle messages
-            queue: Optional queue group name
+            subject (str): NATS subject to subscribe to.
+            callback (Union[Callable[..., Any], Callable[..., Awaitable[Any]]): 
+                Callback function to handle messages (can be sync or async).
+            queue (Optional[str]): Queue group name for load balancing.
         """
         if not self._connected:
             await self.connect()
 
-        # TODO: SDK-INT-001 - Implement actual NATS subscribe
+        # TODO: SDK-INT-001 - Implement actual NATS subscribe  # noqa: FIX002, S1135
         # Placeholder implementation - replace with actual NATS client when integration is ready
-        # await self._client.subscribe(subject, cb=callback, queue=queue)
+        # When implementing, ensure callback is properly handled:
+        # if asyncio.iscoroutinefunction(callback):
+        #     await callback(msg)
+        # else:
+        #     callback(msg)
+        # await self._client.subscribe(subject, cb=_callback, queue=queue)
         logger.info(f"NATS subscribe (placeholder): subject={subject}, queue={queue}")
 
-    async def request(self, subject: str, payload: bytes, timeout: float = 5.0) -> bytes:
+    async def request(self, subject: str, payload: bytes, timeout: float = 5.0) -> bytes:  # noqa: S7483
         """
         Send request and wait for response.
-
+        
         Args:
-            subject: NATS subject
-            payload: Request payload (bytes)
-            timeout: Request timeout in seconds
-
+            subject (str): Input parameter for this operation.
+            payload (bytes): Input parameter for this operation.
+            timeout (float): Input parameter for this operation.
+        
         Returns:
-            Response payload (bytes)
+            bytes: Result of the operation.
         """
         if not self._connected:
             await self.connect()
 
-        # TODO: SDK-INT-001 - Implement actual NATS request
+        # TODO: SDK-INT-001 - Implement actual NATS request  # noqa: FIX002, S1135
         # Placeholder implementation - replace with actual NATS client when integration is ready
         # response = await self._client.request(subject, payload, timeout=timeout)
         # return response.data

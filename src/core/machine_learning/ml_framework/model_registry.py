@@ -4,6 +4,7 @@ Model Registry
 Model versioning and registry management.
 """
 
+
 import logging
 from datetime import datetime, timezone
 from typing import Any, Dict, List, Optional
@@ -25,18 +26,34 @@ class ModelRegistry:
     def __init__(self, db: DatabaseConnection, tenant_id: Optional[str] = None):
         """
         Initialize model registry.
-
+        
         Args:
-            db: Database connection
-            tenant_id: Optional tenant ID
+            db (DatabaseConnection): Database connection/handle.
+            tenant_id (Optional[str]): Tenant identifier used for tenant isolation.
         """
         self.db = db
         self.tenant_id = tenant_id
 
-        self._ensure_tables()
+        # Note: _ensure_tables() is now async, so it should be called externally after __init__
+        # await self._ensure_tables()  # Cannot await in __init__
         logger.info(f"ModelRegistry initialized for tenant: {tenant_id}")
 
-    def register_version(
+    async def initialize(self) -> None:
+        """
+        Initialize ModelRegistry asynchronously (creates database tables).
+        
+        This should be called after __init__ to ensure database tables exist.
+        
+        Example:
+            >>> registry = ModelRegistry(db, tenant_id="tenant_123")
+            >>> await registry.initialize()
+        
+        Returns:
+            None: Result of the operation.
+        """
+        await self._ensure_tables()
+
+    async def register_version(
         self,
         model_id: str,
         version: str,
@@ -46,18 +63,18 @@ class ModelRegistry:
         metadata: Optional[Dict[str, Any]] = None,
     ) -> str:
         """
-        Register a new model version.
-
+        Register a new model version asynchronously.
+        
         Args:
-            model_id: Model ID
-            version: Version string (e.g., '1.0.0')
-            model_path: Path to model file
-            metrics: Training/validation metrics
-            hyperparameters: Model hyperparameters
-            metadata: Additional metadata
-
+            model_id (str): Input parameter for this operation.
+            version (str): Input parameter for this operation.
+            model_path (str): Input parameter for this operation.
+            metrics (Optional[Dict[str, Any]]): Input parameter for this operation.
+            hyperparameters (Optional[Dict[str, Any]]): Input parameter for this operation.
+            metadata (Optional[Dict[str, Any]]): Extra metadata for the operation.
+        
         Returns:
-            Registered version ID
+            str: Returned text value.
         """
         import json
 
@@ -72,18 +89,18 @@ class ModelRegistry:
             model_id, version, model_path, metrics, hyperparameters,
             metadata, tenant_id, created_at
         )
-        VALUES (%s, %s, %s, %s::jsonb, %s::jsonb, %s::jsonb, %s, %s)
+        VALUES ($1, $2, $3, $4::jsonb, $5::jsonb, $6::jsonb, $7, $8)
         ON CONFLICT (model_id, version, tenant_id) DO UPDATE
         SET model_path = EXCLUDED.model_path,
             metrics = EXCLUDED.metrics,
             hyperparameters = EXCLUDED.hyperparameters,
             metadata = EXCLUDED.metadata,
-            updated_at = %s
+            updated_at = $9
         RETURNING id;
         """
 
         now = datetime.now(timezone.utc)
-        result = self.db.execute_query(
+        result = await self.db.execute_query(
             query,
             (
                 model_id,
@@ -102,93 +119,99 @@ class ModelRegistry:
         logger.info(f"Model version registered: {model_id} v{version}")
         return str(result["id"])
 
-    def get_model_version(
+    async def get_model_version(
         self, model_id: str, version: Optional[str] = None
     ) -> Optional[Dict[str, Any]]:
         """
-        Get specific model version.
-
+        Get specific model version asynchronously.
+        
         Args:
-            model_id: Model ID
-            version: Optional version (returns latest if not specified)
-
+            model_id (str): Input parameter for this operation.
+            version (Optional[str]): Input parameter for this operation.
+        
         Returns:
-            Model version information or None if not found
+            Optional[Dict[str, Any]]: Dictionary result of the operation.
         """
         if version:
             query = """
             SELECT * FROM ml_model_versions
-            WHERE model_id = %s AND version = %s AND tenant_id = %s;
+            WHERE model_id = $1 AND version = $2 AND tenant_id = $3;
             """
             params = (model_id, version, self.tenant_id)
         else:
             query = """
             SELECT * FROM ml_model_versions
-            WHERE model_id = %s AND tenant_id = %s
+            WHERE model_id = $1 AND tenant_id = $2
             ORDER BY created_at DESC
             LIMIT 1;
             """
             params = (model_id, self.tenant_id)
 
-        result = self.db.execute_query(query, params, fetch_one=True)
+        result = await self.db.execute_query(query, params, fetch_one=True)
         return dict(result) if result else None
 
-    def list_versions(self, model_id: str, limit: int = 100) -> List[Dict[str, Any]]:
+    async def list_versions(self, model_id: str, limit: int = 100) -> List[Dict[str, Any]]:
         """
-        List all versions of a model.
-
+        List all versions of a model asynchronously.
+        
         Args:
-            model_id: Model ID
-            limit: Maximum number of results
-
+            model_id (str): Input parameter for this operation.
+            limit (int): Input parameter for this operation.
+        
         Returns:
-            List of version information dictionaries
+            List[Dict[str, Any]]: Dictionary result of the operation.
         """
         query = """
         SELECT * FROM ml_model_versions
-        WHERE model_id = %s AND tenant_id = %s
+        WHERE model_id = $1 AND tenant_id = $2
         ORDER BY created_at DESC
-        LIMIT %s;
+        LIMIT $3;
         """
 
-        results = self.db.execute_query(query, (model_id, self.tenant_id, limit))
+        results = await self.db.execute_query(query, (model_id, self.tenant_id, limit))
         return [dict(row) for row in results]
 
-    def promote_version(self, model_id: str, version: str, environment: str) -> None:
+    async def promote_version(self, model_id: str, version: str, environment: str) -> None:
         """
-        Promote model version to environment (dev, staging, prod).
-
+        Promote model version to environment (dev, staging, prod) asynchronously.
+        
         Args:
-            model_id: Model ID
-            version: Version to promote
-            environment: Target environment
+            model_id (str): Input parameter for this operation.
+            version (str): Input parameter for this operation.
+            environment (str): Input parameter for this operation.
+        
+        Returns:
+            None: Result of the operation.
         """
         query = """
         UPDATE ml_model_versions
-        SET environment = %s, updated_at = %s
-        WHERE model_id = %s AND version = %s AND tenant_id = %s;
+        SET environment = $1, updated_at = $2
+        WHERE model_id = $3 AND version = $4 AND tenant_id = $5;
         """
 
-        self.db.execute_query(
+        await self.db.execute_query(
             query, (environment, datetime.now(timezone.utc), model_id, version, self.tenant_id)
         )
 
         logger.info(f"Model version promoted: {model_id} v{version} to {environment}")
 
-    def compare_versions(self, model_id: str, version1: str, version2: str) -> Dict[str, Any]:
+    async def compare_versions(self, model_id: str, version1: str, version2: str) -> Dict[str, Any]:
         """
-        Compare two model versions.
-
+        Compare two model versions asynchronously.
+        
         Args:
-            model_id: Model ID
-            version1: First version
-            version2: Second version
-
+            model_id (str): Input parameter for this operation.
+            version1 (str): Input parameter for this operation.
+            version2 (str): Input parameter for this operation.
+        
         Returns:
-            Comparison dictionary
+            Dict[str, Any]: Dictionary result of the operation.
+        
+        Raises:
+            ModelNotFoundError: Raised when this function detects an invalid state or when an underlying call fails.
         """
-        v1 = self.get_model_version(model_id, version1)
-        v2 = self.get_model_version(model_id, version2)
+        v1 = await self.get_model_version(model_id, version1)
+        v2 = await self.get_model_version(model_id, version2)
 
         if not v1 or not v2:
             raise ModelNotFoundError(
@@ -201,18 +224,18 @@ class ModelRegistry:
             "metrics_diff": self._compare_metrics(v1.get("metrics", {}), v2.get("metrics", {})),
         }
 
-    def get_lineage(self, model_id: str, version: Optional[str] = None) -> Dict[str, Any]:
+    async def get_lineage(self, model_id: str, version: Optional[str] = None) -> Dict[str, Any]:
         """
-        Get model lineage (training data, parent models, etc.).
-
+        Get model lineage (training data, parent models, etc.) asynchronously.
+        
         Args:
-            model_id: Model ID
-            version: Optional version
-
+            model_id (str): Input parameter for this operation.
+            version (Optional[str]): Input parameter for this operation.
+        
         Returns:
-            Lineage information
+            Dict[str, Any]: Dictionary result of the operation.
         """
-        version_info = self.get_model_version(model_id, version)
+        version_info = await self.get_model_version(model_id, version)
         if not version_info:
             return {}
 
@@ -227,7 +250,16 @@ class ModelRegistry:
     def _compare_metrics(
         self, metrics1: Dict[str, Any], metrics2: Dict[str, Any]
     ) -> Dict[str, Any]:
-        """Compare metrics between two versions."""
+        """
+        Compare metrics between two versions.
+        
+        Args:
+            metrics1 (Dict[str, Any]): Input parameter for this operation.
+            metrics2 (Dict[str, Any]): Input parameter for this operation.
+        
+        Returns:
+            Dict[str, Any]: Dictionary result of the operation.
+        """
         diff = {}
         all_keys = set(metrics1.keys()) | set(metrics2.keys())
 
@@ -240,8 +272,13 @@ class ModelRegistry:
 
         return diff
 
-    def _ensure_tables(self) -> None:
-        """Ensure required database tables exist."""
+    async def _ensure_tables(self) -> None:
+        """
+        Ensure required database tables exist asynchronously.
+        
+        Returns:
+            None: Result of the operation.
+        """
         query = """
         CREATE TABLE IF NOT EXISTS ml_model_versions (
             id SERIAL PRIMARY KEY,
@@ -262,4 +299,4 @@ class ModelRegistry:
         CREATE INDEX IF NOT EXISTS idx_ml_versions_env ON ml_model_versions(environment);
         """
 
-        self.db.execute_query(query)
+        await self.db.execute_query(query)

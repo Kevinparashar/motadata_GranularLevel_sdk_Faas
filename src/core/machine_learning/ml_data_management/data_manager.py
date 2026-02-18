@@ -4,6 +4,7 @@ Data Manager
 Manages data lifecycle for ML operations.
 """
 
+
 import logging
 from datetime import datetime, timezone
 from typing import Any, Dict, Optional
@@ -23,38 +24,38 @@ class DataManager:
     def __init__(self, db: DatabaseConnection, tenant_id: Optional[str] = None):
         """
         Initialize data manager.
-
+        
         Args:
-            db: Database connection
-            tenant_id: Optional tenant ID
+            db (DatabaseConnection): Database connection/handle.
+            tenant_id (Optional[str]): Tenant identifier used for tenant isolation.
         """
         self.db = db
         self.tenant_id = tenant_id
 
         logger.info(f"DataManager initialized for tenant: {tenant_id}")
 
-    def ingest_data(
+    async def ingest_data(
         self, dataset_name: str, metadata: Optional[Dict[str, Any]] = None
     ) -> str:
         """
-        Ingest new data.
-
+        Ingest new data asynchronously.
+        
         Args:
-            dataset_name: Name of dataset
-            metadata: Optional metadata
-
+            dataset_name (str): Input parameter for this operation.
+            metadata (Optional[Dict[str, Any]]): Extra metadata for the operation.
+        
         Returns:
-            Dataset ID
+            str: Returned text value.
         """
         import json
 
         query = """
         INSERT INTO ml_datasets (dataset_name, metadata, tenant_id, created_at)
-        VALUES (%s, %s::jsonb, %s, %s)
+        VALUES ($1, $2::jsonb, $3, $4)
         RETURNING id;
         """
 
-        result = self.db.execute_query(
+        result = await self.db.execute_query(
             query,
             (dataset_name, json.dumps(metadata or {}), self.tenant_id, datetime.now(timezone.utc)),
             fetch_one=True,
@@ -66,29 +67,32 @@ class DataManager:
     def validate_data(self, data: Any, schema: Optional[Dict[str, Any]] = None) -> bool:
         """
         Validate data quality.
-
+        
         Args:
-            data: Data to validate
-            schema: Optional data schema
-
+            data (Any): Input parameter for this operation.
+            schema (Optional[Dict[str, Any]]): Input parameter for this operation.
+        
         Returns:
-            True if valid
+            bool: True if the operation succeeds, else False.
         """
         # Basic validation logic
         return True
 
-    def archive_data(self, dataset_id: str) -> None:
+    async def archive_data(self, dataset_id: str) -> None:
         """
-        Archive old data.
-
+        Archive old data asynchronously.
+        
         Args:
-            dataset_id: Dataset ID
+            dataset_id (str): Input parameter for this operation.
+        
+        Returns:
+            None: Result of the operation.
         """
         query = """
         UPDATE ml_datasets
-        SET archived = true, updated_at = %s
-        WHERE id = %s AND tenant_id = %s;
+        SET archived = true, updated_at = $1
+        WHERE id = $2 AND tenant_id = $3;
         """
 
-        self.db.execute_query(query, (datetime.now(timezone.utc), dataset_id, self.tenant_id))
+        await self.db.execute_query(query, (datetime.now(timezone.utc), dataset_id, self.tenant_id))
         logger.info(f"Data archived: {dataset_id}")

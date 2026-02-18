@@ -286,7 +286,7 @@ See [Troubleshooting Guide](../troubleshooting/prompt_generator_troubleshooting.
 
 ## Related Documentation
 
-- [User Guide](../guides/prompt_based_creation_guide.md)
+- [User Guide](prompt_based_creation_guide.md)
 - [Implementation Plan](../architecture/PROMPT_BASED_GENERATOR_IMPLEMENTATION_PLAN.md)
 - [Component README](../../src/core/prompt_based_generator/README.md)
 

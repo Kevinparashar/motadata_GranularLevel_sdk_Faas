@@ -1,8 +1,13 @@
+# Copyright (c) 2024. All rights reserved.
+# This source code is licensed under the MIT license and a copy
+# of the license can be found in the LICENSE file in the root directory.
+
 """
 RAG System
 
 Complete Retrieval-Augmented Generation system.
 """
+
 
 # Standard library imports
 import logging
@@ -50,23 +55,15 @@ class RAGSystem:
         Initialize RAG system.
 
         Args:
-            db: Database connection
-            gateway: LiteLLM gateway
-            embedding_model: Model for embeddings
-            generation_model: Model for generation
-            cache: Optional cache mechanism
-            cache_config: Optional cache configuration
-            enable_memory: Enable memory for conversation context
-            memory_config: Optional memory configuration
-            **kwargs: Additional configuration options:
-                - chunk_size: Document chunk size (default: 1000)
-                - chunk_overlap: Chunk overlap size (default: 200)
-                - chunking_strategy: Chunking strategy (default: "fixed")
-                - min_chunk_size: Minimum chunk size (default: 50)
-                - max_chunk_size: Maximum chunk size (default: 2000)
-                - enable_preprocessing: Enable preprocessing (default: True)
-                - enable_metadata_extraction: Enable metadata extraction (default: True)
-                - enable_multimodal: Enable multimodal support (default: True)
+            db (DatabaseConnection): Database connection/handle.
+            gateway (LiteLLMGateway): Gateway client used for LLM calls.
+            embedding_model (str): Input parameter for this operation.
+            generation_model (str): Input parameter for this operation.
+            cache (Optional[CacheMechanism]): Cache instance used to store and fetch cached results.
+            cache_config (Optional[CacheConfig]): Input parameter for this operation.
+            enable_memory (bool): Flag to enable or disable memory.
+            memory_config (Optional[Dict[str, Any]]): Input parameter for this operation.
+            **kwargs (Any): Input parameter for this operation.
         """
         self.db = db
         self.gateway = gateway
@@ -92,6 +89,27 @@ class RAGSystem:
         # Initialize vector index manager
         self.index_manager = create_vector_index_manager(db)
 
+        # OTEL Integration (optional) - Initialize before creating Retriever
+        self.otel_tracer: Optional[Any] = kwargs.get("otel_tracer")
+        self.otel_metrics: Optional[Any] = kwargs.get("otel_metrics")
+
+        # Initialize OTEL if not provided
+        if self.otel_tracer is None:
+            try:
+                from ..otel_integration import create_otel_tracer
+
+                self.otel_tracer = create_otel_tracer(service_name="rag-system")
+            except (ImportError, Exception):
+                self.otel_tracer = None
+
+        if self.otel_metrics is None:
+            try:
+                from ..otel_integration import create_otel_metrics
+
+                self.otel_metrics = create_otel_metrics(service_name="rag-system")
+            except (ImportError, Exception):
+                self.otel_metrics = None
+
         # Initialize document processor with multimodal support
         processor_kwargs = {
             "chunk_size": kwargs.get("chunk_size", 1000),
@@ -107,25 +125,50 @@ class RAGSystem:
         self.document_processor = DocumentProcessor(**processor_kwargs)
 
         self.retriever = Retriever(
-            vector_ops=self.vector_ops, gateway=gateway, embedding_model=embedding_model
+            vector_ops=self.vector_ops,
+            gateway=gateway,
+            embedding_model=embedding_model,
+            otel_tracer=self.otel_tracer,
+            otel_metrics=self.otel_metrics,
         )
         self.generator = RAGGenerator(gateway=gateway, model=generation_model)
 
-    def _load_document_from_file(
+    async def _load_document_from_file(
         self, file_path: str, metadata: Optional[Dict[str, Any]]
     ) -> tuple[str, Dict[str, Any], str]:
-        """Load document from file path."""
-        content, loaded_metadata = self.document_processor.load_document(file_path)
+        """
+        Load document from file path asynchronously.
+        
+        Args:
+            file_path (str): Path of the input file.
+            metadata (Optional[Dict[str, Any]]): Extra metadata for the operation.
+        
+        Returns:
+            tuple[str, Dict[str, Any], str]: Dictionary result of the operation.
+        """
+        content, loaded_metadata = await self.document_processor.load_document(file_path)
         if metadata:
             metadata.update(loaded_metadata)
         else:
             metadata = loaded_metadata
         return content, metadata, file_path
 
-    def _insert_document_to_db(
+    async def _insert_document_to_db(
         self, title: str, content: str, metadata: Optional[Dict[str, Any]], source: Optional[str], tenant_id: Optional[str]
     ) -> str:
-        """Insert document into database and return document ID."""
+        """
+        Insert document into database and return document ID.
+        
+        Args:
+            title (str): Input parameter for this operation.
+            content (str): Content text.
+            metadata (Optional[Dict[str, Any]]): Extra metadata for the operation.
+            source (Optional[str]): Input parameter for this operation.
+            tenant_id (Optional[str]): Tenant identifier used for tenant isolation.
+        
+        Returns:
+            str: Returned text value.
+        """
         import json
 
         query = """
@@ -134,7 +177,7 @@ class RAGSystem:
         RETURNING id;
         """
         metadata_json = json.dumps(metadata or {})
-        result = self.db.execute_query(
+        result = await self.db.execute_query(
             query, (title, content, metadata_json, source, tenant_id), fetch_one=True
         )
         return str(result["id"])
@@ -142,7 +185,16 @@ class RAGSystem:
     def _generate_embeddings_batch(
         self, chunk_texts: List[str], document_id: str
     ) -> List[tuple]:
-        """Generate embeddings in batch."""
+        """
+        Generate embeddings in batch.
+        
+        Args:
+            chunk_texts (List[str]): Input parameter for this operation.
+            document_id (str): Input parameter for this operation.
+        
+        Returns:
+            List[tuple]: List result of the operation.
+        """
         try:
             embedding_response = self.gateway.embed(texts=chunk_texts, model=self.embedding_model)
             embeddings_data = []
@@ -158,7 +210,16 @@ class RAGSystem:
     def _generate_embeddings_individual(
         self, chunks: List[Any], document_id: str
     ) -> List[tuple]:
-        """Generate embeddings individually as fallback."""
+        """
+        Generate embeddings individually as fallback.
+        
+        Args:
+            chunks (List[Any]): Input parameter for this operation.
+            document_id (str): Input parameter for this operation.
+        
+        Returns:
+            List[tuple]: List result of the operation.
+        """
         embeddings_data = []
         for chunk in chunks:
             try:
@@ -179,21 +240,38 @@ class RAGSystem:
     def _process_embeddings(
         self, chunks: List[Any], document_id: str
     ) -> List[tuple]:
-        """Process embeddings with batch fallback to individual."""
+        """
+        Process embeddings with batch fallback to individual.
+        
+        Args:
+            chunks (List[Any]): Input parameter for this operation.
+            document_id (str): Input parameter for this operation.
+        
+        Returns:
+            List[tuple]: List result of the operation.
+        """
         chunk_texts = [chunk.content for chunk in chunks]
         embeddings_data = self._generate_embeddings_batch(chunk_texts, document_id)
         if not embeddings_data:
             embeddings_data = self._generate_embeddings_individual(chunks, document_id)
         return embeddings_data
 
-    def _store_embeddings(self, embeddings_data: List[tuple]) -> None:
-        """Store embeddings and trigger reindexing."""
+    async def _store_embeddings(self, embeddings_data: List[tuple]) -> None:
+        """
+        Store embeddings and trigger reindexing.
+        
+        Args:
+            embeddings_data (List[tuple]): Input parameter for this operation.
+        
+        Returns:
+            None: Result of the operation.
+        """
         if not embeddings_data:
             return
 
-        self.vector_ops.batch_insert_embeddings(embeddings_data)
+        await self.vector_ops.batch_insert_embeddings(embeddings_data)
         try:
-            self.index_manager.auto_reindex_on_embedding_change(
+            await self.index_manager.auto_reindex_on_embedding_change(
                 table_name="embeddings", column_name="embedding"
             )
         except Exception as e:
@@ -210,32 +288,39 @@ class RAGSystem:
     ) -> str:
         """
         Ingest a document into the RAG system.
-
+        
         Supports both direct content and file paths for multi-modal data:
-        - Text files: .txt, .md, .html, .json
-        - Documents: .pdf, .doc, .docx
-        - Audio: .mp3, .wav, .m4a, .ogg (with transcription)
-        - Video: .mp4, .avi, .mov, .mkv (with transcription and frame extraction)
-        - Images: .jpg, .png, .gif, .bmp (with OCR and description)
-
+                                                - Text files: .txt, .md, .html, .json
+                                                - Documents: .pdf, .doc, .docx
+                                                - Audio: .mp3, .wav, .m4a, .ogg (with transcription)
+                                                - Video: .mp4, .avi, .mov, .mkv (with transcription and frame extraction)
+                                                - Images: .jpg, .png, .gif, .bmp (with OCR and description)
+        
         Args:
-            title: Document title
-            content: Document content (if provided directly)
-            file_path: Path to file (for multi-modal loading)
-            tenant_id: Optional tenant ID for multi-tenant SaaS
-            source: Optional source URL/path
-            metadata: Optional metadata
-
+            title (str): Input parameter for this operation.
+            content (Optional[str]): Content text.
+            file_path (Optional[str]): Path of the input file.
+            tenant_id (Optional[str]): Tenant identifier used for tenant isolation.
+            source (Optional[str]): Input parameter for this operation.
+            metadata (Optional[Dict[str, Any]]): Extra metadata for the operation.
+        
         Returns:
-            Document ID
+            str: Returned text value.
+        
+        Raises:
+            ValueError: Raised when this function detects an invalid state or when an underlying call fails.
         """
+        import asyncio
+
         if file_path:
-            content, metadata, source = self._load_document_from_file(file_path, metadata)
+            # Call async method from sync context
+            content, metadata, source = asyncio.run(self._load_document_from_file(file_path, metadata))
 
         if not content:
             raise ValueError("Either 'content' or 'file_path' must be provided")
 
-        document_id = self._insert_document_to_db(title, content, metadata, source, tenant_id)
+        # Call async method from sync context
+        document_id = asyncio.run(self._insert_document_to_db(title, content, metadata, source, tenant_id))
 
         chunks = self.document_processor.chunk_document(
             content=content, document_id=document_id, metadata=metadata
@@ -245,7 +330,7 @@ class RAGSystem:
             return document_id
 
         embeddings_data = self._process_embeddings(chunks, document_id)
-        self._store_embeddings(embeddings_data)
+        asyncio.run(self._store_embeddings(embeddings_data))
 
         return document_id
 
@@ -254,13 +339,13 @@ class RAGSystem:
         Rewrite query to improve retrieval quality.
 
         Simple query rewriting: expand abbreviations, normalize terms.
-        Can be extended with LLM-based query expansion.
-
+                                Can be extended with LLM-based query expansion.
+        
         Args:
-            query: Original query
-
+            query (str): Input parameter for this operation.
+        
         Returns:
-            Rewritten query
+            str: Returned text value.
         """
         # Basic query normalization
         rewritten = query.strip()
@@ -298,26 +383,28 @@ class RAGSystem:
         Query the RAG system with query optimization.
 
         Args:
-            query: User query
-            tenant_id: Optional tenant ID for multi-tenant SaaS (filters documents by tenant)
-            top_k: Number of documents to retrieve
-            threshold: Similarity threshold
-            max_tokens: Maximum tokens in response
-            use_query_rewriting: Whether to rewrite query for better retrieval
-            retrieval_strategy: Retrieval strategy ("vector", "hybrid", "keyword")
-            user_id: Optional user ID for memory context
-            conversation_id: Optional conversation ID for memory context
-
+            query (str): Input parameter for this operation.
+            tenant_id (Optional[str]): Tenant identifier used for tenant isolation.
+            top_k (int): Input parameter for this operation.
+            threshold (float): Input parameter for this operation.
+            max_tokens (int): Input parameter for this operation.
+            use_query_rewriting (bool): Input parameter for this operation.
+            retrieval_strategy (str): Input parameter for this operation.
+            user_id (Optional[str]): User identifier (used for auditing or personalization).
+            conversation_id (Optional[str]): Conversation identifier (used for context or memory).
+        
         Returns:
-            Dictionary with answer and retrieved documents
+            Dict[str, Any]: Dictionary result of the operation.
         """
+        import asyncio
+
         # Retrieve relevant memories if memory is enabled
         memories = []
         memory_context = ""
         if self.memory:
-            memories = self.memory.retrieve(
+            memories = asyncio.run(self.memory.retrieve(
                 query=query, limit=5
-            )
+            ))
             if memories:
                 memory_context = "\n".join([f"- {mem.content}" for mem in memories[:3]])
 
@@ -328,7 +415,7 @@ class RAGSystem:
 
         # Include tenant_id in cache key for tenant isolation
         cache_key = f"rag:query:{tenant_id or 'global'}:{query}:{top_k}:{threshold}:{max_tokens}:{retrieval_strategy}"
-        cached = self.cache.get(cache_key, tenant_id=tenant_id)
+        cached = asyncio.run(self.cache.get(cache_key, tenant_id=tenant_id))
         if cached:
             return cached
 
@@ -366,11 +453,11 @@ class RAGSystem:
             }
 
             # Store in cache
-            self.cache.set(cache_key, result, ttl=300, tenant_id=tenant_id)
+            asyncio.run(self.cache.set(cache_key, result, ttl=300, tenant_id=tenant_id))
 
             # Store in memory for future context
             if self.memory:
-                self.memory.store(
+                asyncio.run(self.memory.store(
                     content=f"Query: {original_query}\nAnswer: {answer}",
                     memory_type=MemoryType.EPISODIC,
                     importance=0.7,
@@ -380,7 +467,7 @@ class RAGSystem:
                         "tenant_id": tenant_id,
                         "num_documents": len(retrieved_docs),
                     },
-                )
+                ))
 
             return result
         except (ConnectionError, TimeoutError) as e:
@@ -427,28 +514,186 @@ class RAGSystem:
         Query the RAG system asynchronously.
 
         Args:
-            query: User query
-            tenant_id: Optional tenant ID for multi-tenant SaaS
-            top_k: Number of documents to retrieve
-            threshold: Similarity threshold
-            max_tokens: Maximum tokens in response
-            use_query_rewriting: Whether to rewrite query
-            retrieval_strategy: Retrieval strategy
-            user_id: Optional user ID for memory context
-            conversation_id: Optional conversation ID for memory context
-
+            query (str): Input parameter for this operation.
+            tenant_id (Optional[str]): Tenant identifier used for tenant isolation.
+            top_k (int): Input parameter for this operation.
+            threshold (float): Input parameter for this operation.
+            max_tokens (int): Input parameter for this operation.
+            use_query_rewriting (bool): Input parameter for this operation.
+            retrieval_strategy (str): Input parameter for this operation.
+            user_id (Optional[str]): User identifier (used for auditing or personalization).
+            conversation_id (Optional[str]): Conversation identifier (used for context or memory).
+        
         Returns:
-            Dictionary with answer and retrieved documents
+            Dict[str, Any]: Dictionary result of the operation.
         """
-        # RAG QUERY PROCESS: Step-by-step retrieval and generation
+        # OTEL Integration: Start trace for RAG query
+        import time
+        start_time = time.time()
+        
+        tracer = self.otel_tracer
+        if tracer is None:
+            try:
+                from ..otel_integration import create_otel_tracer
+                tracer = create_otel_tracer()
+            except (ImportError, Exception):
+                tracer = None
 
-        # STEP 1: Retrieve relevant conversation memories (if memory enabled)
-        # This provides context from previous conversations to improve answer relevance
-        # Cost impact: Memory retrieval is free (no API call), improves answer quality
-        memories = []
+        if tracer:
+            with tracer.start_trace("rag.query") as trace:
+                trace.set_attribute("rag.tenant_id", tenant_id or "global")
+                trace.set_attribute("rag.query.length", len(query))
+                trace.set_attribute("rag.top_k", top_k)
+                trace.set_attribute("rag.retrieval_strategy", retrieval_strategy)
+
+                # STEP 1: Retrieve relevant conversation memories (if memory enabled)
+                with tracer.start_span("rag.memory.retrieve", parent=trace) as memory_span:
+                    memories = []
+                    memory_context = ""
+                    if self.memory:
+                        memories = await self.memory.retrieve(
+                            query=query, limit=5
+                        )
+                        if memories:
+                            memory_context = "\n".join([f"- {mem.content}" for mem in memories[:3]])
+                    memory_span.set_attribute("rag.memory.count", len(memories))
+
+                # STEP 2: Query rewriting for optimization
+                original_query = query
+                if use_query_rewriting:
+                    with tracer.start_span("rag.query.rewrite", parent=trace):
+                        query = self._rewrite_query(query)
+
+                # STEP 3: Check cache for previous identical queries
+                with tracer.start_span("rag.cache.check", parent=trace) as cache_span:
+                    cache_key = f"rag:query:{tenant_id or 'global'}:{query}:{top_k}:{threshold}:{max_tokens}:{retrieval_strategy}"
+                    cached = await self.cache.get(cache_key, tenant_id=tenant_id)
+                    cache_span.set_attribute("rag.cache.hit", cached is not None)
+                    if cached:
+                        # Record cache hit metrics
+                        metrics = self.otel_metrics
+                        if metrics is None:
+                            try:
+                                from ..otel_integration import create_otel_metrics
+                                metrics = create_otel_metrics()
+                            except (ImportError, Exception):
+                                metrics = None
+                        if metrics:
+                            metrics.increment_counter("rag.cache.hits", amount=1.0, attributes={
+                                "tenant_id": tenant_id or "global",
+                            })
+                        return cached
+
+                try:
+                    # STEP 4: Document retrieval (vector search in database)
+                    with tracer.start_span("rag.retrieve", parent=trace) as retrieve_span:
+                        if retrieval_strategy == "hybrid":
+                            retrieved_docs = self.retriever.retrieve_hybrid(
+                                query=query, top_k=top_k, threshold=threshold, tenant_id=tenant_id
+                            )
+                        else:
+                            retrieved_docs = self.retriever.retrieve(
+                                query=query, top_k=top_k, threshold=threshold, tenant_id=tenant_id
+                            )
+                        retrieve_span.set_attribute("rag.documents.retrieved", len(retrieved_docs))
+
+                    # STEP 5: Enhance context with memory if available
+                    enhanced_context = retrieved_docs
+                    if memory_context:
+                        enhanced_context = [
+                            {"title": "Previous Context", "content": memory_context, "source": "memory"}
+                        ] + retrieved_docs
+
+                    # STEP 6: Generate answer using LLM with retrieved context
+                    with tracer.start_span("rag.generate", parent=trace) as generate_span:
+                        answer = await self.generator.generate_async(
+                            query=original_query,
+                            context_documents=enhanced_context,
+                            max_tokens=max_tokens,
+                        )
+                        generate_span.set_attribute("rag.answer.length", len(answer) if answer else 0)
+
+                    result = {
+                        "answer": answer,
+                        "retrieved_documents": retrieved_docs,
+                        "num_documents": len(retrieved_docs),
+                        "query_used": query if use_query_rewriting else original_query,
+                        "original_query": original_query,
+                        "memory_used": len(memories) if memories else 0,
+                    }
+
+                    # Store in cache
+                    await self.cache.set(cache_key, result, ttl=300, tenant_id=tenant_id)
+
+                    # Store in memory for future context
+                    if self.memory:
+                        await self.memory.store(
+                            content=f"Query: {original_query}\nAnswer: {answer}",
+                            memory_type=MemoryType.EPISODIC,
+                            importance=0.7,
+                            metadata={
+                                "user_id": user_id,
+                                "conversation_id": conversation_id,
+                                "tenant_id": tenant_id,
+                                "num_documents": len(retrieved_docs),
+                            },
+                        )
+
+                    # Record metrics
+                    duration = time.time() - start_time
+                    metrics = self.otel_metrics
+                    if metrics is None:
+                        try:
+                            from ..otel_integration import create_otel_metrics
+                            metrics = create_otel_metrics()
+                        except (ImportError, Exception):
+                            metrics = None
+
+                    if metrics:
+                        metrics.record_histogram("rag.query.duration", duration, {
+                            "tenant_id": tenant_id or "global",
+                            "retrieval_strategy": retrieval_strategy,
+                        })
+                        metrics.increment_counter("rag.queries.completed", amount=1.0, attributes={
+                            "tenant_id": tenant_id or "global",
+                            "documents_retrieved": len(retrieved_docs),
+                        })
+
+                    return result
+                except Exception as e:
+                    trace.record_exception(e)
+                    duration = time.time() - start_time
+
+                    # Record error metrics
+                    metrics = self.otel_metrics
+                    if metrics is None:
+                        try:
+                            from ..otel_integration import create_otel_metrics
+                            metrics = create_otel_metrics()
+                        except (ImportError, Exception):
+                            metrics = None
+
+                    if metrics:
+                        metrics.record_histogram("rag.query.duration", duration, {
+                            "tenant_id": tenant_id or "global",
+                        })
+                        metrics.increment_counter("rag.queries.completed", amount=1.0, attributes={
+                            "tenant_id": tenant_id or "global",
+                            "status": "error",
+                            "error_type": type(e).__name__,
+                        })
+                    raise
+        else:
+            # No OTEL - execute without tracing
+            # RAG QUERY PROCESS: Step-by-step retrieval and generation
+
+            # STEP 1: Retrieve relevant conversation memories (if memory enabled)
+            # This provides context from previous conversations to improve answer relevance
+            # Cost impact: Memory retrieval is free (no API call), improves answer quality
+            memories = []
         memory_context = ""
         if self.memory:
-            memories = self.memory.retrieve(
+            memories = await self.memory.retrieve(
                 query=query, limit=5
             )
             if memories:
@@ -465,7 +710,7 @@ class RAGSystem:
         # COST OPTIMIZATION: Cache hits avoid expensive embedding + generation calls
         # Cost saved per cache hit: ~$0.003-0.03 (embedding + generation)
         cache_key = f"rag:query:{tenant_id or 'global'}:{query}:{top_k}:{threshold}:{max_tokens}:{retrieval_strategy}"
-        cached = self.cache.get(cache_key, tenant_id=tenant_id)
+        cached = await self.cache.get(cache_key, tenant_id=tenant_id)
         if cached:
             return cached
 
@@ -513,11 +758,11 @@ class RAGSystem:
             }
 
             # Store in cache
-            self.cache.set(cache_key, result, ttl=300, tenant_id=tenant_id)
+            await self.cache.set(cache_key, result, ttl=300, tenant_id=tenant_id)
 
             # Store in memory for future context
             if self.memory:
-                self.memory.store(
+                await self.memory.store(
                     content=f"Query: {original_query}\nAnswer: {answer}",
                     memory_type=MemoryType.EPISODIC,
                     importance=0.7,
@@ -561,7 +806,16 @@ class RAGSystem:
     async def _try_batch_embeddings(
         self, chunk_texts: List[str], document_id: str
     ) -> Optional[List[tuple]]:
-        """Try to generate embeddings in batch, return None if it fails."""
+        """
+        Try to generate embeddings in batch, return None if it fails.
+        
+        Args:
+            chunk_texts (List[str]): Input parameter for this operation.
+            document_id (str): Input parameter for this operation.
+        
+        Returns:
+            Optional[List[tuple]]: List result of the operation.
+        """
         try:
             embedding_response = await self.gateway.embed_async(
                 texts=chunk_texts, model=self.embedding_model
@@ -580,7 +834,16 @@ class RAGSystem:
     async def _fallback_individual_embeddings(
         self, chunks: List[Any], document_id: str
     ) -> List[tuple]:
-        """Generate embeddings individually as fallback."""
+        """
+        Generate embeddings individually as fallback.
+        
+        Args:
+            chunks (List[Any]): Input parameter for this operation.
+            document_id (str): Input parameter for this operation.
+        
+        Returns:
+            List[tuple]: List result of the operation.
+        """
         embeddings_data = []
         for chunk in chunks:
             try:
@@ -598,12 +861,20 @@ class RAGSystem:
                 continue
         return embeddings_data
 
-    def _store_embeddings_and_reindex(self, embeddings_data: List[tuple]) -> None:
-        """Store embeddings and trigger reindexing."""
+    async def _store_embeddings_and_reindex(self, embeddings_data: List[tuple]) -> None:
+        """
+        Store embeddings and trigger reindexing.
+        
+        Args:
+            embeddings_data (List[tuple]): Input parameter for this operation.
+        
+        Returns:
+            None: Result of the operation.
+        """
         if embeddings_data:
-            self.vector_ops.batch_insert_embeddings(embeddings_data)
+            await self.vector_ops.batch_insert_embeddings(embeddings_data)
             try:
-                self.index_manager.auto_reindex_on_embedding_change(
+                await self.index_manager.auto_reindex_on_embedding_change(
                     table_name="embeddings", column_name="embedding"
                 )
             except Exception as e:
@@ -620,13 +891,13 @@ class RAGSystem:
         Ingest a document into the RAG system asynchronously with batch processing.
 
         Args:
-            title: Document title
-            content: Document content
-            source: Optional source URL/path
-            metadata: Optional metadata
-
+            title (str): Input parameter for this operation.
+            content (str): Content text.
+            source (Optional[str]): Input parameter for this operation.
+            metadata (Optional[Dict[str, Any]]): Extra metadata for the operation.
+        
         Returns:
-            Document ID
+            str: Returned text value.
         """
         # Insert document
         query = """
@@ -639,7 +910,7 @@ class RAGSystem:
 
         metadata_json = json.dumps(metadata or {})
 
-        result = self.db.execute_query(
+        result = await self.db.execute_query(
             query, (title, content, metadata_json, source), fetch_one=True
         )
 
@@ -662,7 +933,7 @@ class RAGSystem:
             embeddings_data = await self._fallback_individual_embeddings(chunks, document_id)
 
         # Store embeddings and reindex
-        self._store_embeddings_and_reindex(embeddings_data)
+        await self._store_embeddings_and_reindex(embeddings_data)
 
         return document_id
 
@@ -673,11 +944,11 @@ class RAGSystem:
         Ingest multiple documents in batch with optimized processing.
 
         Args:
-            documents: List of document dicts with keys: title, content, source (optional), metadata (optional)
-            batch_size: Number of documents to process in each batch
-
+            documents (List[Dict[str, Any]]): Input parameter for this operation.
+            batch_size (int): Input parameter for this operation.
+        
         Returns:
-            List of document IDs
+            List[str]: List result of the operation.
         """
         document_ids = []
 
@@ -715,11 +986,11 @@ class RAGSystem:
         Ingest multiple documents in batch asynchronously with optimized processing.
 
         Args:
-            documents: List of document dicts with keys: title, content, source (optional), metadata (optional)
-            batch_size: Number of documents to process in each batch
-
+            documents (List[Dict[str, Any]]): Input parameter for this operation.
+            batch_size (int): Input parameter for this operation.
+        
         Returns:
-            List of document IDs
+            List[str]: List result of the operation.
         """
         import asyncio
 
@@ -760,24 +1031,24 @@ class RAGSystem:
 
         return document_ids
 
-    def create_index(
+    async def create_index(
         self,
         index_type: IndexType = IndexType.IVFFLAT,
         distance: IndexDistance = IndexDistance.COSINE,
         **kwargs: Any,
-    ) -> bool:
+    ) -> str:
         """
         Create a vector index for optimal search performance.
-
+        
         Args:
-            index_type: Type of index (IVFFlat or HNSW)
-            distance: Distance metric (cosine, l2, inner_product)
-            **kwargs: Additional index parameters
-
+            index_type (IndexType): Input parameter for this operation.
+            distance (IndexDistance): Input parameter for this operation.
+            **kwargs (Any): Input parameter for this operation.
+        
         Returns:
-            True if index created successfully
+            str: The name of the created or existing index.
         """
-        return self.index_manager.create_index(
+        return await self.index_manager.create_index(
             table_name="embeddings",
             column_name="embedding",
             index_type=index_type,
@@ -785,31 +1056,40 @@ class RAGSystem:
             **kwargs,
         )
 
-    def reindex(self, concurrently: bool = True) -> List[str]:
+    async def reindex(self, concurrently: bool = True) -> List[str]:
         """
         Reindex all vector indexes (useful after embedding model changes or bulk updates).
-
+        
         Args:
-            concurrently: Whether to rebuild concurrently (non-blocking)
-
+            concurrently (bool): Input parameter for this operation.
+        
         Returns:
-            List of reindexed index names
+            List[str]: List result of the operation.
         """
-        return self.index_manager.reindex_table(table_name="embeddings", concurrently=concurrently)
+        return await self.index_manager.reindex_table(table_name="embeddings", concurrently=concurrently)
 
-    def get_index_info(self) -> List[Dict[str, Any]]:
+    async def get_index_info(self) -> List[Dict[str, Any]]:
         """
         Get information about all vector indexes.
-
+        
         Returns:
-            List of index information dictionaries
+            List[Dict[str, Any]]: Dictionary result of the operation.
         """
-        return self.index_manager.list_indexes(table_name="embeddings")
+        return await self.index_manager.list_indexes(table_name="embeddings")
 
     def _build_document_update_query(
         self, title: Optional[str], metadata: Optional[Dict[str, Any]]
     ) -> tuple:
-        """Build SQL query and params for document metadata updates."""
+        """
+        Build SQL query and params for document metadata updates.
+        
+        Args:
+            title (Optional[str]): Input parameter for this operation.
+            metadata (Optional[Dict[str, Any]]): Extra metadata for the operation.
+        
+        Returns:
+            tuple: Result of the operation.
+        """
         updates = []
         params = []
         
@@ -824,15 +1104,24 @@ class RAGSystem:
         
         return updates, params
 
-    def _generate_and_store_embeddings(
+    async def _generate_and_store_embeddings(
         self, chunks: List[Any], document_id: str
     ) -> None:
-        """Generate embeddings for chunks and store them."""
+        """
+        Generate embeddings for chunks and store them.
+        
+        Args:
+            chunks (List[Any]): Input parameter for this operation.
+            document_id (str): Input parameter for this operation.
+        
+        Returns:
+            None: Result of the operation.
+        """
         if not chunks:
             return
         
         chunk_texts = [chunk.content for chunk in chunks]
-        embedding_response = self.gateway.embed(
+        embedding_response = await self.gateway.embed_async(
             texts=chunk_texts, model=self.embedding_model
         )
         
@@ -843,25 +1132,35 @@ class RAGSystem:
                     embeddings_data.append((int(document_id), embedding, self.embedding_model))
             
             if embeddings_data:
-                self.vector_ops.batch_insert_embeddings(embeddings_data)
+                await self.vector_ops.batch_insert_embeddings(embeddings_data)
 
-    def _update_document_content(
+    async def _update_document_content(
         self, document_id: str, content: str, metadata: Optional[Dict[str, Any]]
     ) -> None:
-        """Re-process and update document content."""
+        """
+        Re-process and update document content.
+        
+        Args:
+            document_id (str): Input parameter for this operation.
+            content (str): Content text.
+            metadata (Optional[Dict[str, Any]]): Extra metadata for the operation.
+        
+        Returns:
+            None: Result of the operation.
+        """
         # Delete old chunks and embeddings
-        self._delete_document_chunks(document_id)
+        await self._delete_document_chunks(document_id)
         
         # Re-process and re-embed
         chunks = self.document_processor.chunk_document(
             content=content, document_id=document_id, metadata=metadata
         )
         
-        self._generate_and_store_embeddings(chunks, document_id)
+        await self._generate_and_store_embeddings(chunks, document_id)
         
         # Auto-reindex
         try:
-            self.index_manager.auto_reindex_on_embedding_change(
+            await self.index_manager.auto_reindex_on_embedding_change(
                 table_name="embeddings", column_name="embedding"
             )
         except Exception as e:
@@ -869,9 +1168,9 @@ class RAGSystem:
         
         # Update content in database
         query = "UPDATE documents SET content = %s WHERE id = %s;"
-        self.db.execute_query(query, (content, document_id))
+        await self.db.execute_query(query, (content, document_id))
 
-    def update_document(
+    async def update_document(
         self,
         document_id: str,
         title: Optional[str] = None,
@@ -882,13 +1181,13 @@ class RAGSystem:
         Update an existing document in the RAG system.
 
         Args:
-            document_id: Document ID to update
-            title: Optional new title
-            content: Optional new content (will re-process and re-embed)
-            metadata: Optional new metadata
-
+            document_id (str): Input parameter for this operation.
+            title (Optional[str]): Input parameter for this operation.
+            content (Optional[str]): Content text.
+            metadata (Optional[Dict[str, Any]]): Extra metadata for the operation.
+        
         Returns:
-            True if update successful, False otherwise
+            bool: True if the operation succeeds, else False.
         """
         try:
             # Update document metadata
@@ -901,14 +1200,14 @@ class RAGSystem:
                 WHERE id = %s;
                 """
                 params.append(document_id)
-                self.db.execute_query(query, tuple(params))
+                await self.db.execute_query(query, tuple(params))
 
             # If content changed, re-process document
             if content is not None:
-                self._update_document_content(document_id, content, metadata)
+                await self._update_document_content(document_id, content, metadata)
 
             # Invalidate cache for this document
-            self.cache.invalidate_pattern(f"rag:doc:{document_id}")
+            await self.cache.invalidate_pattern(f"rag:doc:{document_id}")
 
             return True
         except (ConnectionError, ValueError) as e:
@@ -920,27 +1219,27 @@ class RAGSystem:
             logger.error(f"Unexpected error updating document {document_id}: {e}", exc_info=True)
             return False
 
-    def delete_document(self, document_id: str) -> bool:
+    async def delete_document(self, document_id: str) -> bool:
         """
         Delete a document and its associated chunks/embeddings from the RAG system.
 
         Args:
-            document_id: Document ID to delete
-
+            document_id (str): Input parameter for this operation.
+        
         Returns:
-            True if deletion successful, False otherwise
+            bool: True if the operation succeeds, else False.
         """
         try:
             # Delete document chunks and embeddings
-            self._delete_document_chunks(document_id)
+            await self._delete_document_chunks(document_id)
 
             # Delete document
             query = "DELETE FROM documents WHERE id = %s;"
-            self.db.execute_query(query, (document_id,))
+            await self.db.execute_query(query, (document_id,))
 
             # Invalidate cache
-            self.cache.invalidate_pattern(f"rag:doc:{document_id}")
-            self.cache.invalidate_pattern("rag:query:*")
+            await self.cache.invalidate_pattern(f"rag:doc:{document_id}")
+            await self.cache.invalidate_pattern("rag:query:*")
 
             return True
         except (ConnectionError, ValueError) as e:
@@ -952,17 +1251,20 @@ class RAGSystem:
             logger.error(f"Unexpected error deleting document {document_id}: {e}", exc_info=True)
             return False
 
-    def _delete_document_chunks(self, document_id: str) -> None:
+    async def _delete_document_chunks(self, document_id: str) -> None:
         """
         Delete all chunks and embeddings for a document.
 
         Args:
-            document_id: Document ID
+            document_id (str): Input parameter for this operation.
+        
+        Returns:
+            None: Result of the operation.
         """
         # Delete embeddings
         query = "DELETE FROM embeddings WHERE document_id = %s;"
-        self.db.execute_query(query, (document_id,))
+        await self.db.execute_query(query, (document_id,))
 
         # Note: If you have a chunks table, delete from there too
         # query = "DELETE FROM chunks WHERE document_id = %s;"
-        # self.db.execute_query(query, (document_id,))
+        # await self.db.execute_query(query, (document_id,))

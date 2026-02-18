@@ -4,6 +4,7 @@ Agent Session Management
 Manages agent sessions, conversation history, and session state.
 """
 
+
 import uuid
 from datetime import datetime
 from enum import Enum
@@ -66,12 +67,12 @@ class AgentSession(BaseModel):
         Add a message to the session.
 
         Args:
-            role: Message role (user, assistant, system)
-            content: Message content
-            metadata: Optional message metadata
-
+            role (str): Input parameter for this operation.
+            content (str): Content text.
+            metadata (Optional[Dict[str, Any]]): Extra metadata for the operation.
+        
         Returns:
-            Created message
+            SessionMessage: Result of the operation.
         """
         message = SessionMessage(role=role, content=content, metadata=metadata or {})
 
@@ -91,11 +92,11 @@ class AgentSession(BaseModel):
         Get conversation history.
 
         Args:
-            limit: Optional limit on number of messages
-            role_filter: Optional role filter
-
+            limit (Optional[int]): Input parameter for this operation.
+            role_filter (Optional[str]): Input parameter for this operation.
+        
         Returns:
-            List of messages
+            List[SessionMessage]: List result of the operation.
         """
         messages = self.messages
 
@@ -112,8 +113,11 @@ class AgentSession(BaseModel):
         Set context variable.
 
         Args:
-            key: Context key
-            value: Context value
+            key (str): Input parameter for this operation.
+            value (Any): Input parameter for this operation.
+        
+        Returns:
+            None: Result of the operation.
         """
         self.context[key] = value
         self.last_activity = datetime.now()
@@ -123,11 +127,11 @@ class AgentSession(BaseModel):
         Get context variable.
 
         Args:
-            key: Context key
-            default: Default value if key not found
-
+            key (str): Input parameter for this operation.
+            default (Any): Input parameter for this operation.
+        
         Returns:
-            Context value
+            Any: Result of the operation.
         """
         return self.context.get(key, default)
 
@@ -136,8 +140,11 @@ class AgentSession(BaseModel):
         Set session variable.
 
         Args:
-            key: Variable key
-            value: Variable value
+            key (str): Input parameter for this operation.
+            value (Any): Input parameter for this operation.
+        
+        Returns:
+            None: Result of the operation.
         """
         self.variables[key] = value
         self.last_activity = datetime.now()
@@ -147,11 +154,11 @@ class AgentSession(BaseModel):
         Get session variable.
 
         Args:
-            key: Variable key
-            default: Default value if key not found
-
+            key (str): Input parameter for this operation.
+            default (Any): Input parameter for this operation.
+        
         Returns:
-            Variable value
+            Any: Result of the operation.
         """
         return self.variables.get(key, default)
 
@@ -160,25 +167,40 @@ class AgentSession(BaseModel):
         Check if session is expired.
 
         Returns:
-            True if expired
+            bool: True if the operation succeeds, else False.
         """
         if self.expires_at is None:
             return False
         return datetime.now() > self.expires_at
 
     def pause(self) -> None:
-        """Pause the session."""
+        """
+        Pause the session.
+        
+        Returns:
+            None: Result of the operation.
+        """
         self.status = SessionStatus.PAUSED
         self.last_activity = datetime.now()
 
     def resume(self) -> None:
-        """Resume the session."""
+        """
+        Resume the session.
+        
+        Returns:
+            None: Result of the operation.
+        """
         if self.status == SessionStatus.PAUSED:
             self.status = SessionStatus.ACTIVE
             self.last_activity = datetime.now()
 
     def complete(self) -> None:
-        """Mark session as completed."""
+        """
+        Mark session as completed.
+        
+        Returns:
+            None: Result of the operation.
+        """
         self.status = SessionStatus.COMPLETED
         self.last_activity = datetime.now()
 
@@ -197,12 +219,12 @@ class SessionManager:
         Create a new session.
 
         Args:
-            agent_id: Agent identifier
-            max_history: Maximum conversation history length
-            expires_at: Optional expiration time
-
+            agent_id (str): Input parameter for this operation.
+            max_history (int): Input parameter for this operation.
+            expires_at (Optional[datetime]): Input parameter for this operation.
+        
         Returns:
-            Created session
+            AgentSession: Result of the operation.
         """
         session = AgentSession(agent_id=agent_id, max_history=max_history, expires_at=expires_at)
 
@@ -214,10 +236,10 @@ class SessionManager:
         Get a session by ID.
 
         Args:
-            session_id: Session identifier
-
+            session_id (str): Input parameter for this operation.
+        
         Returns:
-            Session or None
+            Optional[AgentSession]: Result if available, else None.
         """
         session = self._sessions.get(session_id)
 
@@ -232,10 +254,10 @@ class SessionManager:
         Get all sessions for an agent.
 
         Args:
-            agent_id: Agent identifier
-
+            agent_id (str): Input parameter for this operation.
+        
         Returns:
-            List of sessions
+            List[AgentSession]: List result of the operation.
         """
         return [
             session
@@ -248,7 +270,10 @@ class SessionManager:
         Delete a session.
 
         Args:
-            session_id: Session identifier
+            session_id (str): Input parameter for this operation.
+        
+        Returns:
+            None: Result of the operation.
         """
         self._sessions.pop(session_id, None)
 
@@ -257,7 +282,7 @@ class SessionManager:
         Clean up expired sessions.
 
         Returns:
-            Number of sessions cleaned up
+            int: Result of the operation.
         """
         expired = [
             session_id for session_id, session in self._sessions.items() if session.is_expired()

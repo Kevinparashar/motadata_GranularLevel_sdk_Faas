@@ -1,8 +1,13 @@
+# Copyright (c) 2024. All rights reserved.
+# This source code is licensed under the MIT license and a copy
+# of the license can be found in the LICENSE file in the root directory.
+
 """
 RAG System - High-Level Functions
 
 Factory functions, convenience functions, and utilities for RAG system.
 """
+
 
 from typing import Any, Awaitable, Callable, Dict, List, Optional
 
@@ -392,7 +397,8 @@ def update_document_simple(
         ...     content="Updated content"
         ... )
     """
-    return rag_system.update_document(document_id, title, content, metadata)
+    import asyncio
+    return asyncio.run(rag_system.update_document(document_id, title, content, metadata))
 
 
 def delete_document_simple(rag_system: RAGSystem, document_id: str) -> bool:
@@ -409,7 +415,8 @@ def delete_document_simple(rag_system: RAGSystem, document_id: str) -> bool:
     Example:
         >>> success = delete_document_simple(rag, "doc-123")
     """
-    return rag_system.delete_document(document_id)
+    import asyncio
+    return asyncio.run(rag_system.delete_document(document_id))
 
 
 __all__ = [

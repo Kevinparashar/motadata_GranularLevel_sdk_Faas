@@ -455,8 +455,8 @@ result = await service.ingest_async(data="...")  # May fail
 ### Related Components
 - **[Data Validator](data_validator.py)** - Data validation
 - **[Data Cleaner](data_cleaner.py)** - Data cleaning
-- **[RAG System](../../rag/README.md)** - RAG integration
-- **[LiteLLM Gateway](../../litellm_gateway/README.md)** - Multi-modal processing
+- **[RAG System](../rag/README.md)** - RAG integration
+- **[LiteLLM Gateway](../litellm_gateway/README.md)** - Multi-modal processing
 
 ### External Resources
 - **[Multi-Modal Processing Guide](../../../docs/components/multimodal_data_processing.md)** - Format support details

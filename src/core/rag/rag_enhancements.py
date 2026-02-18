@@ -1,9 +1,15 @@
+# Copyright (c) 2024. All rights reserved.
+# This source code is licensed under the MIT license and a copy
+# of the license can be found in the LICENSE file in the root directory.
+
 """
 RAG System Enhancements
 
 Advanced features: re-ranking, versioning, relevance scoring, incremental updates, validation, real-time sync.
 """
 
+
+import asyncio
 import hashlib
 import json
 from dataclasses import dataclass, field
@@ -44,9 +50,9 @@ class DocumentReranker:
     def __init__(self, rerank_method: str = "cross_encoder"):
         """
         Initialize re-ranker.
-
+        
         Args:
-            rerank_method: Re-ranking method ("cross_encoder", "bm25", "hybrid")
+            rerank_method (str): Input parameter for this operation.
         """
         self.rerank_method = rerank_method
 
@@ -55,14 +61,14 @@ class DocumentReranker:
     ) -> List[Dict[str, Any]]:
         """
         Re-rank documents based on query relevance.
-
+        
         Args:
-            query: Search query
-            documents: List of retrieved documents with scores
-            top_k: Number of top documents to return
-
+            query (str): Input parameter for this operation.
+            documents (List[Dict[str, Any]]): Input parameter for this operation.
+            top_k (int): Input parameter for this operation.
+        
         Returns:
-            Re-ranked documents
+            List[Dict[str, Any]]: Dictionary result of the operation.
         """
         if not documents:
             return []
@@ -96,14 +102,14 @@ class DocumentReranker:
     ) -> List[Dict[str, Any]]:
         """
         Re-rank using cross-encoder model (requires sentence-transformers).
-
+        
         Args:
-            query: Search query
-            documents: List of retrieved documents
-            top_k: Number of top documents to return
-
+            query (str): Input parameter for this operation.
+            documents (List[Dict[str, Any]]): Input parameter for this operation.
+            top_k (int): Input parameter for this operation.
+        
         Returns:
-            Re-ranked documents
+            List[Dict[str, Any]]: Dictionary result of the operation.
         """
         try:
             from sentence_transformers import CrossEncoder  # type: ignore[import-not-found]
@@ -143,15 +149,24 @@ class DocumentVersioning:
     def __init__(self, db):
         """
         Initialize document versioning.
-
+        
         Args:
-            db: Database connection
+            db (Any): Database connection/handle.
         """
         self.db = db
-        self._ensure_version_table()
+        # Note: _ensure_version_table() is async, call initialize() after instantiation
 
-    def _ensure_version_table(self) -> None:
-        """Ensure document_versions table exists."""
+    async def initialize(self) -> None:
+        """Initialize the versioning system (async setup)."""
+        await self._ensure_version_table()
+
+    async def _ensure_version_table(self) -> None:
+        """
+        Ensure document_versions table exists.
+        
+        Returns:
+            None: Result of the operation.
+        """
         query = """
         CREATE TABLE IF NOT EXISTS document_versions (
             id SERIAL PRIMARY KEY,
@@ -167,9 +182,9 @@ class DocumentVersioning:
         CREATE INDEX IF NOT EXISTS idx_doc_versions_doc_id ON document_versions(document_id);
         CREATE INDEX IF NOT EXISTS idx_doc_versions_tenant ON document_versions(tenant_id);
         """
-        self.db.execute_query(query)
+        await self.db.execute_query(query)
 
-    def create_version(
+    async def create_version(
         self,
         document_id: str,
         content: str,
@@ -178,15 +193,15 @@ class DocumentVersioning:
     ) -> DocumentVersion:
         """
         Create a new document version.
-
+        
         Args:
-            document_id: Document ID
-            content: Document content
-            tenant_id: Optional tenant ID
-            metadata: Optional metadata
-
+            document_id (str): Input parameter for this operation.
+            content (str): Content text.
+            tenant_id (Optional[str]): Tenant identifier used for tenant isolation.
+            metadata (Optional[Dict[str, Any]]): Extra metadata for the operation.
+        
         Returns:
-            DocumentVersion object
+            DocumentVersion: Result of the operation.
         """
         # Calculate content hash
         content_hash = hashlib.sha256(content.encode()).hexdigest()
@@ -197,7 +212,7 @@ class DocumentVersioning:
         FROM document_versions
         WHERE document_id = %s
         """
-        result = self.db.execute_query(query, (document_id,), fetch_one=True)
+        result = await self.db.execute_query(query, (document_id,), fetch_one=True)
         next_version = (result.get("max_version") or 0) + 1
 
         # Insert new version
@@ -207,7 +222,7 @@ class DocumentVersioning:
         RETURNING id, created_at
         """
         metadata_json = json.dumps(metadata or {})
-        result = self.db.execute_query(
+        result = await self.db.execute_query(
             insert_query,
             (document_id, next_version, content_hash, content, metadata_json, tenant_id),
             fetch_one=True,
@@ -221,18 +236,18 @@ class DocumentVersioning:
             metadata=metadata or {},
         )
 
-    def get_versions(
+    async def get_versions(
         self, document_id: str, tenant_id: Optional[str] = None
     ) -> List[DocumentVersion]:
         """
         Get all versions of a document.
-
+        
         Args:
-            document_id: Document ID
-            tenant_id: Optional tenant ID
-
+            document_id (str): Input parameter for this operation.
+            tenant_id (Optional[str]): Tenant identifier used for tenant isolation.
+        
         Returns:
-            List of DocumentVersion objects
+            List[DocumentVersion]: List result of the operation.
         """
         query = """
         SELECT version, content_hash, created_at, metadata
@@ -247,7 +262,7 @@ class DocumentVersioning:
 
         query += " ORDER BY version DESC"
 
-        results = self.db.execute_query(query, tuple(params), fetch_all=True)
+        results = await self.db.execute_query(query, tuple(params), fetch_all=True)
 
         return [
             DocumentVersion(
@@ -273,14 +288,14 @@ class RelevanceScorer:
     def score(self, query: str, document: Dict[str, Any], method: str = "hybrid") -> RelevanceScore:
         """
         Score document relevance to query.
-
+        
         Args:
-            query: Search query
-            document: Document to score
-            method: Scoring method ("similarity", "keyword", "hybrid")
-
+            query (str): Input parameter for this operation.
+            document (Dict[str, Any]): Input parameter for this operation.
+            method (str): Input parameter for this operation.
+        
         Returns:
-            RelevanceScore object
+            RelevanceScore: Result of the operation.
         """
         score = 0.0
         details = {}
@@ -321,27 +336,27 @@ class IncrementalUpdater:
     def __init__(self, db, vector_ops):
         """
         Initialize incremental updater.
-
+        
         Args:
-            db: Database connection
-            vector_ops: Vector operations instance
+            db (Any): Database connection/handle.
+            vector_ops (Any): Input parameter for this operation.
         """
         self.db = db
         self.vector_ops = vector_ops
 
-    def should_reembed(
+    async def should_reembed(
         self, document_id: str, new_content: str, tenant_id: Optional[str] = None
     ) -> bool:
         """
         Check if document needs re-embedding.
-
+        
         Args:
-            document_id: Document ID
-            new_content: New document content
-            tenant_id: Optional tenant ID
-
+            document_id (str): Input parameter for this operation.
+            new_content (str): Input parameter for this operation.
+            tenant_id (Optional[str]): Tenant identifier used for tenant isolation.
+        
         Returns:
-            True if re-embedding needed, False otherwise
+            bool: True if the operation succeeds, else False.
         """
         # Get current content hash
         query = """
@@ -355,7 +370,7 @@ class IncrementalUpdater:
             query += TENANT_FILTER_SQL
             params.append(tenant_id)
 
-        result = self.db.execute_query(query, tuple(params), fetch_one=True)
+        result = await self.db.execute_query(query, tuple(params), fetch_one=True)
 
         if not result:
             return True  # Document not found, needs embedding
@@ -365,7 +380,7 @@ class IncrementalUpdater:
 
         return old_hash != new_hash
 
-    def incremental_update(
+    async def incremental_update(
         self,
         document_id: str,
         new_content: str,
@@ -374,17 +389,17 @@ class IncrementalUpdater:
     ) -> bool:
         """
         Perform incremental update if needed.
-
+        
         Args:
-            document_id: Document ID
-            new_content: New document content
-            gateway: LiteLLM gateway
-            tenant_id: Optional tenant ID
-
+            document_id (str): Input parameter for this operation.
+            new_content (str): Input parameter for this operation.
+            gateway (Any): Gateway client used for LLM calls.
+            tenant_id (Optional[str]): Tenant identifier used for tenant isolation.
+        
         Returns:
-            True if update was performed, False otherwise
+            bool: True if the operation succeeds, else False.
         """
-        if not self.should_reembed(document_id, new_content, tenant_id):
+        if not await self.should_reembed(document_id, new_content, tenant_id):
             # Only update metadata/content, no re-embedding needed
             query = """
             UPDATE documents
@@ -397,7 +412,7 @@ class IncrementalUpdater:
                 query += TENANT_FILTER_SQL
                 params.append(tenant_id)
 
-            self.db.execute_query(query, tuple(params))
+            await self.db.execute_query(query, tuple(params))
             return False  # No re-embedding performed
 
         # Full re-embedding needed
@@ -416,9 +431,12 @@ class DocumentValidator:
     def add_validation_rule(self, rule: Callable) -> None:
         """
         Add a validation rule.
-
+        
         Args:
-            rule: Validation function that returns (is_valid, error_message)
+            rule (Callable): Input parameter for this operation.
+        
+        Returns:
+            None: Result of the operation.
         """
         self.validation_rules.append(rule)
 
@@ -427,14 +445,14 @@ class DocumentValidator:
     ) -> Tuple[bool, List[str]]:
         """
         Validate a document.
-
+        
         Args:
-            title: Document title
-            content: Document content
-            metadata: Optional metadata
-
+            title (str): Input parameter for this operation.
+            content (str): Content text.
+            metadata (Optional[Dict[str, Any]]): Extra metadata for the operation.
+        
         Returns:
-            Tuple of (is_valid, list_of_errors)
+            Tuple[bool, List[str]]: True if the operation succeeds, else False.
         """
         errors = []
 
@@ -468,10 +486,10 @@ class RealTimeSync:
     def __init__(self, db, rag_system):
         """
         Initialize real-time sync.
-
+        
         Args:
-            db: Database connection
-            rag_system: RAG system instance
+            db (Any): Database connection/handle.
+            rag_system (Any): Input parameter for this operation.
         """
         self.db = db
         self.rag_system = rag_system
@@ -480,22 +498,25 @@ class RealTimeSync:
     def add_sync_callback(self, callback: Callable) -> None:
         """
         Add a callback for document sync events.
-
+        
         Args:
-            callback: Callback function to call on sync
+            callback (Callable): Input parameter for this operation.
+        
+        Returns:
+            None: Result of the operation.
         """
         self.sync_callbacks.append(callback)
 
     async def sync_document(self, document_id: str, tenant_id: Optional[str] = None) -> bool:
         """
         Synchronize a document (re-process and update).
-
+        
         Args:
-            document_id: Document ID
-            tenant_id: Optional tenant ID
-
+            document_id (str): Input parameter for this operation.
+            tenant_id (Optional[str]): Tenant identifier used for tenant isolation.
+        
         Returns:
-            True if sync successful
+            bool: True if the operation succeeds, else False.
         """
         # Get document
         query = """
@@ -509,20 +530,32 @@ class RealTimeSync:
             query += TENANT_FILTER_SQL
             params.append(tenant_id)
 
-        result = self.db.execute_query(query, tuple(params), fetch_one=True)
+        result = await self.db.execute_query(query, tuple(params), fetch_one=True)
 
         if not result:
             return False
 
         # Re-ingest document
         try:
-            self.rag_system.ingest_document(
-                title=result["title"],
-                content=result["content"],
-                tenant_id=tenant_id,
-                source=result.get("source"),
-                metadata=result.get("metadata"),
-            )
+            # Use async ingestion if available, otherwise wrap sync call
+            if hasattr(self.rag_system, "ingest_document_async"):
+                await self.rag_system.ingest_document_async(
+                    title=result["title"],
+                    content=result["content"],
+                    tenant_id=tenant_id,
+                    source=result.get("source"),
+                    metadata=result.get("metadata"),
+                )
+            else:
+                # Wrap sync call in thread pool
+                await asyncio.to_thread(
+                    self.rag_system.ingest_document,
+                    title=result["title"],
+                    content=result["content"],
+                    tenant_id=tenant_id,
+                    source=result.get("source"),
+                    metadata=result.get("metadata"),
+                )
 
             # Call sync callbacks
             for callback in self.sync_callbacks:
@@ -538,7 +571,3 @@ class RealTimeSync:
 
         except Exception:
             return False
-
-
-# Import asyncio for async operations
-import asyncio

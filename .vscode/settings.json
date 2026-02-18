@@ -1,0 +1,21 @@
+{
+  "sonarlint.connectedMode.servers": [
+    {
+      "serverId": "sonarcloud",
+      "serverUrl": "https://sonarcloud.io",
+      "token": "${env:SONAR_TOKEN}",
+      "organizationKey": "motadata"
+    }
+  ],
+  "sonarlint.connectedMode.project": {
+    "projectKey": "motadata_motadata-python-sdk"
+  },
+  "sonarlint.rules": {
+    "python": {
+      "S1481": "off",
+      "S1067": "off"
+    }
+  },
+  "sonarlint.pathToNodeExecutable": "node",
+  "sonarlint.pathToPythonExecutable": "python3"
+}

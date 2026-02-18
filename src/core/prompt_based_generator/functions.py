@@ -4,6 +4,7 @@ Prompt-Based Generator - High-Level Functions
 Factory functions and convenience functions for prompt-based agent and tool creation.
 """
 
+
 from typing import Optional
 
 from ..agno_agent_framework.agent import Agent
@@ -181,7 +182,7 @@ async def create_tool_from_prompt(
         )
 
 
-def rate_agent(
+async def rate_agent(
     agent_id: str,
     rating: int,
     user_id: str,
@@ -192,7 +193,7 @@ def rate_agent(
     **kwargs: ConfigDict,
 ) -> str:
     """
-    Rate an agent and provide feedback.
+    Rate an agent and provide feedback asynchronously.
 
     Args:
         agent_id: Agent ID
@@ -208,7 +209,7 @@ def rate_agent(
         Feedback ID
 
     Example:
-        >>> rate_agent(
+        >>> await rate_agent(
         ...     agent_id="agent_123",
         ...     rating=5,
         ...     user_id="user_456",
@@ -218,7 +219,7 @@ def rate_agent(
     """
     collector = feedback_collector or _default_feedback_collector
 
-    return collector.collect_agent_feedback(
+    return await collector.collect_agent_feedback(
         agent_id=agent_id,
         rating=rating,
         user_id=user_id,
@@ -229,7 +230,7 @@ def rate_agent(
     )
 
 
-def rate_tool(
+async def rate_tool(
     tool_id: str,
     rating: int,
     user_id: str,
@@ -240,7 +241,7 @@ def rate_tool(
     **kwargs: ConfigDict,
 ) -> str:
     """
-    Rate a tool and provide feedback.
+    Rate a tool and provide feedback asynchronously.
 
     Args:
         tool_id: Tool ID
@@ -256,7 +257,7 @@ def rate_tool(
         Feedback ID
 
     Example:
-        >>> rate_tool(
+        >>> await rate_tool(
         ...     tool_id="tool_123",
         ...     rating=4,
         ...     user_id="user_456",
@@ -266,7 +267,7 @@ def rate_tool(
     """
     collector = feedback_collector or _default_feedback_collector
 
-    return collector.collect_tool_feedback(
+    return await collector.collect_tool_feedback(
         tool_id=tool_id,
         rating=rating,
         user_id=user_id,
@@ -287,23 +288,26 @@ def grant_permission(
 ) -> None:
     """
     Grant permission to a user for a resource.
-
-    Args:
-        tenant_id: Tenant ID
-        user_id: User ID
-        resource_type: Type of resource ("agent" or "tool")
-        resource_id: Resource ID
-        permission: Permission to grant ("read", "execute", "create", "delete", "admin")
-        access_control: Optional AccessControl instance
-
+    
     Example:
-        >>> grant_permission(
-        ...     tenant_id="tenant_123",
-        ...     user_id="user_456",
-        ...     resource_type="agent",
-        ...     resource_id="agent_789",
-        ...     permission="execute"
-        ... )
+                            >>> grant_permission(
+                            ...     tenant_id="tenant_123",
+                            ...     user_id="user_456",
+                            ...     resource_type="agent",
+                            ...     resource_id="agent_789",
+                            ...     permission="execute"
+                            ... )
+    
+    Args:
+        tenant_id (str): Tenant identifier used for tenant isolation.
+        user_id (str): User identifier (used for auditing or personalization).
+        resource_type (str): Input parameter for this operation.
+        resource_id (str): Input parameter for this operation.
+        permission (str): Input parameter for this operation.
+        access_control (Optional[AccessControl]): Input parameter for this operation.
+    
+    Returns:
+        None: Result of the operation.
     """
     ac = access_control or _default_access_control
 

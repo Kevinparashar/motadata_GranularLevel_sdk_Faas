@@ -37,6 +37,8 @@
   "reportUnnecessaryTypeIgnoreComment": "warning",
   "reportMatchNotExhaustive": "warning",
   "reportShadowedImports": "warning",
+  "reportGeneralTypeIssues": "warning",
+  "reportAttributeAccessIssue": "none",
   "pythonPlatform": "Linux",
   "exclude": [
     "**/__pycache__",

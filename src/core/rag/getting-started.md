@@ -522,5 +522,5 @@ result = quick_rag_query(
 - See [README.md](README.md) for detailed component documentation
 - Check [docs/components/rag_system_explanation.md](../../../docs/components/rag_system_explanation.md) for comprehensive guide
 - Review [troubleshooting guide](../../../docs/troubleshooting/rag_system_troubleshooting.md) for common issues
-- Explore [examples/basic_usage/06_rag_basic.py](../../../examples/basic_usage/06_rag_basic.py) for more examples
+- Explore [examples/basic_usage/07_rag_basic.py](../../../examples/basic_usage/07_rag_basic.py) for more examples
 

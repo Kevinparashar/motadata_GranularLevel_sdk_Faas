@@ -2,10 +2,11 @@
 Configuration management for FaaS services.
 """
 
-import os
-from typing import Any, Dict, Optional
 
-from pydantic import BaseModel, Field
+import os
+from typing import Any, Optional
+
+from pydantic import BaseModel, ConfigDict, Field
 
 
 class ServiceConfig(BaseModel):
@@ -33,7 +34,7 @@ class ServiceConfig(BaseModel):
 
     # Database
     database_url: str = Field(..., description="Database connection URL")
-    redis_url: Optional[str] = Field(None, description="Redis connection URL")
+    dragonfly_url: Optional[str] = Field(None, description="Dragonfly connection URL (Redis-compatible)")
 
     # Integrations
     nats_url: Optional[str] = Field(None, description="NATS server URL")
@@ -50,9 +51,9 @@ class ServiceConfig(BaseModel):
     enable_otel: bool = Field(default=False, description="Enable OTEL integration")
     enable_codec: bool = Field(default=False, description="Enable CODEC integration")
 
-    class Config:
-        env_file = ".env"
-        case_sensitive = False
+    model_config = ConfigDict(
+        extra="ignore",
+    )
 
 
 _config: Optional[ServiceConfig] = None
@@ -82,8 +83,10 @@ def load_config(service_name: str, **overrides: Any) -> ServiceConfig:
         "ml_service_url": os.getenv("ML_SERVICE_URL"),
         "prompt_service_url": os.getenv("PROMPT_SERVICE_URL"),
         "data_ingestion_service_url": os.getenv("DATA_INGESTION_SERVICE_URL"),
+        "prompt_generator_service_url": os.getenv("PROMPT_GENERATOR_SERVICE_URL"),
+        "llmops_service_url": os.getenv("LLMOPS_SERVICE_URL"),
         "database_url": os.getenv("DATABASE_URL", "postgresql://user:pass@localhost/db"),
-        "redis_url": os.getenv("REDIS_URL"),
+        "dragonfly_url": os.getenv("DRAGONFLY_URL"),
         "nats_url": os.getenv("NATS_URL"),
         "otel_exporter_otlp_endpoint": os.getenv("OTEL_EXPORTER_OTLP_ENDPOINT"),
         "codec_type": os.getenv("CODEC_TYPE", "json"),

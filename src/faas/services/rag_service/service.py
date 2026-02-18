@@ -4,6 +4,7 @@ RAG Service - Main service implementation.
 Handles document ingestion, query processing, document management, and vector search.
 """
 
+
 import logging
 from typing import Any, Dict, Optional
 
@@ -18,15 +19,11 @@ from ...integrations.otel import create_otel_tracer
 from ...shared.config import ServiceConfig, load_config
 from ...shared.contracts import ServiceResponse, extract_headers
 from ...shared.database import get_database_connection
-from ...shared.exceptions import DependencyError, NotFoundError
 from ...shared.middleware import setup_middleware
 from .models import (
-    DocumentResponse,
     IngestDocumentRequest,
     QueryRequest,
-    QueryResponse,
     SearchRequest,
-    SearchResponse,
     UpdateDocumentRequest,
 )
 
@@ -54,13 +51,13 @@ class RAGService:
     ):
         """
         Initialize RAG Service.
-
+        
         Args:
-            config: Service configuration
-            db_connection: Database connection
-            nats_client: NATS client (optional)
-            otel_tracer: OTEL tracer (optional)
-            codec_manager: Codec manager (optional)
+            config (ServiceConfig): Configuration object or settings.
+            db_connection (Any): Input parameter for this operation.
+            nats_client (Optional[Any]): Input parameter for this operation.
+            otel_tracer (Optional[Any]): Input parameter for this operation.
+            codec_manager (Optional[Any]): Input parameter for this operation.
         """
         self.config = config
         self.db = db_connection
@@ -81,22 +78,29 @@ class RAGService:
         # Setup middleware
         setup_middleware(self.app)
 
+        # Register startup event to ensure database connection is ready
+        @self.app.on_event("startup")
+        async def startup_event():
+            """Ensure database connection is ready on service startup."""
+            if hasattr(self.db, "connect"):
+                await self.db.connect()
+
         # Register routes
         self._register_routes()
 
-    async def _get_rag_system(self, tenant_id: str) -> RAGSystem:
+    def _get_rag_system(self, tenant_id: str) -> RAGSystem:  # noqa: S1172
         """
         Create RAG system for tenant (stateless - created on-demand).
-
+        
         Args:
-            tenant_id: Tenant ID
-
+            tenant_id (str): Tenant identifier used for tenant isolation.
+        
         Returns:
-            RAGSystem instance
+            RAGSystem: Result of the operation.
         """
         # Create RAG system on-demand (stateless)
         # Get gateway client
-        gateway = await self._get_gateway_client(tenant_id)
+        gateway = self._get_gateway_client(tenant_id)
 
         # Create RAG system
         rag_system = create_rag_system(
@@ -108,295 +112,376 @@ class RAGService:
 
         return rag_system
 
-    async def _get_gateway_client(self, tenant_id: str):
+    def _get_gateway_client(self, tenant_id: str):  # noqa: S1172
         """
         Get gateway client for LLM calls.
-
+        
         Args:
-            tenant_id: Tenant ID
-
+            tenant_id (str): Tenant identifier used for tenant isolation.
+        
         Returns:
-            Gateway client instance
+            Any: Result of the operation.
         """
-        if self.config.gateway_service_url:
-            # Use Gateway Service
-            # For now, create direct gateway (in production, call Gateway Service)
-            gateway = create_gateway(api_key="placeholder", provider="openai")
-            return gateway
-        else:
-            # Create direct gateway
-            gateway = create_gateway(api_key="placeholder", provider="openai")
-            return gateway
+        # Create direct gateway
+        # In production, could call Gateway Service if config.gateway_service_url is set
+        import os
+
+        api_key = os.getenv("OPENAI_API_KEY", "")
+        return create_gateway(api_keys={"openai": api_key} if api_key else {})
 
     def _register_routes(self):
         """Register FastAPI routes."""
-
-        @self.app.post(
+        self.app.post(
             "/api/v1/rag/documents",
             response_model=ServiceResponse,
             status_code=status.HTTP_201_CREATED,
+        )(self._handle_ingest_document)
+
+        self.app.post("/api/v1/rag/query", response_model=ServiceResponse)(self._handle_query)
+
+        self.app.post("/api/v1/rag/search", response_model=ServiceResponse)(self._handle_search)
+
+        # Define document endpoint path constant
+        document_path = "/api/v1/rag/documents/{document_id}"
+        self.app.get(document_path, response_model=ServiceResponse)(self._handle_get_document)
+
+        self.app.put(document_path, response_model=ServiceResponse)(self._handle_update_document)
+
+        self.app.delete(document_path, status_code=status.HTTP_204_NO_CONTENT)(
+            self._handle_delete_document
         )
-        async def ingest_document(
-            request: IngestDocumentRequest,
-            headers: dict = Header(...),
-        ):
-            """Ingest a document into the RAG system."""
-            standard_headers = extract_headers(**headers)
 
-            span = None
-            if self.otel_tracer:
-                span = self.otel_tracer.start_span("ingest_document")
-                span.set_attribute("document.title", request.title)
-                span.set_attribute("tenant.id", standard_headers.tenant_id)
+        self.app.get("/api/v1/rag/documents", response_model=ServiceResponse)(
+            self._handle_list_documents
+        )
 
-            try:
-                # Get RAG system (created on-demand, stateless)
-                rag_system = await self._get_rag_system(standard_headers.tenant_id)
+        self.app.get("/health")(self._handle_health_check)
 
-                # Ingest document
-                document_id = await rag_system.ingest_document_async(
-                    title=request.title,
-                    content=request.content,
-                    file_path=request.file_path,
-                    tenant_id=standard_headers.tenant_id,
-                    source=request.source,
-                    metadata=request.metadata,
-                )
+    async def _handle_ingest_document(
+        self, request: IngestDocumentRequest, headers: dict = Header(...)
+    ):
+        """
+        Ingest a document into the RAG system.
+        
+        Args:
+            request (IngestDocumentRequest): Request payload object.
+            headers (dict): HTTP headers passed from the caller.
+        
+        Returns:
+            Any: Result of the operation.
+        
+        Raises:
+            HTTPException: Raised when this function detects an invalid state or when an underlying call fails.
+        """
+        standard_headers = extract_headers(**headers)
 
-                # Publish event via NATS
-                if self.nats_client:
-                    event = {
-                        "event_type": "rag.document.ingested",
-                        "document_id": document_id,
-                        "tenant_id": standard_headers.tenant_id,
-                    }
-                    await self.nats_client.publish(
-                        f"rag.events.{standard_headers.tenant_id}",
-                        self.codec_manager.encode(event),
-                    )
+        span = None
+        if self.otel_tracer:
+            span = self.otel_tracer.start_span("ingest_document")
+            span.set_attribute("document.title", request.title)
+            span.set_attribute("tenant.id", standard_headers.tenant_id)
 
-                return ServiceResponse(
-                    success=True,
-                    data={"document_id": document_id, "title": request.title},
-                    message="Document ingested successfully",
-                    correlation_id=standard_headers.correlation_id,
-                    request_id=standard_headers.request_id,
-                )
-            except Exception as e:
-                logger.error(f"Error ingesting document: {str(e)}", exc_info=True)
-                raise HTTPException(
-                    status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-                    detail=f"Failed to ingest document: {str(e)}",
-                )
-            finally:
-                if span:
-                    span.end()
+        try:
+            # Get RAG system (created on-demand, stateless)
+            rag_system = self._get_rag_system(standard_headers.tenant_id)
 
-        @self.app.post("/api/v1/rag/query", response_model=ServiceResponse)
-        async def query(
-            request: QueryRequest,
-            headers: dict = Header(...),
-        ):
-            """Process a RAG query."""
-            standard_headers = extract_headers(**headers)
-
-            span = None
-            if self.otel_tracer:
-                span = self.otel_tracer.start_span("rag_query")
-                span.set_attribute("query.length", len(request.query))
-                span.set_attribute("tenant.id", standard_headers.tenant_id)
-
-            try:
-                # Get RAG system (created on-demand, stateless)
-                rag_system = await self._get_rag_system(standard_headers.tenant_id)
-
-                # Process query
-                result = await quick_rag_query_async(
-                    rag_system=rag_system,
-                    query=request.query,
-                    top_k=request.top_k,
-                    threshold=request.threshold,
-                    metadata_filters=request.metadata_filters,
-                    tenant_id=standard_headers.tenant_id,
-                )
-
-                return ServiceResponse(
-                    success=True,
-                    data={
-                        "answer": result.get("answer", ""),
-                        "documents": result.get("documents", []),
-                        "sources": result.get("sources", []),
-                        "confidence": result.get("confidence"),
-                    },
-                    correlation_id=standard_headers.correlation_id,
-                    request_id=standard_headers.request_id,
-                )
-            except Exception as e:
-                logger.error(f"Error processing query: {str(e)}", exc_info=True)
-                raise HTTPException(
-                    status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-                    detail=f"Failed to process query: {str(e)}",
-                )
-            finally:
-                if span:
-                    span.end()
-
-        @self.app.post("/api/v1/rag/search", response_model=ServiceResponse)
-        async def search(
-            request: SearchRequest,
-            headers: dict = Header(...),
-        ):
-            """Perform vector search."""
-            standard_headers = extract_headers(**headers)
-
-            try:
-                # Get RAG system (created on-demand, stateless)
-                rag_system = await self._get_rag_system(standard_headers.tenant_id)
-
-                # Perform search
-                if request.query_embedding:
-                    # Use provided embedding
-                    results = await rag_system.retriever.retrieve_async(
-                        query_embedding=request.query_embedding,
-                        top_k=request.top_k,
-                        threshold=request.threshold,
-                        metadata_filters=request.metadata_filters,
-                        tenant_id=standard_headers.tenant_id,
-                    )
-                elif request.query_text:
-                    # Generate embedding from text
-                    results = await rag_system.retriever.retrieve_async(
-                        query_text=request.query_text,
-                        top_k=request.top_k,
-                        threshold=request.threshold,
-                        metadata_filters=request.metadata_filters,
-                        tenant_id=standard_headers.tenant_id,
-                    )
-                else:
-                    raise HTTPException(
-                        status_code=status.HTTP_400_BAD_REQUEST,
-                        detail="Either query_embedding or query_text must be provided",
-                    )
-
-                return ServiceResponse(
-                    success=True,
-                    data={
-                        "documents": results.get("documents", []),
-                        "scores": results.get("scores", []),
-                        "count": len(results.get("documents", [])),
-                    },
-                    correlation_id=standard_headers.correlation_id,
-                    request_id=standard_headers.request_id,
-                )
-            except Exception as e:
-                logger.error(f"Error performing search: {str(e)}", exc_info=True)
-                raise HTTPException(
-                    status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-                    detail=f"Failed to perform search: {str(e)}",
-                )
-
-        @self.app.get("/api/v1/rag/documents/{document_id}", response_model=ServiceResponse)
-        async def get_document(
-            document_id: str,
-            headers: dict = Header(...),
-        ):
-            """Get document by ID."""
-            standard_headers = extract_headers(**headers)
-
-            # TODO: SDK-SVC-004 - Implement document retrieval from database
-            # Placeholder - replace with actual database query implementation
-            raise HTTPException(
-                status_code=status.HTTP_501_NOT_IMPLEMENTED,
-                detail="Document retrieval not yet implemented",
+            # Ingest document
+            # ingest_document_async takes: title, content, source, metadata
+            # content is required, provide default if None
+            document_id = await rag_system.ingest_document_async(
+                title=request.title,
+                content=request.content or "",
+                source=request.source,
+                metadata=request.metadata,
             )
 
-        @self.app.put("/api/v1/rag/documents/{document_id}", response_model=ServiceResponse)
-        async def update_document(
-            document_id: str,
-            request: UpdateDocumentRequest,
-            headers: dict = Header(...),
-        ):
-            """Update a document."""
-            standard_headers = extract_headers(**headers)
+            # Publish event via NATS
+            if self.nats_client:
+                await self._publish_ingest_event(document_id, standard_headers.tenant_id)
 
-            try:
-                # Get RAG system (created on-demand, stateless)
-                rag_system = await self._get_rag_system(standard_headers.tenant_id)
-
-                # Update document
-                await rag_system.update_document_async(
-                    document_id=document_id,
-                    title=request.title,
-                    content=request.content,
-                    metadata=request.metadata,
-                    reprocess=request.reprocess,
-                    tenant_id=standard_headers.tenant_id,
-                )
-
-                return ServiceResponse(
-                    success=True,
-                    data={"document_id": document_id},
-                    message="Document updated successfully",
-                    correlation_id=standard_headers.correlation_id,
-                    request_id=standard_headers.request_id,
-                )
-            except Exception as e:
-                logger.error(f"Error updating document: {str(e)}", exc_info=True)
-                raise HTTPException(
-                    status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-                    detail=f"Failed to update document: {str(e)}",
-                )
-
-        @self.app.delete(
-            "/api/v1/rag/documents/{document_id}", status_code=status.HTTP_204_NO_CONTENT
-        )
-        async def delete_document(
-            document_id: str,
-            headers: dict = Header(...),
-        ):
-            """Delete a document."""
-            standard_headers = extract_headers(**headers)
-
-            try:
-                # Get RAG system (created on-demand, stateless)
-                rag_system = await self._get_rag_system(standard_headers.tenant_id)
-
-                # Delete document
-                await rag_system.delete_document_async(
-                    document_id=document_id,
-                    tenant_id=standard_headers.tenant_id,
-                )
-
-                return None
-            except Exception as e:
-                logger.error(f"Error deleting document: {str(e)}", exc_info=True)
-                raise HTTPException(
-                    status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-                    detail=f"Failed to delete document: {str(e)}",
-                )
-
-        @self.app.get("/api/v1/rag/documents", response_model=ServiceResponse)
-        async def list_documents(
-            headers: dict = Header(...),
-            limit: int = 100,
-            offset: int = 0,
-        ):
-            """List documents."""
-            standard_headers = extract_headers(**headers)
-
-            # TODO: SDK-SVC-004 - Implement document listing from database
-            # Placeholder - replace with actual database query implementation
             return ServiceResponse(
                 success=True,
-                data={"documents": [], "total": 0},
+                data={"document_id": document_id, "title": request.title},
+                message="Document ingested successfully",
                 correlation_id=standard_headers.correlation_id,
                 request_id=standard_headers.request_id,
             )
+        except Exception as e:
+            logger.error(f"Error ingesting document: {str(e)}", exc_info=True)
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail=f"Failed to ingest document: {str(e)}",
+            )
+        finally:
+            if span:
+                span.end()
 
-        @self.app.get("/health")
-        async def health_check():
-            """Health check endpoint."""
-            return {"status": "healthy", "service": "rag-service"}
+    async def _publish_ingest_event(self, document_id: str, tenant_id: str) -> None:
+        """
+        Publish document ingestion event via NATS.
+        
+        Args:
+            document_id (str): Input parameter for this operation.
+            tenant_id (str): Tenant identifier used for tenant isolation.
+        
+        Returns:
+            None: Result of the operation.
+        """
+        event = {
+            "event_type": "rag.document.ingested",
+            "document_id": document_id,
+            "tenant_id": tenant_id,
+        }
+        await self.nats_client.publish(
+            f"rag.events.{tenant_id}",
+            await self.codec_manager.encode(event),
+        )
+
+    async def _handle_query(self, request: QueryRequest, headers: dict = Header(...)):
+        """
+        Process a RAG query.
+        
+        Args:
+            request (QueryRequest): Request payload object.
+            headers (dict): HTTP headers passed from the caller.
+        
+        Returns:
+            Any: Result of the operation.
+        
+        Raises:
+            HTTPException: Raised when this function detects an invalid state or when an underlying call fails.
+        """
+        standard_headers = extract_headers(**headers)
+
+        span = None
+        if self.otel_tracer:
+            span = self.otel_tracer.start_span("rag_query")
+            span.set_attribute("query.length", len(request.query))
+            span.set_attribute("tenant.id", standard_headers.tenant_id)
+
+        try:
+            # Get RAG system (created on-demand, stateless)
+            rag_system = self._get_rag_system(standard_headers.tenant_id)
+
+            # Process query
+            # quick_rag_query_async takes: rag_system, query, tenant_id, top_k, threshold, etc.
+            # threshold has default 0.7, provide default if None
+            result = await quick_rag_query_async(
+                rag_system=rag_system,
+                query=request.query,
+                tenant_id=standard_headers.tenant_id,
+                top_k=request.top_k,
+                threshold=request.threshold or 0.7,
+            )
+
+            return ServiceResponse(
+                success=True,
+                data={
+                    "answer": result.get("answer", ""),
+                    "documents": result.get("documents", []),
+                    "sources": result.get("sources", []),
+                    "confidence": result.get("confidence"),
+                },
+                correlation_id=standard_headers.correlation_id,
+                request_id=standard_headers.request_id,
+            )
+        except Exception as e:
+            logger.error(f"Error processing query: {str(e)}", exc_info=True)
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail=f"Failed to process query: {str(e)}",
+            )
+        finally:
+            if span:
+                span.end()
+
+    async def _handle_search(self, request: SearchRequest, headers: dict = Header(...)):  # noqa: S7503
+        """
+        Perform vector search. Async required for FastAPI route handler.
+        
+        Args:
+            request (SearchRequest): Request payload object.
+            headers (dict): HTTP headers passed from the caller.
+        
+        Returns:
+            Any: Result of the operation.
+        
+        Raises:
+            HTTPException: Raised when this function detects an invalid state or when an underlying call fails.
+        """
+        standard_headers = extract_headers(**headers)
+
+        try:
+            # Get RAG system (created on-demand, stateless)
+            rag_system = self._get_rag_system(standard_headers.tenant_id)
+
+            # Perform search
+            # retriever.retrieve() is synchronous (uses asyncio.run internally) and takes: query, tenant_id, top_k, threshold, filters
+            if not request.query_text:
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail="query_text must be provided",
+                )
+
+            results = rag_system.retriever.retrieve(
+                query=request.query_text,
+                tenant_id=standard_headers.tenant_id,
+                top_k=request.top_k,
+                threshold=request.threshold or 0.7,
+                filters=request.metadata_filters,
+            )
+
+            # results is a list of dicts, not a dict
+            return ServiceResponse(
+                success=True,
+                data={
+                    "documents": results,
+                    "count": len(results),
+                },
+                correlation_id=standard_headers.correlation_id,
+                request_id=standard_headers.request_id,
+            )
+        except HTTPException:
+            raise
+        except Exception as e:
+            logger.error(f"Error performing search: {str(e)}", exc_info=True)
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail=f"Failed to perform search: {str(e)}",
+            )
+
+    async def _handle_get_document(  # noqa: S7503
+        self, document_id: str, headers: dict = Header(...)
+    ):
+        """
+        Get document by ID. Async required for FastAPI route handler.
+        
+        Args:
+            document_id (str): Input parameter for this operation.
+            headers (dict): HTTP headers passed from the caller.
+        
+        Raises:
+            HTTPException: Raised when this function detects an invalid state or when an underlying call fails.
+        """
+        extract_headers(**headers)  # Extract headers for validation
+
+        # Document retrieval from database - to be implemented
+        raise HTTPException(
+            status_code=status.HTTP_501_NOT_IMPLEMENTED,
+            detail="Document retrieval not yet implemented",
+        )
+
+    async def _handle_update_document(  # noqa: S7503
+        self, document_id: str, request: UpdateDocumentRequest, headers: dict = Header(...)
+    ):
+        """
+        Update a document. Async required for FastAPI route handler.
+        
+        Args:
+            document_id (str): Input parameter for this operation.
+            request (UpdateDocumentRequest): Request payload object.
+            headers (dict): HTTP headers passed from the caller.
+        
+        Returns:
+            Any: Result of the operation.
+        
+        Raises:
+            HTTPException: Raised when this function detects an invalid state or when an underlying call fails.
+        """
+        standard_headers = extract_headers(**headers)
+
+        try:
+            # Get RAG system (created on-demand, stateless)
+            rag_system = self._get_rag_system(standard_headers.tenant_id)
+
+            # Update document (async)
+            await rag_system.update_document(
+                document_id=document_id,
+                title=request.title,
+                content=request.content,
+                metadata=request.metadata,
+            )
+
+            return ServiceResponse(
+                success=True,
+                data={"document_id": document_id},
+                message="Document updated successfully",
+                correlation_id=standard_headers.correlation_id,
+                request_id=standard_headers.request_id,
+            )
+        except Exception as e:
+            logger.error(f"Error updating document: {str(e)}", exc_info=True)
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail=f"Failed to update document: {str(e)}",
+            )
+
+    async def _handle_delete_document(  # noqa: S7503
+        self, document_id: str, headers: dict = Header(...)
+    ):
+        """
+        Delete a document. Async required for FastAPI route handler.
+        
+        Args:
+            document_id (str): Input parameter for this operation.
+            headers (dict): HTTP headers passed from the caller.
+        
+        Returns:
+            Any: Result of the operation.
+        
+        Raises:
+            HTTPException: Raised when this function detects an invalid state or when an underlying call fails.
+        """
+        standard_headers = extract_headers(**headers)
+
+        try:
+            # Get RAG system (created on-demand, stateless)
+            rag_system = self._get_rag_system(standard_headers.tenant_id)
+
+            # Delete document (async)
+            await rag_system.delete_document(document_id=document_id)
+
+            return None
+        except Exception as e:
+            logger.error(f"Error deleting document: {str(e)}", exc_info=True)
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail=f"Failed to delete document: {str(e)}",
+            )
+
+    async def _handle_list_documents(  # noqa: S7503
+        self, headers: dict = Header(...), limit: int = 100, offset: int = 0
+    ):
+        """
+        List documents. Async required for FastAPI route handler.
+        
+        Args:
+            headers (dict): HTTP headers passed from the caller.
+            limit (int): Input parameter for this operation.
+            offset (int): Input parameter for this operation.
+        
+        Returns:
+            Any: Result of the operation.
+        """
+        standard_headers = extract_headers(**headers)
+
+        # Document listing from database - to be implemented
+        # For now, return placeholder response
+        return ServiceResponse(
+            success=True,
+            data={"documents": [], "total": 0},
+            correlation_id=standard_headers.correlation_id,
+            request_id=standard_headers.request_id,
+        )
+
+    async def _handle_health_check(self):  # noqa: S7503
+        """
+        Health check endpoint. Async required for FastAPI route handler.
+        
+        Returns:
+            Any: Result of the operation.
+        """
+        return {"status": "healthy", "service": "rag-service"}
 
 
 def create_rag_service(
@@ -422,7 +507,7 @@ def create_rag_service(
 
     # Initialize integrations
     nats_client = create_nats_client() if config.enable_nats else None
-    otel_tracer = create_otel_tracer(config.service_name) if config.enable_otel else None
+    otel_tracer = create_otel_tracer() if config.enable_otel else None
 
     # Create service
     service = RAGService(

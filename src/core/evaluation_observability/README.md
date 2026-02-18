@@ -94,7 +94,7 @@ The **Governance Framework** (root level) can use observability data for:
 ## OpenTelemetry (OTEL) Implementation
 
 For detailed information on how OpenTelemetry is implemented in this SDK, see:
-- **[OTEL Implementation Guide](../../../OTEL_IMPLEMENTATION_GUIDE.md)**: Comprehensive guide covering:
+- **[OTEL Integration Guide](../../../docs/integration_guides/otel_integration_guide.md)**: Comprehensive guide covering:
   - Architecture and integration points
   - Component instrumentation (Agent, RAG, Gateway, Database, NATS)
   - Context propagation across async operations and messaging

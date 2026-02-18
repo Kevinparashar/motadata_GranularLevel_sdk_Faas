@@ -361,7 +361,7 @@ except Exception as e:
 
 ## See Also
 
-- [NATS Integration Guide](../../integration_guides/nats_integration_guide.md)
+- [NATS Integration Guide](../integration_guides/nats_integration_guide.md)
 - [CORE_COMPONENTS_INTEGRATION_STORY.md](../../../CORE_COMPONENTS_INTEGRATION_STORY.md)
 - Core SDK NATS wrapper documentation
 

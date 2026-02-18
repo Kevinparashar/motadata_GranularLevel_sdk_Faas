@@ -1,8 +1,13 @@
+# Copyright (c) 2024. All rights reserved.
+# This source code is licensed under the MIT license and a copy
+# of the license can be found in the LICENSE file in the root directory.
+
 """
 Generator
 
 Handles LLM generation with retrieved context.
 """
+
 
 from typing import Any, Dict, List, Optional
 
@@ -31,10 +36,10 @@ class RAGGenerator:
         Initialize RAG generator.
 
         Args:
-            gateway: LiteLLM gateway instance
-            model: LLM model to use
-            system_prompt: Optional system prompt
-            enable_hallucination_detection: Whether to enable hallucination detection
+            gateway (LiteLLMGateway): Gateway client used for LLM calls.
+            model (str): Model name or identifier to use.
+            system_prompt (Optional[str]): System prompt used to guide behaviour.
+            enable_hallucination_detection (bool): Flag to enable or disable hallucination detection.
         """
         self.gateway = gateway
         self.model = model
@@ -60,42 +65,27 @@ class RAGGenerator:
         Generate response using retrieved context.
 
         Args:
-            query: User query
-            context_documents: Retrieved context documents
-            max_tokens: Maximum tokens to generate
-            temperature: Generation temperature
-            check_hallucination: Whether to check for hallucinations (default: uses instance setting)
-
+            query (str): Input parameter for this operation.
+            context_documents (List[Dict[str, Any]]): Input parameter for this operation.
+            max_tokens (int): Input parameter for this operation.
+            temperature (float): Input parameter for this operation.
+            check_hallucination (Optional[bool]): Input parameter for this operation.
+        
         Returns:
-            Dictionary with 'response' and optionally 'hallucination_result'
+            Dict[str, Any]: Dictionary result of the operation.
         """
-        # Build context from documents
-        context = self._build_context(context_documents)
+        import asyncio
 
-        # Build prompt with context
-        prompt = self._build_prompt(query, context)
-
-        # Generate response
-        response = self.gateway.generate(
-            prompt=prompt, model=self.model, max_tokens=max_tokens, temperature=temperature
-        )
-
-        result = {"response": response.text, "model": response.model, "usage": response.usage}
-
-        # Check for hallucinations if enabled
-        should_check = (
-            check_hallucination
-            if check_hallucination is not None
-            else self.enable_hallucination_detection
-        )
-        if should_check and self.hallucination_detector:
-            hallucination_result = self.hallucination_detector.detect(
-                response=response.text, context_documents=context_documents, query=query
+        # Call async method from sync context
+        return asyncio.run(
+            self.generate_async(
+                query=query,
+                context_documents=context_documents,
+                max_tokens=max_tokens,
+                temperature=temperature,
+                check_hallucination=check_hallucination,
             )
-            result["hallucination_result"] = hallucination_result.to_dict()
-            result["is_hallucination"] = hallucination_result.is_hallucination
-
-        return result
+        )
 
     async def generate_async(
         self,
@@ -109,14 +99,14 @@ class RAGGenerator:
         Generate response asynchronously.
 
         Args:
-            query: User query
-            context_documents: Retrieved context documents
-            max_tokens: Maximum tokens to generate
-            temperature: Generation temperature
-            check_hallucination: Whether to check for hallucinations (default: uses instance setting)
-
+            query (str): Input parameter for this operation.
+            context_documents (List[Dict[str, Any]]): Input parameter for this operation.
+            max_tokens (int): Input parameter for this operation.
+            temperature (float): Input parameter for this operation.
+            check_hallucination (Optional[bool]): Input parameter for this operation.
+        
         Returns:
-            Dictionary with 'response' and optionally 'hallucination_result'
+            Dict[str, Any]: Dictionary result of the operation.
         """
         context = self._build_context(context_documents)
         prompt = self._build_prompt(query, context)
@@ -134,7 +124,7 @@ class RAGGenerator:
             else self.enable_hallucination_detection
         )
         if should_check and self.hallucination_detector:
-            hallucination_result = self.hallucination_detector.detect_async(
+            hallucination_result = await self.hallucination_detector.detect_async(
                 response=response.text, context_documents=context_documents, query=query
             )
             result["hallucination_result"] = hallucination_result.to_dict()
@@ -147,10 +137,10 @@ class RAGGenerator:
         Build context string from documents.
 
         Args:
-            documents: Retrieved documents
-
+            documents (List[Dict[str, Any]]): Input parameter for this operation.
+        
         Returns:
-            Context string
+            str: Returned text value.
         """
         context_parts = []
 
@@ -170,11 +160,11 @@ class RAGGenerator:
         Build prompt with query and context.
 
         Args:
-            query: User query
-            context: Retrieved context
-
+            query (str): Input parameter for this operation.
+            context (str): Input parameter for this operation.
+        
         Returns:
-            Formatted prompt
+            str: Returned text value.
         """
         return f"""Based on the following context, please answer the question.
 
@@ -186,7 +176,12 @@ Question: {query}
 Answer:"""
 
     def _default_system_prompt(self) -> str:
-        """Get default system prompt."""
+        """
+        Get default system prompt.
+        
+        Returns:
+            str: Returned text value.
+        """
         return """You are a helpful assistant that answers questions based on the provided context.
 Use only the information from the context to answer questions. If the context doesn't contain
 enough information to answer the question, say so. Be accurate and cite specific parts of

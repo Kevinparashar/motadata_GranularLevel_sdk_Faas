@@ -1,189 +1,497 @@
 """
 Cache Mechanism
 
-Provides a simple pluggable cache layer with in-memory and Dragonfly backends,
-supporting TTL, basic LRU eviction, and pattern-based invalidation.
+Provides async-first cache layer with in-memory and Dragonfly backends.
+Production-ready implementation for scalable deployments.
 """
 
-
+import asyncio
+import json
+import logging
 import time
 from collections import OrderedDict
 from dataclasses import dataclass
-from typing import Any, List, Optional, cast
+from typing import Any, Optional
 
 try:
-    import redis  # Dragonfly is Redis-compatible
-except ImportError:  # pragma: no cover - optional dependency
-    redis = None
+    import aioredis
+except ImportError:
+    aioredis = None
+
+logger = logging.getLogger(__name__)
 
 
 @dataclass
 class CacheConfig:
-    backend: str = "memory"  # "memory" or "dragonfly"
+    """Cache configuration."""
+    backend: str = "memory"
     default_ttl: int = 300
-    max_size: int = 1024  # only applies to memory backend
+    max_size: int = 1024
     dragonfly_url: Optional[str] = None
     namespace: str = "sdk_cache"
 
 
 class CacheMechanism:
     """
-    Cache wrapper that supports in-memory and Dragonfly backends with TTL support.
+    Async-first cache wrapper supporting in-memory and Dragonfly backends.
     """
 
-    def __init__(self, config: Optional[CacheConfig] = None) -> None:
+    def __init__(
+        self,
+        config: Optional[CacheConfig] = None,
+        otel_tracer: Optional[Any] = None,
+        otel_metrics: Optional[Any] = None,
+    ) -> None:
+        """
+        Initialize cache mechanism.
+        
+        Args:
+            config: Cache configuration
+            otel_tracer: Optional OTEL tracer for distributed tracing
+            otel_metrics: Optional OTEL metrics for metrics collection
+        """
         self.config = config or CacheConfig()
         self.backend = self.config.backend
+        self._async_client: Optional[Any] = None
+        self._lock = asyncio.Lock()
+        self._store: OrderedDict[str, tuple[Any, float]] = OrderedDict()
 
-        if self.backend == "dragonfly":
-            if redis is None:
-                raise ImportError(
-                    "redis package is required for Dragonfly backend (Dragonfly is Redis-compatible)"
-                )
-            self._client = redis.Redis.from_url(
-                self.config.dragonfly_url or "dragonfly://localhost:6379/0"
+        # OTEL Integration (optional)
+        self.otel_tracer: Optional[Any] = otel_tracer
+        self.otel_metrics: Optional[Any] = otel_metrics
+
+        # Initialize OTEL if not provided
+        if self.otel_tracer is None:
+            try:
+                from ..otel_integration import create_otel_tracer
+
+                self.otel_tracer = create_otel_tracer(service_name="cache-mechanism")
+            except (ImportError, Exception):
+                self.otel_tracer = None
+
+        if self.otel_metrics is None:
+            try:
+                from ..otel_integration import create_otel_metrics
+
+                self.otel_metrics = create_otel_metrics(service_name="cache-mechanism")
+            except (ImportError, Exception):
+                self.otel_metrics = None
+
+    async def _ensure_async_client(self) -> Any:
+        """Ensure async Dragonfly client is initialized."""
+        if self._async_client is None and self.backend == "dragonfly":
+            if aioredis is None:
+                raise ImportError("aioredis required for Dragonfly backend")
+            self._async_client = await aioredis.from_url(
+                self.config.dragonfly_url or "redis://localhost:6379/0",
+                encoding="utf-8",
+                decode_responses=False
             )
-        else:
-            # Simple in-memory LRU with TTL
-            self._store: OrderedDict[str, tuple[Any, float]] = OrderedDict()
+        return self._async_client
 
     def _namespaced_key(self, key: str, tenant_id: Optional[str] = None) -> str:
-        """Create namespaced cache key with optional tenant isolation."""
+        """Create namespaced cache key."""
         if tenant_id:
             return f"{self.config.namespace}:{tenant_id}:{key}"
         return f"{self.config.namespace}:{key}"
 
-    def set(
+    async def set(
         self, key: str, value: Any, tenant_id: Optional[str] = None, ttl: Optional[int] = None
     ) -> None:
-        """
-        Store a value in cache with TTL.
-
-        COST IMPACT: Caching responses saves LLM API costs.
-        - Cache hit = $0 cost (no API call)
-        - Cache miss = normal API cost (~$0.001-0.01 per call)
-        - Typical savings: 50-90% cost reduction for repeated queries
-        """
+        """Store value in cache asynchronously."""
+        start_time = time.time()
         ttl = ttl or self.config.default_ttl
         expires_at = time.time() + ttl
         namespaced = self._namespaced_key(key, tenant_id=tenant_id)
 
-        if self.backend == "dragonfly":
-            # Dragonfly backend: Distributed cache, survives process restarts
-            self._client.set(namespaced, value, ex=ttl)
-            return
+        # OTEL Integration
+        if self.otel_tracer:
+            with self.otel_tracer.start_trace("cache.set") as trace:
+                trace.set_attribute("cache.backend", self.backend)
+                trace.set_attribute("cache.key", key)
+                trace.set_attribute("cache.ttl", ttl)
+                if tenant_id:
+                    trace.set_attribute("cache.tenant_id", tenant_id)
 
-        # MEMORY BACKEND: In-memory LRU cache with TTL
-        # LRU (Least Recently Used) eviction: removes least recently accessed items when full
-        # This keeps frequently accessed items in cache, maximizing cache hit rate
-        self._store[namespaced] = (value, expires_at)
-        self._store.move_to_end(namespaced)  # Mark as recently used (LRU)
-        self._evict_if_needed()  # Remove oldest items if cache is full
+                try:
+                    if self.backend == "dragonfly":
+                        client = await self._ensure_async_client()
+                        await client.set(namespaced, value, ex=ttl)
+                    else:
+                        async with self._lock:
+                            self._store[namespaced] = (value, expires_at)
+                            self._store.move_to_end(namespaced)
+                            self._evict_if_needed()
 
-    def get(self, key: str, tenant_id: Optional[str] = None) -> Optional[Any]:
-        """
-        Retrieve a value from cache.
+                    duration = time.time() - start_time
+                    if self.otel_metrics:
+                        self.otel_metrics.record_histogram(
+                            "cache.set.duration", duration, {"backend": self.backend}
+                        )
+                        self.otel_metrics.increment_counter(
+                            "cache.operations",
+                            amount=1.0,
+                            attributes={"operation": "set", "backend": self.backend, "status": "success"},
+                        )
+                except Exception as e:
+                    trace.record_exception(e)
+                    duration = time.time() - start_time
+                    if self.otel_metrics:
+                        self.otel_metrics.record_histogram(
+                            "cache.set.duration", duration, {"backend": self.backend}
+                        )
+                        self.otel_metrics.increment_counter(
+                            "cache.operations",
+                            amount=1.0,
+                            attributes={"operation": "set", "backend": self.backend, "status": "error"},
+                        )
+                    raise
+        else:
+            # No OTEL - execute without tracing
+            if self.backend == "dragonfly":
+                client = await self._ensure_async_client()
+                await client.set(namespaced, value, ex=ttl)
+            else:
+                async with self._lock:
+                    self._store[namespaced] = (value, expires_at)
+                    self._store.move_to_end(namespaced)
+                    self._evict_if_needed()
 
-        PERFORMANCE: Cache hits are instant (<1ms), avoiding expensive API calls.
-        Returns None if key not found or expired (cache miss).
-        """
+    async def get(self, key: str, tenant_id: Optional[str] = None) -> Optional[Any]:
+        """Retrieve value from cache asynchronously."""
+        start_time = time.time()
         namespaced = self._namespaced_key(key, tenant_id=tenant_id)
 
-        if self.backend == "dragonfly":
-            value = self._client.get(namespaced)
+        # OTEL Integration
+        if self.otel_tracer:
+            with self.otel_tracer.start_trace("cache.get") as trace:
+                trace.set_attribute("cache.backend", self.backend)
+                trace.set_attribute("cache.key", key)
+                if tenant_id:
+                    trace.set_attribute("cache.tenant_id", tenant_id)
+
+                try:
+                    if self.backend == "dragonfly":
+                        client = await self._ensure_async_client()
+                        result = await client.get(namespaced)
+                    else:
+                        if namespaced not in self._store:
+                            result = None
+                        else:
+                            value, expires_at = self._store[namespaced]
+                            if expires_at < time.time():
+                                self._store.pop(namespaced, None)
+                                result = None
+                            else:
+                                async with self._lock:
+                                    self._store.move_to_end(namespaced)
+                                result = value
+
+                    duration = time.time() - start_time
+                    cache_hit = result is not None
+                    trace.set_attribute("cache.hit", cache_hit)
+
+                    if self.otel_metrics:
+                        self.otel_metrics.record_histogram(
+                            "cache.get.duration", duration, {"backend": self.backend}
+                        )
+                        self.otel_metrics.increment_counter(
+                            "cache.operations",
+                            amount=1.0,
+                            attributes={
+                                "operation": "get",
+                                "backend": self.backend,
+                                "status": "success",
+                            },
+                        )
+                        if cache_hit:
+                            self.otel_metrics.increment_counter(
+                                "cache.hits",
+                                amount=1.0,
+                                attributes={"backend": self.backend},
+                            )
+                        else:
+                            self.otel_metrics.increment_counter(
+                                "cache.misses",
+                                amount=1.0,
+                                attributes={"backend": self.backend},
+                            )
+
+                    return result
+                except Exception as e:
+                    trace.record_exception(e)
+                    duration = time.time() - start_time
+                    if self.otel_metrics:
+                        self.otel_metrics.record_histogram(
+                            "cache.get.duration", duration, {"backend": self.backend}
+                        )
+                        self.otel_metrics.increment_counter(
+                            "cache.operations",
+                            amount=1.0,
+                            attributes={"operation": "get", "backend": self.backend, "status": "error"},
+                        )
+                    raise
+        else:
+            # No OTEL - execute without tracing
+            if self.backend == "dragonfly":
+                client = await self._ensure_async_client()
+                return await client.get(namespaced)
+
+            if namespaced not in self._store:
+                return None
+
+            value, expires_at = self._store[namespaced]
+            if expires_at < time.time():
+                self._store.pop(namespaced, None)
+                return None
+
+            async with self._lock:
+                self._store.move_to_end(namespaced)
             return value
 
-        if namespaced not in self._store:
-            return None  # Cache miss
-
-        value, expires_at = self._store[namespaced]
-        if expires_at < time.time():
-            # TTL expired: Remove from cache (cache miss)
-            self._store.pop(namespaced, None)
-            return None
-
-        # LRU: Mark as recently used (move to end of OrderedDict)
-        # This ensures frequently accessed items stay in cache longer
-        self._store.move_to_end(namespaced)
-        return value  # Cache hit: return cached value
-
-    def delete(self, key: str, tenant_id: Optional[str] = None) -> None:
+    async def delete(self, key: str, tenant_id: Optional[str] = None) -> None:
+        """Delete key from cache asynchronously."""
+        start_time = time.time()
         namespaced = self._namespaced_key(key, tenant_id=tenant_id)
-        if self.backend == "dragonfly":
-            self._client.delete(namespaced)
+
+        # OTEL Integration
+        if self.otel_tracer:
+            with self.otel_tracer.start_trace("cache.delete") as trace:
+                trace.set_attribute("cache.backend", self.backend)
+                trace.set_attribute("cache.key", key)
+                if tenant_id:
+                    trace.set_attribute("cache.tenant_id", tenant_id)
+
+                try:
+                    if self.backend == "dragonfly":
+                        client = await self._ensure_async_client()
+                        await client.delete(namespaced)
+                    else:
+                        async with self._lock:
+                            self._store.pop(namespaced, None)
+
+                    duration = time.time() - start_time
+                    if self.otel_metrics:
+                        self.otel_metrics.record_histogram(
+                            "cache.delete.duration", duration, {"backend": self.backend}
+                        )
+                        self.otel_metrics.increment_counter(
+                            "cache.operations",
+                            amount=1.0,
+                            attributes={"operation": "delete", "backend": self.backend, "status": "success"},
+                        )
+                except Exception as e:
+                    trace.record_exception(e)
+                    duration = time.time() - start_time
+                    if self.otel_metrics:
+                        self.otel_metrics.record_histogram(
+                            "cache.delete.duration", duration, {"backend": self.backend}
+                        )
+                        self.otel_metrics.increment_counter(
+                            "cache.operations",
+                            amount=1.0,
+                            attributes={"operation": "delete", "backend": self.backend, "status": "error"},
+                        )
+                    raise
         else:
-            self._store.pop(namespaced, None)
+            # No OTEL - execute without tracing
+            if self.backend == "dragonfly":
+                client = await self._ensure_async_client()
+                await client.delete(namespaced)
+            else:
+                async with self._lock:
+                    self._store.pop(namespaced, None)
 
-    def invalidate_pattern(self, pattern: str, tenant_id: Optional[str] = None) -> None:
-        """
-        Invalidate all keys matching pattern (simple substring match for memory).
-
-        Args:
-            pattern: Pattern to match
-            tenant_id: Optional tenant ID to limit invalidation to specific tenant
-        """
+    async def invalidate_pattern(self, pattern: str, tenant_id: Optional[str] = None) -> None:
+        """Invalidate keys matching pattern asynchronously."""
+        start_time = time.time()
         if tenant_id:
             pattern = f"{tenant_id}:{pattern}"
-        if self.backend == "dragonfly":
-            # Redis keys() returns a list synchronously
-            keys_result = self._client.keys(f"{self.config.namespace}:{pattern}*")
-            keys: List[Any] = cast(List[Any], keys_result)
-            if keys:
-                self._client.delete(*keys)
-            return
 
-        to_delete = [k for k in self._store if pattern in k]
-        for k in to_delete:
-            self._store.pop(k, None)
+        # OTEL Integration
+        if self.otel_tracer:
+            with self.otel_tracer.start_trace("cache.invalidate_pattern") as trace:
+                trace.set_attribute("cache.backend", self.backend)
+                trace.set_attribute("cache.pattern", pattern)
+                if tenant_id:
+                    trace.set_attribute("cache.tenant_id", tenant_id)
+
+                try:
+                    keys_deleted = 0
+                    if self.backend == "dragonfly":
+                        client = await self._ensure_async_client()
+                        keys_to_delete = []
+                        cursor = b'0'
+                        while cursor:
+                            cursor, keys = await client.scan(
+                                cursor, match=f"{self.config.namespace}:{pattern}*", count=100
+                            )
+                            keys_to_delete.extend(keys)
+                            if cursor == b'0':
+                                break
+                        if keys_to_delete:
+                            await client.delete(*keys_to_delete)
+                            keys_deleted = len(keys_to_delete)
+                    else:
+                        async with self._lock:
+                            # More efficient: iterate once and delete in place
+                            keys_to_delete = [k for k in self._store.keys() if pattern in k]
+                            keys_deleted = len(keys_to_delete)
+                            for k in keys_to_delete:
+                                self._store.pop(k, None)
+
+                    duration = time.time() - start_time
+                    trace.set_attribute("cache.keys_deleted", keys_deleted)
+
+                    if self.otel_metrics:
+                        self.otel_metrics.record_histogram(
+                            "cache.invalidate_pattern.duration", duration, {"backend": self.backend}
+                        )
+                        self.otel_metrics.increment_counter(
+                            "cache.operations",
+                            amount=1.0,
+                            attributes={
+                                "operation": "invalidate_pattern",
+                                "backend": self.backend,
+                                "status": "success",
+                            },
+                        )
+                except Exception as e:
+                    trace.record_exception(e)
+                    duration = time.time() - start_time
+                    if self.otel_metrics:
+                        self.otel_metrics.record_histogram(
+                            "cache.invalidate_pattern.duration", duration, {"backend": self.backend}
+                        )
+                        self.otel_metrics.increment_counter(
+                            "cache.operations",
+                            amount=1.0,
+                            attributes={
+                                "operation": "invalidate_pattern",
+                                "backend": self.backend,
+                                "status": "error",
+                            },
+                        )
+                    raise
+        else:
+            # No OTEL - execute without tracing
+            if self.backend == "dragonfly":
+                client = await self._ensure_async_client()
+                keys_to_delete = []
+                cursor = b'0'
+                while cursor:
+                    cursor, keys = await client.scan(
+                        cursor, match=f"{self.config.namespace}:{pattern}*", count=100
+                    )
+                    keys_to_delete.extend(keys)
+                    if cursor == b'0':
+                        break
+                if keys_to_delete:
+                    await client.delete(*keys_to_delete)
+            else:
+                async with self._lock:
+                    # More efficient: iterate once and delete in place
+                    keys_to_delete = [k for k in self._store.keys() if pattern in k]
+                    for k in keys_to_delete:
+                        self._store.pop(k, None)
 
     def _evict_if_needed(self) -> None:
+        """Evict oldest entries if cache exceeds max size."""
         while len(self._store) > self.config.max_size:
-            # Pop oldest (LRU)
             self._store.popitem(last=False)
 
-    def cache_prompt_interpretation(
-        self,
-        prompt_hash: str,
-        interpretation: Any,
-        tenant_id: Optional[str] = None,
-        ttl: Optional[int] = None,
+    async def cache_prompt_interpretation(
+        self, prompt_hash: str, interpretation: Any, tenant_id: Optional[str] = None, ttl: Optional[int] = None
     ) -> None:
-        """
-        Cache prompt interpretation result.
-
-        Args:
-            prompt_hash: Hash of the prompt
-            interpretation: Interpretation result (will be JSON serialized)
-            tenant_id: Optional tenant ID
-            ttl: Optional TTL override
-        """
-        import json
-
+        """Cache prompt interpretation asynchronously."""
         if isinstance(interpretation, dict):
             interpretation = json.dumps(interpretation)
-        self.set(f"prompt_interp:{prompt_hash}", interpretation, tenant_id=tenant_id, ttl=ttl)
+        await self.set(f"prompt_interp:{prompt_hash}", interpretation, tenant_id=tenant_id, ttl=ttl)
 
-    def get_prompt_interpretation(
+    async def get_prompt_interpretation(
         self, prompt_hash: str, tenant_id: Optional[str] = None
     ) -> Optional[Any]:
-        """
-        Get cached prompt interpretation.
-
-        Args:
-            prompt_hash: Hash of the prompt
-            tenant_id: Optional tenant ID
-
-        Returns:
-            Cached interpretation or None
-        """
-        import json
-
-        cached = self.get(f"prompt_interp:{prompt_hash}", tenant_id=tenant_id)
+        """Get cached prompt interpretation asynchronously."""
+        cached = await self.get(f"prompt_interp:{prompt_hash}", tenant_id=tenant_id)
         if cached:
             try:
                 if isinstance(cached, str):
                     return json.loads(cached)
                 return cached
-            except Exception:
+            except (json.JSONDecodeError, TypeError):
                 return None
         return None
+
+    async def clear(self, tenant_id: Optional[str] = None) -> None:
+        """Clear cache entries asynchronously."""
+        start_time = time.time()
+
+        # OTEL Integration
+        if self.otel_tracer:
+            with self.otel_tracer.start_trace("cache.clear") as trace:
+                trace.set_attribute("cache.backend", self.backend)
+                if tenant_id:
+                    trace.set_attribute("cache.tenant_id", tenant_id)
+
+                try:
+                    keys_deleted = 0
+                    if self.backend == "dragonfly":
+                        pattern = f"{tenant_id}:*" if tenant_id else "*"
+                        await self.invalidate_pattern(pattern.replace(f"{self.config.namespace}:", ""))
+                        # Note: keys_deleted would be set by invalidate_pattern, but we can't easily get it here
+                        # This is acceptable as invalidate_pattern has its own tracing
+                    else:
+                        async with self._lock:
+                            if tenant_id:
+                                to_delete = [k for k in self._store if f":{tenant_id}:" in k]
+                                keys_deleted = len(to_delete)
+                                for k in to_delete:
+                                    self._store.pop(k, None)
+                            else:
+                                keys_deleted = len(self._store)
+                                self._store.clear()
+
+                    duration = time.time() - start_time
+                    trace.set_attribute("cache.keys_deleted", keys_deleted)
+
+                    if self.otel_metrics:
+                        self.otel_metrics.record_histogram(
+                            "cache.clear.duration", duration, {"backend": self.backend}
+                        )
+                        self.otel_metrics.increment_counter(
+                            "cache.operations",
+                            amount=1.0,
+                            attributes={"operation": "clear", "backend": self.backend, "status": "success"},
+                        )
+                except Exception as e:
+                    trace.record_exception(e)
+                    duration = time.time() - start_time
+                    if self.otel_metrics:
+                        self.otel_metrics.record_histogram(
+                            "cache.clear.duration", duration, {"backend": self.backend}
+                        )
+                        self.otel_metrics.increment_counter(
+                            "cache.operations",
+                            amount=1.0,
+                            attributes={"operation": "clear", "backend": self.backend, "status": "error"},
+                        )
+                    raise
+        else:
+            # No OTEL - execute without tracing
+            if self.backend == "dragonfly":
+                pattern = f"{tenant_id}:*" if tenant_id else "*"
+                await self.invalidate_pattern(pattern.replace(f"{self.config.namespace}:", ""))
+            else:
+                async with self._lock:
+                    if tenant_id:
+                        to_delete = [k for k in self._store if f":{tenant_id}:" in k]
+                        for k in to_delete:
+                            self._store.pop(k, None)
+                    else:
+                        self._store.clear()
+
+    async def close(self) -> None:
+        """Close async client connections."""
+        if self._async_client:
+            await self._async_client.close()
+            self._async_client = None

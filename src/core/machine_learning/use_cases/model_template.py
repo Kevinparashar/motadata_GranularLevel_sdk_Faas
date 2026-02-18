@@ -5,6 +5,7 @@ Template for creating new ML use case models.
 Copy this file to your use case folder and implement the methods.
 """
 
+
 import logging
 from typing import Any, Dict, Optional
 
@@ -27,11 +28,11 @@ class UseCaseModelTemplate(BaseMLModel):
     def __init__(self, model_id: str, tenant_id: Optional[str] = None, **kwargs):
         """
         Initialize use case model.
-
+        
         Args:
-            model_id: Unique model identifier
-            tenant_id: Optional tenant ID
-            **kwargs: Additional model-specific parameters
+            model_id (str): Input parameter for this operation.
+            tenant_id (Optional[str]): Tenant identifier used for tenant isolation.
+            **kwargs (Any): Input parameter for this operation.
         """
         super().__init__(model_id, tenant_id, **kwargs)
 
@@ -47,8 +48,17 @@ class UseCaseModelTemplate(BaseMLModel):
     ) -> Dict[str, Any]:
         """
         Train the model.
-
+        
         Implement your training logic here.
+        
+        Args:
+            training_data (Any): Input parameter for this operation.
+            validation_data (Optional[Any]): Input parameter for this operation.
+            hyperparameters (Optional[Dict[str, Any]]): Input parameter for this operation.
+            **kwargs (Any): Input parameter for this operation.
+        
+        Returns:
+            Dict[str, Any]: Dictionary result of the operation.
         """
         # TODO: SDK-TEMPLATE-001 - Implement training logic for your use case  # noqa: FIX002, S1135
         # 1. Preprocess training data
@@ -63,8 +73,18 @@ class UseCaseModelTemplate(BaseMLModel):
     def predict(self, input_data: Any, **kwargs) -> Any:
         """
         Make predictions.
-
+        
         Implement your prediction logic here.
+        
+        Args:
+            input_data (Any): Input parameter for this operation.
+            **kwargs (Any): Input parameter for this operation.
+        
+        Returns:
+            Any: Result of the operation.
+        
+        Raises:
+            ValueError: Raised when this function detects an invalid state or when an underlying call fails.
         """
         if not self.is_trained:
             raise ValueError("Model must be trained before making predictions")
@@ -80,8 +100,18 @@ class UseCaseModelTemplate(BaseMLModel):
     def evaluate(self, test_data: Any, **kwargs) -> Dict[str, Any]:
         """
         Evaluate model performance.
-
+        
         Implement your evaluation logic here.
+        
+        Args:
+            test_data (Any): Input parameter for this operation.
+            **kwargs (Any): Input parameter for this operation.
+        
+        Returns:
+            Dict[str, Any]: Dictionary result of the operation.
+        
+        Raises:
+            ValueError: Raised when this function detects an invalid state or when an underlying call fails.
         """
         if not self.is_trained:
             raise ValueError("Model must be trained before evaluation")
@@ -97,8 +127,15 @@ class UseCaseModelTemplate(BaseMLModel):
     def save(self, filepath: str, **kwargs) -> str:
         """
         Save model to file.
-
+        
         Implement your save logic here.
+        
+        Args:
+            filepath (str): Input parameter for this operation.
+            **kwargs (Any): Input parameter for this operation.
+        
+        Returns:
+            str: Returned text value.
         """
         # TODO: SDK-TEMPLATE-004 - Implement save logic for your use case  # noqa: FIX002, S1135
         # Use joblib or pickle to save self.model
@@ -112,8 +149,15 @@ class UseCaseModelTemplate(BaseMLModel):
     def load(self, filepath: str, **kwargs) -> None:
         """
         Load model from file.
-
+        
         Implement your load logic here.
+        
+        Args:
+            filepath (str): Input parameter for this operation.
+            **kwargs (Any): Input parameter for this operation.
+        
+        Returns:
+            None: Result of the operation.
         """
         # TODO: SDK-TEMPLATE-005 - Implement load logic for your use case  # noqa: FIX002, S1135
         # Load model using joblib or pickle

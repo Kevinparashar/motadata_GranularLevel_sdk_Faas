@@ -15,6 +15,7 @@ Services communicate via:
 - Shared state (PostgreSQL, Redis)
 """
 
+
 __version__ = "0.1.0"
 
 # Import from shared components

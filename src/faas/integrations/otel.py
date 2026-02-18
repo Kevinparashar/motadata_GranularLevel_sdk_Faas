@@ -1,8 +1,13 @@
+# Copyright (c) 2024. All rights reserved.
+# This source code is licensed under the MIT license and a copy
+# of the license can be found in the LICENSE file in the root directory.
+
 """
 OpenTelemetry Integration for FaaS services.
 
 Provides distributed tracing, metrics, and logging.
 """
+
 
 import logging
 from typing import Any, Dict, Optional
@@ -21,10 +26,10 @@ class OTELTracer:
     def __init__(self, service_name: str, otlp_endpoint: Optional[str] = None):
         """
         Initialize OTEL tracer.
-
+        
         Args:
-            service_name: Name of the service
-            otlp_endpoint: OTLP exporter endpoint (optional)
+            service_name (str): Input parameter for this operation.
+            otlp_endpoint (Optional[str]): Input parameter for this operation.
         """
         self.service_name = service_name
         self.otlp_endpoint = otlp_endpoint
@@ -33,15 +38,15 @@ class OTELTracer:
     def start_span(self, name: str, **kwargs) -> "OTELSpan":
         """
         Start a new span.
-
+        
         Args:
-            name: Span name
-            **kwargs: Additional span attributes
-
+            name (str): Name value.
+            **kwargs (Any): Input parameter for this operation.
+        
         Returns:
-            OTELSpan instance
+            'OTELSpan': Result of the operation.
         """
-        # TODO: SDK-INT-003 - Implement actual OTEL span creation
+        # TODO: SDK-INT-003 - Implement actual OTEL span creation  # noqa: FIX002, S1135
         # Placeholder implementation - replace with actual OpenTelemetry SDK when integration is ready
         # from opentelemetry import trace
         # tracer = trace.get_tracer(self.service_name)
@@ -52,11 +57,11 @@ class OTELTracer:
     def get_current_span(self) -> Optional["OTELSpan"]:
         """
         Get current active span.
-
+        
         Returns:
-            Current span or None
+            Optional['OTELSpan']: Result if available, else None.
         """
-        # TODO: SDK-INT-003 - Implement actual OTEL current span retrieval
+        # TODO: SDK-INT-003 - Implement actual OTEL current span retrieval  # noqa: FIX002, S1135
         # Placeholder implementation - replace with actual OpenTelemetry SDK when integration is ready
         # from opentelemetry import trace
         # span = trace.get_current_span()
@@ -67,17 +72,35 @@ class OTELSpan:
     """OpenTelemetry span (placeholder)."""
 
     def __init__(self, name: str, **attributes):
-        """Initialize span."""
+        """
+        Initialize span.
+        
+        Args:
+            name (str): Name value.
+            **attributes (Any): Input parameter for this operation.
+        """
         self.name = name
         self.attributes = attributes
         self._ended = False
 
     def set_attribute(self, key: str, value: Any):
-        """Set span attribute."""
+        """
+        Set span attribute.
+        
+        Args:
+            key (str): Input parameter for this operation.
+            value (Any): Input parameter for this operation.
+        """
         self.attributes[key] = value
 
-    def add_event(self, name: str, attributes: Optional[Dict[str, Any]] = None):
-        """Add event to span."""
+    def add_event(self, name: str, _attributes: Optional[Dict[str, Any]] = None):
+        """
+        Add event to span.
+        
+        Args:
+            name (str): Name value.
+            _attributes (Optional[Dict[str, Any]]): Input parameter for this operation.
+        """
         logger.debug(f"OTEL event (placeholder): {name}")
 
     def end(self):
@@ -87,11 +110,23 @@ class OTELSpan:
             logger.debug(f"OTEL span ended (placeholder): {self.name}")
 
     def __enter__(self):
-        """Context manager entry."""
+        """
+        Context manager entry.
+        
+        Returns:
+            Any: Result of the operation.
+        """
         return self
 
     def __exit__(self, exc_type, exc_val, exc_tb):
-        """Context manager exit."""
+        """
+        Context manager exit.
+        
+        Args:
+            exc_type (Any): Input parameter for this operation.
+            exc_val (Any): Input parameter for this operation.
+            exc_tb (Any): Input parameter for this operation.
+        """
         self.end()
 
 

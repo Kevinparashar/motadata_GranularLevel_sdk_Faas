@@ -222,7 +222,7 @@ results = vector_ops.search_similar(query_vector, threshold=0.99)  # Too high
 ### Documentation
 - **[PostgreSQL Database README](README.md)** - Complete database guide
 - **[Vector Index Manager Documentation](vector_index_manager.md)** - Index management
-- **[RAG System Documentation](../../rag/README.md)** - RAG usage
+- **[RAG System Documentation](../rag/README.md)** - RAG usage
 
 ### Related Components
 - **[Database Connection](connection.py)** - Database connection

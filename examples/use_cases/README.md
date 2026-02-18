@@ -10,13 +10,13 @@ This directory contains real-world use case implementations built using the SDK.
 - **Status**: 📝 Template
 - **Purpose**: Template for creating new use cases
 - **Components**: All SDK components
-- [Documentation](template/README.md)
+- [Documentation](template/README.md.template)
 
 ## 🆕 Adding a New Use Case
 
 1. **Create Folder**: Use `snake_case` naming (e.g., `customer_support_chatbot`)
 2. **Copy Template**: Copy files from `template/` folder
-3. **Implement**: Follow SDK patterns (see [BUILDING_NEW_USECASE_GUIDE.md](../BUILDING_NEW_USECASE_GUIDE.md))
+3. **Implement**: Follow SDK patterns (see [BUILDING_NEW_USECASE_GUIDE.md](../../BUILDING_NEW_USECASE_GUIDE.md))
 4. **Test**: Add comprehensive tests
 5. **Document**: Complete README.md
 6. **Register**: Add entry to this index

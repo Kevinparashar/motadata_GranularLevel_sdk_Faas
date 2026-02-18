@@ -4,6 +4,7 @@ Health Check System
 Provides health check functionality for monitoring component performance and availability.
 """
 
+
 import asyncio
 from dataclasses import dataclass, field
 from datetime import datetime
@@ -33,7 +34,15 @@ class HealthCheckResult:
 
 
 def _normalize_check_result(result: Any) -> HealthCheckResult:
-    """Normalize check result to HealthCheckResult."""
+    """
+    Normalize check result to HealthCheckResult.
+    
+    Args:
+        result (Any): Input parameter for this operation.
+    
+    Returns:
+        HealthCheckResult: Result of the operation.
+    """
     if isinstance(result, bool):
         return HealthCheckResult(
             status=HealthStatus.HEALTHY if result else HealthStatus.UNHEALTHY,
@@ -45,7 +54,15 @@ def _normalize_check_result(result: Any) -> HealthCheckResult:
 
 
 def _determine_overall_status(results: List[HealthCheckResult]) -> tuple[HealthStatus, str]:
-    """Determine overall health status from individual results."""
+    """
+    Determine overall health status from individual results.
+    
+    Args:
+        results (List[HealthCheckResult]): Input parameter for this operation.
+    
+    Returns:
+        tuple[HealthStatus, str]: Result of the operation.
+    """
     if not results:
         return HealthStatus.UNKNOWN, "No health checks configured"
     
@@ -61,7 +78,15 @@ def _determine_overall_status(results: List[HealthCheckResult]) -> tuple[HealthS
 
 
 def _create_error_result(exception: Exception) -> HealthCheckResult:
-    """Create error health check result from exception."""
+    """
+    Create error health check result from exception.
+    
+    Args:
+        exception (Exception): Input parameter for this operation.
+    
+    Returns:
+        HealthCheckResult: Result of the operation.
+    """
     return HealthCheckResult(
         status=HealthStatus.UNHEALTHY,
         message=f"Check failed: {str(exception)}",
@@ -79,9 +104,9 @@ class HealthCheck:
     def __init__(self, name: str):
         """
         Initialize health check.
-
+        
         Args:
-            name: Name of the component being monitored
+            name (str): Name value.
         """
         self.name = name
         self.status = HealthStatus.UNKNOWN
@@ -94,19 +119,31 @@ class HealthCheck:
     def add_check(self, check_func: Callable) -> None:
         """
         Add a health check function.
-
+        
         Args:
-            check_func: Function that returns HealthCheckResult or bool
+            check_func (Callable): Input parameter for this operation.
+        
+        Returns:
+            None: Result of the operation.
         """
         self._check_functions.append(check_func)
 
     async def _run_single_check(self, check_func: Callable) -> HealthCheckResult:
-        """Run a single health check function."""
+        """
+        Run a single health check function.
+        
+        Args:
+            check_func (Callable): Input parameter for this operation.
+        
+        Returns:
+            HealthCheckResult: Builder instance (returned for call chaining).
+        """
         try:
             if asyncio.iscoroutinefunction(check_func):
                 result = await check_func()
             else:
-                result = check_func()
+                # Run sync function in thread pool to avoid blocking event loop
+                result = await asyncio.to_thread(check_func)
             return _normalize_check_result(result)
         except Exception as e:
             return _create_error_result(e)
@@ -114,16 +151,21 @@ class HealthCheck:
     async def check(self) -> HealthCheckResult:
         """
         Perform health check.
-
+        
         Returns:
-            HealthCheckResult with current health status
+            HealthCheckResult: Builder instance (returned for call chaining).
         """
         import time
 
         start_time = time.time()
 
-        # Run all check functions
-        results = [await self._run_single_check(check_func) for check_func in self._check_functions]
+        # Run all check functions in parallel for better performance
+        if self._check_functions:
+            results = await asyncio.gather(
+                *[self._run_single_check(check_func) for check_func in self._check_functions]
+            )
+        else:
+            results = []
 
         # Determine overall status
         status, message = _determine_overall_status(results)
@@ -148,7 +190,12 @@ class HealthCheck:
         return result
 
     def _format_last_result(self) -> Optional[Dict[str, Any]]:
-        """Format last result for health status response."""
+        """
+        Format last result for health status response.
+        
+        Returns:
+            Optional[Dict[str, Any]]: Dictionary result of the operation.
+        """
         if not self.last_result:
             return None
         
@@ -160,7 +207,12 @@ class HealthCheck:
         }
 
     def get_health(self) -> Dict[str, Any]:
-        """Get current health status."""
+        """
+        Get current health status.
+        
+        Returns:
+            Dict[str, Any]: Dictionary result of the operation.
+        """
         return {
             "name": self.name,
             "status": self.status.value,

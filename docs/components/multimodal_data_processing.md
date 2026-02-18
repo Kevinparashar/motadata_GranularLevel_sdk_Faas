@@ -335,6 +335,6 @@ pip install beautifulsoup4
 ## Related Documentation
 
 - **[RAG System](rag_system_explanation.md)** - Complete RAG documentation
-- **[Document Processor](../src/core/rag/README.md)** - Document processing details
+- **[Document Processor](../../src/core/rag/README.md)** - Document processing details
 - **[Agent Framework](agno_agent_framework_explanation.md)** - Using agents with multi-modal data
 

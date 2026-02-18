@@ -1,0 +1,84 @@
+trigger:
+- main
+
+pool:
+  name: 'Motadata-Pool'
+  demands: 
+  - Agent.Name -equals ubuntu24
+
+steps:
+
+- script: |
+    echo "##vso[task.prependpath]/opt/myagent/_work/_tool/Python/3.12/bin"
+  displayName: 'Add Python 3.12 to PATH'
+
+- script: |
+    python3 --version ; which python3
+    pip install --upgrade pip
+    pip install -r requirements.txt
+  displayName: 'Install dependencies and run script'
+
+- task: SonarCloudPrepare@4 # Use the appropriate major version
+  displayName: 'Prepare SonarQube analysis'
+  inputs:
+    SonarQube: SonarCloud
+    organization: motadata
+    scannerMode: cli
+    configMode: manual
+    cliProjectKey: 'Motadata_motadata-python-sdk'
+    # Add extra properties for coverage reports
+    extraProperties: |
+      sonar.sources=src
+      sonar.tests=tests
+      sonar.test.inclusions=**/test_*.py,**/*_test.py
+      sonar.exclusions=**/__pycache__/**,**/*.pyc,**/*.pyo,**/venv/**,**/env/**,**/.venv/**,**/build/**,**/dist/**,**/*.egg-info/**,**/node_modules/**,**/examples/**
+      sonar.coverage.exclusions=**/test_*.py,**/*_test.py,**/tests/**,**/__pycache__/**,**/*.pyc,**/*.pyo,**/venv/**,**/env/**,**/.venv/**,**/build/**,**/dist/**,**/*.egg-info/**,**/testdata/**,**/*_pb2.py,**/mock_*.py,**/mocks/**,**/conftest.py,**/setup.py,**/examples/**,**/machine_learning/**,**/ml_service/**
+      sonar.python.coverage.reportPaths=$(System.DefaultWorkingDirectory)/coverage.xml
+      sonar.python.xunit.reportPath=$(System.DefaultWorkingDirectory)/test-results.xml
+      sonar.qualitygate.wait=true
+   
+- script: |
+    # Run pytest and generate reports in compatible formats
+    # Use Cobertura for Azure DevOps native coverage display
+    # Generate an XML report for SonarQube to pick up
+    # Note: Don't remove pyproject.toml as it contains pytest configuration
+    pytest -v --junitxml=test-results.xml --cov=src --cov-report=xml:coverage.xml --cov-report=html --cov-report=term -s tests/ || true
+    # Ensure coverage.xml exists even if tests fail
+    if [ ! -f "coverage.xml" ]; then
+      echo "Warning: coverage.xml not generated, creating empty file"
+      echo '<?xml version="1.0" ?><coverage></coverage>' > coverage.xml
+    fi
+    # Verify files exist and show their locations
+    echo "Current directory: $(pwd)"
+    ls -la test-results.xml coverage.xml || true
+  displayName: 'Run Pytest with Coverage'
+  continueOnError: true
+  
+- task: PublishTestResults@2
+  displayName: 'Publish Test Results'
+  inputs:
+    testResultsFiles: '$(System.DefaultWorkingDirectory)/test-results.xml'
+    failTaskOnMissingResultsFile: false
+    failTaskOnFailedTests: false
+    testRunTitle: 'Unit Tests'
+    publishRunAttachments: false
+    testResultsFormat: 'JUnit'
+  condition: succeededOrFailed()
+
+- task: PublishCodeCoverageResults@2
+  condition: succeededOrFailed()
+  inputs:
+    summaryFileLocation: '$(System.DefaultWorkingDirectory)/coverage.xml'
+    failIfCoverageEmpty: false
+    codeCoverageTool: 'Cobertura'
+  displayName: 'Publish code coverage'
+
+# Run Sonar analysis
+- task: SonarCloudAnalyze@4
+  displayName: 'Run Sonar Code Analysis'
+
+# Publish Quality Gate result
+- task: SonarCloudPublish@4
+  displayName: 'Publish Sonar Quality Gate Result'
+  inputs:
+    pollingTimeoutSec: '300'

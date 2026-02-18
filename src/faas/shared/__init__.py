@@ -5,6 +5,7 @@ This module contains common utilities, contracts, and middleware
 used across all AI component services.
 """
 
+
 from .agent_storage import AgentStorage
 from .config import (
     ServiceConfig,
@@ -17,10 +18,8 @@ from .contracts import (
     ServiceResponse,
     StandardHeaders,
 )
-from .database import (
-    DatabaseConnection,
-    get_database_connection,
-)
+from .database import get_database_connection
+from ...core.postgresql_database import DatabaseConnection
 from .exceptions import (
     InternalServerError,
     NotFoundError,

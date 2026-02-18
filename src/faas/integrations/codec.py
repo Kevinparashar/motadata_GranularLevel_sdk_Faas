@@ -1,12 +1,26 @@
+# Copyright (c) 2024. All rights reserved.
+# This source code is licensed under the MIT license and a copy
+# of the license can be found in the LICENSE file in the root directory.
+
 """
 CODEC Integration for FaaS services.
 
 Provides message serialization/deserialization for efficient data encoding.
 """
 
+
+import asyncio
 import json
 import logging
 from typing import Any, Dict, Optional
+
+# Import core codec integration
+try:
+    from ...core.codec_integration import CodecSerializer, create_codec_serializer
+except ImportError:
+    # Fallback if core codec not available
+    CodecSerializer = None
+    create_codec_serializer = None
 
 logger = logging.getLogger(__name__)
 
@@ -15,78 +29,173 @@ class CodecManager:
     """
     Codec manager for message serialization/deserialization.
 
-    This is a placeholder implementation. Replace with actual CODEC library
-    when CODEC integration is implemented.
+    Wraps core CodecSerializer for FaaS services with envelope support.
     """
 
     def __init__(self, codec_type: str = "json"):
         """
         Initialize codec manager.
-
+        
         Args:
-            codec_type: Codec type ("json", "msgpack", "protobuf")
+            codec_type (str): Codec type ("json", "msgpack", "protobuf")
         """
         self.codec_type = codec_type
-        logger.info(f"Codec manager initialized (placeholder) - type: {codec_type}")
+        # Use core codec serializer if available
+        if CodecSerializer is not None:
+            self._codec = create_codec_serializer(codec_type=codec_type)
+            logger.info(f"Codec manager initialized with core serializer - type: {codec_type}")
+        else:
+            self._codec = None
+            logger.warning("Core codec serializer not available, using fallback implementation")
 
-    def encode(self, data: Dict[str, Any]) -> bytes:
+    def create_envelope(
+        self,
+        message_type: str,
+        schema_version: str,
+        data: Dict[str, Any],
+    ) -> Dict[str, Any]:
         """
-        Encode data to bytes.
-
+        Create a message envelope.
+        
         Args:
-            data: Data dictionary to encode
-
+            message_type: Type of message (e.g., "agent_message")
+            schema_version: Schema version (e.g., "1.0")
+            data: Message data dictionary
+        
         Returns:
-            Encoded bytes
+            Envelope dictionary
         """
+        if self._codec is not None:
+            return self._codec.create_envelope(message_type, schema_version, data)
+        
+        # Fallback implementation
+        return {
+            "schema_version": schema_version,
+            "message_type": message_type,
+            "data": data,
+        }
+
+    async def encode(self, data: Dict[str, Any]) -> bytes:
+        """
+        Encode data to bytes asynchronously.
+        
+        If data is already an envelope (has schema_version and message_type),
+        encodes it directly. Otherwise, wraps it in a basic envelope.
+        
+        Args:
+            data (Dict[str, Any]): Data dictionary or envelope dictionary
+        
+        Returns:
+            bytes: Result of the operation.
+        
+        Raises:
+            ValueError: Raised when this function detects an invalid state or when an underlying call fails.
+        """
+        # Check if data is already an envelope
+        if isinstance(data, dict) and "schema_version" in data and "message_type" in data:
+            envelope = data
+        else:
+            # Wrap in basic envelope
+            envelope = self.create_envelope("generic_message", "1.0", data)
+        
+        # Use core codec if available
+        if self._codec is not None:
+            try:
+                return await self._codec.encode(envelope)
+            except Exception as e:
+                # Convert CodecEncodingError to ValueError for backward compatibility
+                if "Unsupported codec type" in str(e) or "unsupported" in str(e).lower():
+                    raise ValueError(f"Unsupported codec type: {self.codec_type}") from e
+                raise
+        
+        # Fallback implementation
+        def _encode_json() -> bytes:
+            """Encode data to JSON bytes."""
+            return json.dumps(envelope, default=str).encode("utf-8")
+        
         if self.codec_type == "json":
-            return json.dumps(data).encode("utf-8")
+            # Wrap JSON encoding in thread pool to avoid blocking event loop
+            return await asyncio.to_thread(_encode_json)
         elif self.codec_type == "msgpack":
             # TODO: SDK-INT-002 - Implement msgpack encoding  # NOSONAR - Tracked technical debt with ticket reference
-            # Placeholder implementation - replace with actual msgpack when integration is ready
-            # import msgpack
-            # return msgpack.packb(data)
             logger.warning("msgpack codec not implemented, falling back to JSON")
-            return json.dumps(data).encode("utf-8")
+            return await asyncio.to_thread(_encode_json)
         elif self.codec_type == "protobuf":
             # TODO: SDK-INT-002 - Implement protobuf encoding  # NOSONAR - Tracked technical debt with ticket reference
-            # Placeholder implementation - replace with actual protobuf when integration is ready
-            # from google.protobuf.message import Message
-            # return message.SerializeToString()
             logger.warning("protobuf codec not implemented, falling back to JSON")
-            return json.dumps(data).encode("utf-8")
+            return await asyncio.to_thread(_encode_json)
         else:
             raise ValueError(f"Unsupported codec type: {self.codec_type}")
 
-    def decode(self, data: bytes) -> Dict[str, Any]:
+    async def decode(self, data: bytes) -> Dict[str, Any]:
         """
-        Decode bytes to data dictionary.
-
+        Decode bytes to envelope dictionary asynchronously.
+        
         Args:
-            data: Encoded bytes to decode
-
+            data (bytes): Encoded bytes to decode
+        
         Returns:
-            Decoded data dictionary
+            Dict[str, Any]: Envelope dictionary with schema_version, message_type, and data
+        
+        Raises:
+            ValueError: Raised when this function detects an invalid state or when an underlying call fails.
         """
-        if self.codec_type == "json":
+        # Use core codec if available
+        if self._codec is not None:
+            try:
+                return await self._codec.decode(data)
+            except Exception as e:
+                # Convert CodecDecodingError to ValueError for backward compatibility
+                if "Unsupported codec type" in str(e) or "unsupported" in str(e).lower():
+                    raise ValueError(f"Unsupported codec type: {self.codec_type}") from e
+                raise
+        
+        # Fallback implementation
+        def _decode_json() -> Dict[str, Any]:
+            """Decode JSON bytes to dictionary."""
             return json.loads(data.decode("utf-8"))
+        
+        if self.codec_type == "json":
+            # Wrap JSON decoding in thread pool to avoid blocking event loop
+            return await asyncio.to_thread(_decode_json)
         elif self.codec_type == "msgpack":
             # TODO: SDK-INT-002 - Implement msgpack decoding  # NOSONAR - Tracked technical debt with ticket reference
-            # Placeholder implementation - replace with actual msgpack when integration is ready
-            # import msgpack
-            # return msgpack.unpackb(data, raw=False)
             logger.warning("msgpack codec not implemented, falling back to JSON")
-            return json.loads(data.decode("utf-8"))
+            return await asyncio.to_thread(_decode_json)
         elif self.codec_type == "protobuf":
             # TODO: SDK-INT-002 - Implement protobuf decoding  # NOSONAR - Tracked technical debt with ticket reference
-            # Placeholder implementation - replace with actual protobuf when integration is ready
-            # from google.protobuf.message import Message
-            # message.ParseFromString(data)
-            # return message_to_dict(message)
             logger.warning("protobuf codec not implemented, falling back to JSON")
-            return json.loads(data.decode("utf-8"))
+            return await asyncio.to_thread(_decode_json)
         else:
             raise ValueError(f"Unsupported codec type: {self.codec_type}")
+    
+    def validate_schema(self, envelope: Dict[str, Any], schema_name: Optional[str] = None) -> bool:
+        """
+        Validate envelope against schema.
+        
+        Args:
+            envelope: Envelope dictionary to validate
+            schema_name: Optional schema name (extracted from envelope if not provided)
+        
+        Returns:
+            True if valid
+        
+        Raises:
+            ValueError: If validation fails
+        """
+        if self._codec is not None:
+            return self._codec.validate_schema(envelope, schema_name)
+        
+        # Fallback: basic validation
+        if not isinstance(envelope, dict):
+            raise ValueError("Envelope must be a dictionary")
+        if "schema_version" not in envelope:
+            raise ValueError("Envelope missing 'schema_version'")
+        if "message_type" not in envelope:
+            raise ValueError("Envelope missing 'message_type'")
+        if "data" not in envelope:
+            raise ValueError("Envelope missing 'data'")
+        return True
 
 
 def create_codec_manager(codec_type: Optional[str] = None) -> CodecManager:

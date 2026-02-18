@@ -4,6 +4,7 @@ Type Helper Utilities
 Provides type aliases and helpers to reduce Any usage and improve type safety.
 """
 
+
 from typing import Any, Dict, Optional, TypeVar
 
 from typing_extensions import Protocol
@@ -20,11 +21,29 @@ class GatewayProtocol(Protocol):
     """Protocol for LiteLLM Gateway interface."""
 
     async def generate_async(self, prompt: str, **kwargs: Any) -> Any:
-        """Generate text asynchronously."""
+        """
+        Generate text asynchronously.
+        
+        Args:
+            prompt (str): Prompt text sent to the model.
+            **kwargs (Any): Input parameter for this operation.
+        
+        Returns:
+            Any: Result of the operation.
+        """
         ...
 
     def generate(self, prompt: str, **kwargs: Any) -> Any:
-        """Generate text synchronously."""
+        """
+        Generate text synchronously.
+        
+        Args:
+            prompt (str): Prompt text sent to the model.
+            **kwargs (Any): Input parameter for this operation.
+        
+        Returns:
+            Any: Result of the operation.
+        """
         ...
 
 
@@ -46,8 +65,16 @@ class ToolProtocol(Protocol):
     name: str
     description: str
 
-    def execute(self, **kwargs: Any) -> Any:
-        """Execute the tool."""
+    async def execute(self, **kwargs: Any) -> Any:
+        """
+        Execute the tool asynchronously.
+        
+        Args:
+            **kwargs (Any): Input parameter for this operation.
+        
+        Returns:
+            Any: Result of the operation.
+        """
         ...
 
 
@@ -55,14 +82,60 @@ class ToolProtocol(Protocol):
 class CacheProtocol(Protocol):
     """Protocol for Cache interface."""
 
-    def get(self, key: str, tenant_id: Optional[str] = None) -> Optional[Any]:
-        """Get value from cache."""
+    async def get(self, key: str, tenant_id: Optional[str] = None) -> Optional[Any]:
+        """
+        Get value from cache asynchronously.
+        
+        Args:
+            key (str): Input parameter for this operation.
+            tenant_id (Optional[str]): Tenant identifier used for tenant isolation.
+        
+        Returns:
+            Optional[Any]: Result if available, else None.
+        """
         ...
 
-    def set(
+    async def set(
         self, key: str, value: Any, tenant_id: Optional[str] = None, ttl: Optional[int] = None
     ) -> None:
-        """Set value in cache."""
+        """
+        Set value in cache asynchronously.
+        
+        Args:
+            key (str): Input parameter for this operation.
+            value (Any): Input parameter for this operation.
+            tenant_id (Optional[str]): Tenant identifier used for tenant isolation.
+            ttl (Optional[int]): Input parameter for this operation.
+        
+        Returns:
+            None: Result of the operation.
+        """
+        ...
+
+    async def delete(self, key: str, tenant_id: Optional[str] = None) -> None:
+        """
+        Delete key from cache asynchronously.
+        
+        Args:
+            key (str): Input parameter for this operation.
+            tenant_id (Optional[str]): Tenant identifier used for tenant isolation.
+        
+        Returns:
+            None: Result of the operation.
+        """
+        ...
+
+    async def invalidate_pattern(self, pattern: str, tenant_id: Optional[str] = None) -> None:
+        """
+        Invalidate cache keys matching pattern asynchronously.
+        
+        Args:
+            pattern (str): Input parameter for this operation.
+            tenant_id (Optional[str]): Tenant identifier used for tenant isolation.
+        
+        Returns:
+            None: Result of the operation.
+        """
         ...
 
 

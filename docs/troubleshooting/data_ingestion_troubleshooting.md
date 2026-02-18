@@ -388,7 +388,7 @@ except Exception as e:
 
 ## Related Documentation
 
-- **[Data Ingestion Service](../src/core/data_ingestion/README.md)** - Component documentation
+- **[Data Ingestion Service](../../src/core/data_ingestion/README.md)** - Component documentation
 - **[Multi-Modal Processing](../components/multimodal_data_processing.md)** - Format support
 - **[RAG System Troubleshooting](rag_system_troubleshooting.md)** - RAG-specific issues
 - **[Cache Mechanism Troubleshooting](cache_mechanism_troubleshooting.md)** - Cache issues

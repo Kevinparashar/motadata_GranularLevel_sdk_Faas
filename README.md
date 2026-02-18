@@ -4,6 +4,31 @@
 
 ---
 
+## 📄 Document Metadata
+
+| Property | Value |
+|----------|-------|
+| **Document Type** | Project README / Quick Start Guide |
+| **Audience** | Developers, Architects, Technical Leads |
+| **Scope** | High-level SDK overview and quick start only |
+| **Related Docs** | [Full Documentation](docs/README.md), [Onboarding Guide](docs/ONBOARDING_GUIDE.md) |
+
+### What This Document Covers
+
+- ✅ **What** the SDK is and who it's for
+- ✅ **Why** you would use this SDK
+- ✅ **Quick start** (5 minutes to first working code)
+- ✅ **Documentation roadmap** (where to go next)
+
+### What This Document Does NOT Cover
+
+- ❌ **Detailed component usage** → See [Component Documentation](docs/components/)
+- ❌ **Integration patterns** → See [Developer Integration Guide](docs/guide/DEVELOPER_INTEGRATION_GUIDE.md)
+- ❌ **Troubleshooting** → See [Troubleshooting Index](docs/troubleshooting/README.md)
+- ❌ **Development setup** → See [Development Guide](PYTHON_SDK_DEV_ENVIRONMENT_SETUP_GUIDE.md)
+
+---
+
 ## Table of Contents
 
 - [Quick Start](#-quick-start-5-minutes)
@@ -67,9 +92,51 @@ AI Response: Hello! I'm an AI assistant ready to help you.
 
 ---
 
-## Overview
+## What Is This SDK?
 
-The Motadata Python AI SDK is a comprehensive, modular SDK for building AI-powered applications. It provides a unified interface for LLM operations, agent frameworks, RAG systems, machine learning capabilities, and database operations, all designed with modularity and swappability in mind.
+### The 30-Second Summary
+
+The **Motadata Python AI SDK** is a production-ready, modular framework for building AI-powered applications in Python.
+
+**What it provides:**
+- 🤖 **Autonomous AI Agents** with memory, tools, and multi-agent orchestration
+- 📚 **RAG (Retrieval-Augmented Generation)** for document Q&A systems
+- 🔌 **Unified LLM Gateway** supporting OpenAI, Anthropic, Google, and more
+- 🧠 **Machine Learning Framework** with training, inference, and MLOps
+- 💾 **Built-in Infrastructure** (vector DB, caching, observability)
+- ⚡ **Dual Mode**: Use as a library or deploy as microservices (FaaS)
+
+### Who This Is For
+
+- **Developers** building AI-powered SaaS applications
+- **Teams** who need production-ready AI infrastructure
+- **Enterprises** requiring multi-tenant AI systems
+- **Startups** wanting to move fast without reinventing AI plumbing
+
+### Why Use This SDK?
+
+**Instead of...**
+- ❌ Building your own LLM abstraction layer
+- ❌ Figuring out vector databases and embeddings
+- ❌ Implementing agent frameworks from scratch
+- ❌ Setting up observability and caching
+
+**You get...**
+- ✅ **Pre-built, tested components** that work together
+- ✅ **Multi-tenant by design** (tenant isolation everywhere)
+- ✅ **Production-grade features** (caching, retries, circuit breakers)
+- ✅ **Swappable components** (not locked into any single framework)
+
+### How Documentation Is Organized
+
+1. **This README** - Quick start and SDK overview
+2. **[Onboarding Guide](docs/ONBOARDING_GUIDE.md)** - Complete introduction for new team members
+3. **[Component Documentation](docs/components/)** - Deep dives into each component
+4. **[Integration Guides](docs/guide/DEVELOPER_INTEGRATION_GUIDE.md)** - How to build with the SDK
+5. **[Troubleshooting](docs/troubleshooting/)** - Solutions to common problems
+6. **[Examples](examples/)** - Working code samples for every component
+
+---
 
 ## Features
 
@@ -124,7 +191,6 @@ The Motadata Python AI SDK is a comprehensive, modular SDK for building AI-power
 - **Want to reduce API costs?** → Use [Cache Mechanism](src/core/cache_mechanism/README.md)
 - **Need monitoring and debugging?** → Use [Observability](src/core/evaluation_observability/README.md)
 - **Managing prompts and templates?** → Use [Prompt Context Management](src/core/prompt_context_management/README.md)
-- **Building REST APIs?** → Use [API Backend Services](src/core/api_backend_services/README.md)
 - **Deploying as microservices?** → Use [FaaS Services](src/faas/README.md)
 
 **For detailed guidance on each component, see their individual README files which include:**
@@ -157,7 +223,6 @@ The SDK follows a layered architecture with clear separation of concerns:
 
 ### Application Layer
 - **RAG System**: Document processing, retrieval, and generation
-- **API Backend Services**: RESTful API endpoints exposing SDK functionality
 
 ### Design Principles
 - **Interface-Based Design**: Components implement interfaces defined in `src/core/interfaces.py` for easy swapping
@@ -191,7 +256,6 @@ motadata-python-ai-sdk/
 │   │   ├── prompt_context_management/
 │   │   ├── prompt_based_generator/  # Prompt-based agent/tool creation
 │   │   ├── evaluation_observability/
-│   │   ├── api_backend_services/
 │   │   └── cache_mechanism/
 │   ├── faas/                    # FaaS Services (API Layer)
 │   │   ├── services/            # AI Component Services
@@ -325,11 +389,7 @@ motadata-python-ai-sdk/
    - Structured logging
    - Metrics collection
 
-8. **API Backend Services** (`src/core/api_backend_services/`)
-   - RESTful API endpoints
-   - Backend integration
-
-9. **Cache Mechanism** (`src/core/cache_mechanism/`)
+8. **Cache Mechanism** (`src/core/cache_mechanism/`)
    - Response, embedding, and query result caching
    - In-memory (LRU + TTL) and optional Dragonfly backend
    - Pattern-based invalidation and max-size enforcement
@@ -429,8 +489,6 @@ Each AI component is also available as an independent REST API service for micro
 ```
 User Request
     ↓
-API Backend Services
-    ↓
     ├─→ Agent Framework → LiteLLM Gateway → LLM Providers
     ├─→ RAG System → Vector Database → PostgreSQL
     └─→ Other Components
@@ -472,7 +530,7 @@ The SDK requires the following key libraries (automatically installed with requi
 - **pydantic**: Data validation and settings management
 - **litellm**: Unified LLM gateway
 - **psycopg2-binary**: PostgreSQL database adapter
-- **fastapi/uvicorn**: API framework (for API Backend component)
+- **fastapi/uvicorn**: API framework (for FaaS Services)
 - **opentelemetry**: Observability and tracing
 - **httpx/aiohttp**: Async HTTP clients
 - **dragonfly**: Caching backend (optional, Redis-compatible)
@@ -660,12 +718,6 @@ from src.core.cache_mechanism import create_memory_cache, create_dragonfly_cache
 
 cache = create_memory_cache(default_ttl=600, max_size=2048)
 dragonfly_cache = create_dragonfly_cache(dragonfly_url="dragonfly://localhost:6379/0")
-
-# API Backend Services
-from src.core.api_backend_services import create_api_app, create_api_router
-
-app = create_api_app(title="AI SDK API", enable_cors=True)
-router = create_api_router(prefix="/api/v1", tags=["agents"])
 ```
 
 ### High-Level Convenience Functions
@@ -747,19 +799,6 @@ from src.core.cache_mechanism import cache_get, cache_set, cache_delete
 cache_set(cache, "user:123", {"name": "John"}, ttl=600)
 value = cache_get(cache, "user:123")
 cache_delete(cache, "user:123")
-
-# API Operations
-from src.core.api_backend_services import (
-    register_router,
-    create_rag_endpoints,
-    create_agent_endpoints,
-    add_health_check
-)
-
-create_rag_endpoints(router, rag, prefix="/api/rag")
-create_agent_endpoints(router, agent_manager, prefix="/api/agents")
-register_router(app, router)
-add_health_check(app, path="/health")
 ```
 
 ### Utility Functions
@@ -839,18 +878,6 @@ print(result["answer"])
 from src.core.cache_mechanism import create_memory_cache, cache_set
 cache = create_memory_cache(default_ttl=600)
 cache_set(cache, "result", result, ttl=300)
-
-# Create API app
-from src.core.api_backend_services import (
-    create_api_app,
-    create_api_router,
-    create_rag_endpoints,
-    register_router
-)
-app = create_api_app(title="AI SDK API")
-router = create_api_router(prefix="/api/v1")
-create_rag_endpoints(router, rag)
-register_router(app, router)
 ```
 
 See component-specific README files for detailed function documentation.
@@ -892,7 +919,6 @@ The SDK includes comprehensive working examples and tutorials:
   - `05_agent_basic.py` - Agent framework
   - `06_prompt_context_basic.py` - Prompt management
   - `07_rag_basic.py` - RAG system
-  - `08_api_backend_basic.py` - REST API endpoints
 
 ### Integration Examples
 - **Component Integration**: See `examples/integration/` for multi-component examples
@@ -940,14 +966,12 @@ The SDK includes comprehensive test suites:
   - `test_agent_functions.py` - Agent framework functions tests
   - `test_rag_functions.py` - RAG system functions tests
   - `test_cache_functions.py` - Cache mechanism functions tests
-  - `test_api_functions.py` - API backend functions tests
   - `test_litellm_gateway_functions.py` - LiteLLM Gateway functions tests
   - `test_prompt_context_functions.py` - Prompt context functions tests
 
 ### Integration Tests
 - **Component Integration**: See `src/tests/integration_tests/` for integration tests
   - `test_agent_rag_integration.py` - Agent-RAG integration
-  - `test_api_agent_integration.py` - API-Agent integration
   - `test_end_to_end_workflows.py` - Complete workflow tests
   - `test_nats_integration.py` - NATS messaging integration
   - `test_otel_integration.py` - OpenTelemetry observability integration
@@ -1090,12 +1114,12 @@ MIT License - see LICENSE file for details.
 
 ## Related
 
-- [Onboarding Guide](ONBOARDING_GUIDE.md) - Complete guide for new team members
+- [Onboarding Guide](docs/ONBOARDING_GUIDE.md) - Complete guide for new team members
 - [Documentation Index](docs/guide/DOCUMENTATION_INDEX.md) - Complete navigation
 - [Developer Integration Guide](docs/guide/DEVELOPER_INTEGRATION_GUIDE.md) - Component development and integration
 - [Development Environment Setup Guide](PYTHON_SDK_DEV_ENVIRONMENT_SETUP_GUIDE.md) - Local development setup
 - [Quality Gate Rules](PYTHON_SDK_QUALITY_GATE_RULES_AND_DEVELOPMENT_GUIDELINE_DOCUMENT.md) - Quality standards
-- [Changelog](CHANGELOG.md) - Version history
+- [Changelog](docs/guide/CHANGELOG.md) - Version history
 
 ## Feedback
 

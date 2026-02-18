@@ -4,6 +4,7 @@ Agent Plugins
 Plugin system for extending agent capabilities.
 """
 
+
 import importlib
 from abc import ABC, abstractmethod
 from enum import Enum
@@ -64,13 +65,21 @@ class AgentPlugin(BaseModel, ABC):
         Initialize the plugin.
 
         Args:
-            agent: Agent instance
+            agent (Any): Input parameter for this operation.
+        
+        Returns:
+            None: Result of the operation.
         """
         pass
 
     @abstractmethod
     def cleanup(self) -> None:
-        """Cleanup plugin resources."""
+        """
+        Cleanup plugin resources.
+        
+        Returns:
+            None: Result of the operation.
+        """
         pass
 
     def register_hook(self, hook_name: str, callback: Callable, priority: int = 0) -> None:
@@ -78,9 +87,12 @@ class AgentPlugin(BaseModel, ABC):
         Register a plugin hook.
 
         Args:
-            hook_name: Name of the hook
-            callback: Callback function
-            priority: Hook priority
+            hook_name (str): Input parameter for this operation.
+            callback (Callable): Input parameter for this operation.
+            priority (int): Input parameter for this operation.
+        
+        Returns:
+            None: Result of the operation.
         """
         hook = PluginHook(hook_name=hook_name, callback=callback, priority=priority)
         self.hooks.append(hook)
@@ -90,10 +102,10 @@ class AgentPlugin(BaseModel, ABC):
         Hook called when a task starts.
 
         Args:
-            task: Task being started
-
+            task (Any): Input parameter for this operation.
+        
         Returns:
-            Optional modified task
+            Optional[Any]: Result if available, else None.
         """
         return None
 
@@ -102,11 +114,11 @@ class AgentPlugin(BaseModel, ABC):
         Hook called when a task completes.
 
         Args:
-            task: Completed task
-            result: Task result
-
+            task (Any): Input parameter for this operation.
+            result (Any): Input parameter for this operation.
+        
         Returns:
-            Optional modified result
+            Optional[Any]: Result if available, else None.
         """
         return None
 
@@ -115,10 +127,10 @@ class AgentPlugin(BaseModel, ABC):
         Hook called when a message is received.
 
         Args:
-            message: Received message
-
+            message (Any): Input parameter for this operation.
+        
         Returns:
-            Optional modified message
+            Optional[Any]: Result if available, else None.
         """
         return None
 
@@ -136,8 +148,15 @@ class PluginManager:
         Register a plugin.
 
         Args:
-            plugin: Plugin to register
-            agent: Optional agent instance for initialization
+            plugin (AgentPlugin): Input parameter for this operation.
+            agent (Optional[Any]): Input parameter for this operation.
+        
+        Returns:
+            None: Result of the operation.
+        
+        Raises:
+            RuntimeError: Raised when this function detects an invalid state or when an underlying call fails.
+            ValueError: Raised when this function detects an invalid state or when an underlying call fails.
         """
         # Check dependencies
         for dep in plugin.dependencies:
@@ -170,12 +189,15 @@ class PluginManager:
         Load a plugin from a Python module.
 
         Args:
-            module_path: Path to Python module
-            plugin_class_name: Name of plugin class
-            agent: Optional agent instance
-
+            module_path (str): Input parameter for this operation.
+            plugin_class_name (str): Input parameter for this operation.
+            agent (Optional[Any]): Input parameter for this operation.
+        
         Returns:
-            Loaded plugin
+            AgentPlugin: Result of the operation.
+        
+        Raises:
+            RuntimeError: Raised when this function detects an invalid state or when an underlying call fails.
         """
         try:
             module = importlib.import_module(module_path)
@@ -192,10 +214,10 @@ class PluginManager:
         Get a plugin by ID.
 
         Args:
-            plugin_id: Plugin identifier
-
+            plugin_id (str): Input parameter for this operation.
+        
         Returns:
-            Plugin or None
+            Optional[AgentPlugin]: Result if available, else None.
         """
         return self._plugins.get(plugin_id)
 
@@ -204,7 +226,7 @@ class PluginManager:
         List all registered plugins.
 
         Returns:
-            List of plugins
+            List[AgentPlugin]: List result of the operation.
         """
         return list(self._plugins.values())
 
@@ -213,12 +235,12 @@ class PluginManager:
         Execute all hooks for a hook name.
 
         Args:
-            hook_name: Name of hook to execute
-            *args: Hook arguments
-            **kwargs: Hook keyword arguments
-
+            hook_name (str): Input parameter for this operation.
+            *args (Any): Input parameter for this operation.
+            **kwargs (Any): Input parameter for this operation.
+        
         Returns:
-            List of hook results
+            List[Any]: List result of the operation.
         """
         results = []
 
@@ -238,7 +260,10 @@ class PluginManager:
         Unregister a plugin.
 
         Args:
-            plugin_id: Plugin identifier
+            plugin_id (str): Input parameter for this operation.
+        
+        Returns:
+            None: Result of the operation.
         """
         plugin = self._plugins.get(plugin_id)
         if plugin:
@@ -269,9 +294,22 @@ class ExamplePlugin(AgentPlugin):
         )
 
     def initialize(self, agent: Any) -> None:
-        """Initialize the plugin."""
+        """
+        Initialize the plugin.
+        
+        Args:
+            agent (Any): Input parameter for this operation.
+        
+        Returns:
+            None: Result of the operation.
+        """
         self.status = PluginStatus.ACTIVE
 
     def cleanup(self) -> None:
-        """Cleanup plugin resources."""
+        """
+        Cleanup plugin resources.
+        
+        Returns:
+            None: Result of the operation.
+        """
         self.status = PluginStatus.INACTIVE

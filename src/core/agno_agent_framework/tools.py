@@ -4,6 +4,7 @@ Agent Tools
 Tools that agents can use to extend their capabilities.
 """
 
+
 import inspect
 from enum import Enum
 from typing import Any, Callable, Dict, List, Optional
@@ -62,21 +63,23 @@ class Tool(BaseModel):
     class Config:
         arbitrary_types_allowed = True
 
-    def execute(self, **kwargs: Any) -> Any:
+    async def execute(self, **kwargs: Any) -> Any:
         """
-        Execute the tool.
-
+        Execute the tool asynchronously.
+        
         Args:
-            **kwargs: Tool parameters
-
+            **kwargs (Any): Input parameter for this operation.
+        
         Returns:
-            Tool execution result
-
+            Any: Result of the operation.
+        
         Raises:
-            ToolNotImplementedError: If tool has no function implementation
-            ToolValidationError: If required parameters are missing
-            ToolInvocationError: If tool execution fails
+            ToolInvocationError: Raised when this function detects an invalid state or when an underlying call fails.
+            ToolNotImplementedError: Raised when this function detects an invalid state or when an underlying call fails.
+            ToolValidationError: Raised when this function detects an invalid state or when an underlying call fails.
         """
+        import asyncio
+        
         if self.function is None:
             raise ToolNotImplementedError(self.name)
 
@@ -89,13 +92,17 @@ class Tool(BaseModel):
                 tool_name=self.name,
                 missing_parameters=[str(e)],
                 original_error=e,
-            )
+            ) from e
 
-        # Execute function
+        # Execute function (async or sync)
         try:
-            return self.function(**kwargs)
+            if asyncio.iscoroutinefunction(self.function):
+                return await self.function(**kwargs)
+            else:
+                # Run sync function in executor to avoid blocking
+                loop = asyncio.get_event_loop()
+                return await loop.run_in_executor(None, lambda: self.function(**kwargs))
         except ToolInvocationError:
-            # Re-raise tool invocation errors as-is
             raise
         except Exception as e:
             raise ToolInvocationError(
@@ -104,17 +111,20 @@ class Tool(BaseModel):
                 arguments=kwargs,
                 error_type="runtime",
                 original_error=e,
-            )
+            ) from e
 
     def _validate_parameters(self, provided: Dict[str, Any]) -> None:
         """
         Validate provided parameters.
 
         Args:
-            provided: Provided parameters
-
+            provided (Dict[str, Any]): Input parameter for this operation.
+        
+        Returns:
+            None: Result of the operation.
+        
         Raises:
-            ToolValidationError: If validation fails
+            ToolValidationError: Raised when this function detects an invalid state or when an underlying call fails.
         """
         missing_params = []
         for param in self.parameters:
@@ -133,7 +143,7 @@ class Tool(BaseModel):
         Get tool schema for LLM function calling.
 
         Returns:
-            Tool schema dictionary
+            Dict[str, Any]: Dictionary result of the operation.
         """
         properties = {}
         required = []
@@ -163,7 +173,15 @@ class ToolRegistry:
         self._tools: Dict[str, Tool] = {}
 
     def _detect_param_type(self, param: inspect.Parameter) -> str:
-        """Detect parameter type from annotation."""
+        """
+        Detect parameter type from annotation.
+        
+        Args:
+            param (inspect.Parameter): Input parameter for this operation.
+        
+        Returns:
+            str: Returned text value.
+        """
         if param.annotation == inspect.Parameter.empty:
             return "string"
         
@@ -179,7 +197,16 @@ class ToolRegistry:
         return "string"
 
     def _create_tool_parameter(self, param_name: str, param: inspect.Parameter) -> ToolParameter:
-        """Create a ToolParameter from a function parameter."""
+        """
+        Create a ToolParameter from a function parameter.
+        
+        Args:
+            param_name (str): Input parameter for this operation.
+            param (inspect.Parameter): Input parameter for this operation.
+        
+        Returns:
+            ToolParameter: Result of the operation.
+        """
         return ToolParameter(
             name=param_name,
             type=self._detect_param_type(param),
@@ -189,7 +216,15 @@ class ToolRegistry:
         )
 
     def _auto_detect_parameters(self, function: Callable) -> List[ToolParameter]:
-        """Auto-detect parameters from function signature."""
+        """
+        Auto-detect parameters from function signature.
+        
+        Args:
+            function (Callable): Input parameter for this operation.
+        
+        Returns:
+            List[ToolParameter]: List result of the operation.
+        """
         sig = inspect.signature(function)
         return [
             self._create_tool_parameter(param_name, param)
@@ -201,8 +236,11 @@ class ToolRegistry:
         Register a tool.
 
         Args:
-            tool: Tool to register
-            auto_register_function: If True, auto-detect parameters from function
+            tool (Tool): Input parameter for this operation.
+            auto_register_function (bool): Input parameter for this operation.
+        
+        Returns:
+            None: Result of the operation.
         """
         if auto_register_function and tool.function:
             tool.parameters = self._auto_detect_parameters(tool.function)
@@ -216,13 +254,13 @@ class ToolRegistry:
         Register a function as a tool.
 
         Args:
-            name: Tool name
-            function: Function to register
-            description: Tool description
-            tool_id: Optional tool ID
-
+            name (str): Name value.
+            function (Callable): Input parameter for this operation.
+            description (str): Human-readable description text.
+            tool_id (Optional[str]): Tool identifier.
+        
         Returns:
-            Created tool
+            Tool: Result of the operation.
         """
         import uuid
 
@@ -242,10 +280,10 @@ class ToolRegistry:
         Get a tool by ID.
 
         Args:
-            tool_id: Tool identifier
-
+            tool_id (str): Tool identifier.
+        
         Returns:
-            Tool or None
+            Optional[Tool]: Result if available, else None.
         """
         return self._tools.get(tool_id)
 
@@ -254,10 +292,10 @@ class ToolRegistry:
         Get a tool by name.
 
         Args:
-            name: Tool name
-
+            name (str): Name value.
+        
         Returns:
-            Tool or None
+            Optional[Tool]: Result if available, else None.
         """
         for tool in self._tools.values():
             if tool.name == name:
@@ -269,10 +307,10 @@ class ToolRegistry:
         List all tools.
 
         Args:
-            tags: Optional tag filter
-
+            tags (Optional[List[str]]): Input parameter for this operation.
+        
         Returns:
-            List of tools
+            List[Tool]: List result of the operation.
         """
         tools = list(self._tools.values())
 
@@ -286,7 +324,7 @@ class ToolRegistry:
         Get schemas for all tools (for LLM function calling).
 
         Returns:
-            List of tool schemas
+            List[Dict[str, Any]]: Dictionary result of the operation.
         """
         return [tool.get_schema() for tool in self._tools.values()]
 
@@ -299,24 +337,27 @@ class ToolExecutor:
         Initialize tool executor.
 
         Args:
-            registry: Tool registry
+            registry (ToolRegistry): Input parameter for this operation.
         """
         self.registry = registry
 
-    def execute_tool_call(self, tool_name: str, arguments: Dict[str, Any]) -> Any:
+    async def execute_tool_call(self, tool_name: str, arguments: Dict[str, Any]) -> Any:
         """
-        Execute a tool call.
-
+        Execute a tool call asynchronously.
+        
         Args:
-            tool_name: Name of tool to execute
-            arguments: Tool arguments
-
+            tool_name (str): Input parameter for this operation.
+            arguments (Dict[str, Any]): Input parameter for this operation.
+        
         Returns:
-            Tool execution result
+            Any: Result of the operation.
+        
+        Raises:
+            ToolNotFoundError: Raised when this function detects an invalid state or when an underlying call fails.
         """
         tool = self.registry.get_tool_by_name(tool_name)
 
         if tool is None:
             raise ToolNotFoundError(tool_name)
 
-        return tool.execute(**arguments)
+        return await tool.execute(**arguments)

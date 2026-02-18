@@ -4,6 +4,7 @@ Feedback Integration
 Integration with feedback loop system for agent and tool feedback collection.
 """
 
+
 from datetime import datetime
 from typing import Any, Dict, Optional
 
@@ -50,15 +51,15 @@ class FeedbackCollector:
     def __init__(self, feedback_loop: Optional[FeedbackLoop] = None):
         """
         Initialize feedback collector.
-
+        
         Args:
-            feedback_loop: Optional FeedbackLoop instance
+            feedback_loop (Optional[FeedbackLoop]): Input parameter for this operation.
         """
         self.feedback_loop = feedback_loop
         self._agent_feedback: Dict[str, list] = {}  # {agent_id: [feedback]}
         self._tool_feedback: Dict[str, list] = {}  # {tool_id: [feedback]}
 
-    def collect_agent_feedback(
+    async def collect_agent_feedback(
         self,
         agent_id: str,
         rating: int,
@@ -69,19 +70,19 @@ class FeedbackCollector:
         metadata: Optional[Dict[str, Any]] = None,
     ) -> str:
         """
-        Collect feedback for an agent.
-
+        Collect feedback for an agent asynchronously.
+        
         Args:
-            agent_id: Agent ID
-            rating: Rating (1-5)
-            user_id: User ID
-            tenant_id: Tenant ID
-            feedback_text: Optional feedback text
-            effectiveness_score: Optional effectiveness score (0.0-1.0)
-            metadata: Optional metadata
-
+            agent_id (str): Input parameter for this operation.
+            rating (int): Input parameter for this operation.
+            user_id (str): User identifier (used for auditing or personalization).
+            tenant_id (str): Tenant identifier used for tenant isolation.
+            feedback_text (Optional[str]): Input parameter for this operation.
+            effectiveness_score (Optional[float]): Input parameter for this operation.
+            metadata (Optional[Dict[str, Any]]): Extra metadata for the operation.
+        
         Returns:
-            Feedback ID
+            str: Returned text value.
         """
         feedback = AgentFeedback(
             agent_id=agent_id,
@@ -100,7 +101,7 @@ class FeedbackCollector:
 
         # Also record in feedback loop if available
         if self.feedback_loop:
-            self.feedback_loop.record_feedback(
+            await self.feedback_loop.record_feedback(
                 query=f"Agent {agent_id} feedback",
                 response=f"Rating: {rating}, Effectiveness: {feedback.effectiveness_score}",
                 feedback_type=FeedbackType.RATING,
@@ -116,7 +117,7 @@ class FeedbackCollector:
 
         return feedback.agent_id
 
-    def collect_tool_feedback(
+    async def collect_tool_feedback(
         self,
         tool_id: str,
         rating: int,
@@ -127,19 +128,19 @@ class FeedbackCollector:
         metadata: Optional[Dict[str, Any]] = None,
     ) -> str:
         """
-        Collect feedback for a tool.
-
+        Collect feedback for a tool asynchronously.
+        
         Args:
-            tool_id: Tool ID
-            rating: Rating (1-5)
-            user_id: User ID
-            tenant_id: Tenant ID
-            feedback_text: Optional feedback text
-            performance_score: Optional performance score (0.0-1.0)
-            metadata: Optional metadata
-
+            tool_id (str): Tool identifier.
+            rating (int): Input parameter for this operation.
+            user_id (str): User identifier (used for auditing or personalization).
+            tenant_id (str): Tenant identifier used for tenant isolation.
+            feedback_text (Optional[str]): Input parameter for this operation.
+            performance_score (Optional[float]): Input parameter for this operation.
+            metadata (Optional[Dict[str, Any]]): Extra metadata for the operation.
+        
         Returns:
-            Feedback ID
+            str: Returned text value.
         """
         feedback = ToolFeedback(
             tool_id=tool_id,
@@ -158,7 +159,7 @@ class FeedbackCollector:
 
         # Also record in feedback loop if available
         if self.feedback_loop:
-            self.feedback_loop.record_feedback(
+            await self.feedback_loop.record_feedback(
                 query=f"Tool {tool_id} feedback",
                 response=f"Rating: {rating}, Performance: {feedback.performance_score}",
                 feedback_type=FeedbackType.RATING,
@@ -179,13 +180,13 @@ class FeedbackCollector:
     ) -> Dict[str, Any]:
         """
         Get feedback statistics for an agent.
-
+        
         Args:
-            agent_id: Agent ID
-            tenant_id: Optional tenant ID filter
-
+            agent_id (str): Input parameter for this operation.
+            tenant_id (Optional[str]): Tenant identifier used for tenant isolation.
+        
         Returns:
-            Dictionary with feedback statistics
+            Dict[str, Any]: Dictionary result of the operation.
         """
         if agent_id not in self._agent_feedback:
             return {"total_feedback": 0, "average_rating": 0.0, "average_effectiveness": 0.0}
@@ -220,13 +221,13 @@ class FeedbackCollector:
     ) -> Dict[str, Any]:
         """
         Get feedback statistics for a tool.
-
+        
         Args:
-            tool_id: Tool ID
-            tenant_id: Optional tenant ID filter
-
+            tool_id (str): Tool identifier.
+            tenant_id (Optional[str]): Tenant identifier used for tenant isolation.
+        
         Returns:
-            Dictionary with feedback statistics
+            Dict[str, Any]: Dictionary result of the operation.
         """
         if tool_id not in self._tool_feedback:
             return {"total_feedback": 0, "average_rating": 0.0, "average_performance": 0.0}

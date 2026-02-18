@@ -4,12 +4,17 @@ LLMOps - LLM Operations and Monitoring
 Comprehensive logging, monitoring, and operational management for LLM operations.
 """
 
+
 import json
+import logging
+import time
 from dataclasses import dataclass, field
 from datetime import datetime
 from enum import Enum
 from pathlib import Path
 from typing import Any, Dict, List, Optional
+
+logger = logging.getLogger(__name__)
 
 
 class LLMOperationType(str, Enum):
@@ -65,14 +70,18 @@ class LLMOps:
         storage_path: Optional[str] = None,
         enable_logging: bool = True,
         enable_cost_tracking: bool = True,
+        otel_tracer: Optional[Any] = None,
+        otel_metrics: Optional[Any] = None,
     ):
         """
         Initialize LLMOps.
-
+        
         Args:
-            storage_path: Optional path for persistent storage
-            enable_logging: Whether to enable operation logging
-            enable_cost_tracking: Whether to track costs
+            storage_path (Optional[str]): Input parameter for this operation.
+            enable_logging (bool): Flag to enable or disable logging.
+            enable_cost_tracking (bool): Flag to enable or disable cost tracking.
+            otel_tracer: Optional OTEL tracer for distributed tracing
+            otel_metrics: Optional OTEL metrics for metrics collection
         """
         self.storage_path = Path(storage_path) if storage_path else None
         self.enable_logging = enable_logging
@@ -91,10 +100,44 @@ class LLMOps:
             "claude-3-haiku": {"prompt": 0.25, "completion": 1.25},
         }
 
-        if self.storage_path and self.storage_path.exists():
-            self._load()
+        # OTEL Integration (optional)
+        self.otel_tracer: Optional[Any] = otel_tracer
+        self.otel_metrics: Optional[Any] = otel_metrics
 
-    def log_operation(
+        # Initialize OTEL if not provided
+        if self.otel_tracer is None:
+            try:
+                from ..otel_integration import create_otel_tracer
+
+                self.otel_tracer = create_otel_tracer(service_name="llmops")
+            except (ImportError, Exception):
+                self.otel_tracer = None
+
+        if self.otel_metrics is None:
+            try:
+                from ..otel_integration import create_otel_metrics
+
+                self.otel_metrics = create_otel_metrics(service_name="llmops")
+            except (ImportError, Exception):
+                self.otel_metrics = None
+
+    async def initialize(self) -> None:
+        """
+        Initialize LLMOps asynchronously (loads persisted operations).
+        
+        This should be called after __init__ to load operations from disk.
+        
+        Example:
+            >>> llmops = LLMOps(storage_path="llmops.json")
+            >>> await llmops.initialize()
+        
+        Returns:
+            None: Result of the operation.
+        """
+        if self.storage_path and self.storage_path.exists():
+            await self._load()
+
+    async def log_operation(
         self,
         operation_type: LLMOperationType,
         model: str,
@@ -108,65 +151,159 @@ class LLMOps:
         metadata: Optional[Dict[str, Any]] = None,
     ) -> str:
         """
-        Log an LLM operation.
-
+        Log an LLM operation asynchronously.
+        
         Args:
-            operation_type: Type of operation
-            model: Model used
-            prompt_tokens: Number of prompt tokens
-            completion_tokens: Number of completion tokens
-            latency_ms: Operation latency in milliseconds
-            status: Operation status
-            error_message: Optional error message
-            tenant_id: Optional tenant ID
-            agent_id: Optional agent ID
-            metadata: Optional metadata
-
+            operation_type (LLMOperationType): Input parameter for this operation.
+            model (str): Model name or identifier to use.
+            prompt_tokens (int): Input parameter for this operation.
+            completion_tokens (int): Input parameter for this operation.
+            latency_ms (float): Input parameter for this operation.
+            status (LLMOperationStatus): Input parameter for this operation.
+            error_message (Optional[str]): Input parameter for this operation.
+            tenant_id (Optional[str]): Tenant identifier used for tenant isolation.
+            agent_id (Optional[str]): Input parameter for this operation.
+            metadata (Optional[Dict[str, Any]]): Extra metadata for the operation.
+        
         Returns:
-            Operation ID
+            str: Returned text value.
         """
         if not self.enable_logging:
             return ""
 
-        import uuid
+        # OTEL Integration
+        if self.otel_tracer:
+            with self.otel_tracer.start_trace("llmops.log_operation") as trace:
+                trace.set_attribute("llmops.operation_type", operation_type.value)
+                trace.set_attribute("llmops.model", model)
+                trace.set_attribute("llmops.prompt_tokens", prompt_tokens)
+                trace.set_attribute("llmops.completion_tokens", completion_tokens)
+                trace.set_attribute("llmops.latency_ms", latency_ms)
+                trace.set_attribute("llmops.status", status.value)
+                if tenant_id:
+                    trace.set_attribute("llmops.tenant_id", tenant_id)
+                if agent_id:
+                    trace.set_attribute("llmops.agent_id", agent_id)
 
-        operation_id = str(uuid.uuid4())
-        total_tokens = prompt_tokens + completion_tokens
+                try:
+                    import uuid
 
-        # Calculate cost
-        cost_usd = 0.0
-        if self.enable_cost_tracking:
-            model_key = model.split("/")[-1] if "/" in model else model
-            costs = self.model_costs.get(model_key, {"prompt": 0.0, "completion": 0.0})
-            cost_usd = (prompt_tokens / 1_000_000) * costs.get("prompt", 0.0) + (
-                completion_tokens / 1_000_000
-            ) * costs.get("completion", 0.0)
+                    operation_id = str(uuid.uuid4())
+                    total_tokens = prompt_tokens + completion_tokens
 
-        operation = LLMOperation(
-            operation_id=operation_id,
-            operation_type=operation_type,
-            model=model,
-            tenant_id=tenant_id,
-            agent_id=agent_id,
-            prompt_tokens=prompt_tokens,
-            completion_tokens=completion_tokens,
-            total_tokens=total_tokens,
-            latency_ms=latency_ms,
-            cost_usd=cost_usd,
-            status=status,
-            error_message=error_message,
-            metadata=metadata or {},
-        )
+                    # Calculate cost
+                    cost_usd = 0.0
+                    if self.enable_cost_tracking:
+                        model_key = model.split("/")[-1] if "/" in model else model
+                        costs = self.model_costs.get(model_key, {"prompt": 0.0, "completion": 0.0})
+                        cost_usd = (prompt_tokens / 1_000_000) * costs.get("prompt", 0.0) + (
+                            completion_tokens / 1_000_000
+                        ) * costs.get("completion", 0.0)
 
-        self.operations.append(operation)
+                    operation = LLMOperation(
+                        operation_id=operation_id,
+                        operation_type=operation_type,
+                        model=model,
+                        tenant_id=tenant_id,
+                        agent_id=agent_id,
+                        prompt_tokens=prompt_tokens,
+                        completion_tokens=completion_tokens,
+                        total_tokens=total_tokens,
+                        latency_ms=latency_ms,
+                        cost_usd=cost_usd,
+                        status=status,
+                        error_message=error_message,
+                        metadata=metadata or {},
+                    )
 
-        # Trim if exceeds max
-        if len(self.operations) > self.max_operations_in_memory:
-            self.operations = self.operations[-self.max_operations_in_memory :]
+                    self.operations.append(operation)
 
-        self._persist()
+                    # Trim if exceeds max
+                    if len(self.operations) > self.max_operations_in_memory:
+                        self.operations = self.operations[-self.max_operations_in_memory :]
 
-        return operation_id
+                    await self._persist()
+
+                    trace.set_attribute("llmops.operation_id", operation_id)
+                    trace.set_attribute("llmops.total_tokens", total_tokens)
+                    trace.set_attribute("llmops.cost_usd", cost_usd)
+
+                    if self.otel_metrics:
+                        self.otel_metrics.increment_counter(
+                            "llmops.operations.logged",
+                            amount=1.0,
+                            attributes={
+                                "operation_type": operation_type.value,
+                                "model": model,
+                                "status": status.value,
+                            },
+                        )
+                        self.otel_metrics.record_histogram(
+                            "llmops.tokens.total", total_tokens, {"model": model}
+                        )
+                        self.otel_metrics.record_histogram(
+                            "llmops.cost.usd", cost_usd, {"model": model}
+                        )
+                        self.otel_metrics.record_histogram(
+                            "llmops.latency.ms", latency_ms, {"model": model}
+                        )
+
+                    return operation_id
+                except Exception as e:
+                    trace.record_exception(e)
+                    if self.otel_metrics:
+                        self.otel_metrics.increment_counter(
+                            "llmops.operations.logged",
+                            amount=1.0,
+                            attributes={
+                                "operation_type": operation_type.value,
+                                "model": model,
+                                "status": "error",
+                                "error_type": type(e).__name__,
+                            },
+                        )
+                    raise
+        else:
+            # No OTEL - execute without tracing
+            import uuid
+
+            operation_id = str(uuid.uuid4())
+            total_tokens = prompt_tokens + completion_tokens
+
+            # Calculate cost
+            cost_usd = 0.0
+            if self.enable_cost_tracking:
+                model_key = model.split("/")[-1] if "/" in model else model
+                costs = self.model_costs.get(model_key, {"prompt": 0.0, "completion": 0.0})
+                cost_usd = (prompt_tokens / 1_000_000) * costs.get("prompt", 0.0) + (
+                    completion_tokens / 1_000_000
+                ) * costs.get("completion", 0.0)
+
+            operation = LLMOperation(
+                operation_id=operation_id,
+                operation_type=operation_type,
+                model=model,
+                tenant_id=tenant_id,
+                agent_id=agent_id,
+                prompt_tokens=prompt_tokens,
+                completion_tokens=completion_tokens,
+                total_tokens=total_tokens,
+                latency_ms=latency_ms,
+                cost_usd=cost_usd,
+                status=status,
+                error_message=error_message,
+                metadata=metadata or {},
+            )
+
+            self.operations.append(operation)
+
+            # Trim if exceeds max
+            if len(self.operations) > self.max_operations_in_memory:
+                self.operations = self.operations[-self.max_operations_in_memory :]
+
+            await self._persist()
+
+            return operation_id
 
     def get_metrics(
         self,
@@ -176,102 +313,216 @@ class LLMOps:
     ) -> Dict[str, Any]:
         """
         Get LLM operation metrics.
-
+        
         Args:
-            tenant_id: Optional tenant ID filter
-            agent_id: Optional agent ID filter
-            time_range_hours: Time range in hours (default: 24)
-
+            tenant_id (Optional[str]): Tenant identifier used for tenant isolation.
+            agent_id (Optional[str]): Input parameter for this operation.
+            time_range_hours (Optional[int]): Input parameter for this operation.
+        
         Returns:
-            Dictionary with metrics
+            Dict[str, Any]: Dictionary result of the operation.
         """
-        cutoff = datetime.now()
-        if time_range_hours:
-            from datetime import timedelta
+        start_time = time.time()
 
-            cutoff = cutoff - timedelta(hours=time_range_hours)
+        # OTEL Integration
+        if self.otel_tracer:
+            with self.otel_tracer.start_trace("llmops.get_metrics") as trace:
+                if tenant_id:
+                    trace.set_attribute("llmops.tenant_id", tenant_id)
+                if agent_id:
+                    trace.set_attribute("llmops.agent_id", agent_id)
+                trace.set_attribute("llmops.time_range_hours", time_range_hours or 24)
 
-        filtered = [
-            op
-            for op in self.operations
-            if op.timestamp >= cutoff
-            and (not tenant_id or op.tenant_id == tenant_id)
-            and (not agent_id or op.agent_id == agent_id)
-        ]
+                try:
+                    cutoff = datetime.now()
+                    if time_range_hours:
+                        from datetime import timedelta
 
-        if not filtered:
-            return {
-                "total_operations": 0,
-                "total_tokens": 0,
-                "total_cost_usd": 0.0,
-                "average_latency_ms": 0.0,
-                "success_rate": 0.0,
-                "by_model": {},
-                "by_type": {},
-                "error_rate": 0.0,
-            }
+                        cutoff = cutoff - timedelta(hours=time_range_hours)
 
-        total_operations = len(filtered)
-        total_tokens = sum(op.total_tokens for op in filtered)
-        total_cost = sum(op.cost_usd for op in filtered)
-        avg_latency = sum(op.latency_ms for op in filtered) / total_operations
-        success_count = len([op for op in filtered if op.status == LLMOperationStatus.SUCCESS])
-        success_rate = success_count / total_operations if total_operations > 0 else 0.0
-        error_count = len([op for op in filtered if op.status == LLMOperationStatus.ERROR])
-        error_rate = error_count / total_operations if total_operations > 0 else 0.0
+                    filtered = [
+                        op
+                        for op in self.operations
+                        if op.timestamp >= cutoff
+                        and (not tenant_id or op.tenant_id == tenant_id)
+                        and (not agent_id or op.agent_id == agent_id)
+                    ]
 
-        # By model
-        by_model = {}
-        for op in filtered:
-            if op.model not in by_model:
-                by_model[op.model] = {
-                    "count": 0,
-                    "tokens": 0,
-                    "cost_usd": 0.0,
-                    "avg_latency_ms": 0.0,
+                    if not filtered:
+                        result = {
+                            "total_operations": 0,
+                            "total_tokens": 0,
+                            "total_cost_usd": 0.0,
+                            "average_latency_ms": 0.0,
+                            "success_rate": 0.0,
+                            "by_model": {},
+                            "by_type": {},
+                            "error_rate": 0.0,
+                        }
+                    else:
+                        total_operations = len(filtered)
+                        total_tokens = sum(op.total_tokens for op in filtered)
+                        total_cost = sum(op.cost_usd for op in filtered)
+                        avg_latency = sum(op.latency_ms for op in filtered) / total_operations
+                        success_count = len([op for op in filtered if op.status == LLMOperationStatus.SUCCESS])
+                        success_rate = success_count / total_operations if total_operations > 0 else 0.0
+                        error_count = len([op for op in filtered if op.status == LLMOperationStatus.ERROR])
+                        error_rate = error_count / total_operations if total_operations > 0 else 0.0
+
+                        # By model
+                        by_model = {}
+                        for op in filtered:
+                            if op.model not in by_model:
+                                by_model[op.model] = {
+                                    "count": 0,
+                                    "tokens": 0,
+                                    "cost_usd": 0.0,
+                                    "avg_latency_ms": 0.0,
+                                }
+                            by_model[op.model]["count"] += 1
+                            by_model[op.model]["tokens"] += op.total_tokens
+                            by_model[op.model]["cost_usd"] += op.cost_usd
+                            by_model[op.model]["avg_latency_ms"] += op.latency_ms
+
+                        for model in by_model:
+                            count = by_model[model]["count"]
+                            by_model[model]["avg_latency_ms"] /= count
+
+                        # By type
+                        by_type = {}
+                        for op in filtered:
+                            op_type = op.operation_type.value
+                            if op_type not in by_type:
+                                by_type[op_type] = {"count": 0, "tokens": 0}
+                            by_type[op_type]["count"] += 1
+                            by_type[op_type]["tokens"] += op.total_tokens
+
+                        result = {
+                            "total_operations": total_operations,
+                            "total_tokens": total_tokens,
+                            "total_cost_usd": total_cost,
+                            "average_latency_ms": avg_latency,
+                            "success_rate": success_rate,
+                            "error_rate": error_rate,
+                            "by_model": by_model,
+                            "by_type": by_type,
+                            "time_range_hours": time_range_hours,
+                        }
+
+                    duration = time.time() - start_time
+                    trace.set_attribute("llmops.metrics.total_operations", result["total_operations"])
+                    trace.set_attribute("llmops.metrics.total_tokens", result["total_tokens"])
+                    trace.set_attribute("llmops.metrics.total_cost_usd", result["total_cost_usd"])
+
+                    if self.otel_metrics:
+                        self.otel_metrics.record_histogram("llmops.get_metrics.duration", duration)
+                        self.otel_metrics.increment_counter(
+                            "llmops.metrics.queries",
+                            amount=1.0,
+                            attributes={"status": "success"},
+                        )
+
+                    return result
+                except Exception as e:
+                    trace.record_exception(e)
+                    duration = time.time() - start_time
+                    if self.otel_metrics:
+                        self.otel_metrics.record_histogram("llmops.get_metrics.duration", duration)
+                        self.otel_metrics.increment_counter(
+                            "llmops.metrics.queries",
+                            amount=1.0,
+                            attributes={"status": "error", "error_type": type(e).__name__},
+                        )
+                    raise
+        else:
+            # No OTEL - execute without tracing
+            cutoff = datetime.now()
+            if time_range_hours:
+                from datetime import timedelta
+
+                cutoff = cutoff - timedelta(hours=time_range_hours)
+
+            filtered = [
+                op
+                for op in self.operations
+                if op.timestamp >= cutoff
+                and (not tenant_id or op.tenant_id == tenant_id)
+                and (not agent_id or op.agent_id == agent_id)
+            ]
+
+            if not filtered:
+                return {
+                    "total_operations": 0,
+                    "total_tokens": 0,
+                    "total_cost_usd": 0.0,
+                    "average_latency_ms": 0.0,
+                    "success_rate": 0.0,
+                    "by_model": {},
+                    "by_type": {},
+                    "error_rate": 0.0,
                 }
-            by_model[op.model]["count"] += 1
-            by_model[op.model]["tokens"] += op.total_tokens
-            by_model[op.model]["cost_usd"] += op.cost_usd
-            by_model[op.model]["avg_latency_ms"] += op.latency_ms
 
-        for model in by_model:
-            count = by_model[model]["count"]
-            by_model[model]["avg_latency_ms"] /= count
+            total_operations = len(filtered)
+            total_tokens = sum(op.total_tokens for op in filtered)
+            total_cost = sum(op.cost_usd for op in filtered)
+            avg_latency = sum(op.latency_ms for op in filtered) / total_operations
+            success_count = len([op for op in filtered if op.status == LLMOperationStatus.SUCCESS])
+            success_rate = success_count / total_operations if total_operations > 0 else 0.0
+            error_count = len([op for op in filtered if op.status == LLMOperationStatus.ERROR])
+            error_rate = error_count / total_operations if total_operations > 0 else 0.0
 
-        # By type
-        by_type = {}
-        for op in filtered:
-            op_type = op.operation_type.value
-            if op_type not in by_type:
-                by_type[op_type] = {"count": 0, "tokens": 0}
-            by_type[op_type]["count"] += 1
-            by_type[op_type]["tokens"] += op.total_tokens
+            # By model
+            by_model = {}
+            for op in filtered:
+                if op.model not in by_model:
+                    by_model[op.model] = {
+                        "count": 0,
+                        "tokens": 0,
+                        "cost_usd": 0.0,
+                        "avg_latency_ms": 0.0,
+                    }
+                by_model[op.model]["count"] += 1
+                by_model[op.model]["tokens"] += op.total_tokens
+                by_model[op.model]["cost_usd"] += op.cost_usd
+                by_model[op.model]["avg_latency_ms"] += op.latency_ms
 
-        return {
-            "total_operations": total_operations,
-            "total_tokens": total_tokens,
-            "total_cost_usd": total_cost,
-            "average_latency_ms": avg_latency,
-            "success_rate": success_rate,
-            "error_rate": error_rate,
-            "by_model": by_model,
-            "by_type": by_type,
-            "time_range_hours": time_range_hours,
-        }
+            for model in by_model:
+                count = by_model[model]["count"]
+                by_model[model]["avg_latency_ms"] /= count
+
+            # By type
+            by_type = {}
+            for op in filtered:
+                op_type = op.operation_type.value
+                if op_type not in by_type:
+                    by_type[op_type] = {"count": 0, "tokens": 0}
+                by_type[op_type]["count"] += 1
+                by_type[op_type]["tokens"] += op.total_tokens
+
+            return {
+                "total_operations": total_operations,
+                "total_tokens": total_tokens,
+                "total_cost_usd": total_cost,
+                "average_latency_ms": avg_latency,
+                "success_rate": success_rate,
+                "error_rate": error_rate,
+                "by_model": by_model,
+                "by_type": by_type,
+                "time_range_hours": time_range_hours,
+            }
 
     def get_cost_summary(
         self, tenant_id: Optional[str] = None, time_range_hours: Optional[int] = 24
     ) -> Dict[str, Any]:
         """
         Get cost summary.
-
+        
         Args:
-            tenant_id: Optional tenant ID filter
-            time_range_hours: Time range in hours
-
+            tenant_id (Optional[str]): Tenant identifier used for tenant isolation.
+            time_range_hours (Optional[int]): Input parameter for this operation.
+        
         Returns:
-            Dictionary with cost summary
+            Dict[str, Any]: Dictionary result of the operation.
         """
         metrics = self.get_metrics(tenant_id=tenant_id, time_range_hours=time_range_hours)
 
@@ -296,72 +547,94 @@ class LLMOps:
             "time_range_hours": time_range_hours,
         }
 
-    def _persist(self) -> None:
-        """Persist operations to disk."""
+    async def _persist(self) -> None:
+        """
+        Persist operations to disk asynchronously.
+        
+        Returns:
+            None: Result of the operation.
+        """
+        import asyncio
+        
         if not self.storage_path:
             return
 
-        try:
-            # Only persist recent operations
-            recent_ops = self.operations[-1000:]
+        def _persist_sync() -> None:
+            try:
+                # Only persist recent operations
+                recent_ops = self.operations[-1000:]
 
-            data = {
-                "operations": [
-                    {
-                        "operation_id": op.operation_id,
-                        "operation_type": op.operation_type.value,
-                        "model": op.model,
-                        "tenant_id": op.tenant_id,
-                        "agent_id": op.agent_id,
-                        "prompt_tokens": op.prompt_tokens,
-                        "completion_tokens": op.completion_tokens,
-                        "total_tokens": op.total_tokens,
-                        "latency_ms": op.latency_ms,
-                        "cost_usd": op.cost_usd,
-                        "status": op.status.value,
-                        "error_message": op.error_message,
-                        "timestamp": op.timestamp.isoformat(),
-                        "metadata": op.metadata,
-                    }
-                    for op in recent_ops
-                ]
-            }
+                data = {
+                    "operations": [
+                        {
+                            "operation_id": op.operation_id,
+                            "operation_type": op.operation_type.value,
+                            "model": op.model,
+                            "tenant_id": op.tenant_id,
+                            "agent_id": op.agent_id,
+                            "prompt_tokens": op.prompt_tokens,
+                            "completion_tokens": op.completion_tokens,
+                            "total_tokens": op.total_tokens,
+                            "latency_ms": op.latency_ms,
+                            "cost_usd": op.cost_usd,
+                            "status": op.status.value,
+                            "error_message": op.error_message,
+                            "timestamp": op.timestamp.isoformat(),
+                            "metadata": op.metadata,
+                        }
+                        for op in recent_ops
+                    ]
+                }
 
-            self.storage_path.parent.mkdir(parents=True, exist_ok=True)
-            with self.storage_path.open("w", encoding="utf-8") as f:
-                json.dump(data, f, default=str, indent=2)
-        except Exception:
-            # Silently fail persistence
-            pass
+                self.storage_path.parent.mkdir(parents=True, exist_ok=True)
+                with self.storage_path.open("w", encoding="utf-8") as f:
+                    json.dump(data, f, default=str, indent=2)
+            except Exception:
+                # Silently fail persistence
+                pass
+        
+        # Run file I/O in thread pool to avoid blocking
+        await asyncio.to_thread(_persist_sync)
 
-    def _load(self) -> None:
-        """Load operations from disk."""
+    async def _load(self) -> None:
+        """
+        Load operations from disk asynchronously.
+        
+        Returns:
+            None: Result of the operation.
+        """
+        import asyncio
+        
         if not self.storage_path or not self.storage_path.exists():
             return
 
-        try:
-            with self.storage_path.open("r", encoding="utf-8") as f:
-                data = json.load(f)
+        def _load_sync() -> List[LLMOperation]:
+            try:
+                with self.storage_path.open("r", encoding="utf-8") as f:
+                    data = json.load(f)
 
-            def _parse_operation(item: Dict[str, Any]) -> LLMOperation:
-                return LLMOperation(
-                    operation_id=item["operation_id"],
-                    operation_type=LLMOperationType(item["operation_type"]),
-                    model=item["model"],
-                    tenant_id=item.get("tenant_id"),
-                    agent_id=item.get("agent_id"),
-                    prompt_tokens=item["prompt_tokens"],
-                    completion_tokens=item["completion_tokens"],
-                    total_tokens=item["total_tokens"],
-                    latency_ms=item["latency_ms"],
-                    cost_usd=item["cost_usd"],
-                    status=LLMOperationStatus(item["status"]),
-                    error_message=item.get("error_message"),
-                    timestamp=datetime.fromisoformat(item["timestamp"]),
-                    metadata=item.get("metadata", {}),
-                )
+                def _parse_operation(item: Dict[str, Any]) -> LLMOperation:
+                    return LLMOperation(
+                        operation_id=item["operation_id"],
+                        operation_type=LLMOperationType(item["operation_type"]),
+                        model=item["model"],
+                        tenant_id=item.get("tenant_id"),
+                        agent_id=item.get("agent_id"),
+                        prompt_tokens=item["prompt_tokens"],
+                        completion_tokens=item["completion_tokens"],
+                        total_tokens=item["total_tokens"],
+                        latency_ms=item["latency_ms"],
+                        cost_usd=item["cost_usd"],
+                        status=LLMOperationStatus(item["status"]),
+                        error_message=item.get("error_message"),
+                        timestamp=datetime.fromisoformat(item["timestamp"]),
+                        metadata=item.get("metadata", {}),
+                    )
 
-            self.operations = [_parse_operation(item) for item in data.get("operations", [])]
-        except Exception:
-            # Silently fail loading
-            pass
+                return [_parse_operation(item) for item in data.get("operations", [])]
+            except Exception:
+                # Silently fail loading
+                return []
+        
+        # Run file I/O in thread pool to avoid blocking
+        self.operations = await asyncio.to_thread(_load_sync)

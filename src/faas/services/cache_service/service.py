@@ -4,6 +4,7 @@ Cache Service - Main service implementation.
 Provides distributed caching operations.
 """
 
+
 import logging
 from typing import Any, Dict, Optional
 
@@ -16,12 +17,7 @@ from ...integrations.otel import create_otel_tracer
 from ...shared.config import ServiceConfig, load_config
 from ...shared.contracts import ServiceResponse, extract_headers
 from ...shared.middleware import setup_middleware
-from .models import (
-    CacheResponse,
-    GetCacheRequest,
-    InvalidateCacheRequest,
-    SetCacheRequest,
-)
+from .models import InvalidateCacheRequest, SetCacheRequest
 
 logger = logging.getLogger(__name__)
 
@@ -47,12 +43,12 @@ class CacheService:
     ):
         """
         Initialize Cache Service.
-
+        
         Args:
-            config: Service configuration
-            nats_client: NATS client (optional)
-            otel_tracer: OTEL tracer (optional)
-            codec_manager: Codec manager (optional)
+            config (ServiceConfig): Configuration object or settings.
+            nats_client (Optional[Any]): Input parameter for this operation.
+            otel_tracer (Optional[Any]): Input parameter for this operation.
+            codec_manager (Optional[Any]): Input parameter for this operation.
         """
         self.config = config
         self.nats_client = nats_client
@@ -60,7 +56,7 @@ class CacheService:
         self.codec_manager = codec_manager or create_codec_manager()
 
         # Cache instances are created on-demand per request (stateless)
-        # CacheMechanism itself uses Redis/memory backend, so instances are lightweight
+        # CacheMechanism itself uses Dragonfly/memory backend, so instances are lightweight
 
         # Create FastAPI app
         self.app = FastAPI(
@@ -78,209 +74,278 @@ class CacheService:
     def _get_cache(self, tenant_id: str) -> CacheMechanism:
         """
         Create cache for tenant (stateless - created on-demand).
-
+        
         Args:
-            tenant_id: Tenant ID
-
+            tenant_id (str): Tenant identifier used for tenant isolation.
+        
         Returns:
-            CacheMechanism instance
+            CacheMechanism: Result of the operation.
         """
         # Create cache on-demand (stateless)
-        # CacheMechanism uses Redis/memory backend, so instances are lightweight
+        # CacheMechanism uses Dragonfly/memory backend, so instances are lightweight
         cache = create_cache(
-            backend="redis" if self.config.redis_url else "memory",
-            redis_url=self.config.redis_url,
+            backend="dragonfly" if self.config.dragonfly_url else "memory",
+            dragonfly_url=self.config.dragonfly_url,
             namespace=f"cache_{tenant_id}",
         )
         return cache
 
     def _register_routes(self):
         """Register FastAPI routes."""
-
-        @self.app.get("/api/v1/cache/{key}", response_model=ServiceResponse)
-        async def get_cache(
-            key: str,
-            headers: dict = Header(...),
-        ):
-            """Get cached value."""
-            standard_headers = extract_headers(**headers)
-
-            span = None
-            if self.otel_tracer:
-                span = self.otel_tracer.start_span("cache_get")
-                span.set_attribute("cache.key", key)
-                span.set_attribute("tenant.id", standard_headers.tenant_id)
-
-            try:
-                # Get cache
-                cache = self._get_cache(standard_headers.tenant_id)
-
-                # Get value
-                value = await cache.get_async(key)
-
-                if value is None:
-                    return ServiceResponse(
-                        success=True,
-                        data={"key": key, "found": False},
-                        correlation_id=standard_headers.correlation_id,
-                        request_id=standard_headers.request_id,
-                    )
-
-                return ServiceResponse(
-                    success=True,
-                    data={"key": key, "value": value, "found": True},
-                    correlation_id=standard_headers.correlation_id,
-                    request_id=standard_headers.request_id,
-                )
-            except Exception as e:
-                logger.error(f"Error getting cache: {str(e)}", exc_info=True)
-                raise HTTPException(
-                    status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-                    detail=f"Failed to get cache: {str(e)}",
-                )
-            finally:
-                if span:
-                    span.end()
-
-        @self.app.post(
-            "/api/v1/cache", response_model=ServiceResponse, status_code=status.HTTP_201_CREATED
+        self.app.get("/api/v1/cache/{key}", response_model=ServiceResponse)(
+            self._handle_get_cache
         )
-        async def set_cache(
-            request: SetCacheRequest,
-            headers: dict = Header(...),
-        ):
-            """Set cached value."""
-            standard_headers = extract_headers(**headers)
 
-            span = None
-            if self.otel_tracer:
-                span = self.otel_tracer.start_span("cache_set")
-                span.set_attribute("cache.key", request.key)
-                span.set_attribute("tenant.id", standard_headers.tenant_id)
+        self.app.post(
+            "/api/v1/cache", response_model=ServiceResponse, status_code=status.HTTP_201_CREATED
+        )(self._handle_set_cache)
 
-            try:
-                # Get cache
-                cache = self._get_cache(standard_headers.tenant_id)
+        self.app.delete("/api/v1/cache/{key}", status_code=status.HTTP_204_NO_CONTENT)(
+            self._handle_delete_cache
+        )
 
-                # Set value
-                await cache.set_async(
-                    key=request.key,
-                    value=request.value,
-                    ttl=request.ttl,
-                )
+        self.app.post("/api/v1/cache/invalidate", response_model=ServiceResponse)(
+            self._handle_invalidate_cache
+        )
 
-                # Publish event via NATS
-                if self.nats_client:
-                    event = {
-                        "event_type": "cache.set",
-                        "key": request.key,
-                        "tenant_id": standard_headers.tenant_id,
-                    }
-                    await self.nats_client.publish(
-                        f"cache.events.{standard_headers.tenant_id}",
-                        self.codec_manager.encode(event),
-                    )
+        self.app.delete("/api/v1/cache/tenant/{tenant_id}", status_code=status.HTTP_204_NO_CONTENT)(
+            self._handle_clear_tenant_cache
+        )
 
+        self.app.get("/health")(self._handle_health_check)
+
+    async def _handle_get_cache(self, key: str, headers: dict = Header(...)):  # noqa: S7503
+        """
+        Get cached value. Async required for FastAPI route handler.
+        
+        Args:
+            key (str): Input parameter for this operation.
+            headers (dict): HTTP headers passed from the caller.
+        
+        Returns:
+            Any: Result of the operation.
+        
+        Raises:
+            HTTPException: Raised when this function detects an invalid state or when an underlying call fails.
+        """
+        standard_headers = extract_headers(**headers)
+
+        span = None
+        if self.otel_tracer:
+            span = self.otel_tracer.start_span("cache_get")
+            span.set_attribute("cache.key", key)
+            span.set_attribute("tenant.id", standard_headers.tenant_id)
+
+        try:
+            # Get cache
+            cache = self._get_cache(standard_headers.tenant_id)
+
+            # Get value
+            value = await cache.get(key, tenant_id=standard_headers.tenant_id)
+
+            if value is None:
                 return ServiceResponse(
                     success=True,
-                    data={"key": request.key, "status": "set"},
-                    message="Cache value set successfully",
+                    data={"key": key, "found": False},
                     correlation_id=standard_headers.correlation_id,
                     request_id=standard_headers.request_id,
                 )
-            except Exception as e:
-                logger.error(f"Error setting cache: {str(e)}", exc_info=True)
-                raise HTTPException(
-                    status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-                    detail=f"Failed to set cache: {str(e)}",
-                )
-            finally:
-                if span:
-                    span.end()
 
-        @self.app.delete("/api/v1/cache/{key}", status_code=status.HTTP_204_NO_CONTENT)
-        async def delete_cache(
-            key: str,
-            headers: dict = Header(...),
-        ):
-            """Delete cached value."""
-            standard_headers = extract_headers(**headers)
+            return ServiceResponse(
+                success=True,
+                data={"key": key, "value": value, "found": True},
+                correlation_id=standard_headers.correlation_id,
+                request_id=standard_headers.request_id,
+            )
+        except Exception as e:
+            logger.error(f"Error getting cache: {str(e)}", exc_info=True)
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail=f"Failed to get cache: {str(e)}",
+            )
+        finally:
+            if span:
+                span.end()
 
-            try:
-                # Get cache
-                cache = self._get_cache(standard_headers.tenant_id)
+    async def _handle_set_cache(self, request: SetCacheRequest, headers: dict = Header(...)):
+        """
+        Set cached value.
+        
+        Args:
+            request (SetCacheRequest): Request payload object.
+            headers (dict): HTTP headers passed from the caller.
+        
+        Returns:
+            Any: Result of the operation.
+        
+        Raises:
+            HTTPException: Raised when this function detects an invalid state or when an underlying call fails.
+        """
+        standard_headers = extract_headers(**headers)
 
-                # Delete value
-                await cache.delete_async(key)
+        span = None
+        if self.otel_tracer:
+            span = self.otel_tracer.start_span("cache_set")
+            span.set_attribute("cache.key", request.key)
+            span.set_attribute("tenant.id", standard_headers.tenant_id)
 
-                return None
-            except Exception as e:
-                logger.error(f"Error deleting cache: {str(e)}", exc_info=True)
-                raise HTTPException(
-                    status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-                    detail=f"Failed to delete cache: {str(e)}",
-                )
+        try:
+            # Get cache
+            cache = self._get_cache(standard_headers.tenant_id)
 
-        @self.app.post("/api/v1/cache/invalidate", response_model=ServiceResponse)
-        async def invalidate_cache(
-            request: InvalidateCacheRequest,
-            headers: dict = Header(...),
-        ):
-            """Invalidate cache by pattern."""
-            standard_headers = extract_headers(**headers)
+            # Set value
+            await cache.set(
+                key=request.key,
+                value=request.value,
+                ttl=request.ttl,
+                tenant_id=standard_headers.tenant_id,
+            )
 
-            try:
-                # Get cache
-                cache = self._get_cache(request.tenant_id or standard_headers.tenant_id)
-
-                # Invalidate by pattern
-                if request.pattern:
-                    await cache.invalidate_pattern_async(request.pattern)
-                else:
-                    # Clear all cache for tenant
-                    await cache.clear_async()
-
-                return ServiceResponse(
-                    success=True,
-                    data={"pattern": request.pattern, "status": "invalidated"},
-                    message="Cache invalidated successfully",
-                    correlation_id=standard_headers.correlation_id,
-                    request_id=standard_headers.request_id,
-                )
-            except Exception as e:
-                logger.error(f"Error invalidating cache: {str(e)}", exc_info=True)
-                raise HTTPException(
-                    status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-                    detail=f"Failed to invalidate cache: {str(e)}",
+            # Publish event via NATS
+            if self.nats_client:
+                event = {
+                    "event_type": "cache.set",
+                    "key": request.key,
+                    "tenant_id": standard_headers.tenant_id,
+                }
+                await self.nats_client.publish(
+                    f"cache.events.{standard_headers.tenant_id}",
+                    await self.codec_manager.encode(event),
                 )
 
-        @self.app.delete("/api/v1/cache/tenant/{tenant_id}", status_code=status.HTTP_204_NO_CONTENT)
-        async def clear_tenant_cache(
-            tenant_id: str,
-            headers: dict = Header(...),
-        ):
-            """Clear all cache for a tenant."""
-            standard_headers = extract_headers(**headers)
+            return ServiceResponse(
+                success=True,
+                data={"key": request.key, "status": "set"},
+                message="Cache value set successfully",
+                correlation_id=standard_headers.correlation_id,
+                request_id=standard_headers.request_id,
+            )
+        except Exception as e:
+            logger.error(f"Error setting cache: {str(e)}", exc_info=True)
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail=f"Failed to set cache: {str(e)}",
+            )
+        finally:
+            if span:
+                span.end()
 
-            try:
-                # Get cache
-                cache = self._get_cache(tenant_id)
+    async def _handle_delete_cache(self, key: str, headers: dict = Header(...)):  # noqa: S7503
+        """
+        Delete cached value. Async required for FastAPI route handler.
+        
+        Args:
+            key (str): Input parameter for this operation.
+            headers (dict): HTTP headers passed from the caller.
+        
+        Returns:
+            Any: Result of the operation.
+        
+        Raises:
+            HTTPException: Raised when this function detects an invalid state or when an underlying call fails.
+        """
+        standard_headers = extract_headers(**headers)
 
-                # Clear cache
-                await cache.clear_async()
+        try:
+            # Get cache
+            cache = self._get_cache(standard_headers.tenant_id)
 
-                return None
-            except Exception as e:
-                logger.error(f"Error clearing tenant cache: {str(e)}", exc_info=True)
-                raise HTTPException(
-                    status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-                    detail=f"Failed to clear tenant cache: {str(e)}",
-                )
+            # Delete value
+            await cache.delete(key, tenant_id=standard_headers.tenant_id)
 
-        @self.app.get("/health")
-        async def health_check():
-            """Health check endpoint."""
-            return {"status": "healthy", "service": "cache-service"}
+            return None
+        except Exception as e:
+            logger.error(f"Error deleting cache: {str(e)}", exc_info=True)
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail=f"Failed to delete cache: {str(e)}",
+            )
+
+    async def _handle_invalidate_cache(  # noqa: S7503
+        self, request: InvalidateCacheRequest, headers: dict = Header(...)
+    ):
+        """
+        Invalidate cache by pattern. Async required for FastAPI route handler.
+        
+        Args:
+            request (InvalidateCacheRequest): Request payload object.
+            headers (dict): HTTP headers passed from the caller.
+        
+        Returns:
+            Any: Result of the operation.
+        
+        Raises:
+            HTTPException: Raised when this function detects an invalid state or when an underlying call fails.
+        """
+        standard_headers = extract_headers(**headers)
+
+        try:
+            # Get cache
+            tenant_id = request.tenant_id or standard_headers.tenant_id
+            cache = self._get_cache(tenant_id)
+
+            # Invalidate by pattern
+            if request.pattern:
+                await cache.invalidate_pattern(request.pattern, tenant_id=tenant_id)
+            else:
+                # Clear all cache for tenant by invalidating all patterns
+                await cache.invalidate_pattern("*", tenant_id=tenant_id)
+
+            return ServiceResponse(
+                success=True,
+                data={"pattern": request.pattern, "status": "invalidated"},
+                message="Cache invalidated successfully",
+                correlation_id=standard_headers.correlation_id,
+                request_id=standard_headers.request_id,
+            )
+        except Exception as e:
+            logger.error(f"Error invalidating cache: {str(e)}", exc_info=True)
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail=f"Failed to invalidate cache: {str(e)}",
+            )
+
+    async def _handle_clear_tenant_cache(  # noqa: S7503
+        self, tenant_id: str, headers: dict = Header(...)
+    ):
+        """
+        Clear all cache for a tenant. Async required for FastAPI route handler.
+        
+        Args:
+            tenant_id (str): Tenant identifier used for tenant isolation.
+            headers (dict): HTTP headers passed from the caller.
+        
+        Returns:
+            Any: Result of the operation.
+        
+        Raises:
+            HTTPException: Raised when this function detects an invalid state or when an underlying call fails.
+        """
+        extract_headers(**headers)  # Extract headers for validation
+
+        try:
+            # Get cache
+            cache = self._get_cache(tenant_id)
+
+            # Clear cache by invalidating all patterns
+            await cache.invalidate_pattern("*", tenant_id=tenant_id)
+
+            return None
+        except Exception as e:
+            logger.error(f"Error clearing tenant cache: {str(e)}", exc_info=True)
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail=f"Failed to clear tenant cache: {str(e)}",
+            )
+
+    async def _handle_health_check(self):  # noqa: S7503
+        """
+        Health check endpoint. Async required for FastAPI route handler.
+        
+        Returns:
+            Any: Result of the operation.
+        """
+        return {"status": "healthy", "service": "cache-service"}
 
 
 def create_cache_service(

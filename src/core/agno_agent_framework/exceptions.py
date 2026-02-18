@@ -4,6 +4,7 @@ Agent Framework Exception Hierarchy
 Exceptions specific to the Agent Framework, including agents, tools, memory, and orchestration.
 """
 
+
 from typing import Any, Dict, Optional
 
 from ..exceptions import SDKError
@@ -33,6 +34,16 @@ class AgentExecutionError(AgentError):
         execution_stage: Optional[str] = None,
         original_error: Optional[Exception] = None,
     ):
+        """
+        __init__.
+        
+        Args:
+            message (str): Input parameter for this operation.
+            agent_id (Optional[str]): Input parameter for this operation.
+            task_type (Optional[str]): Input parameter for this operation.
+            execution_stage (Optional[str]): Input parameter for this operation.
+            original_error (Optional[Exception]): Input parameter for this operation.
+        """
         super().__init__(message, original_error)
         self.agent_id = agent_id
         self.task_type = task_type
@@ -55,6 +66,15 @@ class AgentConfigurationError(AgentError):
         config_key: Optional[str] = None,
         original_error: Optional[Exception] = None,
     ):
+        """
+        __init__.
+        
+        Args:
+            message (str): Input parameter for this operation.
+            agent_id (Optional[str]): Input parameter for this operation.
+            config_key (Optional[str]): Input parameter for this operation.
+            original_error (Optional[Exception]): Input parameter for this operation.
+        """
         super().__init__(message, original_error)
         self.agent_id = agent_id
         self.config_key = config_key
@@ -78,6 +98,16 @@ class AgentStateError(AgentError):
         file_path: Optional[str] = None,
         original_error: Optional[Exception] = None,
     ):
+        """
+        __init__.
+        
+        Args:
+            message (str): Input parameter for this operation.
+            agent_id (Optional[str]): Input parameter for this operation.
+            operation (Optional[str]): Input parameter for this operation.
+            file_path (Optional[str]): Path of the input file.
+            original_error (Optional[Exception]): Input parameter for this operation.
+        """
         super().__init__(message, original_error)
         self.agent_id = agent_id
         self.operation = operation
@@ -108,6 +138,16 @@ class ToolInvocationError(ToolError):
         error_type: Optional[str] = None,
         original_error: Optional[Exception] = None,
     ):
+        """
+        __init__.
+        
+        Args:
+            message (str): Input parameter for this operation.
+            tool_name (Optional[str]): Input parameter for this operation.
+            arguments (Optional[Dict[str, Any]]): Input parameter for this operation.
+            error_type (Optional[str]): Input parameter for this operation.
+            original_error (Optional[Exception]): Input parameter for this operation.
+        """
         super().__init__(message, original_error)
         self.tool_name = tool_name
         self.arguments = arguments
@@ -123,6 +163,13 @@ class ToolNotFoundError(ToolError):
     """
 
     def __init__(self, tool_name: str, original_error: Optional[Exception] = None):
+        """
+        __init__.
+        
+        Args:
+            tool_name (str): Input parameter for this operation.
+            original_error (Optional[Exception]): Input parameter for this operation.
+        """
         message = f"Tool '{tool_name}' not found"
         super().__init__(message, original_error)
         self.tool_name = tool_name
@@ -137,6 +184,13 @@ class ToolNotImplementedError(ToolError):
     """
 
     def __init__(self, tool_name: str, original_error: Optional[Exception] = None):
+        """
+        __init__.
+        
+        Args:
+            tool_name (str): Input parameter for this operation.
+            original_error (Optional[Exception]): Input parameter for this operation.
+        """
         message = f"Tool '{tool_name}' is not implemented"
         super().__init__(message, original_error)
         self.tool_name = tool_name
@@ -158,6 +212,15 @@ class ToolValidationError(ToolError):
         missing_parameters: Optional[list] = None,
         original_error: Optional[Exception] = None,
     ):
+        """
+        __init__.
+        
+        Args:
+            message (str): Input parameter for this operation.
+            tool_name (Optional[str]): Input parameter for this operation.
+            missing_parameters (Optional[list]): Input parameter for this operation.
+            original_error (Optional[Exception]): Input parameter for this operation.
+        """
         super().__init__(message, original_error)
         self.tool_name = tool_name
         self.missing_parameters = missing_parameters or []
@@ -187,6 +250,16 @@ class MemoryReadError(MemoryError):
         operation: Optional[str] = None,
         original_error: Optional[Exception] = None,
     ):
+        """
+        __init__.
+        
+        Args:
+            message (str): Input parameter for this operation.
+            agent_id (Optional[str]): Input parameter for this operation.
+            memory_id (Optional[str]): Input parameter for this operation.
+            operation (Optional[str]): Input parameter for this operation.
+            original_error (Optional[Exception]): Input parameter for this operation.
+        """
         super().__init__(message, original_error)
         self.agent_id = agent_id
         self.memory_id = memory_id
@@ -213,6 +286,17 @@ class MemoryWriteError(MemoryError):
         operation: Optional[str] = None,
         original_error: Optional[Exception] = None,
     ):
+        """
+        __init__.
+        
+        Args:
+            message (str): Input parameter for this operation.
+            agent_id (Optional[str]): Input parameter for this operation.
+            memory_id (Optional[str]): Input parameter for this operation.
+            memory_type (Optional[str]): Input parameter for this operation.
+            operation (Optional[str]): Input parameter for this operation.
+            original_error (Optional[Exception]): Input parameter for this operation.
+        """
         super().__init__(message, original_error)
         self.agent_id = agent_id
         self.memory_id = memory_id
@@ -238,6 +322,16 @@ class MemoryPersistenceError(MemoryError):
         operation: Optional[str] = None,
         original_error: Optional[Exception] = None,
     ):
+        """
+        __init__.
+        
+        Args:
+            message (str): Input parameter for this operation.
+            agent_id (Optional[str]): Input parameter for this operation.
+            file_path (Optional[str]): Path of the input file.
+            operation (Optional[str]): Input parameter for this operation.
+            original_error (Optional[Exception]): Input parameter for this operation.
+        """
         super().__init__(message, original_error)
         self.agent_id = agent_id
         self.file_path = file_path
@@ -262,6 +356,16 @@ class OrchestrationError(SDKError):
         operation: Optional[str] = None,
         original_error: Optional[Exception] = None,
     ):
+        """
+        __init__.
+        
+        Args:
+            message (str): Input parameter for this operation.
+            workflow_id (Optional[str]): Input parameter for this operation.
+            agent_id (Optional[str]): Input parameter for this operation.
+            operation (Optional[str]): Input parameter for this operation.
+            original_error (Optional[Exception]): Input parameter for this operation.
+        """
         super().__init__(message, original_error)
         self.workflow_id = workflow_id
         self.agent_id = agent_id
@@ -277,6 +381,13 @@ class WorkflowNotFoundError(OrchestrationError):
     """
 
     def __init__(self, workflow_id: str, original_error: Optional[Exception] = None):
+        """
+        __init__.
+        
+        Args:
+            workflow_id (str): Input parameter for this operation.
+            original_error (Optional[Exception]): Input parameter for this operation.
+        """
         message = f"Workflow '{workflow_id}' not found"
         super().__init__(message, workflow_id=workflow_id, original_error=original_error)
         self.workflow_id = workflow_id
@@ -291,6 +402,13 @@ class AgentNotFoundError(OrchestrationError):
     """
 
     def __init__(self, agent_id: str, original_error: Optional[Exception] = None):
+        """
+        __init__.
+        
+        Args:
+            agent_id (str): Input parameter for this operation.
+            original_error (Optional[Exception]): Input parameter for this operation.
+        """
         message = f"Agent '{agent_id}' not found"
         super().__init__(message, agent_id=agent_id, original_error=original_error)
         self.agent_id = agent_id

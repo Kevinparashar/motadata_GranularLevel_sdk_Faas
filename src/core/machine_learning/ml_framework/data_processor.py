@@ -4,6 +4,7 @@ Data Processor
 Data preprocessing and feature engineering for ML models.
 """
 
+
 import logging
 from typing import Any, Dict, Optional, Tuple
 
@@ -33,9 +34,9 @@ class DataProcessor:
     def __init__(self, tenant_id: Optional[str] = None):
         """
         Initialize data processor.
-
+        
         Args:
-            tenant_id: Optional tenant ID
+            tenant_id (Optional[str]): Tenant identifier used for tenant isolation.
         """
         self.tenant_id = tenant_id
         self._scalers = {}
@@ -48,14 +49,17 @@ class DataProcessor:
     ) -> Any:
         """
         Preprocess data for model training or inference.
-
+        
         Args:
-            data: Raw input data
-            model_type: Optional model type for type-specific processing
-            is_training: Whether this is training data (affects scaling fit)
-
+            data (Any): Input parameter for this operation.
+            model_type (Optional[str]): Input parameter for this operation.
+            is_training (bool): Flag to indicate whether training is true.
+        
         Returns:
-            Preprocessed data
+            Any: Result of the operation.
+        
+        Raises:
+            DataProcessingError: Raised when this function detects an invalid state or when an underlying call fails.
         """
         try:
             # Handle different input types
@@ -83,13 +87,16 @@ class DataProcessor:
     def extract_features(self, data: Any, feature_config: Optional[Dict[str, Any]] = None) -> Any:
         """
         Extract features from raw data.
-
+        
         Args:
-            data: Raw input data
-            feature_config: Optional feature extraction configuration
-
+            data (Any): Input parameter for this operation.
+            feature_config (Optional[Dict[str, Any]]): Input parameter for this operation.
+        
         Returns:
-            Extracted features
+            Any: Result of the operation.
+        
+        Raises:
+            DataProcessingError: Raised when this function detects an invalid state or when an underlying call fails.
         """
         try:
             if _pandas_available and pd is not None and isinstance(data, pd.DataFrame):
@@ -104,13 +111,17 @@ class DataProcessor:
     def transform_features(self, features: Any, transform_type: str = "standard") -> Any:
         """
         Transform features (scaling, normalization, etc.).
-
+        
         Args:
-            features: Input features
-            transform_type: Type of transformation (standard, minmax, etc.)
-
+            features (Any): Input parameter for this operation.
+            transform_type (str): Input parameter for this operation.
+        
         Returns:
-            Transformed features
+            Any: Result of the operation.
+        
+        Raises:
+            DataProcessingError: Raised when this function detects an invalid state or when an underlying call fails.
+            ValueError: Raised when this function detects an invalid state or when an underlying call fails.
         """
         try:
             from sklearn.preprocessing import MinMaxScaler, StandardScaler
@@ -140,17 +151,19 @@ class DataProcessor:
     ) -> Tuple[Any, ...]:
         """
         Split data into train/validation/test sets.
-
+        
         Args:
-            X: Features
-            y: Labels
-            test_size: Proportion of test set
-            val_size: Optional proportion of validation set
-            random_state: Random seed
-
+            X (Any): Input parameter for this operation.
+            y (Any): Input parameter for this operation.
+            test_size (float): Input parameter for this operation.
+            val_size (Optional[float]): Input parameter for this operation.
+            random_state (int): Input parameter for this operation.
+        
         Returns:
-            Tuple of (X_train, X_val, X_test, y_train, y_val, y_test) or
-            (X_train, X_test, y_train, y_test) if val_size is None
+            Tuple[Any, ...]: Result of the operation.
+        
+        Raises:
+            DataProcessingError: Raised when this function detects an invalid state or when an underlying call fails.
         """
         try:
             from sklearn.model_selection import train_test_split
@@ -178,12 +191,12 @@ class DataProcessor:
     def postprocess(self, predictions: Any) -> Any:
         """
         Postprocess model predictions.
-
+        
         Args:
-            predictions: Raw model predictions
-
+            predictions (Any): Input parameter for this operation.
+        
         Returns:
-            Postprocessed predictions
+            Any: Result of the operation.
         """
         try:
             # Convert numpy arrays to lists for JSON serialization
@@ -198,7 +211,19 @@ class DataProcessor:
             return predictions
 
     def _preprocess_dataframe(self, df: Any, is_training: bool) -> Any:
-        """Preprocess pandas DataFrame."""
+        """
+        Preprocess pandas DataFrame.
+        
+        Args:
+            df (Any): Input parameter for this operation.
+            is_training (bool): Flag to indicate whether training is true.
+        
+        Returns:
+            Any: Result of the operation.
+        
+        Raises:
+            ImportError: Raised when this function detects an invalid state or when an underlying call fails.
+        """
         if not _pandas_available or pd is None:
             raise ImportError(
                 "pandas is required for DataFrame preprocessing. "
@@ -213,7 +238,15 @@ class DataProcessor:
         return df
 
     def _preprocess_array(self, arr: np.ndarray) -> np.ndarray:
-        """Preprocess numpy array."""
+        """
+        Preprocess numpy array.
+        
+        Args:
+            arr (np.ndarray): Input parameter for this operation.
+        
+        Returns:
+            np.ndarray: Result of the operation.
+        """
         # Handle NaN values
         if np.isnan(arr).any():
             arr = np.nan_to_num(arr, nan=0.0)
@@ -223,7 +256,19 @@ class DataProcessor:
     def _extract_features_dataframe(
         self, df: Any, feature_config: Optional[Dict[str, Any]]
     ) -> Any:
-        """Extract features from DataFrame."""
+        """
+        Extract features from DataFrame.
+        
+        Args:
+            df (Any): Input parameter for this operation.
+            feature_config (Optional[Dict[str, Any]]): Input parameter for this operation.
+        
+        Returns:
+            Any: Result of the operation.
+        
+        Raises:
+            ImportError: Raised when this function detects an invalid state or when an underlying call fails.
+        """
         if not _pandas_available or pd is None:
             raise ImportError(
                 "pandas is required for DataFrame feature extraction. "

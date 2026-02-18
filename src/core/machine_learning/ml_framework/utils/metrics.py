@@ -4,6 +4,7 @@ Metrics Calculator
 Utilities for calculating ML metrics.
 """
 
+
 import logging
 from typing import Any, Dict, List, Optional
 
@@ -36,14 +37,14 @@ class MetricsCalculator:
     ) -> Dict[str, float]:
         """
         Calculate classification metrics.
-
+        
         Args:
-            y_true: True labels
-            y_pred: Predicted labels
-            average: Averaging strategy for multi-class
-
+            y_true (Any): Input parameter for this operation.
+            y_pred (Any): Input parameter for this operation.
+            average (str): Input parameter for this operation.
+        
         Returns:
-            Dictionary of metrics
+            Dict[str, float]: Dictionary result of the operation.
         """
         return {
             "accuracy": float(accuracy_score(y_true, y_pred)),
@@ -56,13 +57,13 @@ class MetricsCalculator:
     def calculate_regression_metrics(y_true: Any, y_pred: Any) -> Dict[str, float]:
         """
         Calculate regression metrics.
-
+        
         Args:
-            y_true: True values
-            y_pred: Predicted values
-
+            y_true (Any): Input parameter for this operation.
+            y_pred (Any): Input parameter for this operation.
+        
         Returns:
-            Dictionary of metrics
+            Dict[str, float]: Dictionary result of the operation.
         """
         return {
             "mse": float(mean_squared_error(y_true, y_pred)),
@@ -75,13 +76,13 @@ class MetricsCalculator:
     def get_confusion_matrix(y_true: Any, y_pred: Any) -> np.ndarray:
         """
         Get confusion matrix.
-
+        
         Args:
-            y_true: True labels
-            y_pred: Predicted labels
-
+            y_true (Any): Input parameter for this operation.
+            y_pred (Any): Input parameter for this operation.
+        
         Returns:
-            Confusion matrix
+            np.ndarray: Result of the operation.
         """
         return confusion_matrix(y_true, y_pred)
 
@@ -91,14 +92,14 @@ class MetricsCalculator:
     ) -> str:
         """
         Get classification report.
-
+        
         Args:
-            y_true: True labels
-            y_pred: Predicted labels
-            target_names: Optional class names
-
+            y_true (Any): Input parameter for this operation.
+            y_pred (Any): Input parameter for this operation.
+            target_names (Optional[List[str]]): Input parameter for this operation.
+        
         Returns:
-            Classification report string
+            str: Returned text value.
         """
         result = classification_report(y_true, y_pred, target_names=target_names, output_dict=False)
         return str(result)

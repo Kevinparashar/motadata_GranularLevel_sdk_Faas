@@ -4,6 +4,7 @@ Agent Generator
 Generates agents from natural language prompts using LLM interpretation.
 """
 
+
 import uuid
 from typing import Optional
 
@@ -30,11 +31,11 @@ class AgentGenerator:
     ):
         """
         Initialize agent generator.
-
+        
         Args:
-            gateway: LiteLLM Gateway instance
-            interpreter: Optional PromptInterpreter instance
-            cache: Optional GeneratorCache instance
+            gateway (GatewayProtocol): Gateway client used for LLM calls.
+            interpreter (Optional[PromptInterpreter]): Input parameter for this operation.
+            cache (Optional[GeneratorCache]): Cache instance used to store and fetch cached results.
         """
         self.gateway = gateway
         self.interpreter = interpreter or PromptInterpreter(gateway)
@@ -49,18 +50,18 @@ class AgentGenerator:
     ) -> Agent:
         """
         Generate an agent from a natural language prompt.
-
+        
         Args:
-            prompt: Natural language description of desired agent
-            agent_id: Optional agent ID (generated if not provided)
-            tenant_id: Optional tenant ID
-            **kwargs: Additional agent configuration
-
+            prompt (str): Prompt text sent to the model.
+            agent_id (Optional[str]): Input parameter for this operation.
+            tenant_id (Optional[str]): Tenant identifier used for tenant isolation.
+            **kwargs (ConfigDict): Input parameter for this operation.
+        
         Returns:
-            Configured Agent instance
-
+            Agent: Result of the operation.
+        
         Raises:
-            AgentGenerationError: If generation fails
+            AgentGenerationError: Raised when this function detects an invalid state or when an underlying call fails.
         """
         try:
             # Generate agent ID if not provided
@@ -118,7 +119,7 @@ class AgentGenerator:
             agent.enable_tool_calling = requirements.enable_tool_calling
 
             # Cache agent configuration
-            self.cache.cache_agent_config(
+            await self.cache.cache_agent_config(
                 agent_id=agent_id,
                 config={
                     "name": requirements.name,
@@ -144,20 +145,20 @@ class AgentGenerator:
                 original_error=e,
             )
 
-    def generate_agent_from_cached_config(
+    async def generate_agent_from_cached_config(
         self, agent_id: str, tenant_id: Optional[str] = None
     ) -> Optional[Agent]:
         """
-        Generate an agent from cached configuration.
-
+        Generate an agent from cached configuration asynchronously.
+        
         Args:
-            agent_id: Agent ID
-            tenant_id: Optional tenant ID
-
+            agent_id (str): Input parameter for this operation.
+            tenant_id (Optional[str]): Tenant identifier used for tenant isolation.
+        
         Returns:
-            Agent instance or None if config not found
+            Optional[Agent]: Result if available, else None.
         """
-        config = self.cache.get_cached_agent_config(agent_id, tenant_id=tenant_id)
+        config: Optional[ConfigDict] = await self.cache.get_cached_agent_config(agent_id, tenant_id=tenant_id)
         if not config:
             return None
 

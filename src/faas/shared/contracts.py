@@ -4,12 +4,13 @@ Standard contracts for FaaS services.
 Defines common request/response schemas and headers used across all services.
 """
 
+
 from datetime import datetime
-from typing import Any, Dict, List, Optional
-from uuid import UUID, uuid4
+from typing import Any, Dict, Optional
+from uuid import uuid4
 
 from fastapi import Header
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, ConfigDict, Field
 
 
 class StandardHeaders(BaseModel):
@@ -20,8 +21,9 @@ class StandardHeaders(BaseModel):
     correlation_id: str = Field(default_factory=lambda: str(uuid4()), alias="X-Correlation-ID")
     request_id: str = Field(default_factory=lambda: str(uuid4()), alias="X-Request-ID")
 
-    class Config:
-        populate_by_name = True
+    model_config = ConfigDict(
+        populate_by_name=True,
+    )
 
 
 class ServiceRequest(BaseModel):
@@ -33,8 +35,8 @@ class ServiceRequest(BaseModel):
     request_id: str = Field(default_factory=lambda: str(uuid4()))
     metadata: Optional[Dict[str, Any]] = Field(default_factory=dict)
 
-    class Config:
-        json_schema_extra = {
+    model_config = ConfigDict(
+        json_schema_extra={
             "example": {
                 "tenant_id": "tenant_123",
                 "user_id": "user_456",
@@ -43,6 +45,7 @@ class ServiceRequest(BaseModel):
                 "metadata": {},
             }
         }
+    )
 
 
 class ServiceResponse(BaseModel):
@@ -56,8 +59,8 @@ class ServiceResponse(BaseModel):
     timestamp: datetime = Field(default_factory=datetime.utcnow)
     metadata: Optional[Dict[str, Any]] = Field(default_factory=dict)
 
-    class Config:
-        json_schema_extra = {
+    model_config = ConfigDict(
+        json_schema_extra={
             "example": {
                 "success": True,
                 "data": {},
@@ -68,6 +71,7 @@ class ServiceResponse(BaseModel):
                 "metadata": {},
             }
         }
+    )
 
 
 class ErrorResponse(BaseModel):
@@ -79,8 +83,8 @@ class ErrorResponse(BaseModel):
     request_id: str
     timestamp: datetime = Field(default_factory=datetime.utcnow)
 
-    class Config:
-        json_schema_extra = {
+    model_config = ConfigDict(
+        json_schema_extra={
             "example": {
                 "success": False,
                 "error": {
@@ -93,6 +97,7 @@ class ErrorResponse(BaseModel):
                 "timestamp": "2024-01-01T00:00:00Z",
             }
         }
+    )
 
 
 def extract_headers(
@@ -114,8 +119,10 @@ def extract_headers(
         StandardHeaders object
     """
     return StandardHeaders(
-        tenant_id=x_tenant_id,
-        user_id=x_user_id,
-        correlation_id=x_correlation_id or str(uuid4()),
-        request_id=x_request_id or str(uuid4()),
+        **{
+            "X-Tenant-ID": x_tenant_id,
+            "X-User-ID": x_user_id,
+            "X-Correlation-ID": x_correlation_id or str(uuid4()),
+            "X-Request-ID": x_request_id or str(uuid4()),
+        }
     )

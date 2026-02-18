@@ -4,6 +4,7 @@ Feature Store
 Centralized feature storage and retrieval.
 """
 
+
 import logging
 from typing import Any, Dict, List, Optional
 
@@ -22,17 +23,17 @@ class FeatureStore:
     def __init__(self, db: DatabaseConnection, tenant_id: Optional[str] = None):
         """
         Initialize feature store.
-
+        
         Args:
-            db: Database connection
-            tenant_id: Optional tenant ID
+            db (DatabaseConnection): Database connection/handle.
+            tenant_id (Optional[str]): Tenant identifier used for tenant isolation.
         """
         self.db = db
         self.tenant_id = tenant_id
 
         logger.info(f"FeatureStore initialized for tenant: {tenant_id}")
 
-    def register_feature(
+    async def register_feature(
         self,
         feature_name: str,
         feature_data: Any,
@@ -40,26 +41,26 @@ class FeatureStore:
         metadata: Optional[Dict[str, Any]] = None,
     ) -> str:
         """
-        Register a feature.
-
+        Register a feature asynchronously.
+        
         Args:
-            feature_name: Name of feature
-            feature_data: Feature data
-            version: Feature version
-            metadata: Optional metadata
-
+            feature_name (str): Input parameter for this operation.
+            feature_data (Any): Input parameter for this operation.
+            version (str): Input parameter for this operation.
+            metadata (Optional[Dict[str, Any]]): Extra metadata for the operation.
+        
         Returns:
-            Feature ID
+            str: Returned text value.
         """
         import json
 
         query = """
         INSERT INTO ml_features (feature_name, feature_data, version, metadata, tenant_id)
-        VALUES (%s, %s::jsonb, %s, %s::jsonb, %s)
+        VALUES ($1, $2::jsonb, $3, $4::jsonb, $5)
         RETURNING id;
         """
 
-        result = self.db.execute_query(
+        result = await self.db.execute_query(
             query,
             (
                 feature_name,
@@ -74,42 +75,47 @@ class FeatureStore:
         logger.info(f"Feature registered: {feature_name}")
         return str(result["id"])
 
-    def get_feature(
+    async def get_feature(
         self, feature_name: str, version: Optional[str] = None
     ) -> Optional[Dict[str, Any]]:
         """
-        Get feature.
-
+        Get feature asynchronously.
+        
         Args:
-            feature_name: Feature name
-            version: Optional version
-
+            feature_name (str): Input parameter for this operation.
+            version (Optional[str]): Input parameter for this operation.
+        
         Returns:
-            Feature data or None
+            Optional[Dict[str, Any]]: Dictionary result of the operation.
         """
         if version:
             query = """
             SELECT * FROM ml_features
-            WHERE feature_name = %s AND version = %s AND tenant_id = %s;
+            WHERE feature_name = $1 AND version = $2 AND tenant_id = $3;
             """
             params = (feature_name, version, self.tenant_id)
         else:
             query = """
             SELECT * FROM ml_features
-            WHERE feature_name = %s AND tenant_id = %s
+            WHERE feature_name = $1 AND tenant_id = $2
             ORDER BY created_at DESC LIMIT 1;
             """
             params = (feature_name, self.tenant_id)
 
-        result = self.db.execute_query(query, params, fetch_one=True)
+        result = await self.db.execute_query(query, params, fetch_one=True)
         return dict(result) if result else None
 
-    def list_features(self) -> List[Dict[str, Any]]:
-        """List all features."""
+    async def list_features(self) -> List[Dict[str, Any]]:
+        """
+        List all features asynchronously.
+        
+        Returns:
+            List[Dict[str, Any]]: Dictionary result of the operation.
+        """
         query = """
         SELECT DISTINCT feature_name, version FROM ml_features
-        WHERE tenant_id = %s;
+        WHERE tenant_id = $1;
         """
 
-        results = self.db.execute_query(query, (self.tenant_id,))
+        results = await self.db.execute_query(query, (self.tenant_id,))
         return [dict(row) for row in results]
