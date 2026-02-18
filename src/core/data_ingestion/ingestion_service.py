@@ -8,6 +8,8 @@ with all AI components (RAG, Agents, Cache, etc.).
 
 # Standard library imports
 import asyncio
+import logging
+import time
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 
@@ -20,6 +22,8 @@ from ..rag import RAGSystem, create_rag_system
 from .data_cleaner import DataCleaner
 from .data_validator import DataValidator
 from .exceptions import DataIngestionError, ValidationError
+
+logger = logging.getLogger(__name__)
 
 
 class DataIngestionService:
@@ -44,6 +48,8 @@ class DataIngestionService:
         enable_auto_ingest: bool = True,
         enable_caching: bool = True,
         tenant_id: Optional[str] = None,
+        otel_tracer: Optional[Any] = None,
+        otel_metrics: Optional[Any] = None,
     ):
         """
         Initialize data ingestion service.
@@ -58,6 +64,8 @@ class DataIngestionService:
             enable_auto_ingest (bool): Flag to enable or disable auto ingest.
             enable_caching (bool): Flag to enable or disable caching.
             tenant_id (Optional[str]): Tenant identifier used for tenant isolation.
+            otel_tracer: Optional OTEL tracer for distributed tracing
+            otel_metrics: Optional OTEL metrics for metrics collection
         """
         self.rag_system = rag_system
         self.cache = cache
@@ -68,6 +76,27 @@ class DataIngestionService:
         self.enable_auto_ingest = enable_auto_ingest
         self.enable_caching = enable_caching
         self.tenant_id = tenant_id
+
+        # OTEL Integration (optional)
+        self.otel_tracer: Optional[Any] = otel_tracer
+        self.otel_metrics: Optional[Any] = otel_metrics
+
+        # Initialize OTEL if not provided
+        if self.otel_tracer is None:
+            try:
+                from ..otel_integration import create_otel_tracer
+
+                self.otel_tracer = create_otel_tracer(service_name="data-ingestion")
+            except (ImportError, Exception):
+                self.otel_tracer = None
+
+        if self.otel_metrics is None:
+            try:
+                from ..otel_integration import create_otel_metrics
+
+                self.otel_metrics = create_otel_metrics(service_name="data-ingestion")
+            except (ImportError, Exception):
+                self.otel_metrics = None
 
         # Initialize RAG if not provided but gateway and db are
         if not self.rag_system and self.gateway and self.db:
@@ -133,6 +162,7 @@ class DataIngestionService:
             DataIngestionError: Raised when this function detects an invalid state or when an underlying call fails.
             ValidationError: Raised when this function detects an invalid state or when an underlying call fails.
         """
+        start_time = time.time()
         path = Path(file_path)
 
         if not path.exists():
@@ -140,75 +170,194 @@ class DataIngestionService:
                 message=f"File not found: {file_path}", file_path=str(file_path)
             )
 
-        # Generate title if not provided
-        if not title:
-            title = path.stem
+        # OTEL Integration
+        if self.otel_tracer:
+            with self.otel_tracer.start_trace("ingestion.upload_and_process") as trace:
+                trace.set_attribute("ingestion.file_path", str(file_path))
+                trace.set_attribute("ingestion.file_name", path.name)
+                trace.set_attribute("ingestion.enable_validation", self.enable_validation)
+                trace.set_attribute("ingestion.enable_cleansing", self.enable_cleansing)
+                trace.set_attribute("ingestion.enable_caching", self.enable_caching)
+                if self.tenant_id:
+                    trace.set_attribute("ingestion.tenant_id", self.tenant_id)
 
-        # Validate file
-        if self.validator:
-            validation_result = await self.validator.validate_file(path)
-            if not validation_result["valid"]:
-                raise ValidationError(message=validation_result["error"], file_path=str(file_path))
+                try:
+                    # Generate title if not provided
+                    if not title:
+                        title = path.stem
 
-        # Load and process content
-        try:
-            content, loaded_metadata = await self.multimodal_loader.load(str(path), gateway=self.gateway)
-        except (ValueError, TypeError, OSError, AttributeError) as e:
-            raise DataIngestionError(
-                message=f"Error loading file: {str(e)}", file_path=str(file_path), original_error=e
-            )
+                    # Validate file
+                    if self.validator:
+                        validation_result = await self.validator.validate_file(path)
+                        if not validation_result["valid"]:
+                            raise ValidationError(message=validation_result["error"], file_path=str(file_path))
 
-        # Merge metadata
-        if metadata:
-            loaded_metadata.update(metadata)
-        metadata = loaded_metadata
+                    # Load and process content
+                    try:
+                        content, loaded_metadata = await self.multimodal_loader.load(str(path), gateway=self.gateway)
+                    except (ValueError, TypeError, OSError, AttributeError) as e:
+                        raise DataIngestionError(
+                            message=f"Error loading file: {str(e)}", file_path=str(file_path), original_error=e
+                        )
 
-        # Cleanse data if enabled
-        if self.cleaner:
-            content = await self.cleaner.clean(content, metadata)
+                    # Merge metadata
+                    if metadata:
+                        loaded_metadata.update(metadata)
+                    metadata = loaded_metadata
 
-        # Cache processed content
-        cache_key = f"ingested:{path.name}:{path.stat().st_mtime}"
-        if self.enable_caching:
-            await self.cache.set(
-                cache_key,
-                {"content": content, "metadata": metadata},
-                tenant_id=self.tenant_id,
-                ttl=86400,  # 24 hours
-            )
+                    # Cleanse data if enabled
+                    if self.cleaner:
+                        content = await self.cleaner.clean(content, metadata)
 
-        # Auto-ingest into RAG if enabled
-        document_id = None
-        if (
-            auto_ingest if auto_ingest is not None else self.enable_auto_ingest
-        ) and self.rag_system:
+                    # Cache processed content
+                    cache_key = f"ingested:{path.name}:{path.stat().st_mtime}"
+                    if self.enable_caching:
+                        await self.cache.set(
+                            cache_key,
+                            {"content": content, "metadata": metadata},
+                            tenant_id=self.tenant_id,
+                            ttl=86400,  # 24 hours
+                        )
+
+                    # Auto-ingest into RAG if enabled
+                    document_id = None
+                    if (
+                        auto_ingest if auto_ingest is not None else self.enable_auto_ingest
+                    ) and self.rag_system:
+                        try:
+                            document_id = self.rag_system.ingest_document(
+                                title=title,
+                                content=content,
+                                file_path=str(path),
+                                tenant_id=self.tenant_id,
+                                source=str(path),
+                                metadata=metadata,
+                            )
+                        except (ValueError, TypeError, AttributeError, ConnectionError, TimeoutError) as e:
+                            raise DataIngestionError(
+                                message=f"Error ingesting into RAG: {str(e)}",
+                                file_path=str(file_path),
+                                original_error=e,
+                            )
+
+                    duration = time.time() - start_time
+                    trace.set_attribute("ingestion.content_length", len(content))
+                    trace.set_attribute("ingestion.document_id", document_id or "")
+                    trace.set_attribute("ingestion.cached", self.enable_caching)
+                    trace.set_attribute("ingestion.ingested", document_id is not None)
+
+                    if self.otel_metrics:
+                        self.otel_metrics.record_histogram(
+                            "ingestion.upload_and_process.duration", duration
+                        )
+                        self.otel_metrics.increment_counter(
+                            "ingestion.operations",
+                            amount=1.0,
+                            attributes={
+                                "status": "success",
+                                "cached": str(self.enable_caching),
+                                "ingested": str(document_id is not None),
+                            },
+                        )
+
+                    return {
+                        "success": True,
+                        "file_path": str(path),
+                        "title": title,
+                        "document_id": document_id,
+                        "content_length": len(content),
+                        "content_preview": content[:500] + "..." if len(content) > 500 else content,
+                        "metadata": metadata,
+                        "cached": self.enable_caching,
+                        "ingested": document_id is not None,
+                    }
+                except Exception as e:
+                    trace.record_exception(e)
+                    duration = time.time() - start_time
+                    if self.otel_metrics:
+                        self.otel_metrics.record_histogram(
+                            "ingestion.upload_and_process.duration", duration
+                        )
+                        self.otel_metrics.increment_counter(
+                            "ingestion.operations",
+                            amount=1.0,
+                            attributes={
+                                "status": "error",
+                                "error_type": type(e).__name__,
+                            },
+                        )
+                    raise
+        else:
+            # No OTEL - execute without tracing
+            # Generate title if not provided
+            if not title:
+                title = path.stem
+
+            # Validate file
+            if self.validator:
+                validation_result = await self.validator.validate_file(path)
+                if not validation_result["valid"]:
+                    raise ValidationError(message=validation_result["error"], file_path=str(file_path))
+
+            # Load and process content
             try:
-                document_id = self.rag_system.ingest_document(
-                    title=title,
-                    content=content,
-                    file_path=str(path),
-                    tenant_id=self.tenant_id,
-                    source=str(path),
-                    metadata=metadata,
-                )
-            except (ValueError, TypeError, AttributeError, ConnectionError, TimeoutError) as e:
+                content, loaded_metadata = await self.multimodal_loader.load(str(path), gateway=self.gateway)
+            except (ValueError, TypeError, OSError, AttributeError) as e:
                 raise DataIngestionError(
-                    message=f"Error ingesting into RAG: {str(e)}",
-                    file_path=str(file_path),
-                    original_error=e,
+                    message=f"Error loading file: {str(e)}", file_path=str(file_path), original_error=e
                 )
 
-        return {
-            "success": True,
-            "file_path": str(path),
-            "title": title,
-            "document_id": document_id,
-            "content_length": len(content),
-            "content_preview": content[:500] + "..." if len(content) > 500 else content,
-            "metadata": metadata,
-            "cached": self.enable_caching,
-            "ingested": document_id is not None,
-        }
+            # Merge metadata
+            if metadata:
+                loaded_metadata.update(metadata)
+            metadata = loaded_metadata
+
+            # Cleanse data if enabled
+            if self.cleaner:
+                content = await self.cleaner.clean(content, metadata)
+
+            # Cache processed content
+            cache_key = f"ingested:{path.name}:{path.stat().st_mtime}"
+            if self.enable_caching:
+                await self.cache.set(
+                    cache_key,
+                    {"content": content, "metadata": metadata},
+                    tenant_id=self.tenant_id,
+                    ttl=86400,  # 24 hours
+                )
+
+            # Auto-ingest into RAG if enabled
+            document_id = None
+            if (
+                auto_ingest if auto_ingest is not None else self.enable_auto_ingest
+            ) and self.rag_system:
+                try:
+                    document_id = self.rag_system.ingest_document(
+                        title=title,
+                        content=content,
+                        file_path=str(path),
+                        tenant_id=self.tenant_id,
+                        source=str(path),
+                        metadata=metadata,
+                    )
+                except (ValueError, TypeError, AttributeError, ConnectionError, TimeoutError) as e:
+                    raise DataIngestionError(
+                        message=f"Error ingesting into RAG: {str(e)}",
+                        file_path=str(file_path),
+                        original_error=e,
+                    )
+
+            return {
+                "success": True,
+                "file_path": str(path),
+                "title": title,
+                "document_id": document_id,
+                "content_length": len(content),
+                "content_preview": content[:500] + "..." if len(content) > 500 else content,
+                "metadata": metadata,
+                "cached": self.enable_caching,
+                "ingested": document_id is not None,
+            }
 
     async def upload_and_process_async(
         self,

@@ -9,11 +9,15 @@ Handles document retrieval using vector similarity search.
 """
 
 
+import logging
+import time
 from typing import Any, Dict, List, Optional
 
 from ..litellm_gateway import LiteLLMGateway
 from ..postgresql_database.vector_operations import VectorOperations
 from .exceptions import EmbeddingError
+
+logger = logging.getLogger(__name__)
 
 
 class Retriever:
@@ -28,6 +32,8 @@ class Retriever:
         vector_ops: VectorOperations,
         gateway: Optional[LiteLLMGateway] = None,
         embedding_model: str = "text-embedding-3-small",
+        otel_tracer: Optional[Any] = None,
+        otel_metrics: Optional[Any] = None,
     ):
         """
         Initialize retriever.
@@ -36,12 +42,35 @@ class Retriever:
             vector_ops (VectorOperations): Input parameter for this operation.
             gateway (Optional[LiteLLMGateway]): Gateway client used for LLM calls.
             embedding_model (str): Input parameter for this operation.
+            otel_tracer: Optional OTEL tracer for distributed tracing
+            otel_metrics: Optional OTEL metrics for metrics collection
         """
         self.vector_ops = vector_ops
         self.gateway = gateway
         self.embedding_model = embedding_model
         # Access database connection from vector_ops for keyword search
         self.db = vector_ops.db if hasattr(vector_ops, "db") else None
+
+        # OTEL Integration (optional)
+        self.otel_tracer: Optional[Any] = otel_tracer
+        self.otel_metrics: Optional[Any] = otel_metrics
+
+        # Initialize OTEL if not provided
+        if self.otel_tracer is None:
+            try:
+                from ..otel_integration import create_otel_tracer
+
+                self.otel_tracer = create_otel_tracer(service_name="rag-retriever")
+            except (ImportError, Exception):
+                self.otel_tracer = None
+
+        if self.otel_metrics is None:
+            try:
+                from ..otel_integration import create_otel_metrics
+
+                self.otel_metrics = create_otel_metrics(service_name="rag-retriever")
+            except (ImportError, Exception):
+                self.otel_metrics = None
 
     def retrieve(
         self,
@@ -64,29 +93,101 @@ class Retriever:
         Returns:
             List[Dict[str, Any]]: Dictionary result of the operation.
         """
-        # Generate query embedding
-        query_embedding = self._get_embedding(query)
+        start_time = time.time()
 
-        # Add tenant_id to filters for tenant isolation
-        if tenant_id:
-            if filters is None:
-                filters = {}
-            filters["tenant_id"] = tenant_id
+        # OTEL Integration
+        if self.otel_tracer:
+            with self.otel_tracer.start_trace("retriever.retrieve") as trace:
+                trace.set_attribute("retriever.query", query[:100])  # Truncate for safety
+                trace.set_attribute("retriever.top_k", top_k)
+                trace.set_attribute("retriever.threshold", threshold)
+                trace.set_attribute("retriever.embedding_model", self.embedding_model)
+                if tenant_id:
+                    trace.set_attribute("retriever.tenant_id", tenant_id)
 
-        # Perform similarity search
-        import asyncio
-        results = asyncio.run(self.vector_ops.similarity_search(
-            query_embedding=query_embedding,
-            limit=top_k,
-            threshold=threshold,
-            model=self.embedding_model,
-        ))
+                try:
+                    # Generate query embedding
+                    query_embedding = self._get_embedding(query)
 
-        # Apply additional filters if provided
-        if filters:
-            results = self._apply_filters(results, filters)
+                    # Add tenant_id to filters for tenant isolation
+                    if tenant_id:
+                        if filters is None:
+                            filters = {}
+                        filters["tenant_id"] = tenant_id
 
-        return results
+                    # Perform similarity search
+                    import asyncio
+                    results = asyncio.run(self.vector_ops.similarity_search(
+                        query_embedding=query_embedding,
+                        limit=top_k,
+                        threshold=threshold,
+                        model=self.embedding_model,
+                    ))
+
+                    # Apply additional filters if provided
+                    if filters:
+                        results = self._apply_filters(results, filters)
+
+                    duration = time.time() - start_time
+                    trace.set_attribute("retriever.results_count", len(results))
+
+                    if self.otel_metrics:
+                        self.otel_metrics.record_histogram(
+                            "retriever.retrieve.duration", duration, {"embedding_model": self.embedding_model}
+                        )
+                        self.otel_metrics.increment_counter(
+                            "retriever.operations",
+                            amount=1.0,
+                            attributes={
+                                "status": "success",
+                                "embedding_model": self.embedding_model,
+                                "results_count": len(results),
+                            },
+                        )
+
+                    return results
+                except Exception as e:
+                    trace.record_exception(e)
+                    duration = time.time() - start_time
+                    if self.otel_metrics:
+                        self.otel_metrics.record_histogram(
+                            "retriever.retrieve.duration", duration, {"embedding_model": self.embedding_model}
+                        )
+                        self.otel_metrics.increment_counter(
+                            "retriever.operations",
+                            amount=1.0,
+                            attributes={
+                                "status": "error",
+                                "embedding_model": self.embedding_model,
+                                "error_type": type(e).__name__,
+                            },
+                        )
+                    raise
+        else:
+            # No OTEL - execute without tracing
+            # Generate query embedding
+            query_embedding = self._get_embedding(query)
+
+            # Add tenant_id to filters for tenant isolation
+            if tenant_id:
+                if filters is None:
+                    filters = {}
+                filters["tenant_id"] = tenant_id
+
+            # Perform similarity search
+            import asyncio
+            results = asyncio.run(self.vector_ops.similarity_search(
+                query_embedding=query_embedding,
+                limit=top_k,
+                threshold=threshold,
+                model=self.embedding_model,
+            ))
+
+            # Apply additional filters if provided
+            if filters:
+                results = self._apply_filters(results, filters)
+
+            return results
 
     def _get_embedding(self, text: str) -> List[float]:
         """
@@ -142,36 +243,123 @@ class Retriever:
         Returns:
             List[Dict[str, Any]]: Dictionary result of the operation.
         """
-        # Add tenant_id to filters for tenant isolation
-        if tenant_id:
-            if filters is None:
-                filters = {}
-            filters["tenant_id"] = tenant_id
+        start_time = time.time()
 
-        # Vector-based retrieval
-        query_embedding = self._get_embedding(query)
-        import asyncio
-        vector_results = asyncio.run(self.vector_ops.similarity_search(
-            query_embedding=query_embedding,
-            limit=top_k * 2,  # Get more for re-ranking
-            threshold=threshold * 0.8,  # Lower threshold for hybrid
-            model=self.embedding_model,
-        ))
+        # OTEL Integration
+        if self.otel_tracer:
+            with self.otel_tracer.start_trace("retriever.retrieve_hybrid") as trace:
+                trace.set_attribute("retriever.query", query[:100])  # Truncate for safety
+                trace.set_attribute("retriever.top_k", top_k)
+                trace.set_attribute("retriever.threshold", threshold)
+                trace.set_attribute("retriever.vector_weight", vector_weight)
+                trace.set_attribute("retriever.keyword_weight", keyword_weight)
+                trace.set_attribute("retriever.embedding_model", self.embedding_model)
+                if tenant_id:
+                    trace.set_attribute("retriever.tenant_id", tenant_id)
 
-        # Keyword-based retrieval (simple text search)
-        keyword_results = self._keyword_search(query, tenant_id=tenant_id, top_k=top_k * 2)
+                try:
+                    # Add tenant_id to filters for tenant isolation
+                    if tenant_id:
+                        if filters is None:
+                            filters = {}
+                        filters["tenant_id"] = tenant_id
 
-        # Combine and re-rank results
-        combined = self._combine_results(
-            vector_results, keyword_results, vector_weight, keyword_weight
-        )
+                    # Vector-based retrieval
+                    query_embedding = self._get_embedding(query)
+                    import asyncio
+                    vector_results = asyncio.run(self.vector_ops.similarity_search(
+                        query_embedding=query_embedding,
+                        limit=top_k * 2,  # Get more for re-ranking
+                        threshold=threshold * 0.8,  # Lower threshold for hybrid
+                        model=self.embedding_model,
+                    ))
 
-        # Apply filters if provided
-        if filters:
-            combined = self._apply_filters(combined, filters)
+                    # Keyword-based retrieval (simple text search)
+                    keyword_results = self._keyword_search(query, tenant_id=tenant_id, top_k=top_k * 2)
 
-        # Return top_k results
-        return combined[:top_k]
+                    # Combine and re-rank results
+                    combined = self._combine_results(
+                        vector_results, keyword_results, vector_weight, keyword_weight
+                    )
+
+                    # Apply filters if provided
+                    if filters:
+                        combined = self._apply_filters(combined, filters)
+
+                    # Return top_k results
+                    results = combined[:top_k]
+
+                    duration = time.time() - start_time
+                    trace.set_attribute("retriever.results_count", len(results))
+                    trace.set_attribute("retriever.vector_results_count", len(vector_results))
+                    trace.set_attribute("retriever.keyword_results_count", len(keyword_results))
+
+                    if self.otel_metrics:
+                        self.otel_metrics.record_histogram(
+                            "retriever.retrieve_hybrid.duration", duration, {"embedding_model": self.embedding_model}
+                        )
+                        self.otel_metrics.increment_counter(
+                            "retriever.operations",
+                            amount=1.0,
+                            attributes={
+                                "operation": "hybrid",
+                                "status": "success",
+                                "embedding_model": self.embedding_model,
+                                "results_count": len(results),
+                            },
+                        )
+
+                    return results
+                except Exception as e:
+                    trace.record_exception(e)
+                    duration = time.time() - start_time
+                    if self.otel_metrics:
+                        self.otel_metrics.record_histogram(
+                            "retriever.retrieve_hybrid.duration", duration, {"embedding_model": self.embedding_model}
+                        )
+                        self.otel_metrics.increment_counter(
+                            "retriever.operations",
+                            amount=1.0,
+                            attributes={
+                                "operation": "hybrid",
+                                "status": "error",
+                                "embedding_model": self.embedding_model,
+                                "error_type": type(e).__name__,
+                            },
+                        )
+                    raise
+        else:
+            # No OTEL - execute without tracing
+            # Add tenant_id to filters for tenant isolation
+            if tenant_id:
+                if filters is None:
+                    filters = {}
+                filters["tenant_id"] = tenant_id
+
+            # Vector-based retrieval
+            query_embedding = self._get_embedding(query)
+            import asyncio
+            vector_results = asyncio.run(self.vector_ops.similarity_search(
+                query_embedding=query_embedding,
+                limit=top_k * 2,  # Get more for re-ranking
+                threshold=threshold * 0.8,  # Lower threshold for hybrid
+                model=self.embedding_model,
+            ))
+
+            # Keyword-based retrieval (simple text search)
+            keyword_results = self._keyword_search(query, tenant_id=tenant_id, top_k=top_k * 2)
+
+            # Combine and re-rank results
+            combined = self._combine_results(
+                vector_results, keyword_results, vector_weight, keyword_weight
+            )
+
+            # Apply filters if provided
+            if filters:
+                combined = self._apply_filters(combined, filters)
+
+            # Return top_k results
+            return combined[:top_k]
 
     def _keyword_search(
         self, query: str, tenant_id: Optional[str] = None, top_k: int = 10

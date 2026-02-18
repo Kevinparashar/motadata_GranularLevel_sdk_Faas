@@ -89,6 +89,27 @@ class RAGSystem:
         # Initialize vector index manager
         self.index_manager = create_vector_index_manager(db)
 
+        # OTEL Integration (optional) - Initialize before creating Retriever
+        self.otel_tracer: Optional[Any] = kwargs.get("otel_tracer")
+        self.otel_metrics: Optional[Any] = kwargs.get("otel_metrics")
+
+        # Initialize OTEL if not provided
+        if self.otel_tracer is None:
+            try:
+                from ..otel_integration import create_otel_tracer
+
+                self.otel_tracer = create_otel_tracer(service_name="rag-system")
+            except (ImportError, Exception):
+                self.otel_tracer = None
+
+        if self.otel_metrics is None:
+            try:
+                from ..otel_integration import create_otel_metrics
+
+                self.otel_metrics = create_otel_metrics(service_name="rag-system")
+            except (ImportError, Exception):
+                self.otel_metrics = None
+
         # Initialize document processor with multimodal support
         processor_kwargs = {
             "chunk_size": kwargs.get("chunk_size", 1000),
@@ -104,13 +125,13 @@ class RAGSystem:
         self.document_processor = DocumentProcessor(**processor_kwargs)
 
         self.retriever = Retriever(
-            vector_ops=self.vector_ops, gateway=gateway, embedding_model=embedding_model
+            vector_ops=self.vector_ops,
+            gateway=gateway,
+            embedding_model=embedding_model,
+            otel_tracer=self.otel_tracer,
+            otel_metrics=self.otel_metrics,
         )
         self.generator = RAGGenerator(gateway=gateway, model=generation_model)
-
-        # OTEL Integration (optional)
-        self.otel_tracer: Optional[Any] = None  # OTELTracer instance for distributed tracing
-        self.otel_metrics: Optional[Any] = None  # OTELMetrics instance for metrics collection
 
     async def _load_document_from_file(
         self, file_path: str, metadata: Optional[Dict[str, Any]]
