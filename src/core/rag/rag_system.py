@@ -108,6 +108,10 @@ class RAGSystem:
         )
         self.generator = RAGGenerator(gateway=gateway, model=generation_model)
 
+        # OTEL Integration (optional)
+        self.otel_tracer: Optional[Any] = None  # OTELTracer instance for distributed tracing
+        self.otel_metrics: Optional[Any] = None  # OTELMetrics instance for metrics collection
+
     async def _load_document_from_file(
         self, file_path: str, metadata: Optional[Dict[str, Any]]
     ) -> tuple[str, Dict[str, Any], str]:
@@ -502,12 +506,170 @@ class RAGSystem:
         Returns:
             Dict[str, Any]: Dictionary result of the operation.
         """
-        # RAG QUERY PROCESS: Step-by-step retrieval and generation
+        # OTEL Integration: Start trace for RAG query
+        import time
+        start_time = time.time()
+        
+        tracer = self.otel_tracer
+        if tracer is None:
+            try:
+                from ..otel_integration import create_otel_tracer
+                tracer = create_otel_tracer()
+            except (ImportError, Exception):
+                tracer = None
 
-        # STEP 1: Retrieve relevant conversation memories (if memory enabled)
-        # This provides context from previous conversations to improve answer relevance
-        # Cost impact: Memory retrieval is free (no API call), improves answer quality
-        memories = []
+        if tracer:
+            with tracer.start_trace("rag.query") as trace:
+                trace.set_attribute("rag.tenant_id", tenant_id or "global")
+                trace.set_attribute("rag.query.length", len(query))
+                trace.set_attribute("rag.top_k", top_k)
+                trace.set_attribute("rag.retrieval_strategy", retrieval_strategy)
+
+                # STEP 1: Retrieve relevant conversation memories (if memory enabled)
+                with tracer.start_span("rag.memory.retrieve", parent=trace) as memory_span:
+                    memories = []
+                    memory_context = ""
+                    if self.memory:
+                        memories = await self.memory.retrieve(
+                            query=query, limit=5
+                        )
+                        if memories:
+                            memory_context = "\n".join([f"- {mem.content}" for mem in memories[:3]])
+                    memory_span.set_attribute("rag.memory.count", len(memories))
+
+                # STEP 2: Query rewriting for optimization
+                original_query = query
+                if use_query_rewriting:
+                    with tracer.start_span("rag.query.rewrite", parent=trace):
+                        query = self._rewrite_query(query)
+
+                # STEP 3: Check cache for previous identical queries
+                with tracer.start_span("rag.cache.check", parent=trace) as cache_span:
+                    cache_key = f"rag:query:{tenant_id or 'global'}:{query}:{top_k}:{threshold}:{max_tokens}:{retrieval_strategy}"
+                    cached = await self.cache.get(cache_key, tenant_id=tenant_id)
+                    cache_span.set_attribute("rag.cache.hit", cached is not None)
+                    if cached:
+                        # Record cache hit metrics
+                        metrics = self.otel_metrics
+                        if metrics is None:
+                            try:
+                                from ..otel_integration import create_otel_metrics
+                                metrics = create_otel_metrics()
+                            except (ImportError, Exception):
+                                metrics = None
+                        if metrics:
+                            metrics.increment_counter("rag.cache.hits", amount=1.0, attributes={
+                                "tenant_id": tenant_id or "global",
+                            })
+                        return cached
+
+                try:
+                    # STEP 4: Document retrieval (vector search in database)
+                    with tracer.start_span("rag.retrieve", parent=trace) as retrieve_span:
+                        if retrieval_strategy == "hybrid":
+                            retrieved_docs = self.retriever.retrieve_hybrid(
+                                query=query, top_k=top_k, threshold=threshold, tenant_id=tenant_id
+                            )
+                        else:
+                            retrieved_docs = self.retriever.retrieve(
+                                query=query, top_k=top_k, threshold=threshold, tenant_id=tenant_id
+                            )
+                        retrieve_span.set_attribute("rag.documents.retrieved", len(retrieved_docs))
+
+                    # STEP 5: Enhance context with memory if available
+                    enhanced_context = retrieved_docs
+                    if memory_context:
+                        enhanced_context = [
+                            {"title": "Previous Context", "content": memory_context, "source": "memory"}
+                        ] + retrieved_docs
+
+                    # STEP 6: Generate answer using LLM with retrieved context
+                    with tracer.start_span("rag.generate", parent=trace) as generate_span:
+                        answer = await self.generator.generate_async(
+                            query=original_query,
+                            context_documents=enhanced_context,
+                            max_tokens=max_tokens,
+                        )
+                        generate_span.set_attribute("rag.answer.length", len(answer) if answer else 0)
+
+                    result = {
+                        "answer": answer,
+                        "retrieved_documents": retrieved_docs,
+                        "num_documents": len(retrieved_docs),
+                        "query_used": query if use_query_rewriting else original_query,
+                        "original_query": original_query,
+                        "memory_used": len(memories) if memories else 0,
+                    }
+
+                    # Store in cache
+                    await self.cache.set(cache_key, result, ttl=300, tenant_id=tenant_id)
+
+                    # Store in memory for future context
+                    if self.memory:
+                        await self.memory.store(
+                            content=f"Query: {original_query}\nAnswer: {answer}",
+                            memory_type=MemoryType.EPISODIC,
+                            importance=0.7,
+                            metadata={
+                                "user_id": user_id,
+                                "conversation_id": conversation_id,
+                                "tenant_id": tenant_id,
+                                "num_documents": len(retrieved_docs),
+                            },
+                        )
+
+                    # Record metrics
+                    duration = time.time() - start_time
+                    metrics = self.otel_metrics
+                    if metrics is None:
+                        try:
+                            from ..otel_integration import create_otel_metrics
+                            metrics = create_otel_metrics()
+                        except (ImportError, Exception):
+                            metrics = None
+
+                    if metrics:
+                        metrics.record_histogram("rag.query.duration", duration, {
+                            "tenant_id": tenant_id or "global",
+                            "retrieval_strategy": retrieval_strategy,
+                        })
+                        metrics.increment_counter("rag.queries.completed", amount=1.0, attributes={
+                            "tenant_id": tenant_id or "global",
+                            "documents_retrieved": len(retrieved_docs),
+                        })
+
+                    return result
+                except Exception as e:
+                    trace.record_exception(e)
+                    duration = time.time() - start_time
+
+                    # Record error metrics
+                    metrics = self.otel_metrics
+                    if metrics is None:
+                        try:
+                            from ..otel_integration import create_otel_metrics
+                            metrics = create_otel_metrics()
+                        except (ImportError, Exception):
+                            metrics = None
+
+                    if metrics:
+                        metrics.record_histogram("rag.query.duration", duration, {
+                            "tenant_id": tenant_id or "global",
+                        })
+                        metrics.increment_counter("rag.queries.completed", amount=1.0, attributes={
+                            "tenant_id": tenant_id or "global",
+                            "status": "error",
+                            "error_type": type(e).__name__,
+                        })
+                    raise
+        else:
+            # No OTEL - execute without tracing
+            # RAG QUERY PROCESS: Step-by-step retrieval and generation
+
+            # STEP 1: Retrieve relevant conversation memories (if memory enabled)
+            # This provides context from previous conversations to improve answer relevance
+            # Cost impact: Memory retrieval is free (no API call), improves answer quality
+            memories = []
         memory_context = ""
         if self.memory:
             memories = await self.memory.retrieve(

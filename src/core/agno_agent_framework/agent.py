@@ -124,6 +124,10 @@ class Agent(BaseModel):
     # CODEC Integration (optional)
     codec_serializer: Optional[Any] = None  # CodecSerializer instance for message encoding/decoding
 
+    # OTEL Integration (optional)
+    otel_tracer: Optional[Any] = None  # OTELTracer instance for distributed tracing
+    otel_metrics: Optional[Any] = None  # OTELMetrics instance for metrics collection
+
     # Reliability
     max_retries: int = 1
     retry_delay: float = 0.1
@@ -315,14 +319,92 @@ class Agent(BaseModel):
         if tenant_id is None:
             tenant_id = self.tenant_id
 
-        self.status = AgentStatus.RUNNING
-        self.current_task = task
+        # OTEL Integration: Start trace for task execution
+        tracer = self.otel_tracer
+        if tracer is None:
+            try:
+                from ..otel_integration import create_otel_tracer
+                tracer = create_otel_tracer()
+            except (ImportError, Exception):
+                tracer = None
 
-        try:
-            return await self._execute_with_retry(task)
-        finally:
-            self.status = AgentStatus.IDLE
-            self.current_task = None
+        import time
+        start_time = time.time()
+
+        if tracer:
+            with tracer.start_trace("agent.task.execute") as trace:
+                trace.set_attribute("agent.id", self.agent_id)
+                trace.set_attribute("task.id", task.task_id)
+                trace.set_attribute("task.type", task.task_type)
+                if tenant_id:
+                    trace.set_attribute("tenant.id", tenant_id)
+
+                self.status = AgentStatus.RUNNING
+                self.current_task = task
+
+                try:
+                    result = await self._execute_with_retry(task)
+                    duration = time.time() - start_time
+
+                    # Record metrics
+                    metrics = self.otel_metrics
+                    if metrics is None:
+                        try:
+                            from ..otel_integration import create_otel_metrics
+                            metrics = create_otel_metrics()
+                        except (ImportError, Exception):
+                            metrics = None
+
+                    if metrics:
+                        metrics.record_histogram("agent.task.duration", duration, {
+                            "agent_id": self.agent_id,
+                            "task_type": task.task_type,
+                        })
+                        metrics.increment_counter("agent.tasks.executed", amount=1.0, attributes={
+                            "agent_id": self.agent_id,
+                            "task_type": task.task_type,
+                            "status": "success",
+                        })
+
+                    return result
+                except Exception as e:
+                    duration = time.time() - start_time
+                    trace.record_exception(e)
+
+                    # Record error metrics
+                    metrics = self.otel_metrics
+                    if metrics is None:
+                        try:
+                            from ..otel_integration import create_otel_metrics
+                            metrics = create_otel_metrics()
+                        except (ImportError, Exception):
+                            metrics = None
+
+                    if metrics:
+                        metrics.record_histogram("agent.task.duration", duration, {
+                            "agent_id": self.agent_id,
+                            "task_type": task.task_type,
+                        })
+                        metrics.increment_counter("agent.tasks.executed", amount=1.0, attributes={
+                            "agent_id": self.agent_id,
+                            "task_type": task.task_type,
+                            "status": "error",
+                            "error_type": type(e).__name__,
+                        })
+                    raise
+                finally:
+                    self.status = AgentStatus.IDLE
+                    self.current_task = None
+        else:
+            # No OTEL - execute without tracing
+            self.status = AgentStatus.RUNNING
+            self.current_task = task
+
+            try:
+                return await self._execute_with_retry(task)
+            finally:
+                self.status = AgentStatus.IDLE
+                self.current_task = None
 
     async def _execute_task_internal(self, task: AgentTask) -> Any:
         """

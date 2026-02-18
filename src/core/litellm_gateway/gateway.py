@@ -292,6 +292,10 @@ class LiteLLMGateway:
         # CODEC Integration (optional)
         self.codec_serializer: Optional[Any] = None  # CodecSerializer instance for request/response encoding
 
+        # OTEL Integration (optional)
+        self.otel_tracer: Optional[Any] = None  # OTELTracer instance for distributed tracing
+        self.otel_metrics: Optional[Any] = None  # OTELMetrics instance for metrics collection
+
     def _setup_health_checks(self) -> None:
         """
         Setup health check functions.
@@ -1011,114 +1015,302 @@ class LiteLLMGateway:
         if messages is None:
             messages = [{"role": "user", "content": prompt}]
 
-        # Check KV cache
-        kv_cache_key = await self._check_kv_cache(prompt, model, messages, tenant_id)
-
-        # Check response cache
-        cached_response = await self._check_response_cache(
-            prompt, model, messages, tenant_id, stream, **kwargs
-        )
-        if cached_response:
-            return cached_response
-
-        # Rate limiting
-        rate_limiter = self._get_rate_limiter(tenant_id)
-        if rate_limiter:
-            await rate_limiter.acquire()
+        # OTEL Integration: Start trace for LLM generation
+        tracer = self.otel_tracer
+        if tracer is None:
+            try:
+                from ..otel_integration import create_otel_tracer
+                tracer = create_otel_tracer()
+            except (ImportError, Exception):
+                tracer = None
 
         # Track operation metrics
         start_time = time.time()
-        prompt_tokens: List[int] = [0]
-        completion_tokens: List[int] = [0]
-        error_message: List[Optional[str]] = [None]
-        status_list: List[LLMOperationStatus] = [LLMOperationStatus.SUCCESS]
 
-        # Create generation function
-        async def _generate() -> Any:
-            return await self._execute_generation(
-                model=model,
-                messages=messages,
-                stream=stream,
-                prompt_tokens=prompt_tokens,
-                completion_tokens=completion_tokens,
-                error_message=error_message,
-                status=status_list,
-                **kwargs,
+        if tracer:
+            with tracer.start_trace("gateway.generate") as trace:
+                trace.set_attribute("gateway.model", model)
+                trace.set_attribute("gateway.prompt.length", len(prompt))
+                if tenant_id:
+                    trace.set_attribute("gateway.tenant_id", tenant_id)
+
+                # Check KV cache span
+                with tracer.start_span("gateway.cache.kv.check", parent=trace) as cache_span:
+                    kv_cache_key = await self._check_kv_cache(prompt, model, messages, tenant_id)
+                    cache_span.set_attribute("cache.kv.hit", kv_cache_key is not None)
+
+                # Check response cache span
+                with tracer.start_span("gateway.cache.response.check", parent=trace) as cache_span:
+                    cached_response = await self._check_response_cache(
+                        prompt, model, messages, tenant_id, stream, **kwargs
+                    )
+                    cache_span.set_attribute("cache.response.hit", cached_response is not None)
+                    if cached_response:
+                        # Record cache hit metrics
+                        metrics = self.otel_metrics
+                        if metrics is None:
+                            try:
+                                from ..otel_integration import create_otel_metrics
+                                metrics = create_otel_metrics()
+                            except (ImportError, Exception):
+                                metrics = None
+                        if metrics:
+                            metrics.increment_counter("gateway.cache.hits", amount=1.0, attributes={
+                                "model": model,
+                            })
+                        return cached_response
+
+                # Rate limiting span
+                rate_limiter = self._get_rate_limiter(tenant_id)
+                if rate_limiter:
+                    with tracer.start_span("gateway.rate_limit", parent=trace):
+                        await rate_limiter.acquire()
+
+                # Provider call span
+                with tracer.start_span("gateway.provider.call", parent=trace) as provider_span:
+                    provider_span.set_attribute("provider.model", model)
+                    
+                    try:
+                        # Execute generation
+                        otel_prompt_tokens: List[int] = [0]
+                        otel_completion_tokens: List[int] = [0]
+                        otel_error_message: List[Optional[str]] = [None]
+                        otel_status_list: List[LLMOperationStatus] = [LLMOperationStatus.SUCCESS]
+
+                        # Create generation function
+                        async def _generate() -> Any:
+                            return await self._execute_generation(
+                                model=model,
+                                messages=messages,
+                                stream=stream,
+                                prompt_tokens=otel_prompt_tokens,
+                                completion_tokens=otel_completion_tokens,
+                                error_message=otel_error_message,
+                                status=otel_status_list,
+                                **kwargs,
+                            )
+
+                        # Execute with appropriate strategy
+                        if self.deduplicator and not stream:
+                            response = await self.deduplicator.get_or_execute(
+                                _generate, prompt=prompt, model=model, messages=messages, stream=stream, **kwargs
+                            )
+                        elif self.batcher and not stream:
+                            batch_key = f"{model}_{tenant_id or 'global'}"
+                            response = await self.batcher.batch_execute(
+                                batch_key,
+                                _generate,
+                                prompt=prompt,
+                                model=model,
+                                messages=messages,
+                                stream=stream,
+                                **kwargs,
+                            )
+                        elif self.circuit_breaker:
+                            response = await self.circuit_breaker.call(_generate)
+                        else:
+                            response = await _generate()
+
+                        if stream:
+                            return response
+
+                        # Extract response data
+                        text, model_name, usage, finish_reason, raw_response = self._extract_response_data(
+                            response, model
+                        )
+
+                        # Set span attributes with response data
+                        if usage:
+                            prompt_tokens = usage.get("prompt_tokens", 0)
+                            completion_tokens = usage.get("completion_tokens", 0)
+                            total_tokens = usage.get("total_tokens", 0)
+                            provider_span.set_attribute("tokens.prompt", prompt_tokens)
+                            provider_span.set_attribute("tokens.completion", completion_tokens)
+                            provider_span.set_attribute("tokens.total", total_tokens)
+
+                        generate_response = GenerateResponse(
+                            text=text,
+                            model=model_name,
+                            usage=usage,
+                            finish_reason=finish_reason,
+                            raw_response=raw_response,
+                        )
+
+                        # Record metrics
+                        duration = time.time() - start_time
+                        metrics = self.otel_metrics
+                        if metrics is None:
+                            try:
+                                from ..otel_integration import create_otel_metrics
+                                metrics = create_otel_metrics()
+                            except (ImportError, Exception):
+                                metrics = None
+
+                        if metrics and usage:
+                            total_tokens = usage.get("total_tokens", 0)
+                            metrics.record_histogram("gateway.tokens.used", total_tokens, {
+                                "model": model_name,
+                            })
+                            metrics.record_histogram("gateway.request.duration", duration, {
+                                "model": model_name,
+                            })
+                            metrics.increment_counter("gateway.provider.calls", amount=1.0, attributes={
+                                "model": model_name,
+                                "status": "success",
+                            })
+
+                        # Store KV cache
+                        if kv_cache_key:
+                            await self._store_kv_cache(kv_cache_key, prompt, model, tenant_id)
+
+                        # Store response cache
+                        await self._store_response_cache(
+                            prompt=prompt,
+                            model=model,
+                            messages=messages,
+                            tenant_id=tenant_id,
+                            text=text,
+                            model_name=model_name,
+                            usage=usage,
+                            finish_reason=finish_reason,
+                            raw_response=raw_response,
+                            status=LLMOperationStatus.SUCCESS,
+                            **kwargs,
+                        )
+
+                        return generate_response
+
+                    except Exception as e:
+                        provider_span.record_exception(e)
+                        duration = time.time() - start_time
+
+                        # Record error metrics
+                        metrics = self.otel_metrics
+                        if metrics is None:
+                            try:
+                                from ..otel_integration import create_otel_metrics
+                                metrics = create_otel_metrics()
+                            except (ImportError, Exception):
+                                metrics = None
+
+                        if metrics:
+                            metrics.record_histogram("gateway.request.duration", duration, {
+                                "model": model,
+                            })
+                            metrics.increment_counter("gateway.provider.calls", amount=1.0, attributes={
+                                "model": model,
+                                "status": "error",
+                                "error_type": type(e).__name__,
+                            })
+                        raise
+        else:
+            # No OTEL - execute without tracing
+            # Check KV cache
+            kv_cache_key = await self._check_kv_cache(prompt, model, messages, tenant_id)
+
+            # Check response cache
+            cached_response = await self._check_response_cache(
+                prompt, model, messages, tenant_id, stream, **kwargs
+            )
+            if cached_response:
+                return cached_response
+
+            # Rate limiting
+            rate_limiter = self._get_rate_limiter(tenant_id)
+            if rate_limiter:
+                await rate_limiter.acquire()
+
+            no_otel_prompt_tokens: List[int] = [0]
+            no_otel_completion_tokens: List[int] = [0]
+            no_otel_error_message: List[Optional[str]] = [None]
+            no_otel_status_list: List[LLMOperationStatus] = [LLMOperationStatus.SUCCESS]
+
+            # Create generation function
+            async def _generate() -> Any:
+                return await self._execute_generation(
+                    model=model,
+                    messages=messages,
+                    stream=stream,
+                    prompt_tokens=no_otel_prompt_tokens,
+                    completion_tokens=no_otel_completion_tokens,
+                    error_message=no_otel_error_message,
+                    status=no_otel_status_list,
+                    **kwargs,
+                )
+
+            # Execute with appropriate strategy
+            if self.deduplicator and not stream:
+                response = await self.deduplicator.get_or_execute(
+                    _generate, prompt=prompt, model=model, messages=messages, stream=stream, **kwargs
+                )
+            elif self.batcher and not stream:
+                batch_key = f"{model}_{tenant_id or 'global'}"
+                response = await self.batcher.batch_execute(
+                    batch_key,
+                    _generate,
+                    prompt=prompt,
+                    model=model,
+                    messages=messages,
+                    stream=stream,
+                    **kwargs,
+                )
+            elif self.circuit_breaker:
+                response = await self.circuit_breaker.call(_generate)
+            else:
+                response = await _generate()
+
+            if stream:
+                return response
+
+            # Log operation
+            status = no_otel_status_list[0]
+            if self.llmops:
+                latency_ms = (time.time() - start_time) * 1000
+                await self.llmops.log_operation(
+                    operation_type=LLMOperationType.COMPLETION,
+                    model=model,
+                    prompt_tokens=no_otel_prompt_tokens[0],
+                    completion_tokens=no_otel_completion_tokens[0],
+                    latency_ms=latency_ms,
+                    status=status,
+                    error_message=no_otel_error_message[0],
+                    tenant_id=tenant_id,
+                    metadata={"stream": stream},
+                )
+
+            # Extract response data
+            text, model_name, usage, finish_reason, raw_response = self._extract_response_data(
+                response, model
             )
 
-        # Execute with appropriate strategy
-        if self.deduplicator and not stream:
-            response = await self.deduplicator.get_or_execute(
-                _generate, prompt=prompt, model=model, messages=messages, stream=stream, **kwargs
+            generate_response = GenerateResponse(
+                text=text,
+                model=model_name,
+                usage=usage,
+                finish_reason=finish_reason,
+                raw_response=raw_response,
             )
-        elif self.batcher and not stream:
-            batch_key = f"{model}_{tenant_id or 'global'}"
-            response = await self.batcher.batch_execute(
-                batch_key,
-                _generate,
+
+            # Store KV cache
+            if kv_cache_key:
+                await self._store_kv_cache(kv_cache_key, prompt, model, tenant_id)
+
+            # Store response cache
+            await self._store_response_cache(
                 prompt=prompt,
                 model=model,
                 messages=messages,
-                stream=stream,
+                tenant_id=tenant_id,
+                text=text,
+                model_name=model_name,
+                usage=usage,
+                finish_reason=finish_reason,
+                raw_response=raw_response,
+                status=status,
                 **kwargs,
             )
-        elif self.circuit_breaker:
-            response = await self.circuit_breaker.call(_generate)
-        else:
-            response = await _generate()
 
-        if stream:
-            return response
-
-        # Log operation
-        status = status_list[0]
-        if self.llmops:
-            latency_ms = (time.time() - start_time) * 1000
-            await self.llmops.log_operation(
-                operation_type=LLMOperationType.COMPLETION,
-                model=model,
-                prompt_tokens=prompt_tokens[0],
-                completion_tokens=completion_tokens[0],
-                latency_ms=latency_ms,
-                status=status,
-                error_message=error_message[0],
-                tenant_id=tenant_id,
-                metadata={"stream": stream},
-            )
-
-        # Extract response data
-        text, model_name, usage, finish_reason, raw_response = self._extract_response_data(
-            response, model
-        )
-
-        generate_response = GenerateResponse(
-            text=text,
-            model=model_name,
-            usage=usage,
-            finish_reason=finish_reason,
-            raw_response=raw_response,
-        )
-
-        # Store KV cache
-        if kv_cache_key:
-            await self._store_kv_cache(kv_cache_key, prompt, model, tenant_id)
-
-        # Store response cache
-        await self._store_response_cache(
-            prompt=prompt,
-            model=model,
-            messages=messages,
-            tenant_id=tenant_id,
-            text=text,
-            model_name=model_name,
-            usage=usage,
-            finish_reason=finish_reason,
-            raw_response=raw_response,
-            status=status,
-            **kwargs,
-        )
-
-        return generate_response
+            return generate_response
 
     def embed(
         self, texts: List[str], model: str = "text-embedding-3-small", **kwargs: Any
