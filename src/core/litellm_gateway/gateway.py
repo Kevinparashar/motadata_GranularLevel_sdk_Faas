@@ -288,6 +288,9 @@ class LiteLLMGateway:
         self._initialize_llmops()
         self._initialize_validation_manager()
         self._initialize_feedback_loop()
+        
+        # CODEC Integration (optional)
+        self.codec_serializer: Optional[Any] = None  # CodecSerializer instance for request/response encoding
 
     def _setup_health_checks(self) -> None:
         """
@@ -1226,3 +1229,76 @@ class LiteLLMGateway:
             embeddings, model_name, usage = self._extract_embeddings_from_object(response, model)
 
         return EmbedResponse(embeddings=embeddings, model=model_name or model, usage=usage)
+
+    async def encode_llm_request(
+        self,
+        request_id: str,
+        prompt: str,
+        model: str,
+        tenant_id: Optional[str] = None,
+        parameters: Optional[Dict[str, Any]] = None,
+    ) -> bytes:
+        """
+        Encode an LLM request to bytes using codec serializer.
+        
+        Args:
+            request_id: Unique request identifier
+            prompt: Prompt text
+            model: Model name
+            tenant_id: Tenant identifier
+            parameters: Optional request parameters
+        
+        Returns:
+            Encoded bytes
+        
+        Raises:
+            ValueError: If codec serializer is not configured
+        """
+        if not self.codec_serializer:
+            # Try to import and use default codec serializer
+            try:
+                from ..codec_integration import encode_llm_request
+                return await encode_llm_request(
+                    request_id=request_id,
+                    prompt=prompt,
+                    model=model,
+                    tenant_id=tenant_id or "",
+                    parameters=parameters,
+                    codec=None,  # Use default codec
+                )
+            except ImportError:
+                raise ValueError("Codec serializer not configured and codec_integration not available")
+        
+        from ..codec_integration import encode_llm_request
+        return await encode_llm_request(
+            request_id=request_id,
+            prompt=prompt,
+            model=model,
+            tenant_id=tenant_id or "",
+            parameters=parameters,
+            codec=self.codec_serializer,
+        )
+
+    async def decode_llm_response(self, payload: bytes) -> Dict[str, Any]:
+        """
+        Decode bytes to LLM response dictionary using codec serializer.
+        
+        Args:
+            payload: Encoded bytes to decode
+        
+        Returns:
+            Decoded response dictionary
+        
+        Raises:
+            ValueError: If codec serializer is not configured
+        """
+        if not self.codec_serializer:
+            # Try to import and use default codec serializer
+            try:
+                from ..codec_integration import decode_llm_response
+                return await decode_llm_response(payload, codec=None)  # Use default codec
+            except ImportError:
+                raise ValueError("Codec serializer not configured and codec_integration not available")
+        
+        from ..codec_integration import decode_llm_response
+        return await decode_llm_response(payload, codec=self.codec_serializer)

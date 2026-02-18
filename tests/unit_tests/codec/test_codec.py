@@ -2,7 +2,6 @@
 Unit tests for codec.py
 """
 
-import json
 from unittest.mock import MagicMock, patch
 
 import pytest
@@ -34,8 +33,11 @@ class TestCodecManager:
         result = await manager.encode(data)
 
         assert isinstance(result, bytes)
-        decoded = json.loads(result.decode("utf-8"))
-        assert decoded == data
+        decoded = await manager.decode(result)
+        # Decode returns envelope, extract data
+        assert decoded.get("data") == data
+        assert "schema_version" in decoded
+        assert "message_type" in decoded
 
     @pytest.mark.asyncio
     async def test_encode_json_complex(self):
@@ -53,8 +55,9 @@ class TestCodecManager:
         result = await manager.encode(data)
 
         assert isinstance(result, bytes)
-        decoded = json.loads(result.decode("utf-8"))
-        assert decoded == data
+        decoded = await manager.decode(result)
+        # Decode returns envelope, extract data
+        assert decoded.get("data") == data
 
     @pytest.mark.asyncio
     async def test_encode_msgpack_fallback(self):
@@ -66,8 +69,8 @@ class TestCodecManager:
 
         assert isinstance(result, bytes)
         # Should fall back to JSON
-        decoded = json.loads(result.decode("utf-8"))
-        assert decoded == data
+        decoded = await manager.decode(result)
+        assert decoded.get("data") == data
 
     @pytest.mark.asyncio
     async def test_encode_protobuf_fallback(self):
@@ -79,8 +82,8 @@ class TestCodecManager:
 
         assert isinstance(result, bytes)
         # Should fall back to JSON
-        decoded = json.loads(result.decode("utf-8"))
-        assert decoded == data
+        decoded = await manager.decode(result)
+        assert decoded.get("data") == data
 
     @pytest.mark.asyncio
     async def test_encode_unsupported_type(self):
@@ -95,11 +98,12 @@ class TestCodecManager:
         """Test decode with JSON codec."""
         manager = CodecManager(codec_type="json")
         data = {"key": "value", "number": 123}
-        encoded = json.dumps(data).encode("utf-8")
+        # Encode first to get proper envelope structure
+        encoded = await manager.encode(data)
+        decoded = await manager.decode(encoded)
 
-        result = await manager.decode(encoded)
-
-        assert result == data
+        # Decode returns envelope, extract data
+        assert decoded.get("data") == data
 
     @pytest.mark.asyncio
     async def test_decode_json_complex(self):
@@ -113,33 +117,36 @@ class TestCodecManager:
             "list": [1, 2, 3],
             "nested": {"key": "value"},
         }
-        encoded = json.dumps(data).encode("utf-8")
-
+        # Encode first to get proper envelope structure
+        encoded = await manager.encode(data)
         result = await manager.decode(encoded)
 
-        assert result == data
+        # Decode returns envelope, extract data
+        assert result.get("data") == data
 
     @pytest.mark.asyncio
     async def test_decode_msgpack_fallback(self):
         """Test decode with msgpack codec (falls back to JSON)."""
         manager = CodecManager(codec_type="msgpack")
         data = {"key": "value"}
-        encoded = json.dumps(data).encode("utf-8")
-
+        # Encode first to get proper envelope structure
+        encoded = await manager.encode(data)
         result = await manager.decode(encoded)
 
-        assert result == data
+        # Decode returns envelope, extract data
+        assert result.get("data") == data
 
     @pytest.mark.asyncio
     async def test_decode_protobuf_fallback(self):
         """Test decode with protobuf codec (falls back to JSON)."""
         manager = CodecManager(codec_type="protobuf")
         data = {"key": "value"}
-        encoded = json.dumps(data).encode("utf-8")
-
+        # Encode first to get proper envelope structure
+        encoded = await manager.encode(data)
         result = await manager.decode(encoded)
 
-        assert result == data
+        # Decode returns envelope, extract data
+        assert result.get("data") == data
 
     @pytest.mark.asyncio
     async def test_decode_unsupported_type(self):
@@ -158,7 +165,8 @@ class TestCodecManager:
         encoded = await manager.encode(original_data)
         decoded = await manager.decode(encoded)
 
-        assert decoded == original_data
+        # Decode returns envelope, extract data
+        assert decoded.get("data") == original_data
 
 
 class TestCreateCodecManager:

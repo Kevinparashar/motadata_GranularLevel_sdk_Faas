@@ -121,6 +121,9 @@ class Agent(BaseModel):
     task_queue: List[AgentTask] = Field(default_factory=list)
     current_task: Optional[AgentTask] = None
 
+    # CODEC Integration (optional)
+    codec_serializer: Optional[Any] = None  # CodecSerializer instance for message encoding/decoding
+
     # Reliability
     max_retries: int = 1
     retry_delay: float = 0.1
@@ -1150,6 +1153,74 @@ class Agent(BaseModel):
             # Use asyncio.to_thread for thread-safe queue operations
             return await asyncio.to_thread(self.message_queue.pop, 0)
         return None
+
+    async def encode_message(self, message: AgentMessage) -> bytes:
+        """
+        Encode an agent message to bytes using codec serializer.
+        
+        Args:
+            message: AgentMessage instance to encode
+        
+        Returns:
+            Encoded bytes
+        
+        Raises:
+            AgentConfigurationError: If codec serializer is not configured
+        """
+        if not self.codec_serializer:
+            # Try to import and use default codec serializer
+            try:
+                from ..codec_integration import encode_agent_message
+                return await encode_agent_message(message, codec=None)  # Use default codec
+            except ImportError:
+                raise AgentConfigurationError(
+                    "Codec serializer not configured and codec_integration not available",
+                    agent_id=self.agent_id,
+                )
+        
+        from ..codec_integration import encode_agent_message
+        return await encode_agent_message(message, codec=self.codec_serializer)
+
+    async def decode_message(self, payload: bytes) -> AgentMessage:
+        """
+        Decode bytes to agent message using codec serializer.
+        
+        Args:
+            payload: Encoded bytes to decode
+        
+        Returns:
+            AgentMessage instance
+        
+        Raises:
+            AgentConfigurationError: If codec serializer is not configured
+        """
+        if not self.codec_serializer:
+            # Try to import and use default codec serializer
+            try:
+                from ..codec_integration import decode_agent_message
+                decoded_data = await decode_agent_message(payload, codec=None)  # Use default codec
+                return AgentMessage(
+                    from_agent=decoded_data.get("source_agent_id", ""),
+                    to_agent=decoded_data.get("target_agent_id", ""),
+                    content=decoded_data.get("content", ""),
+                    message_type=decoded_data.get("message_type", "text"),
+                    metadata=decoded_data.get("metadata", {}),
+                )
+            except ImportError:
+                raise AgentConfigurationError(
+                    "Codec serializer not configured and codec_integration not available",
+                    agent_id=self.agent_id,
+                )
+        
+        from ..codec_integration import decode_agent_message
+        decoded_data = await decode_agent_message(payload, codec=self.codec_serializer)
+        return AgentMessage(
+            from_agent=decoded_data.get("source_agent_id", ""),
+            to_agent=decoded_data.get("target_agent_id", ""),
+            content=decoded_data.get("content", ""),
+            message_type=decoded_data.get("message_type", "text"),
+            metadata=decoded_data.get("metadata", {}),
+        )
 
     def get_status(self) -> Dict[str, Any]:
         """

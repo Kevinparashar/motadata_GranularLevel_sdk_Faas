@@ -1,175 +1,104 @@
-# MOTADATA - UNIT TESTS
+# Unit Tests Directory Structure
 
-**Unit test suite for SDK components with instructions for running and writing tests.**
+This directory contains unit tests organized by component/module for better maintainability and navigation.
 
-## Instructions for Running Unit Tests
+## Directory Structure
 
-### Setup
-
-```bash
-# Install test dependencies
-pip install -r requirements-test.txt
-
-# Install the SDK in development mode
-pip install -e .
+```
+tests/unit_tests/
+├── agent/              # Agent framework tests
+│   ├── test_agent.py
+│   ├── test_agent_codec.py
+│   ├── test_agent_exceptions.py
+│   ├── test_agent_functions.py
+│   ├── test_memory.py
+│   ├── test_orchestration.py
+│   ├── test_plugins.py
+│   ├── test_session.py
+│   └── test_tools.py
+├── cache/              # Cache-related tests
+│   ├── test_cache.py
+│   ├── test_cache_enhancements.py
+│   ├── test_cache_functions.py
+│   └── test_kv_cache.py
+├── codec/              # Codec integration tests
+│   ├── test_codec.py
+│   ├── test_codec_functions.py
+│   ├── test_codec_registry_migration.py
+│   └── test_codec_serializer.py
+├── config/             # Configuration tests
+│   ├── test_config_builders.py
+│   ├── test_config_discovery.py
+│   └── test_config_validator.py
+├── database/           # Database tests
+│   └── test_postgresql_database.py
+├── error_handler/      # Error handling tests
+│   └── test_error_handler.py
+├── feedback/           # Feedback system tests
+│   └── test_feedback_system.py
+├── gateway/            # LiteLLM Gateway tests
+│   ├── test_litellm_gateway.py
+│   └── test_litellm_gateway_functions.py
+├── health_check/       # Health check tests
+│   └── test_health_check.py
+├── llmops/             # LLMOps tests
+│   └── test_llmops.py
+├── observability/      # Observability tests
+│   ├── test_observability.py
+│   └── test_otel.py
+├── prompt/             # Prompt-related tests
+│   ├── test_prompt_based_generator.py
+│   ├── test_prompt_context_functions.py
+│   └── test_prompt_enhancements.py
+├── rag/                # RAG system tests
+│   ├── test_rag.py
+│   ├── test_rag_exceptions.py
+│   └── test_rag_functions.py
+├── test_faas/          # FaaS service tests
+│   └── (various service tests)
+├── type_helpers/       # Type helper tests
+│   └── test_type_helpers.py
+└── utils/              # Utility function tests
+    ├── test_data_ingestion.py
+    ├── test_guardrails.py
+    ├── test_hallucination_detector.py
+    ├── test_nats.py
+    └── test_rate_limiter.py
 ```
 
-### Running Tests
+## Running Tests
 
+### Run all unit tests
 ```bash
-# Run all unit tests
 pytest tests/unit_tests/
-
-# Run specific test file
-pytest tests/unit_tests/test_litellm_gateway.py
-
-# Run function-driven API tests
-pytest tests/unit_tests/test_agent_functions.py
-pytest tests/unit_tests/test_rag_functions.py
-pytest tests/unit_tests/test_cache_functions.py
-pytest tests/unit_tests/test_api_functions.py
-
-# Run all function-driven API tests
-pytest tests/unit_tests/ -k "functions"
-
-# Run with coverage
-pytest tests/unit_tests/ --cov=src --cov-report=html
-
-# Run in verbose mode
-pytest tests/unit_tests/ -v
 ```
 
-### Test Structure
-
-Tests are organized by component:
-
-```
-unit_tests/
-├── Component Tests (Class-based)
-│   ├── test_agent.py                    # Agent framework class tests
-│   ├── test_cache.py                    # Cache mechanism class tests
-│   ├── test_litellm_gateway.py          # LiteLLM Gateway class tests
-│   ├── test_rag.py                      # RAG system class tests
-│   ├── test_postgresql_database.py      # Database tests
-│   └── test_observability.py           # Observability tests
-│
-└── Function-Driven API Tests
-    ├── test_agent_functions.py          # Agent framework functions tests
-    ├── test_rag_functions.py           # RAG system functions tests
-    ├── test_cache_functions.py         # Cache mechanism functions tests
-    ├── test_api_functions.py            # API backend functions tests
-    ├── test_litellm_gateway_functions.py # LiteLLM Gateway functions tests
-    └── test_prompt_context_functions.py # Prompt context functions tests
-
-└── FaaS Service Tests
-    └── test_faas/
-        └── test_agent_service.py       # Agent Service unit tests
+### Run tests for a specific component
+```bash
+pytest tests/unit_tests/agent/
+pytest tests/unit_tests/codec/
+pytest tests/unit_tests/rag/
 ```
 
-### Function-Driven API Tests
-
-The SDK provides comprehensive test coverage for the function-driven API:
-
-- **Factory Functions**: Test component creation with various configurations
-- **Convenience Functions**: Test high-level operations and integrations
-- **Utility Functions**: Test batch operations, retries, and common patterns
-
-Each function test file includes:
-- Factory function tests (create_*, configure_*)
-- Convenience function tests (high-level operations)
-- Utility function tests (batch processing, retries, etc.)
-- Edge case and error handling tests
-
-## Testing Framework Used
-
-- **pytest**: Primary testing framework
-- **pytest-asyncio**: Async test support
-- **pytest-mock**: Mocking utilities
-- **pytest-cov**: Coverage reporting
-
-## Structure of Test Cases
-
-### Basic Test Structure
-
-```python
-import pytest
-from src.core.litellm_gateway import LiteLLMGateway
-
-class TestGateway:
-    def test_generate_text(self):
-        """Test text generation."""
-        gateway = LiteLLMGateway()
-        response = gateway.generate(
-            prompt="Hello",
-            model="gpt-4"
-        )
-        assert response.text is not None
-        assert len(response.text) > 0
+### Run specific test file
+```bash
+pytest tests/unit_tests/codec/test_codec_serializer.py
 ```
 
-### Async Tests
-
-```python
-import pytest
-
-@pytest.mark.asyncio
-async def test_async_generation():
-    """Test async text generation."""
-    gateway = LiteLLMGateway()
-    response = await gateway.generate_async(
-        prompt="Hello",
-        model="gpt-4"
-    )
-    assert response.text is not None
+### Run with coverage
+```bash
+pytest tests/unit_tests/ --cov=src --cov-report=term
 ```
 
-### Mocked Tests
+## Test Discovery
 
-```python
-from unittest.mock import Mock, patch
+Pytest automatically discovers all test files recursively in subdirectories. The configuration in `pyproject.toml` ensures:
+- Test files matching `test_*.py` pattern are discovered
+- Test classes matching `Test*` pattern are discovered
+- Test functions matching `test_*` pattern are discovered
 
-def test_gateway_with_mock():
-    """Test gateway with mocked LLM."""
-    with patch('litellm.completion') as mock_completion:
-        mock_completion.return_value = Mock(
-            choices=[Mock(message=Mock(content="Test response"))]
-        )
-        
-        gateway = LiteLLMGateway()
-        response = gateway.generate("Hello", "gpt-4")
-        
-        assert response.text == "Test response"
-```
+## Notes
 
-### Fixtures
-
-```python
-import pytest
-
-@pytest.fixture
-def gateway():
-    """Gateway fixture."""
-    return LiteLLMGateway()
-
-@pytest.fixture
-def sample_document():
-    """Sample document fixture."""
-    return {
-        "title": "Test Document",
-        "content": "Test content..."
-    }
-
-def test_with_fixtures(gateway, sample_document):
-    """Test using fixtures."""
-    result = gateway.process(sample_document)
-    assert result is not None
-```
-
-## Best Practices
-
-1. **Test Isolation**: Each test should be independent
-2. **Use Fixtures**: Reuse common test setup
-3. **Mock External Dependencies**: Mock API calls and external services
-4. **Test Edge Cases**: Test error conditions and edge cases
-5. **Maintain Coverage**: Aim for >80% code coverage
-
+- Each subdirectory contains an `__init__.py` file to make it a Python package
+- Test imports should use absolute imports from `src/` (e.g., `from src.core.codec_integration import ...`)
+- The Azure DevOps pipeline and SonarQube configuration support this structure automatically
