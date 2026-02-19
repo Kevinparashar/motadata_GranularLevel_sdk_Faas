@@ -316,3 +316,266 @@ async def decode_rag_query(
 
     return envelope["data"]
 
+
+async def encode_agent_requirements(
+    requirements: Any,
+    codec: Optional[CodecSerializer] = None,
+    schema_version: str = "1.0",
+) -> bytes:
+    """
+    Encode AgentRequirements to bytes.
+
+    Args:
+        requirements: AgentRequirements instance or dictionary
+        codec: CodecSerializer instance (creates default if not provided)
+        schema_version: Schema version to use
+
+    Returns:
+        Encoded bytes
+
+    Example:
+        >>> from src.core.prompt_based_generator.prompt_interpreter import AgentRequirements
+        >>> requirements = AgentRequirements(name="test", description="test", ...)
+        >>> encoded = await encode_agent_requirements(requirements)
+    """
+    if codec is None:
+        codec = create_codec_serializer()
+
+    # Convert requirements to dictionary if it's a Pydantic model
+    if hasattr(requirements, "model_dump"):
+        requirements_dict = requirements.model_dump()
+    elif hasattr(requirements, "dict"):
+        requirements_dict = requirements.dict()
+    elif isinstance(requirements, dict):
+        requirements_dict = requirements
+    else:
+        requirements_dict = {
+            "name": getattr(requirements, "name", ""),
+            "description": getattr(requirements, "description", ""),
+            "capabilities": getattr(requirements, "capabilities", []),
+            "system_prompt": getattr(requirements, "system_prompt", ""),
+            "required_tools": getattr(requirements, "required_tools", []),
+            "memory_config": getattr(requirements, "memory_config", {}),
+            "max_context_tokens": getattr(requirements, "max_context_tokens", 4000),
+            "enable_tool_calling": getattr(requirements, "enable_tool_calling", True),
+            "metadata": getattr(requirements, "metadata", {}),
+        }
+
+    envelope = codec.create_envelope(
+        message_type="agent_requirements",
+        schema_version=schema_version,
+        data=requirements_dict,
+    )
+
+    return await codec.encode(envelope)
+
+
+async def decode_agent_requirements(
+    payload: bytes,
+    codec: Optional[CodecSerializer] = None,
+    target_version: Optional[str] = None,
+) -> Dict[str, Any]:
+    """
+    Decode bytes to AgentRequirements dictionary.
+
+    Args:
+        payload: Encoded bytes
+        codec: CodecSerializer instance (creates default if not provided)
+        target_version: Target schema version (migrates if different)
+
+    Returns:
+        Decoded requirements dictionary
+
+    Example:
+        >>> decoded = await decode_agent_requirements(encoded_bytes)
+        >>> requirements = AgentRequirements(**decoded)
+    """
+    if codec is None:
+        codec = create_codec_serializer()
+
+    envelope = await codec.decode(payload)
+
+    # Migrate if needed
+    if target_version and envelope.get("schema_version") != target_version:
+        envelope = codec.migrate_envelope(envelope, target_version, "agent_requirements")
+
+    # Validate schema
+    codec.validate_schema(envelope, "agent_requirements")
+
+    return envelope["data"]
+
+
+async def encode_tool_requirements(
+    requirements: Any,
+    codec: Optional[CodecSerializer] = None,
+    schema_version: str = "1.0",
+) -> bytes:
+    """
+    Encode ToolRequirements to bytes.
+
+    Args:
+        requirements: ToolRequirements instance or dictionary
+        codec: CodecSerializer instance (creates default if not provided)
+        schema_version: Schema version to use
+
+    Returns:
+        Encoded bytes
+
+    Example:
+        >>> from src.core.prompt_based_generator.prompt_interpreter import ToolRequirements
+        >>> requirements = ToolRequirements(name="test", description="test", ...)
+        >>> encoded = await encode_tool_requirements(requirements)
+    """
+    if codec is None:
+        codec = create_codec_serializer()
+
+    # Convert requirements to dictionary if it's a Pydantic model
+    if hasattr(requirements, "model_dump"):
+        requirements_dict = requirements.model_dump()
+    elif hasattr(requirements, "dict"):
+        requirements_dict = requirements.dict()
+    elif isinstance(requirements, dict):
+        requirements_dict = requirements
+    else:
+        requirements_dict = {
+            "name": getattr(requirements, "name", ""),
+            "description": getattr(requirements, "description", ""),
+            "function_name": getattr(requirements, "function_name", ""),
+            "parameters": getattr(requirements, "parameters", []),
+            "return_type": getattr(requirements, "return_type", "Any"),
+            "code_template": getattr(requirements, "code_template", None),
+            "metadata": getattr(requirements, "metadata", {}),
+        }
+
+    envelope = codec.create_envelope(
+        message_type="tool_requirements",
+        schema_version=schema_version,
+        data=requirements_dict,
+    )
+
+    return await codec.encode(envelope)
+
+
+async def decode_tool_requirements(
+    payload: bytes,
+    codec: Optional[CodecSerializer] = None,
+    target_version: Optional[str] = None,
+) -> Dict[str, Any]:
+    """
+    Decode bytes to ToolRequirements dictionary.
+
+    Args:
+        payload: Encoded bytes
+        codec: CodecSerializer instance (creates default if not provided)
+        target_version: Target schema version (migrates if different)
+
+    Returns:
+        Decoded requirements dictionary
+
+    Example:
+        >>> decoded = await decode_tool_requirements(encoded_bytes)
+        >>> requirements = ToolRequirements(**decoded)
+    """
+    if codec is None:
+        codec = create_codec_serializer()
+
+    envelope = await codec.decode(payload)
+
+    # Migrate if needed
+    if target_version and envelope.get("schema_version") != target_version:
+        envelope = codec.migrate_envelope(envelope, target_version, "tool_requirements")
+
+    # Validate schema
+    codec.validate_schema(envelope, "tool_requirements")
+
+    return envelope["data"]
+
+
+async def encode_prompt_template(
+    template: Any,
+    codec: Optional[CodecSerializer] = None,
+    schema_version: str = "1.0",
+) -> bytes:
+    """
+    Encode PromptTemplate to bytes.
+
+    Args:
+        template: PromptTemplate instance or dictionary
+        codec: CodecSerializer instance (creates default if not provided)
+        schema_version: Schema version to use
+
+    Returns:
+        Encoded bytes
+
+    Example:
+        >>> from src.core.prompt_context_management.prompt_manager import PromptTemplate
+        >>> template = PromptTemplate(name="test", version="1.0", content="Hello {name}")
+        >>> encoded = await encode_prompt_template(template)
+    """
+    if codec is None:
+        codec = create_codec_serializer()
+
+    # Convert template to dictionary
+    if hasattr(template, "__dict__"):
+        # For dataclass instances
+        template_dict = {
+            "name": template.name,
+            "version": template.version,
+            "content": template.content,
+            "tenant_id": getattr(template, "tenant_id", None),
+            "metadata": getattr(template, "metadata", {}),
+        }
+    elif isinstance(template, dict):
+        template_dict = template
+    else:
+        template_dict = {
+            "name": getattr(template, "name", ""),
+            "version": getattr(template, "version", ""),
+            "content": getattr(template, "content", ""),
+            "tenant_id": getattr(template, "tenant_id", None),
+            "metadata": getattr(template, "metadata", {}),
+        }
+
+    envelope = codec.create_envelope(
+        message_type="prompt_template",
+        schema_version=schema_version,
+        data=template_dict,
+    )
+
+    return await codec.encode(envelope)
+
+
+async def decode_prompt_template(
+    payload: bytes,
+    codec: Optional[CodecSerializer] = None,
+    target_version: Optional[str] = None,
+) -> Dict[str, Any]:
+    """
+    Decode bytes to PromptTemplate dictionary.
+
+    Args:
+        payload: Encoded bytes
+        codec: CodecSerializer instance (creates default if not provided)
+        target_version: Target schema version (migrates if different)
+
+    Returns:
+        Decoded template dictionary
+
+    Example:
+        >>> decoded = await decode_prompt_template(encoded_bytes)
+        >>> template = PromptTemplate(**decoded)
+    """
+    if codec is None:
+        codec = create_codec_serializer()
+
+    envelope = await codec.decode(payload)
+
+    # Migrate if needed
+    if target_version and envelope.get("schema_version") != target_version:
+        envelope = codec.migrate_envelope(envelope, target_version, "prompt_template")
+
+    # Validate schema
+    codec.validate_schema(envelope, "prompt_template")
+
+    return envelope["data"]
+

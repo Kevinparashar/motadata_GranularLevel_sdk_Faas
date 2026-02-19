@@ -94,6 +94,7 @@ class PromptInterpreter:
         gateway: GatewayProtocol,
         otel_tracer: Optional[Any] = None,
         otel_metrics: Optional[Any] = None,
+        codec_serializer: Optional[Any] = None,
     ):
         """
         Initialize prompt interpreter.
@@ -102,6 +103,7 @@ class PromptInterpreter:
             gateway (GatewayProtocol): Gateway client used for LLM calls.
             otel_tracer: Optional OTEL tracer for distributed tracing
             otel_metrics: Optional OTEL metrics for metrics collection
+            codec_serializer: Optional CodecSerializer instance for message encoding/decoding
         """
         self.gateway = gateway
 
@@ -125,6 +127,18 @@ class PromptInterpreter:
                 self.otel_metrics = create_otel_metrics(service_name="prompt-interpreter")
             except (ImportError, Exception):
                 self.otel_metrics = None
+
+        # CODEC Integration (optional)
+        self.codec_serializer: Optional[Any] = codec_serializer
+
+        # Initialize CODEC if not provided
+        if self.codec_serializer is None:
+            try:
+                from ..codec_integration import create_codec_serializer
+
+                self.codec_serializer = create_codec_serializer(codec_type="json")
+            except (ImportError, Exception):
+                self.codec_serializer = None
         self._agent_prompt_template = """You are an expert at analyzing requirements for AI agents. 
 Given a user's natural language description, extract the following information:
 
@@ -621,3 +635,135 @@ Only return valid JSON, no additional text."""
                 )
 
             return requirements
+
+    async def encode_agent_requirements(
+        self, requirements: AgentRequirements, schema_version: str = "1.0"
+    ) -> bytes:
+        """
+        Encode AgentRequirements to bytes using codec serializer.
+        
+        Args:
+            requirements: AgentRequirements instance to encode
+            schema_version: Schema version to use
+        
+        Returns:
+            Encoded bytes
+        
+        Raises:
+            PromptInterpretationError: If codec serializer is not configured
+        """
+        if not self.codec_serializer:
+            # Try to import and use default codec serializer
+            try:
+                from ..codec_integration import encode_agent_requirements
+                return await encode_agent_requirements(requirements, codec=None, schema_version=schema_version)
+            except ImportError:
+                raise create_error_with_suggestion(
+                    PromptInterpretationError,
+                    message="Codec serializer not configured and codec_integration not available",
+                    suggestion="Configure codec_serializer in PromptInterpreter initialization or ensure codec_integration is available",
+                    reason="codec_not_configured",
+                )
+        
+        from ..codec_integration import encode_agent_requirements
+        return await encode_agent_requirements(requirements, codec=self.codec_serializer, schema_version=schema_version)
+
+    async def decode_agent_requirements(
+        self, payload: bytes, target_version: Optional[str] = None
+    ) -> AgentRequirements:
+        """
+        Decode bytes to AgentRequirements using codec serializer.
+        
+        Args:
+            payload: Encoded bytes to decode
+            target_version: Target schema version (migrates if different)
+        
+        Returns:
+            AgentRequirements instance
+        
+        Raises:
+            PromptInterpretationError: If codec serializer is not configured
+        """
+        if not self.codec_serializer:
+            # Try to import and use default codec serializer
+            try:
+                from ..codec_integration import decode_agent_requirements
+                decoded_data = await decode_agent_requirements(payload, codec=None, target_version=target_version)
+                return AgentRequirements(**decoded_data)
+            except ImportError:
+                raise create_error_with_suggestion(
+                    PromptInterpretationError,
+                    message="Codec serializer not configured and codec_integration not available",
+                    suggestion="Configure codec_serializer in PromptInterpreter initialization or ensure codec_integration is available",
+                    reason="codec_not_configured",
+                )
+        
+        from ..codec_integration import decode_agent_requirements
+        decoded_data = await decode_agent_requirements(payload, codec=self.codec_serializer, target_version=target_version)
+        return AgentRequirements(**decoded_data)
+
+    async def encode_tool_requirements(
+        self, requirements: ToolRequirements, schema_version: str = "1.0"
+    ) -> bytes:
+        """
+        Encode ToolRequirements to bytes using codec serializer.
+        
+        Args:
+            requirements: ToolRequirements instance to encode
+            schema_version: Schema version to use
+        
+        Returns:
+            Encoded bytes
+        
+        Raises:
+            PromptInterpretationError: If codec serializer is not configured
+        """
+        if not self.codec_serializer:
+            # Try to import and use default codec serializer
+            try:
+                from ..codec_integration import encode_tool_requirements
+                return await encode_tool_requirements(requirements, codec=None, schema_version=schema_version)
+            except ImportError:
+                raise create_error_with_suggestion(
+                    PromptInterpretationError,
+                    message="Codec serializer not configured and codec_integration not available",
+                    suggestion="Configure codec_serializer in PromptInterpreter initialization or ensure codec_integration is available",
+                    reason="codec_not_configured",
+                )
+        
+        from ..codec_integration import encode_tool_requirements
+        return await encode_tool_requirements(requirements, codec=self.codec_serializer, schema_version=schema_version)
+
+    async def decode_tool_requirements(
+        self, payload: bytes, target_version: Optional[str] = None
+    ) -> ToolRequirements:
+        """
+        Decode bytes to ToolRequirements using codec serializer.
+        
+        Args:
+            payload: Encoded bytes to decode
+            target_version: Target schema version (migrates if different)
+        
+        Returns:
+            ToolRequirements instance
+        
+        Raises:
+            PromptInterpretationError: If codec serializer is not configured
+        """
+        if not self.codec_serializer:
+            # Try to import and use default codec serializer
+            try:
+                from ..codec_integration import decode_tool_requirements
+                decoded_data = await decode_tool_requirements(payload, codec=None, target_version=target_version)
+                return ToolRequirements(**decoded_data)
+            except ImportError:
+                raise create_error_with_suggestion(
+                    PromptInterpretationError,
+                    message="Codec serializer not configured and codec_integration not available",
+                    suggestion="Configure codec_serializer in PromptInterpreter initialization or ensure codec_integration is available",
+                    reason="codec_not_configured",
+                )
+        
+        from ..codec_integration import decode_tool_requirements
+        decoded_data = await decode_tool_requirements(payload, codec=self.codec_serializer, target_version=target_version)
+        return ToolRequirements(**decoded_data)

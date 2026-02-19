@@ -17,11 +17,17 @@ from .exceptions import (
 from .functions import (
     create_codec_serializer,
     decode_agent_message,
+    decode_agent_requirements,
     decode_llm_response,
+    decode_prompt_template,
     decode_rag_query,
+    decode_tool_requirements,
     encode_agent_message,
+    encode_agent_requirements,
     encode_llm_request,
+    encode_prompt_template,
     encode_rag_document,
+    encode_tool_requirements,
 )
 
 __all__ = [
@@ -39,6 +45,12 @@ __all__ = [
     # Helper functions
     "encode_agent_message",
     "decode_agent_message",
+    "encode_agent_requirements",
+    "decode_agent_requirements",
+    "encode_tool_requirements",
+    "decode_tool_requirements",
+    "encode_prompt_template",
+    "decode_prompt_template",
     "encode_llm_request",
     "decode_llm_response",
     "encode_rag_document",

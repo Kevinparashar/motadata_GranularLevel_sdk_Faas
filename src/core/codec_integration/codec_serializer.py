@@ -161,6 +161,66 @@ class CodecSerializer:
             is_default=True,
         )
 
+        # Agent Requirements Schema
+        self.schema_registry.register_schema(
+            schema_name="agent_requirements",
+            version="1.0",
+            schema_definition={
+                "type": "object",
+                "required": ["name", "description", "system_prompt"],
+                "properties": {
+                    "name": {"type": "string"},
+                    "description": {"type": "string"},
+                    "capabilities": {"type": "array", "items": {"type": "string"}},
+                    "system_prompt": {"type": "string"},
+                    "required_tools": {"type": "array", "items": {"type": "string"}},
+                    "memory_config": {"type": "object"},
+                    "max_context_tokens": {"type": "integer"},
+                    "enable_tool_calling": {"type": "boolean"},
+                    "metadata": {"type": "object"},
+                },
+            },
+            is_default=True,
+        )
+
+        # Tool Requirements Schema
+        self.schema_registry.register_schema(
+            schema_name="tool_requirements",
+            version="1.0",
+            schema_definition={
+                "type": "object",
+                "required": ["name", "description", "function_name"],
+                "properties": {
+                    "name": {"type": "string"},
+                    "description": {"type": "string"},
+                    "function_name": {"type": "string"},
+                    "parameters": {"type": "array"},
+                    "return_type": {"type": "string"},
+                    "code_template": {"type": ["string", "null"]},
+                    "metadata": {"type": "object"},
+                },
+            },
+            is_default=True,
+        )
+
+        # Prompt Template Schema
+        self.schema_registry.register_schema(
+            schema_name="prompt_template",
+            version="1.0",
+            schema_definition={
+                "type": "object",
+                "required": ["name", "version", "content"],
+                "properties": {
+                    "name": {"type": "string"},
+                    "version": {"type": "string"},
+                    "content": {"type": "string"},
+                    "tenant_id": {"type": ["string", "null"]},
+                    "metadata": {"type": "object"},
+                },
+            },
+            is_default=True,
+        )
+
     def create_envelope(
         self,
         message_type: str,

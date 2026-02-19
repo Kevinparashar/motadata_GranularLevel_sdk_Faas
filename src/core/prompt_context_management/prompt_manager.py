@@ -159,6 +159,7 @@ class PromptContextManager:
         safety_margin: int = 200,
         otel_tracer: Optional[Any] = None,
         otel_metrics: Optional[Any] = None,
+        codec_serializer: Optional[Any] = None,
     ) -> None:
         """
         __init__.
@@ -168,6 +169,7 @@ class PromptContextManager:
             safety_margin (int): Input parameter for this operation.
             otel_tracer: Optional OTEL tracer for distributed tracing
             otel_metrics: Optional OTEL metrics for metrics collection
+            codec_serializer: Optional CodecSerializer instance for message encoding/decoding
         """
         self.store = PromptStore()
         self.history: List[str] = []
@@ -193,6 +195,18 @@ class PromptContextManager:
                 self.otel_metrics = create_otel_metrics(service_name="prompt-context-manager")
             except (ImportError, Exception):
                 self.otel_metrics = None
+
+        # CODEC Integration (optional)
+        self.codec_serializer: Optional[Any] = codec_serializer
+
+        # Initialize CODEC if not provided
+        if self.codec_serializer is None:
+            try:
+                from ..codec_integration import create_codec_serializer
+
+                self.codec_serializer = create_codec_serializer(codec_type="json")
+            except (ImportError, Exception):
+                self.codec_serializer = None
 
     def render(
         self,
@@ -432,3 +446,65 @@ class PromptContextManager:
         for pat in patterns:
             redacted = re.sub(pat, "[REDACTED]", redacted)
         return redacted
+
+    async def encode_template(
+        self, template: PromptTemplate, schema_version: str = "1.0"
+    ) -> bytes:
+        """
+        Encode PromptTemplate to bytes using codec serializer.
+        
+        Args:
+            template: PromptTemplate instance to encode
+            schema_version: Schema version to use
+        
+        Returns:
+            Encoded bytes
+        
+        Raises:
+            ValueError: If codec serializer is not configured
+        """
+        if not self.codec_serializer:
+            # Try to import and use default codec serializer
+            try:
+                from ..codec_integration import encode_prompt_template
+                return await encode_prompt_template(template, codec=None, schema_version=schema_version)
+            except ImportError:
+                raise ValueError(
+                    "Codec serializer not configured and codec_integration not available. "
+                    "Configure codec_serializer in PromptContextManager initialization or ensure codec_integration is available."
+                )
+        
+        from ..codec_integration import encode_prompt_template
+        return await encode_prompt_template(template, codec=self.codec_serializer, schema_version=schema_version)
+
+    async def decode_template(
+        self, payload: bytes, target_version: Optional[str] = None
+    ) -> PromptTemplate:
+        """
+        Decode bytes to PromptTemplate using codec serializer.
+        
+        Args:
+            payload: Encoded bytes to decode
+            target_version: Target schema version (migrates if different)
+        
+        Returns:
+            PromptTemplate instance
+        
+        Raises:
+            ValueError: If codec serializer is not configured
+        """
+        if not self.codec_serializer:
+            # Try to import and use default codec serializer
+            try:
+                from ..codec_integration import decode_prompt_template
+                decoded_data = await decode_prompt_template(payload, codec=None, target_version=target_version)
+                return PromptTemplate(**decoded_data)
+            except ImportError:
+                raise ValueError(
+                    "Codec serializer not configured and codec_integration not available. "
+                    "Configure codec_serializer in PromptContextManager initialization or ensure codec_integration is available."
+                )
+        
+        from ..codec_integration import decode_prompt_template
+        decoded_data = await decode_prompt_template(payload, codec=self.codec_serializer, target_version=target_version)
+        return PromptTemplate(**decoded_data)
