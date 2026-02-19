@@ -4,8 +4,6 @@ Unit Tests for CODEC Integration Functions
 Tests helper functions for component integration.
 """
 
-from datetime import datetime
-
 import pytest
 
 from src.core.agno_agent_framework import AgentMessage
@@ -72,6 +70,46 @@ class TestEncodeAgentMessage:
 
         assert isinstance(encoded, bytes)
 
+    @pytest.mark.asyncio
+    async def test_encode_agent_message_with_dict_method(self):
+        """Test encoding agent message with dict() method (Pydantic v1 style)."""
+        # Create a mock object with dict() method
+        class MockMessage:
+            def dict(self):
+                return {
+                    "from_agent": "agent_1",
+                    "to_agent": "agent_2",
+                    "content": "Hello",
+                    "message_type": "text",
+                    "metadata": {},
+                }
+
+        mock_message = MockMessage()
+        encoded = await encode_agent_message(mock_message)
+
+        assert isinstance(encoded, bytes)
+        assert b"agent_1" in encoded
+        assert b"agent_2" in encoded
+
+    @pytest.mark.asyncio
+    async def test_encode_agent_message_with_plain_object(self):
+        """Test encoding agent message with plain object (else branch)."""
+        # Create a plain object without model_dump or dict
+        class PlainMessage:
+            def __init__(self):
+                self.from_agent = "agent_1"
+                self.to_agent = "agent_2"
+                self.content = "Hello"
+                self.message_type = "text"
+                self.metadata = {}
+
+        plain_message = PlainMessage()
+        encoded = await encode_agent_message(plain_message)
+
+        assert isinstance(encoded, bytes)
+        assert b"agent_1" in encoded
+        assert b"agent_2" in encoded
+
 
 class TestDecodeAgentMessage:
     """Tests for decode_agent_message function."""
@@ -117,6 +155,18 @@ class TestDecodeAgentMessage:
         assert decoded["target_agent_id"] == original.to_agent
         assert decoded["content"] == original.content
 
+    @pytest.mark.asyncio
+    async def test_decode_agent_message_with_migration(self):
+        """Test decoding agent message with target version (triggers migration path)."""
+        message = AgentMessage(from_agent="a1", to_agent="a2", content="Hello")
+        encoded = await encode_agent_message(message, schema_version="1.0")
+
+        # Request same version - tests migration path (even if no actual migration happens)
+        decoded = await decode_agent_message(encoded, target_version="1.0")
+
+        assert decoded["source_agent_id"] == "a1"
+        assert decoded["target_agent_id"] == "a2"
+
 
 class TestEncodeLLMRequest:
     """Tests for encode_llm_request function."""
@@ -152,6 +202,19 @@ class TestEncodeLLMRequest:
         assert b"temperature" in encoded
         assert b"0.7" in encoded
 
+    @pytest.mark.asyncio
+    async def test_encode_llm_request_with_codec_none(self):
+        """Test encoding LLM request with codec=None (creates default)."""
+        encoded = await encode_llm_request(
+            request_id="req_123",
+            prompt="Hello",
+            model="gpt-4",
+            tenant_id="tenant_123",
+            codec=None,
+        )
+
+        assert isinstance(encoded, bytes)
+
 
 class TestDecodeLLMResponse:
     """Tests for decode_llm_response function."""
@@ -181,6 +244,29 @@ class TestDecodeLLMResponse:
         assert decoded["request_id"] == "req_123"
         assert decoded["response"] == "Generated text"
         assert decoded["model"] == "gpt-4"
+
+    @pytest.mark.asyncio
+    async def test_decode_llm_response_with_migration(self):
+        """Test decoding LLM response with target version (triggers migration path)."""
+        from src.core.codec_integration import create_codec_serializer
+
+        codec = create_codec_serializer()
+        response_envelope = codec.create_envelope(
+            "llm_response",
+            "1.0",
+            {
+                "request_id": "req_123",
+                "response": "Generated text",
+                "model": "gpt-4",
+            },
+        )
+        encoded_response = await codec.encode(response_envelope)
+
+        # Request same version - tests migration path
+        decoded = await decode_llm_response(encoded_response, target_version="1.0")
+
+        assert decoded["request_id"] == "req_123"
+        assert decoded["response"] == "Generated text"
 
 
 class TestEncodeRAGDocument:
@@ -216,6 +302,18 @@ class TestEncodeRAGDocument:
         assert b"Test" in encoded
         assert b"chunk_1" in encoded
 
+    @pytest.mark.asyncio
+    async def test_encode_rag_document_with_codec_none(self):
+        """Test encoding RAG document with codec=None (creates default)."""
+        encoded = await encode_rag_document(
+            document_id="doc_123",
+            content="Document content",
+            tenant_id="tenant_123",
+            codec=None,
+        )
+
+        assert isinstance(encoded, bytes)
+
 
 class TestDecodeRAGQuery:
     """Tests for decode_rag_query function."""
@@ -239,6 +337,30 @@ class TestDecodeRAGQuery:
         encoded = await codec.encode(query_envelope)
 
         decoded = await decode_rag_query(encoded)
+
+        assert decoded["query_id"] == "query_123"
+        assert decoded["query"] == "Test query"
+        assert decoded["tenant_id"] == "tenant_123"
+
+    @pytest.mark.asyncio
+    async def test_decode_rag_query_with_migration(self):
+        """Test decoding RAG query with target version (triggers migration path)."""
+        from src.core.codec_integration import create_codec_serializer
+
+        codec = create_codec_serializer()
+        query_envelope = codec.create_envelope(
+            "rag_query",
+            "1.0",
+            {
+                "query_id": "query_123",
+                "query": "Test query",
+                "tenant_id": "tenant_123",
+            },
+        )
+        encoded = await codec.encode(query_envelope)
+
+        # Request same version - tests migration path
+        decoded = await decode_rag_query(encoded, target_version="1.0")
 
         assert decoded["query_id"] == "query_123"
         assert decoded["query"] == "Test query"
