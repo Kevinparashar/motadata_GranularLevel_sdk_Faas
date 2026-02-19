@@ -8,6 +8,7 @@ into structured configurations for agents and tools.
 
 import hashlib
 import json
+import time
 from typing import Any, Dict, List, Optional, Protocol
 
 from pydantic import BaseModel, Field
@@ -88,14 +89,42 @@ class PromptInterpreter:
     for agent and tool creation.
     """
 
-    def __init__(self, gateway: GatewayProtocol):
+    def __init__(
+        self,
+        gateway: GatewayProtocol,
+        otel_tracer: Optional[Any] = None,
+        otel_metrics: Optional[Any] = None,
+    ):
         """
         Initialize prompt interpreter.
         
         Args:
             gateway (GatewayProtocol): Gateway client used for LLM calls.
+            otel_tracer: Optional OTEL tracer for distributed tracing
+            otel_metrics: Optional OTEL metrics for metrics collection
         """
         self.gateway = gateway
+
+        # OTEL Integration (optional)
+        self.otel_tracer: Optional[Any] = otel_tracer
+        self.otel_metrics: Optional[Any] = otel_metrics
+
+        # Initialize OTEL if not provided
+        if self.otel_tracer is None:
+            try:
+                from ..otel_integration import create_otel_tracer
+
+                self.otel_tracer = create_otel_tracer(service_name="prompt-interpreter")
+            except (ImportError, Exception):
+                self.otel_tracer = None
+
+        if self.otel_metrics is None:
+            try:
+                from ..otel_integration import create_otel_metrics
+
+                self.otel_metrics = create_otel_metrics(service_name="prompt-interpreter")
+            except (ImportError, Exception):
+                self.otel_metrics = None
         self._agent_prompt_template = """You are an expert at analyzing requirements for AI agents. 
 Given a user's natural language description, extract the following information:
 
@@ -180,20 +209,171 @@ Only return valid JSON, no additional text."""
         Raises:
             create_error_with_suggestion: Raised when this function detects an invalid state or when an underlying call fails.
         """
-        # Check cache first
-        if cache:
-            prompt_hash = self._hash_prompt(prompt)
-            cached = await cache.get(f"agent_interpretation:{prompt_hash}", tenant_id=tenant_id)
-            if cached:
-                try:
-                    return AgentRequirements(**json.loads(cached))
-                except (json.JSONDecodeError, KeyError, TypeError) as e:
-                    # Cache invalid, continue with interpretation
-                    import logging
-                    logger = logging.getLogger(__name__)
-                    logger.debug(f"Invalid cached agent interpretation, re-interpreting: {e}")
+        start_time = time.time()
 
-        try:
+        # OTEL Integration
+        if self.otel_tracer:
+            with self.otel_tracer.start_trace("prompt_interpreter.interpret_agent") as trace:
+                trace.set_attribute("prompt_interpreter.type", "agent")
+                trace.set_attribute("prompt_interpreter.prompt_length", len(prompt))
+                trace.set_attribute("prompt_interpreter.has_cache", cache is not None)
+                if tenant_id:
+                    trace.set_attribute("prompt_interpreter.tenant_id", tenant_id)
+
+                try:
+                    # Check cache first
+                    if cache:
+                        prompt_hash = self._hash_prompt(prompt)
+                        cached = await cache.get(f"agent_interpretation:{prompt_hash}", tenant_id=tenant_id)
+                        if cached:
+                            try:
+                                requirements = AgentRequirements(**json.loads(cached))
+                                trace.set_attribute("prompt_interpreter.cache_hit", True)
+
+                                duration = time.time() - start_time
+                                if self.otel_metrics:
+                                    self.otel_metrics.record_histogram(
+                                        "prompt_interpreter.interpret_agent.duration",
+                                        duration,
+                                        {"cache_hit": "true"},
+                                    )
+                                    self.otel_metrics.increment_counter(
+                                        "prompt_interpreter.operations",
+                                        amount=1.0,
+                                        attributes={
+                                            "type": "agent",
+                                            "status": "success",
+                                            "cache_hit": "true",
+                                        },
+                                    )
+
+                                return requirements
+                            except (json.JSONDecodeError, KeyError, TypeError) as e:
+                                # Cache invalid, continue with interpretation
+                                import logging
+                                logger = logging.getLogger(__name__)
+                                logger.debug(f"Invalid cached agent interpretation, re-interpreting: {e}")
+
+                    # Use LLM to interpret prompt
+                    formatted_prompt = self._agent_prompt_template.format(prompt=prompt)
+
+                    response = await self.gateway.generate_async(
+                        prompt=formatted_prompt, model="gpt-4", temperature=0.3, max_tokens=2000
+                    )
+
+                    # Parse JSON response
+                    response_text = response.text.strip()
+
+                    # Extract JSON from response (handle markdown code blocks)
+                    if JSON_CODE_BLOCK_MARKER in response_text:
+                        response_text = response_text.split(JSON_CODE_BLOCK_MARKER)[1].split("```")[0].strip()
+                    elif "```" in response_text:
+                        response_text = response_text.split("```")[1].split("```")[0].strip()
+
+                    config = json.loads(response_text)
+
+                    # Create AgentRequirements object
+                    requirements = AgentRequirements(**config)
+
+                    # Cache the interpretation
+                    if cache:
+                        prompt_hash = self._hash_prompt(prompt)
+                        await cache.set(
+                            f"agent_interpretation:{prompt_hash}",
+                            json.dumps(config),
+                            tenant_id=tenant_id,
+                            ttl=86400,  # 24 hours
+                        )
+
+                    duration = time.time() - start_time
+                    trace.set_attribute("prompt_interpreter.cache_hit", False)
+                    trace.set_attribute("prompt_interpreter.agent_name", requirements.name)
+
+                    if self.otel_metrics:
+                        self.otel_metrics.record_histogram(
+                            "prompt_interpreter.interpret_agent.duration",
+                            duration,
+                            {"cache_hit": "false"},
+                        )
+                        self.otel_metrics.increment_counter(
+                            "prompt_interpreter.operations",
+                            amount=1.0,
+                            attributes={
+                                "type": "agent",
+                                "status": "success",
+                                "cache_hit": "false",
+                            },
+                        )
+
+                    return requirements
+
+                except json.JSONDecodeError as e:
+                    trace.record_exception(e)
+                    duration = time.time() - start_time
+                    if self.otel_metrics:
+                        self.otel_metrics.record_histogram(
+                            "prompt_interpreter.interpret_agent.duration",
+                            duration,
+                            {"status": "error"},
+                        )
+                        self.otel_metrics.increment_counter(
+                            "prompt_interpreter.operations",
+                            amount=1.0,
+                            attributes={
+                                "type": "agent",
+                                "status": "error",
+                                "error_type": "json_parse_error",
+                            },
+                        )
+                    raise create_error_with_suggestion(
+                        PromptInterpretationError,
+                        message=f"Failed to parse LLM response as JSON: {str(e)}",
+                        suggestion="The LLM response was not valid JSON. Try rephrasing your prompt to be more specific about the agent requirements. The system expects structured JSON output.",
+                        prompt=prompt,
+                        reason="json_parse_error",
+                        original_error=e,
+                    )
+                except Exception as e:
+                    trace.record_exception(e)
+                    duration = time.time() - start_time
+                    if self.otel_metrics:
+                        self.otel_metrics.record_histogram(
+                            "prompt_interpreter.interpret_agent.duration",
+                            duration,
+                            {"status": "error"},
+                        )
+                        self.otel_metrics.increment_counter(
+                            "prompt_interpreter.operations",
+                            amount=1.0,
+                            attributes={
+                                "type": "agent",
+                                "status": "error",
+                                "error_type": type(e).__name__,
+                            },
+                        )
+                    raise create_error_with_suggestion(
+                        PromptInterpretationError,
+                        message=f"Failed to interpret agent prompt: {str(e)}",
+                        suggestion="Ensure your prompt clearly describes the agent's purpose, capabilities, and requirements. Check that the gateway is properly configured and the LLM provider is accessible.",
+                        prompt=prompt,
+                        reason="interpretation_error",
+                        original_error=e,
+                    )
+        else:
+            # No OTEL - execute without tracing
+            # Check cache first
+            if cache:
+                prompt_hash = self._hash_prompt(prompt)
+                cached = await cache.get(f"agent_interpretation:{prompt_hash}", tenant_id=tenant_id)
+                if cached:
+                    try:
+                        return AgentRequirements(**json.loads(cached))
+                    except (json.JSONDecodeError, KeyError, TypeError) as e:
+                        # Cache invalid, continue with interpretation
+                        import logging
+                        logger = logging.getLogger(__name__)
+                        logger.debug(f"Invalid cached agent interpretation, re-interpreting: {e}")
+
             # Use LLM to interpret prompt
             formatted_prompt = self._agent_prompt_template.format(prompt=prompt)
 
@@ -227,25 +407,6 @@ Only return valid JSON, no additional text."""
 
             return requirements
 
-        except json.JSONDecodeError as e:
-            raise create_error_with_suggestion(
-                PromptInterpretationError,
-                message=f"Failed to parse LLM response as JSON: {str(e)}",
-                suggestion="The LLM response was not valid JSON. Try rephrasing your prompt to be more specific about the agent requirements. The system expects structured JSON output.",
-                prompt=prompt,
-                reason="json_parse_error",
-                original_error=e,
-            )
-        except Exception as e:
-            raise create_error_with_suggestion(
-                PromptInterpretationError,
-                message=f"Failed to interpret agent prompt: {str(e)}",
-                suggestion="Ensure your prompt clearly describes the agent's purpose, capabilities, and requirements. Check that the gateway is properly configured and the LLM provider is accessible.",
-                prompt=prompt,
-                reason="interpretation_error",
-                original_error=e,
-            )
-
     async def interpret_tool_prompt(
         self, prompt: str, cache: Optional[CacheProtocol] = None, tenant_id: Optional[str] = None
     ) -> ToolRequirements:
@@ -263,20 +424,171 @@ Only return valid JSON, no additional text."""
         Raises:
             create_error_with_suggestion: Raised when this function detects an invalid state or when an underlying call fails.
         """
-        # Check cache first
-        if cache:
-            prompt_hash = self._hash_prompt(prompt)
-            cached = await cache.get(f"tool_interpretation:{prompt_hash}", tenant_id=tenant_id)
-            if cached:
-                try:
-                    return ToolRequirements(**json.loads(cached))
-                except (json.JSONDecodeError, KeyError, TypeError) as e:
-                    # Cache invalid, continue with interpretation
-                    import logging
-                    logger = logging.getLogger(__name__)
-                    logger.debug(f"Invalid cached tool interpretation, re-interpreting: {e}")
+        start_time = time.time()
 
-        try:
+        # OTEL Integration
+        if self.otel_tracer:
+            with self.otel_tracer.start_trace("prompt_interpreter.interpret_tool") as trace:
+                trace.set_attribute("prompt_interpreter.type", "tool")
+                trace.set_attribute("prompt_interpreter.prompt_length", len(prompt))
+                trace.set_attribute("prompt_interpreter.has_cache", cache is not None)
+                if tenant_id:
+                    trace.set_attribute("prompt_interpreter.tenant_id", tenant_id)
+
+                try:
+                    # Check cache first
+                    if cache:
+                        prompt_hash = self._hash_prompt(prompt)
+                        cached = await cache.get(f"tool_interpretation:{prompt_hash}", tenant_id=tenant_id)
+                        if cached:
+                            try:
+                                requirements = ToolRequirements(**json.loads(cached))
+                                trace.set_attribute("prompt_interpreter.cache_hit", True)
+
+                                duration = time.time() - start_time
+                                if self.otel_metrics:
+                                    self.otel_metrics.record_histogram(
+                                        "prompt_interpreter.interpret_tool.duration",
+                                        duration,
+                                        {"cache_hit": "true"},
+                                    )
+                                    self.otel_metrics.increment_counter(
+                                        "prompt_interpreter.operations",
+                                        amount=1.0,
+                                        attributes={
+                                            "type": "tool",
+                                            "status": "success",
+                                            "cache_hit": "true",
+                                        },
+                                    )
+
+                                return requirements
+                            except (json.JSONDecodeError, KeyError, TypeError) as e:
+                                # Cache invalid, continue with interpretation
+                                import logging
+                                logger = logging.getLogger(__name__)
+                                logger.debug(f"Invalid cached tool interpretation, re-interpreting: {e}")
+
+                    # Use LLM to interpret prompt
+                    formatted_prompt = self._tool_prompt_template.format(prompt=prompt)
+
+                    response = await self.gateway.generate_async(
+                        prompt=formatted_prompt, model="gpt-4", temperature=0.3, max_tokens=2000
+                    )
+
+                    # Parse JSON response
+                    response_text = response.text.strip()
+
+                    # Extract JSON from response (handle markdown code blocks)
+                    if JSON_CODE_BLOCK_MARKER in response_text:
+                        response_text = response_text.split(JSON_CODE_BLOCK_MARKER)[1].split("```")[0].strip()
+                    elif "```" in response_text:
+                        response_text = response_text.split("```")[1].split("```")[0].strip()
+
+                    config = json.loads(response_text)
+
+                    # Create ToolRequirements object
+                    requirements = ToolRequirements(**config)
+
+                    # Cache the interpretation
+                    if cache:
+                        prompt_hash = self._hash_prompt(prompt)
+                        await cache.set(
+                            f"tool_interpretation:{prompt_hash}",
+                            json.dumps(config),
+                            tenant_id=tenant_id,
+                            ttl=86400,  # 24 hours
+                        )
+
+                    duration = time.time() - start_time
+                    trace.set_attribute("prompt_interpreter.cache_hit", False)
+                    trace.set_attribute("prompt_interpreter.tool_name", requirements.name)
+
+                    if self.otel_metrics:
+                        self.otel_metrics.record_histogram(
+                            "prompt_interpreter.interpret_tool.duration",
+                            duration,
+                            {"cache_hit": "false"},
+                        )
+                        self.otel_metrics.increment_counter(
+                            "prompt_interpreter.operations",
+                            amount=1.0,
+                            attributes={
+                                "type": "tool",
+                                "status": "success",
+                                "cache_hit": "false",
+                            },
+                        )
+
+                    return requirements
+
+                except json.JSONDecodeError as e:
+                    trace.record_exception(e)
+                    duration = time.time() - start_time
+                    if self.otel_metrics:
+                        self.otel_metrics.record_histogram(
+                            "prompt_interpreter.interpret_tool.duration",
+                            duration,
+                            {"status": "error"},
+                        )
+                        self.otel_metrics.increment_counter(
+                            "prompt_interpreter.operations",
+                            amount=1.0,
+                            attributes={
+                                "type": "tool",
+                                "status": "error",
+                                "error_type": "json_parse_error",
+                            },
+                        )
+                    raise create_error_with_suggestion(
+                        PromptInterpretationError,
+                        message=f"Failed to parse LLM response as JSON: {str(e)}",
+                        suggestion="The LLM response was not valid JSON. Try rephrasing your prompt to clearly specify inputs, outputs, and the tool's behavior. The system expects structured JSON output.",
+                        prompt=prompt,
+                        reason="json_parse_error",
+                        original_error=e,
+                    )
+                except Exception as e:
+                    trace.record_exception(e)
+                    duration = time.time() - start_time
+                    if self.otel_metrics:
+                        self.otel_metrics.record_histogram(
+                            "prompt_interpreter.interpret_tool.duration",
+                            duration,
+                            {"status": "error"},
+                        )
+                        self.otel_metrics.increment_counter(
+                            "prompt_interpreter.operations",
+                            amount=1.0,
+                            attributes={
+                                "type": "tool",
+                                "status": "error",
+                                "error_type": type(e).__name__,
+                            },
+                        )
+                    raise create_error_with_suggestion(
+                        PromptInterpretationError,
+                        message=f"Failed to interpret tool prompt: {str(e)}",
+                        suggestion="Ensure your prompt clearly describes the tool's inputs, outputs, and behavior. Include parameter types and return types. Check that the gateway is properly configured.",
+                        prompt=prompt,
+                        reason="interpretation_error",
+                        original_error=e,
+                    )
+        else:
+            # No OTEL - execute without tracing
+            # Check cache first
+            if cache:
+                prompt_hash = self._hash_prompt(prompt)
+                cached = await cache.get(f"tool_interpretation:{prompt_hash}", tenant_id=tenant_id)
+                if cached:
+                    try:
+                        return ToolRequirements(**json.loads(cached))
+                    except (json.JSONDecodeError, KeyError, TypeError) as e:
+                        # Cache invalid, continue with interpretation
+                        import logging
+                        logger = logging.getLogger(__name__)
+                        logger.debug(f"Invalid cached tool interpretation, re-interpreting: {e}")
+
             # Use LLM to interpret prompt
             formatted_prompt = self._tool_prompt_template.format(prompt=prompt)
 
@@ -309,22 +621,3 @@ Only return valid JSON, no additional text."""
                 )
 
             return requirements
-
-        except json.JSONDecodeError as e:
-            raise create_error_with_suggestion(
-                PromptInterpretationError,
-                message=f"Failed to parse LLM response as JSON: {str(e)}",
-                suggestion="The LLM response was not valid JSON. Try rephrasing your prompt to clearly specify inputs, outputs, and the tool's behavior. The system expects structured JSON output.",
-                prompt=prompt,
-                reason="json_parse_error",
-                original_error=e,
-            )
-        except Exception as e:
-            raise create_error_with_suggestion(
-                PromptInterpretationError,
-                message=f"Failed to interpret tool prompt: {str(e)}",
-                suggestion="Ensure your prompt clearly describes the tool's inputs, outputs, and behavior. Include parameter types and return types. Check that the gateway is properly configured.",
-                prompt=prompt,
-                reason="interpretation_error",
-                original_error=e,
-            )

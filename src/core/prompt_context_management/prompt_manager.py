@@ -6,8 +6,8 @@ simple token estimation and truncation.
 """
 
 
-
 import re
+import time
 from dataclasses import dataclass, field
 from typing import Any, Dict, List, Optional
 
@@ -153,17 +153,46 @@ class PromptContextManager:
     Manages prompt templates, history, and context window handling.
     """
 
-    def __init__(self, max_tokens: int = 4000, safety_margin: int = 200) -> None:
+    def __init__(
+        self,
+        max_tokens: int = 4000,
+        safety_margin: int = 200,
+        otel_tracer: Optional[Any] = None,
+        otel_metrics: Optional[Any] = None,
+    ) -> None:
         """
         __init__.
         
         Args:
             max_tokens (int): Input parameter for this operation.
             safety_margin (int): Input parameter for this operation.
+            otel_tracer: Optional OTEL tracer for distributed tracing
+            otel_metrics: Optional OTEL metrics for metrics collection
         """
         self.store = PromptStore()
         self.history: List[str] = []
         self.window = ContextWindowManager(max_tokens=max_tokens, safety_margin=safety_margin)
+
+        # OTEL Integration (optional)
+        self.otel_tracer: Optional[Any] = otel_tracer
+        self.otel_metrics: Optional[Any] = otel_metrics
+
+        # Initialize OTEL if not provided
+        if self.otel_tracer is None:
+            try:
+                from ..otel_integration import create_otel_tracer
+
+                self.otel_tracer = create_otel_tracer(service_name="prompt-context-manager")
+            except (ImportError, Exception):
+                self.otel_tracer = None
+
+        if self.otel_metrics is None:
+            try:
+                from ..otel_integration import create_otel_metrics
+
+                self.otel_metrics = create_otel_metrics(service_name="prompt-context-manager")
+            except (ImportError, Exception):
+                self.otel_metrics = None
 
     def render(
         self,
@@ -187,13 +216,74 @@ class PromptContextManager:
         Raises:
             ValueError: Raised when this function detects an invalid state or when an underlying call fails.
         """
-        template = self.store.get(template_name, tenant_id=tenant_id, version=version)
-        if not template:
-            raise ValueError(
-                f"Template '{template_name}' not found for tenant '{tenant_id or 'global'}'"
-            )
-        # Basic Python format-style rendering
-        return template.content.format(**variables)
+        start_time = time.time()
+
+        # OTEL Integration
+        if self.otel_tracer:
+            with self.otel_tracer.start_trace("prompt_context_manager.render") as trace:
+                trace.set_attribute("prompt_context_manager.template_name", template_name)
+                trace.set_attribute("prompt_context_manager.has_version", version is not None)
+                trace.set_attribute("prompt_context_manager.variables_count", len(variables))
+                if tenant_id:
+                    trace.set_attribute("prompt_context_manager.tenant_id", tenant_id)
+
+                try:
+                    template = self.store.get(template_name, tenant_id=tenant_id, version=version)
+                    if not template:
+                        raise ValueError(
+                            f"Template '{template_name}' not found for tenant '{tenant_id or 'global'}'"
+                        )
+                    # Basic Python format-style rendering
+                    result = template.content.format(**variables)
+
+                    duration = time.time() - start_time
+                    trace.set_attribute("prompt_context_manager.result_length", len(result))
+
+                    if self.otel_metrics:
+                        self.otel_metrics.record_histogram(
+                            "prompt_context_manager.render.duration",
+                            duration,
+                            {"template_name": template_name},
+                        )
+                        self.otel_metrics.increment_counter(
+                            "prompt_context_manager.operations",
+                            amount=1.0,
+                            attributes={
+                                "operation": "render",
+                                "status": "success",
+                                "template_name": template_name,
+                            },
+                        )
+
+                    return result
+                except Exception as e:
+                    trace.record_exception(e)
+                    duration = time.time() - start_time
+                    if self.otel_metrics:
+                        self.otel_metrics.record_histogram(
+                            "prompt_context_manager.render.duration",
+                            duration,
+                            {"status": "error"},
+                        )
+                        self.otel_metrics.increment_counter(
+                            "prompt_context_manager.operations",
+                            amount=1.0,
+                            attributes={
+                                "operation": "render",
+                                "status": "error",
+                                "error_type": type(e).__name__,
+                            },
+                        )
+                    raise
+        else:
+            # No OTEL - execute without tracing
+            template = self.store.get(template_name, tenant_id=tenant_id, version=version)
+            if not template:
+                raise ValueError(
+                    f"Template '{template_name}' not found for tenant '{tenant_id or 'global'}'"
+                )
+            # Basic Python format-style rendering
+            return template.content.format(**variables)
 
     def add_template(
         self,
@@ -216,14 +306,73 @@ class PromptContextManager:
         Returns:
             None: Result of the operation.
         """
-        tmpl = PromptTemplate(
-            name=name,
-            version=version,
-            content=content,
-            tenant_id=tenant_id,
-            metadata=metadata or {},
-        )
-        self.store.add(tmpl)
+        start_time = time.time()
+
+        # OTEL Integration
+        if self.otel_tracer:
+            with self.otel_tracer.start_trace("prompt_context_manager.add_template") as trace:
+                trace.set_attribute("prompt_context_manager.template_name", name)
+                trace.set_attribute("prompt_context_manager.template_version", version)
+                trace.set_attribute("prompt_context_manager.content_length", len(content))
+                trace.set_attribute("prompt_context_manager.has_metadata", metadata is not None)
+                if tenant_id:
+                    trace.set_attribute("prompt_context_manager.tenant_id", tenant_id)
+
+                try:
+                    tmpl = PromptTemplate(
+                        name=name,
+                        version=version,
+                        content=content,
+                        tenant_id=tenant_id,
+                        metadata=metadata or {},
+                    )
+                    self.store.add(tmpl)
+
+                    duration = time.time() - start_time
+                    if self.otel_metrics:
+                        self.otel_metrics.record_histogram(
+                            "prompt_context_manager.add_template.duration",
+                            duration,
+                            {"template_name": name},
+                        )
+                        self.otel_metrics.increment_counter(
+                            "prompt_context_manager.operations",
+                            amount=1.0,
+                            attributes={
+                                "operation": "add_template",
+                                "status": "success",
+                                "template_name": name,
+                            },
+                        )
+                except Exception as e:
+                    trace.record_exception(e)
+                    duration = time.time() - start_time
+                    if self.otel_metrics:
+                        self.otel_metrics.record_histogram(
+                            "prompt_context_manager.add_template.duration",
+                            duration,
+                            {"status": "error"},
+                        )
+                        self.otel_metrics.increment_counter(
+                            "prompt_context_manager.operations",
+                            amount=1.0,
+                            attributes={
+                                "operation": "add_template",
+                                "status": "error",
+                                "error_type": type(e).__name__,
+                            },
+                        )
+                    raise
+        else:
+            # No OTEL - execute without tracing
+            tmpl = PromptTemplate(
+                name=name,
+                version=version,
+                content=content,
+                tenant_id=tenant_id,
+                metadata=metadata or {},
+            )
+            self.store.add(tmpl)
 
     def record_history(self, prompt: str) -> None:
         """
