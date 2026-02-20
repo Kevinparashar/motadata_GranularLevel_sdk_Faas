@@ -33,39 +33,15 @@ class TestCodecManager:
         assert result["key"] == "value"
         assert result["number"] == 123
 
-    @pytest.mark.asyncio
-    async def test_encode_msgpack_fallback(self):
-        """Test encode with msgpack codec (fallback to JSON)."""
-        codec = CodecManager(codec_type="msgpack")
-        data = {"key": "value"}
-        result = await codec.encode(data)
-        assert isinstance(result, bytes)
+    def test_init_msgpack_error(self):
+        """Test CodecManager initialization with msgpack (should raise error)."""
+        with pytest.raises(ValueError, match="Unsupported codec type"):
+            CodecManager(codec_type="msgpack")
 
-    @pytest.mark.asyncio
-    async def test_decode_msgpack_fallback(self):
-        """Test decode with msgpack codec (fallback to JSON)."""
-        codec = CodecManager(codec_type="msgpack")
-        data = b'{"key": "value"}'
-        result = await codec.decode(data)
-        assert isinstance(result, dict)
-        assert result["key"] == "value"
-
-    @pytest.mark.asyncio
-    async def test_encode_protobuf_fallback(self):
-        """Test encode with protobuf codec (fallback to JSON)."""
-        codec = CodecManager(codec_type="protobuf")
-        data = {"key": "value"}
-        result = await codec.encode(data)
-        assert isinstance(result, bytes)
-
-    @pytest.mark.asyncio
-    async def test_decode_protobuf_fallback(self):
-        """Test decode with protobuf codec (fallback to JSON)."""
-        codec = CodecManager(codec_type="protobuf")
-        data = b'{"key": "value"}'
-        result = await codec.decode(data)
-        assert isinstance(result, dict)
-        assert result["key"] == "value"
+    def test_init_protobuf_error(self):
+        """Test CodecManager initialization with protobuf (should raise error)."""
+        with pytest.raises(ValueError, match="Unsupported codec type"):
+            CodecManager(codec_type="protobuf")
 
     @pytest.mark.asyncio
     async def test_encode_unsupported_codec(self):

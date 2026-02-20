@@ -37,8 +37,15 @@ class CodecManager:
         Initialize codec manager.
         
         Args:
-            codec_type (str): Codec type ("json", "msgpack", "protobuf")
+            codec_type (str): Codec type ("json" only - other types are not supported)
+            
+        Raises:
+            ValueError: If codec_type is not "json"
         """
+        if codec_type != "json":
+            raise ValueError(
+                f"Unsupported codec type: {codec_type}. Only 'json' is supported."
+            )
         self.codec_type = codec_type
         # Use core codec serializer if available
         if CodecSerializer is not None:
@@ -116,16 +123,10 @@ class CodecManager:
         if self.codec_type == "json":
             # Wrap JSON encoding in thread pool to avoid blocking event loop
             return await asyncio.to_thread(_encode_json)
-        elif self.codec_type == "msgpack":
-            # TODO: SDK-INT-002 - Implement msgpack encoding  # NOSONAR - Tracked technical debt with ticket reference
-            logger.warning("msgpack codec not implemented, falling back to JSON")
-            return await asyncio.to_thread(_encode_json)
-        elif self.codec_type == "protobuf":
-            # TODO: SDK-INT-002 - Implement protobuf encoding  # NOSONAR - Tracked technical debt with ticket reference
-            logger.warning("protobuf codec not implemented, falling back to JSON")
-            return await asyncio.to_thread(_encode_json)
         else:
-            raise ValueError(f"Unsupported codec type: {self.codec_type}")
+            raise ValueError(
+                f"Unsupported codec type: {self.codec_type}. Only 'json' is supported."
+            )
 
     async def decode(self, data: bytes) -> Dict[str, Any]:
         """
@@ -158,16 +159,10 @@ class CodecManager:
         if self.codec_type == "json":
             # Wrap JSON decoding in thread pool to avoid blocking event loop
             return await asyncio.to_thread(_decode_json)
-        elif self.codec_type == "msgpack":
-            # TODO: SDK-INT-002 - Implement msgpack decoding  # NOSONAR - Tracked technical debt with ticket reference
-            logger.warning("msgpack codec not implemented, falling back to JSON")
-            return await asyncio.to_thread(_decode_json)
-        elif self.codec_type == "protobuf":
-            # TODO: SDK-INT-002 - Implement protobuf decoding  # NOSONAR - Tracked technical debt with ticket reference
-            logger.warning("protobuf codec not implemented, falling back to JSON")
-            return await asyncio.to_thread(_decode_json)
         else:
-            raise ValueError(f"Unsupported codec type: {self.codec_type}")
+            raise ValueError(
+                f"Unsupported codec type: {self.codec_type}. Only 'json' is supported."
+            )
     
     def validate_schema(self, envelope: Dict[str, Any], schema_name: Optional[str] = None) -> bool:
         """

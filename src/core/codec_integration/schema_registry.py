@@ -7,6 +7,19 @@ Manages schema definitions, versions, and validation for message encoding/decodi
 import logging
 from typing import Any, Dict, List, Optional
 
+# Initialize _JSONSCHEMA_AVAILABLE before try/except to avoid constant redefinition warning
+_JSONSCHEMA_AVAILABLE = False
+
+try:
+    from jsonschema import ValidationError as JSONSchemaValidationError
+    from jsonschema.validators import validate
+
+    _JSONSCHEMA_AVAILABLE = True  # pyright: ignore[reportConstantRedefinition]
+except ImportError:
+    _JSONSCHEMA_AVAILABLE = False  # pyright: ignore[reportConstantRedefinition]
+    JSONSchemaValidationError = Exception
+    validate = None
+
 from .exceptions import SchemaValidationError, SchemaVersionError
 
 logger = logging.getLogger(__name__)
@@ -159,19 +172,45 @@ class SchemaRegistry:
                 validation_errors=[str(e)],
             ) from e
 
-        # Validate required fields
+        # Validate data structure
         validation_errors: List[str] = []
         data = envelope.get("data", {})
 
         # Basic structure validation
         if not isinstance(data, dict):
             validation_errors.append("'data' field must be a dictionary")
+            raise SchemaValidationError(
+                f"Schema validation failed for '{schema_name}'",
+                schema_name=schema_name,
+                validation_errors=validation_errors,
+            )
 
-        # Schema-specific validation (simplified - can be enhanced with JSON Schema)
-        required_fields = schema_def.get("required", [])
-        for field in required_fields:
-            if field not in data:
-                validation_errors.append(f"Missing required field: {field}")
+        # Use JSON Schema validation if available
+        if _JSONSCHEMA_AVAILABLE and validate:
+            try:
+                # Validate data against JSON Schema
+                validate(instance=data, schema=schema_def)
+                return True
+            except JSONSchemaValidationError as e:
+                # Extract detailed validation errors
+                validation_errors = self._extract_validation_errors(e)
+                raise SchemaValidationError(
+                    f"Schema validation failed for '{schema_name}': {e.message}",
+                    schema_name=schema_name,
+                    validation_errors=validation_errors,
+                    original_error=e,
+                ) from e
+            except Exception as e:
+                # Fallback for other JSON Schema errors
+                logger.warning(f"JSON Schema validation error: {e}, falling back to basic validation")
+                validation_errors.append(f"Schema validation error: {str(e)}")
+        else:
+            # Fallback to basic validation if JSON Schema not available
+            logger.debug("JSON Schema not available, using basic validation")
+            required_fields = schema_def.get("required", [])
+            for field in required_fields:
+                if field not in data:
+                    validation_errors.append(f"Missing required field: {field}")
 
         if validation_errors:
             raise SchemaValidationError(
@@ -181,6 +220,30 @@ class SchemaRegistry:
             )
 
         return True
+
+    def _extract_validation_errors(self, error: Any) -> List[str]:
+        """
+        Extract detailed validation errors from JSON Schema ValidationError.
+        
+        Args:
+            error: JSON Schema ValidationError instance
+            
+        Returns:
+            List of formatted error messages
+        """
+        errors: List[str] = []
+        
+        # Add main error
+        path = ".".join(str(p) for p in error.path) if error.path else "root"
+        errors.append(f"{path}: {error.message}")
+        
+        # Add context errors (nested validation errors)
+        if hasattr(error, "context") and error.context:
+            for sub_error in error.context:
+                sub_path = ".".join(str(p) for p in sub_error.path) if sub_error.path else "root"
+                errors.append(f"{sub_path}: {sub_error.message}")
+        
+        return errors
 
     def has_schema(self, schema_name: str, version: Optional[str] = None) -> bool:
         """

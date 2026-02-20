@@ -354,7 +354,7 @@ DRAGONFLY_URL=dragonfly://localhost:6379
 # Integrations
 NATS_URL=nats://localhost:4222
 OTEL_EXPORTER_OTLP_ENDPOINT=http://localhost:4317
-CODEC_TYPE=json  # or msgpack, protobuf
+CODEC_TYPE=json  # Only JSON is supported
 ```
 
 ## Deployment

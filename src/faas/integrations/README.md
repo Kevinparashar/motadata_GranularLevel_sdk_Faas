@@ -119,7 +119,7 @@ OTEL_EXPORTER_OTLP_ENDPOINT=http://localhost:4317
 
 # CODEC
 ENABLE_CODEC=true
-CODEC_TYPE=json  # or msgpack, protobuf
+CODEC_TYPE=json  # Only JSON is supported
 ```
 
 ## Integration in Services

@@ -39,8 +39,15 @@ class CodecSerializer:
         Args:
             schema_registry: Schema registry instance (uses default if not provided)
             migration_manager: Migration manager instance (uses default if not provided)
-            codec_type: Codec type ("json", "msgpack", "protobuf")
+            codec_type: Codec type ("json" only - other types are not supported)
+            
+        Raises:
+            ValueError: If codec_type is not "json"
         """
+        if codec_type != "json":
+            raise ValueError(
+                f"Unsupported codec type: {codec_type}. Only 'json' is supported."
+            )
         self.schema_registry = schema_registry or get_default_registry()
         self.migration_manager = migration_manager or get_default_migration_manager()
         self.codec_type = codec_type
@@ -265,21 +272,9 @@ class CodecSerializer:
                     return json.dumps(envelope, default=str).encode("utf-8")
 
                 return await asyncio.to_thread(_encode_json)
-            elif self.codec_type == "msgpack":
-                # TODO: SDK-INT-002 - Implement msgpack encoding
-                logger.warning("msgpack codec not implemented, falling back to JSON")
-                def _encode_json() -> bytes:
-                    return json.dumps(envelope, default=str).encode("utf-8")
-                return await asyncio.to_thread(_encode_json)
-            elif self.codec_type == "protobuf":
-                # TODO: SDK-INT-002 - Implement protobuf encoding
-                logger.warning("protobuf codec not implemented, falling back to JSON")
-                def _encode_json() -> bytes:
-                    return json.dumps(envelope, default=str).encode("utf-8")
-                return await asyncio.to_thread(_encode_json)
             else:
                 raise CodecEncodingError(
-                    f"Unsupported codec type: {self.codec_type}",
+                    f"Unsupported codec type: {self.codec_type}. Only 'json' is supported.",
                     message_type=envelope.get("message_type"),
                 )
         except Exception as e:
@@ -310,21 +305,9 @@ class CodecSerializer:
                     return json.loads(payload.decode("utf-8"))
 
                 return await asyncio.to_thread(_decode_json)
-            elif self.codec_type == "msgpack":
-                # TODO: SDK-INT-002 - Implement msgpack decoding
-                logger.warning("msgpack codec not implemented, falling back to JSON")
-                def _decode_json() -> Dict[str, Any]:
-                    return json.loads(payload.decode("utf-8"))
-                return await asyncio.to_thread(_decode_json)
-            elif self.codec_type == "protobuf":
-                # TODO: SDK-INT-002 - Implement protobuf decoding
-                logger.warning("protobuf codec not implemented, falling back to JSON")
-                def _decode_json() -> Dict[str, Any]:
-                    return json.loads(payload.decode("utf-8"))
-                return await asyncio.to_thread(_decode_json)
             else:
                 raise CodecDecodingError(
-                    f"Unsupported codec type: {self.codec_type}",
+                    f"Unsupported codec type: {self.codec_type}. Only 'json' is supported.",
                     payload=payload[:100] if len(payload) > 100 else payload,
                 )
         except json.JSONDecodeError as e:

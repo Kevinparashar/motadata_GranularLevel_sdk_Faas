@@ -10,7 +10,7 @@ The CODEC Integration module provides message serialization/deserialization with
 
 - **Schema Management**: Register and validate message schemas
 - **Version Migration**: Automatic schema version migration for backward compatibility
-- **Multiple Codec Types**: Support for JSON (with msgpack/protobuf planned)
+- **JSON Codec**: Full support for JSON serialization/deserialization
 - **Type Safety**: Schema validation ensures data structure integrity
 - **Component Integration**: Helper functions for Agent, Gateway, and RAG components
 

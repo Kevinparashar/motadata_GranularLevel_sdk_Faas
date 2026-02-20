@@ -41,7 +41,7 @@ class ServiceConfig(BaseModel):
     otel_exporter_otlp_endpoint: Optional[str] = Field(
         None, description="OTEL OTLP exporter endpoint"
     )
-    codec_type: str = Field(default="json", description="CODEC type (json, msgpack, protobuf)")
+    codec_type: str = Field(default="json", description="CODEC type (json only)")
 
     # Logging
     log_level: str = Field(default="INFO", description="Logging level")

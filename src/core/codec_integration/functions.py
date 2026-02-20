@@ -23,7 +23,7 @@ def create_codec_serializer(
     Create and configure a codec serializer with default settings.
 
     Args:
-        codec_type: Codec type ("json", "msgpack", "protobuf")
+        codec_type: Codec type ("json" only - other types are not supported)
         schema_registry: Optional schema registry instance
         migration_manager: Optional migration manager instance
 

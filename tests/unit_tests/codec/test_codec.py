@@ -20,9 +20,20 @@ class TestCodecManager:
 
     def test_init_with_type(self):
         """Test CodecManager initialization with codec type."""
-        manager = CodecManager(codec_type="msgpack")
+        manager = CodecManager(codec_type="json")
 
-        assert manager.codec_type == "msgpack"
+        assert manager.codec_type == "json"
+
+    def test_init_unsupported_codec_type(self):
+        """Test CodecManager initialization with unsupported codec type."""
+        with pytest.raises(ValueError, match="Unsupported codec type"):
+            CodecManager(codec_type="msgpack")
+        
+        with pytest.raises(ValueError, match="Unsupported codec type"):
+            CodecManager(codec_type="protobuf")
+        
+        with pytest.raises(ValueError, match="Unsupported codec type"):
+            CodecManager(codec_type="unsupported")
 
     @pytest.mark.asyncio
     async def test_encode_json(self):
@@ -60,30 +71,16 @@ class TestCodecManager:
         assert decoded.get("data") == data
 
     @pytest.mark.asyncio
-    async def test_encode_msgpack_fallback(self):
-        """Test encode with msgpack codec (falls back to JSON)."""
-        manager = CodecManager(codec_type="msgpack")
-        data = {"key": "value"}
-
-        result = await manager.encode(data)
-
-        assert isinstance(result, bytes)
-        # Should fall back to JSON
-        decoded = await manager.decode(result)
-        assert decoded.get("data") == data
+    async def test_encode_msgpack_error(self):
+        """Test encode with msgpack codec (should raise error)."""
+        with pytest.raises(ValueError, match="Unsupported codec type"):
+            CodecManager(codec_type="msgpack")
 
     @pytest.mark.asyncio
-    async def test_encode_protobuf_fallback(self):
-        """Test encode with protobuf codec (falls back to JSON)."""
-        manager = CodecManager(codec_type="protobuf")
-        data = {"key": "value"}
-
-        result = await manager.encode(data)
-
-        assert isinstance(result, bytes)
-        # Should fall back to JSON
-        decoded = await manager.decode(result)
-        assert decoded.get("data") == data
+    async def test_encode_protobuf_error(self):
+        """Test encode with protobuf codec (should raise error)."""
+        with pytest.raises(ValueError, match="Unsupported codec type"):
+            CodecManager(codec_type="protobuf")
 
     @pytest.mark.asyncio
     async def test_encode_unsupported_type(self):
@@ -125,28 +122,16 @@ class TestCodecManager:
         assert result.get("data") == data
 
     @pytest.mark.asyncio
-    async def test_decode_msgpack_fallback(self):
-        """Test decode with msgpack codec (falls back to JSON)."""
-        manager = CodecManager(codec_type="msgpack")
-        data = {"key": "value"}
-        # Encode first to get proper envelope structure
-        encoded = await manager.encode(data)
-        result = await manager.decode(encoded)
-
-        # Decode returns envelope, extract data
-        assert result.get("data") == data
+    async def test_decode_msgpack_error(self):
+        """Test decode with msgpack codec (should raise error on init)."""
+        with pytest.raises(ValueError, match="Unsupported codec type"):
+            CodecManager(codec_type="msgpack")
 
     @pytest.mark.asyncio
-    async def test_decode_protobuf_fallback(self):
-        """Test decode with protobuf codec (falls back to JSON)."""
-        manager = CodecManager(codec_type="protobuf")
-        data = {"key": "value"}
-        # Encode first to get proper envelope structure
-        encoded = await manager.encode(data)
-        result = await manager.decode(encoded)
-
-        # Decode returns envelope, extract data
-        assert result.get("data") == data
+    async def test_decode_protobuf_error(self):
+        """Test decode with protobuf codec (should raise error on init)."""
+        with pytest.raises(ValueError, match="Unsupported codec type"):
+            CodecManager(codec_type="protobuf")
 
     @pytest.mark.asyncio
     async def test_decode_unsupported_type(self):
@@ -174,32 +159,49 @@ class TestCreateCodecManager:
 
     def test_create_codec_manager_with_type(self):
         """Test create_codec_manager with explicit codec type."""
-        manager = create_codec_manager(codec_type="msgpack")
+        manager = create_codec_manager(codec_type="json")
 
         assert isinstance(manager, CodecManager)
-        assert manager.codec_type == "msgpack"
+        assert manager.codec_type == "json"
+
+    def test_create_codec_manager_unsupported_type(self):
+        """Test create_codec_manager with unsupported codec type."""
+        with pytest.raises(ValueError, match="Unsupported codec type"):
+            create_codec_manager(codec_type="msgpack")
+        
+        with pytest.raises(ValueError, match="Unsupported codec type"):
+            create_codec_manager(codec_type="protobuf")
 
     def test_create_codec_manager_with_config(self):
         """Test create_codec_manager with config."""
         mock_config = MagicMock()
-        mock_config.codec_type = "protobuf"
+        mock_config.codec_type = "json"
 
         with patch("src.faas.shared.config.get_config", return_value=mock_config):
             manager = create_codec_manager()
 
             assert isinstance(manager, CodecManager)
-            assert manager.codec_type == "protobuf"
+            assert manager.codec_type == "json"
 
-    def test_create_codec_manager_with_config_override(self):
-        """Test create_codec_manager with config and override."""
+    def test_create_codec_manager_with_config_unsupported(self):
+        """Test create_codec_manager with unsupported codec type in config."""
         mock_config = MagicMock()
         mock_config.codec_type = "protobuf"
 
         with patch("src.faas.shared.config.get_config", return_value=mock_config):
-            manager = create_codec_manager(codec_type="msgpack")
+            with pytest.raises(ValueError, match="Unsupported codec type"):
+                create_codec_manager()
+
+    def test_create_codec_manager_with_config_override(self):
+        """Test create_codec_manager with config and override."""
+        mock_config = MagicMock()
+        mock_config.codec_type = "json"
+
+        with patch("src.faas.shared.config.get_config", return_value=mock_config):
+            manager = create_codec_manager(codec_type="json")
 
             assert isinstance(manager, CodecManager)
-            assert manager.codec_type == "msgpack"
+            assert manager.codec_type == "json"
 
     def test_create_codec_manager_config_not_loaded(self):
         """Test create_codec_manager when config not loaded."""
@@ -212,8 +214,12 @@ class TestCreateCodecManager:
     def test_create_codec_manager_config_not_loaded_with_type(self):
         """Test create_codec_manager when config not loaded but type provided."""
         with patch("src.faas.shared.config.get_config", side_effect=RuntimeError("Config not loaded")):
-            manager = create_codec_manager(codec_type="msgpack")
+            manager = create_codec_manager(codec_type="json")
 
             assert isinstance(manager, CodecManager)
-            assert manager.codec_type == "msgpack"
+            assert manager.codec_type == "json"
+        
+        with patch("src.faas.shared.config.get_config", side_effect=RuntimeError("Config not loaded")):
+            with pytest.raises(ValueError, match="Unsupported codec type"):
+                create_codec_manager(codec_type="msgpack")
 

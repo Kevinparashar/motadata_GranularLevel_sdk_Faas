@@ -115,13 +115,23 @@ class TestCodecSerializer:
         with pytest.raises(CodecDecodingError):
             await codec.decode(invalid_payload)
 
-    @pytest.mark.asyncio
-    async def test_decode_unsupported_type(self):
-        """Test decode with unsupported codec type."""
-        codec = CodecSerializer(codec_type="unsupported")
+    def test_init_unsupported_codec_type(self):
+        """Test CodecSerializer initialization with unsupported codec type."""
+        with pytest.raises(ValueError, match="Unsupported codec type"):
+            CodecSerializer(codec_type="msgpack")
+        
+        with pytest.raises(ValueError, match="Unsupported codec type"):
+            CodecSerializer(codec_type="protobuf")
+        
+        with pytest.raises(ValueError, match="Unsupported codec type"):
+            CodecSerializer(codec_type="unsupported")
 
-        with pytest.raises(CodecDecodingError):
-            await codec.decode(b"test")
+    @pytest.mark.asyncio
+    async def test_decode_unsupported_type(self, codec):
+        """Test decode with unsupported codec type (should not happen with validation)."""
+        # This test is kept for backward compatibility but should not occur
+        # since initialization now validates codec_type
+        pass
 
     @pytest.mark.asyncio
     async def test_encode_decode_roundtrip(self, codec):
@@ -175,6 +185,177 @@ class TestCodecSerializer:
 
         with pytest.raises(SchemaValidationError):
             codec.validate_schema(envelope, "unknown_message")
+
+    def test_validate_schema_type_validation(self, codec):
+        """Test schema validation with type mismatches (JSON Schema validation)."""
+        # Register a schema with strict type requirements
+        codec.register_schema(
+            schema_name="typed_message",
+            version="1.0",
+            schema_definition={
+                "type": "object",
+                "required": ["string_field", "number_field", "boolean_field"],
+                "properties": {
+                    "string_field": {"type": "string"},
+                    "number_field": {"type": "number"},
+                    "boolean_field": {"type": "boolean"},
+                },
+            },
+            is_default=True,
+        )
+
+        # Test with wrong type (string instead of number)
+        envelope = codec.create_envelope(
+            "typed_message",
+            "1.0",
+            {
+                "string_field": "test",
+                "number_field": "not_a_number",  # Should be number
+                "boolean_field": True,
+            },
+        )
+
+        with pytest.raises(SchemaValidationError) as exc_info:
+            codec.validate_schema(envelope, "typed_message")
+        
+        assert "typed_message" in str(exc_info.value)
+        assert len(exc_info.value.validation_errors) > 0
+
+    def test_validate_schema_nested_validation(self, codec):
+        """Test schema validation with nested objects (JSON Schema validation)."""
+        codec.register_schema(
+            schema_name="nested_message",
+            version="1.0",
+            schema_definition={
+                "type": "object",
+                "required": ["nested"],
+                "properties": {
+                    "nested": {
+                        "type": "object",
+                        "required": ["inner_field"],
+                        "properties": {
+                            "inner_field": {"type": "string"},
+                        },
+                    },
+                },
+            },
+            is_default=True,
+        )
+
+        # Test with missing nested field
+        envelope = codec.create_envelope(
+            "nested_message",
+            "1.0",
+            {
+                "nested": {},  # Missing inner_field
+            },
+        )
+
+        with pytest.raises(SchemaValidationError):
+            codec.validate_schema(envelope, "nested_message")
+
+    def test_validate_schema_array_validation(self, codec):
+        """Test schema validation with arrays (JSON Schema validation)."""
+        codec.register_schema(
+            schema_name="array_message",
+            version="1.0",
+            schema_definition={
+                "type": "object",
+                "required": ["items"],
+                "properties": {
+                    "items": {
+                        "type": "array",
+                        "items": {"type": "string"},
+                    },
+                },
+            },
+            is_default=True,
+        )
+
+        # Test with invalid array item type
+        envelope = codec.create_envelope(
+            "array_message",
+            "1.0",
+            {
+                "items": [1, 2, 3],  # Should be strings
+            },
+        )
+
+        with pytest.raises(SchemaValidationError):
+            codec.validate_schema(envelope, "array_message")
+
+    def test_validate_schema_enum_validation(self, codec):
+        """Test schema validation with enum constraints (JSON Schema validation)."""
+        codec.register_schema(
+            schema_name="enum_message",
+            version="1.0",
+            schema_definition={
+                "type": "object",
+                "required": ["status"],
+                "properties": {
+                    "status": {
+                        "type": "string",
+                        "enum": ["active", "inactive", "pending"],
+                    },
+                },
+            },
+            is_default=True,
+        )
+
+        # Test with invalid enum value
+        envelope = codec.create_envelope(
+            "enum_message",
+            "1.0",
+            {
+                "status": "invalid_status",  # Not in enum
+            },
+        )
+
+        with pytest.raises(SchemaValidationError):
+            codec.validate_schema(envelope, "enum_message")
+
+    def test_validate_schema_valid_complex(self, codec):
+        """Test schema validation with valid complex data (JSON Schema validation)."""
+        codec.register_schema(
+            schema_name="complex_message",
+            version="1.0",
+            schema_definition={
+                "type": "object",
+                "required": ["name", "age", "active", "tags", "metadata"],
+                "properties": {
+                    "name": {"type": "string"},
+                    "age": {"type": "number"},
+                    "active": {"type": "boolean"},
+                    "tags": {
+                        "type": "array",
+                        "items": {"type": "string"},
+                    },
+                    "metadata": {
+                        "type": "object",
+                        "properties": {
+                            "key": {"type": "string"},
+                        },
+                    },
+                },
+            },
+            is_default=True,
+        )
+
+        # Test with valid complex data
+        envelope = codec.create_envelope(
+            "complex_message",
+            "1.0",
+            {
+                "name": "test",
+                "age": 25,
+                "active": True,
+                "tags": ["tag1", "tag2"],
+                "metadata": {"key": "value"},
+            },
+        )
+
+        result = codec.validate_schema(envelope, "complex_message")
+        assert result is True
 
     def test_register_schema(self, codec):
         """Test schema registration."""
