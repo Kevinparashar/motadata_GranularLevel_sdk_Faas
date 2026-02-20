@@ -19,7 +19,7 @@ try:
     from opentelemetry.sdk.trace.export import BatchSpanProcessor
     from opentelemetry.trace import Status, StatusCode
     from opentelemetry.propagate import set_global_textmap
-    from opentelemetry.propagators.composite import CompositeHTTPPropagator
+    from opentelemetry.propagators.composite import CompositePropagator
     from opentelemetry.trace.propagation.tracecontext import TraceContextTextMapPropagator
     from opentelemetry.baggage.propagation import W3CBaggagePropagator
 
@@ -30,7 +30,7 @@ except ImportError:
     Status = None
     StatusCode = None
     set_global_textmap = None
-    CompositeHTTPPropagator = None
+    CompositePropagator = None
     TraceContextTextMapPropagator = None
     W3CBaggagePropagator = None
 
@@ -91,9 +91,9 @@ class OTELTracer:
                 trace.set_tracer_provider(provider)
                 
                 # Configure composite propagator (TraceContext + Baggage)
-                if set_global_textmap and CompositeHTTPPropagator and TraceContextTextMapPropagator and W3CBaggagePropagator:
+                if set_global_textmap and CompositePropagator and TraceContextTextMapPropagator and W3CBaggagePropagator:
                     set_global_textmap(
-                        CompositeHTTPPropagator([
+                        CompositePropagator([
                             TraceContextTextMapPropagator(),
                             W3CBaggagePropagator(),
                         ])

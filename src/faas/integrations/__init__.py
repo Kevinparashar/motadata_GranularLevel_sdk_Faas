@@ -10,7 +10,7 @@ Provides integrations for:
 
 from .codec import CodecManager, create_codec_manager
 from .nats import NATSClient, create_nats_client
-from .otel import OTELTracer, create_otel_tracer
+from .otel import OTELTracer, OTELSpan, create_otel_tracer
 
 __all__ = [
     # NATS
@@ -18,6 +18,7 @@ __all__ = [
     "create_nats_client",
     # OTEL
     "OTELTracer",
+    "OTELSpan",
     "create_otel_tracer",
     # CODEC
     "CodecManager",

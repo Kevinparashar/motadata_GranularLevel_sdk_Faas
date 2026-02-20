@@ -97,12 +97,17 @@ class OTELMetrics:
         """
         Increment a counter metric.
         
+        Automatically merges tenant.id and tenant.tier from baggage if available.
+        
         Args:
             name: Counter name
             amount: Amount to increment (default: 1.0)
             attributes: Optional attributes/labels
         """
         try:
+            # Merge tenant attributes from baggage
+            merged_attributes = self._merge_tenant_attributes(attributes or {})
+            
             if self._enabled and self._meter:
                 if name not in self._counters:
                     self._counters[name] = self._meter.create_counter(
@@ -110,7 +115,7 @@ class OTELMetrics:
                         description=f"Counter metric: {name}",
                     )
                 counter = self._counters[name]
-                counter.add(amount, attributes=attributes or {})
+                counter.add(amount, attributes=merged_attributes)
             else:
                 logger.debug(f"Counter '{name}' incremented by {amount} (no-op)")
         except Exception as e:
@@ -126,12 +131,17 @@ class OTELMetrics:
         """
         Record a histogram metric.
         
+        Automatically merges tenant.id and tenant.tier from baggage if available.
+        
         Args:
             name: Histogram name
             value: Value to record
             attributes: Optional attributes/labels
         """
         try:
+            # Merge tenant attributes from baggage
+            merged_attributes = self._merge_tenant_attributes(attributes or {})
+            
             if self._enabled and self._meter:
                 if name not in self._histograms:
                     self._histograms[name] = self._meter.create_histogram(
@@ -139,7 +149,7 @@ class OTELMetrics:
                         description=f"Histogram metric: {name}",
                     )
                 histogram = self._histograms[name]
-                histogram.record(value, attributes=attributes or {})
+                histogram.record(value, attributes=merged_attributes)
             else:
                 logger.debug(f"Histogram '{name}' recorded value {value} (no-op)")
         except Exception as e:
@@ -155,12 +165,20 @@ class OTELMetrics:
         """
         Set a gauge metric value.
         
+        Automatically merges tenant.id and tenant.tier from baggage if available.
+        
         Args:
             name: Gauge name
             value: Gauge value
             attributes: Optional attributes/labels
         """
         try:
+            # Merge tenant attributes from baggage
+            # Note: Gauge implementation doesn't currently use attributes,
+            # but we merge them for consistency and future use
+            merged_attributes = self._merge_tenant_attributes(attributes or {})
+            _ = merged_attributes  # Mark as used for linter
+            
             if self._enabled and self._meter:
                 if name not in self._gauges:
                     self._gauges[name] = self._meter.create_up_down_counter(
@@ -179,4 +197,42 @@ class OTELMetrics:
         except Exception as e:
             logger.error(f"Failed to set gauge '{name}': {e}")
             raise OTELMetricsError(f"Failed to set gauge: {e}", metric_name=name, original_error=e)
+
+    def _merge_tenant_attributes(self, attributes: Dict[str, Any]) -> Dict[str, Any]:
+        """
+        Merge tenant.id and tenant.tier from baggage into attributes.
+        
+        This ensures all metrics automatically include tenant context when available.
+        
+        Args:
+            attributes: Existing attributes dictionary
+            
+        Returns:
+            Attributes dictionary with tenant context merged
+        """
+        merged = attributes.copy()
+        
+        # Only merge if tenant attributes not already present
+        if "tenant.id" not in merged and "tenant_id" not in merged:
+            try:
+                from opentelemetry import baggage
+                from opentelemetry import context
+                
+                # Get current context
+                ctx = context.get_current()
+                
+                # Get tenant_id from baggage
+                tenant_id = baggage.get_baggage("tenant_id", context=ctx)
+                if tenant_id:
+                    merged["tenant.id"] = tenant_id
+                
+                # Get tenant_tier from baggage
+                tenant_tier = baggage.get_baggage("tenant_tier", context=ctx)
+                if tenant_tier:
+                    merged["tenant.tier"] = tenant_tier
+            except (ImportError, Exception) as e:
+                # OTEL not available or error getting baggage - silently continue
+                logger.debug(f"Could not merge tenant attributes from baggage: {e}")
+        
+        return merged
 

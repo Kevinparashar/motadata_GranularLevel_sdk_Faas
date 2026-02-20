@@ -45,6 +45,12 @@ from .tenant_middleware import (
     extract_tenant_from_subdomain,
     get_tenant_tier_from_id,
 )
+from .tenant_context import (
+    extract_tenant_from_context,
+    ensure_tenant_attributes_on_span,
+    set_tenant_context_in_baggage,
+    get_tenant_attributes_for_metrics,
+)
 
 __all__ = [
     # Core classes
@@ -84,5 +90,10 @@ __all__ = [
     "extract_tenant_from_jwt",
     "extract_tenant_from_subdomain",
     "get_tenant_tier_from_id",
+    # Tenant context utilities
+    "extract_tenant_from_context",
+    "ensure_tenant_attributes_on_span",
+    "set_tenant_context_in_baggage",
+    "get_tenant_attributes_for_metrics",
 ]
 
