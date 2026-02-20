@@ -541,7 +541,8 @@ class RAGSystem:
 
         if tracer:
             with tracer.start_trace("rag.query") as trace:
-                trace.set_attribute("rag.tenant_id", tenant_id or "global")
+                from ..utils.tenant_utils import add_tenant_attributes_to_span
+                add_tenant_attributes_to_span(trace, tenant_id, attribute_prefix="rag")
                 trace.set_attribute("rag.query.length", len(query))
                 trace.set_attribute("rag.top_k", top_k)
                 trace.set_attribute("rag.retrieval_strategy", retrieval_strategy)

@@ -1031,8 +1031,8 @@ class LiteLLMGateway:
             with tracer.start_trace("gateway.generate") as trace:
                 trace.set_attribute("gateway.model", model)
                 trace.set_attribute("gateway.prompt.length", len(prompt))
-                if tenant_id:
-                    trace.set_attribute("gateway.tenant_id", tenant_id)
+                from ..utils.tenant_utils import add_tenant_attributes_to_span
+                add_tenant_attributes_to_span(trace, tenant_id, attribute_prefix="gateway")
 
                 # Check KV cache span
                 with tracer.start_span("gateway.cache.kv.check", parent=trace) as cache_span:

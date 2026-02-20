@@ -110,8 +110,8 @@ class CacheMechanism:
                 trace.set_attribute("cache.backend", self.backend)
                 trace.set_attribute("cache.key", key)
                 trace.set_attribute("cache.ttl", ttl)
-                if tenant_id:
-                    trace.set_attribute("cache.tenant_id", tenant_id)
+                from ..utils.tenant_utils import add_tenant_attributes_to_span
+                add_tenant_attributes_to_span(trace, tenant_id, attribute_prefix="cache")
 
                 try:
                     if self.backend == "dragonfly":

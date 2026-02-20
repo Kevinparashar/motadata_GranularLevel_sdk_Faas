@@ -238,8 +238,8 @@ class PromptContextManager:
                 trace.set_attribute("prompt_context_manager.template_name", template_name)
                 trace.set_attribute("prompt_context_manager.has_version", version is not None)
                 trace.set_attribute("prompt_context_manager.variables_count", len(variables))
-                if tenant_id:
-                    trace.set_attribute("prompt_context_manager.tenant_id", tenant_id)
+                from ..utils.tenant_utils import add_tenant_attributes_to_span
+                add_tenant_attributes_to_span(trace, tenant_id, attribute_prefix="prompt_context_manager")
 
                 try:
                     template = self.store.get(template_name, tenant_id=tenant_id, version=version)
@@ -329,8 +329,8 @@ class PromptContextManager:
                 trace.set_attribute("prompt_context_manager.template_version", version)
                 trace.set_attribute("prompt_context_manager.content_length", len(content))
                 trace.set_attribute("prompt_context_manager.has_metadata", metadata is not None)
-                if tenant_id:
-                    trace.set_attribute("prompt_context_manager.tenant_id", tenant_id)
+                from ..utils.tenant_utils import add_tenant_attributes_to_span
+                add_tenant_attributes_to_span(trace, tenant_id, attribute_prefix="prompt_context_manager")
 
                 try:
                     tmpl = PromptTemplate(

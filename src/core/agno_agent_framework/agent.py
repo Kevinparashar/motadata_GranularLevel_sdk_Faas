@@ -336,8 +336,8 @@ class Agent(BaseModel):
                 trace.set_attribute("agent.id", self.agent_id)
                 trace.set_attribute("task.id", task.task_id)
                 trace.set_attribute("task.type", task.task_type)
-                if tenant_id:
-                    trace.set_attribute("tenant.id", tenant_id)
+                from ..utils.tenant_utils import add_tenant_attributes_to_span
+                add_tenant_attributes_to_span(trace, tenant_id, attribute_prefix="tenant")
 
                 self.status = AgentStatus.RUNNING
                 self.current_task = task

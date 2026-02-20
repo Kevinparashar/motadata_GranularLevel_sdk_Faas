@@ -180,8 +180,8 @@ class LLMOps:
                 trace.set_attribute("llmops.completion_tokens", completion_tokens)
                 trace.set_attribute("llmops.latency_ms", latency_ms)
                 trace.set_attribute("llmops.status", status.value)
-                if tenant_id:
-                    trace.set_attribute("llmops.tenant_id", tenant_id)
+                from ..utils.tenant_utils import add_tenant_attributes_to_span
+                add_tenant_attributes_to_span(trace, tenant_id, attribute_prefix="llmops")
                 if agent_id:
                     trace.set_attribute("llmops.agent_id", agent_id)
 
@@ -327,8 +327,8 @@ class LLMOps:
         # OTEL Integration
         if self.otel_tracer:
             with self.otel_tracer.start_trace("llmops.get_metrics") as trace:
-                if tenant_id:
-                    trace.set_attribute("llmops.tenant_id", tenant_id)
+                from ..utils.tenant_utils import add_tenant_attributes_to_span
+                add_tenant_attributes_to_span(trace, tenant_id, attribute_prefix="llmops")
                 if agent_id:
                     trace.set_attribute("llmops.agent_id", agent_id)
                 trace.set_attribute("llmops.time_range_hours", time_range_hours or 24)

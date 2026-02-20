@@ -102,8 +102,8 @@ class Retriever:
                 trace.set_attribute("retriever.top_k", top_k)
                 trace.set_attribute("retriever.threshold", threshold)
                 trace.set_attribute("retriever.embedding_model", self.embedding_model)
-                if tenant_id:
-                    trace.set_attribute("retriever.tenant_id", tenant_id)
+                from ..utils.tenant_utils import add_tenant_attributes_to_span
+                add_tenant_attributes_to_span(trace, tenant_id, attribute_prefix="retriever")
 
                 try:
                     # Generate query embedding
@@ -254,8 +254,8 @@ class Retriever:
                 trace.set_attribute("retriever.vector_weight", vector_weight)
                 trace.set_attribute("retriever.keyword_weight", keyword_weight)
                 trace.set_attribute("retriever.embedding_model", self.embedding_model)
-                if tenant_id:
-                    trace.set_attribute("retriever.tenant_id", tenant_id)
+                from ..utils.tenant_utils import add_tenant_attributes_to_span
+                add_tenant_attributes_to_span(trace, tenant_id, attribute_prefix="retriever")
 
                 try:
                     # Add tenant_id to filters for tenant isolation

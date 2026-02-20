@@ -231,8 +231,8 @@ Only return valid JSON, no additional text."""
                 trace.set_attribute("prompt_interpreter.type", "agent")
                 trace.set_attribute("prompt_interpreter.prompt_length", len(prompt))
                 trace.set_attribute("prompt_interpreter.has_cache", cache is not None)
-                if tenant_id:
-                    trace.set_attribute("prompt_interpreter.tenant_id", tenant_id)
+                from ..utils.tenant_utils import add_tenant_attributes_to_span
+                add_tenant_attributes_to_span(trace, tenant_id, attribute_prefix="prompt_interpreter")
 
                 try:
                     # Check cache first
@@ -446,8 +446,8 @@ Only return valid JSON, no additional text."""
                 trace.set_attribute("prompt_interpreter.type", "tool")
                 trace.set_attribute("prompt_interpreter.prompt_length", len(prompt))
                 trace.set_attribute("prompt_interpreter.has_cache", cache is not None)
-                if tenant_id:
-                    trace.set_attribute("prompt_interpreter.tenant_id", tenant_id)
+                from ..utils.tenant_utils import add_tenant_attributes_to_span
+                add_tenant_attributes_to_span(trace, tenant_id, attribute_prefix="prompt_interpreter")
 
                 try:
                     # Check cache first

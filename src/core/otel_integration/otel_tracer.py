@@ -18,6 +18,10 @@ try:
     from opentelemetry.sdk.trace import TracerProvider
     from opentelemetry.sdk.trace.export import BatchSpanProcessor
     from opentelemetry.trace import Status, StatusCode
+    from opentelemetry.propagate import set_global_textmap
+    from opentelemetry.propagators.composite import CompositeHTTPPropagator
+    from opentelemetry.trace.propagation.tracecontext import TraceContextTextMapPropagator
+    from opentelemetry.baggage.propagation import W3CBaggagePropagator
 
     _OTEL_AVAILABLE = True  # pyright: ignore[reportConstantRedefinition]
 except ImportError:
@@ -25,6 +29,10 @@ except ImportError:
     trace = None
     Status = None
     StatusCode = None
+    set_global_textmap = None
+    CompositeHTTPPropagator = None
+    TraceContextTextMapPropagator = None
+    W3CBaggagePropagator = None
 
 from .exceptions import OTELTracingError
 
@@ -43,6 +51,7 @@ class OTELTracer:
         service_name: str,
         otlp_endpoint: Optional[str] = None,
         environment: Optional[str] = None,
+        service_version: Optional[str] = None,
     ):
         """
         Initialize OTEL tracer.
@@ -51,18 +60,23 @@ class OTELTracer:
             service_name: Name of the service
             otlp_endpoint: OTLP exporter endpoint (optional)
             environment: Environment name (e.g., "production", "development")
+            service_version: Service version (optional)
         """
         self.service_name = service_name
         self.otlp_endpoint = otlp_endpoint
         self.environment = environment or "development"
+        self.service_version = service_version
         
         if _OTEL_AVAILABLE and otlp_endpoint:
             try:
-                # Create resource
-                resource = Resource.create({
+                # Create resource with service version
+                resource_attrs = {
                     "service.name": service_name,
                     "service.environment": self.environment,
-                })
+                }
+                if service_version:
+                    resource_attrs["service.version"] = service_version
+                resource = Resource.create(resource_attrs)
                 
                 # Create tracer provider
                 provider = TracerProvider(resource=resource)
@@ -75,6 +89,16 @@ class OTELTracer:
                 
                 # Set global tracer provider
                 trace.set_tracer_provider(provider)
+                
+                # Configure composite propagator (TraceContext + Baggage)
+                if set_global_textmap and CompositeHTTPPropagator and TraceContextTextMapPropagator and W3CBaggagePropagator:
+                    set_global_textmap(
+                        CompositeHTTPPropagator([
+                            TraceContextTextMapPropagator(),
+                            W3CBaggagePropagator(),
+                        ])
+                    )
+                    logger.debug("Composite propagator (TraceContext + Baggage) configured")
                 
                 # Get tracer
                 self._tracer = trace.get_tracer(service_name)

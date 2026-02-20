@@ -179,7 +179,8 @@ class DataIngestionService:
                 trace.set_attribute("ingestion.enable_cleansing", self.enable_cleansing)
                 trace.set_attribute("ingestion.enable_caching", self.enable_caching)
                 if self.tenant_id:
-                    trace.set_attribute("ingestion.tenant_id", self.tenant_id)
+                    from ..utils.tenant_utils import add_tenant_attributes_to_span
+                add_tenant_attributes_to_span(trace, self.tenant_id, attribute_prefix="ingestion")
 
                 try:
                     # Generate title if not provided

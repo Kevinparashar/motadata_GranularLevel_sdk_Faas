@@ -19,6 +19,7 @@ def create_otel_tracer(
     service_name: Optional[str] = None,
     otlp_endpoint: Optional[str] = None,
     environment: Optional[str] = None,
+    service_version: Optional[str] = None,
 ) -> Optional[OTELTracer]:
     """
     Create and configure an OTEL tracer with default settings.
@@ -27,12 +28,13 @@ def create_otel_tracer(
         service_name: Service name
         otlp_endpoint: OTLP exporter endpoint
         environment: Environment name
+        service_version: Service version (optional)
         
     Returns:
         Configured OTELTracer instance or None if OTEL is disabled
         
     Example:
-        >>> tracer = create_otel_tracer(service_name="ai-sdk")
+        >>> tracer = create_otel_tracer(service_name="ai-sdk", service_version="1.0.0")
         >>> with tracer.start_trace("operation") as span:
         ...     span.set_attribute("key", "value")
     """
@@ -52,13 +54,16 @@ def create_otel_tracer(
         if environment is None:
             environment = getattr(config, "environment", "development")
         
+        if service_version is None:
+            service_version = getattr(config, "service_version", None)
+        
         # Ensure service_name is not None
         final_service_name = service_name or "ai-sdk"
-        return OTELTracer(final_service_name, otlp_endpoint, environment)
+        return OTELTracer(final_service_name, otlp_endpoint, environment, service_version)
     except (RuntimeError, ImportError, AttributeError):
         # Config not loaded or not available, use provided values
         final_service_name = service_name or "ai-sdk"
-        return OTELTracer(final_service_name, otlp_endpoint, environment)
+        return OTELTracer(final_service_name, otlp_endpoint, environment, service_version)
 
 
 def create_otel_metrics(

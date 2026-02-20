@@ -22,6 +22,24 @@ from .config_discovery import (
 )
 from .config_validator import ConfigHelper, ConfigurationError, ConfigValidator
 from .error_handler import ErrorHandler, create_error_with_suggestion
+from .pii_masking import (
+    mask_email,
+    mask_phone,
+    mask_ssn,
+    mask_credit_card,
+    mask_ip_address,
+    mask_string,
+    should_mask_attribute,
+    mask_attribute_value,
+)
+from .tenant_utils import (
+    get_tenant_tier,
+    set_tenant_tier_mapping,
+    set_tenant_tier_mappings,
+    clear_tenant_tier_mappings,
+    get_tenant_tier_mappings,
+    add_tenant_attributes_to_span,
+)
 from .type_helpers import (
     AgentProtocol,
     CacheProtocol,
@@ -67,4 +85,20 @@ __all__ = [
     "get_rag_config_options",
     "print_config_options",
     "discover_config",
+    # PII masking
+    "mask_email",
+    "mask_phone",
+    "mask_ssn",
+    "mask_credit_card",
+    "mask_ip_address",
+    "mask_string",
+    "should_mask_attribute",
+    "mask_attribute_value",
+    # Tenant utilities
+    "get_tenant_tier",
+    "set_tenant_tier_mapping",
+    "set_tenant_tier_mappings",
+    "clear_tenant_tier_mappings",
+    "get_tenant_tier_mappings",
+    "add_tenant_attributes_to_span",
 ]

@@ -22,6 +22,28 @@ from .context_propagation import (
     inject_trace_context,
     extract_trace_context,
     get_trace_context,
+    set_baggage,
+    get_baggage,
+    set_tenant_context,
+    get_tenant_context,
+)
+from .auto_instrumentation import (
+    setup_fastapi_instrumentation,
+    setup_httpx_instrumentation,
+    setup_requests_instrumentation,
+    setup_asyncpg_instrumentation,
+    setup_sqlalchemy_instrumentation,
+    setup_redis_instrumentation,
+    setup_all_instrumentation,
+    get_enabled_instrumentations,
+    is_instrumentation_enabled,
+)
+from .tenant_middleware import (
+    TenantContextMiddleware,
+    create_tenant_middleware,
+    extract_tenant_from_jwt,
+    extract_tenant_from_subdomain,
+    get_tenant_tier_from_id,
 )
 
 __all__ = [
@@ -41,5 +63,26 @@ __all__ = [
     "extract_trace_context",
     "get_trace_context",
     "get_current_trace_context",
+    # Baggage propagation
+    "set_baggage",
+    "get_baggage",
+    "set_tenant_context",
+    "get_tenant_context",
+    # Auto-instrumentation
+    "setup_fastapi_instrumentation",
+    "setup_httpx_instrumentation",
+    "setup_requests_instrumentation",
+    "setup_asyncpg_instrumentation",
+    "setup_sqlalchemy_instrumentation",
+    "setup_redis_instrumentation",
+    "setup_all_instrumentation",
+    "get_enabled_instrumentations",
+    "is_instrumentation_enabled",
+    # Tenant context middleware
+    "TenantContextMiddleware",
+    "create_tenant_middleware",
+    "extract_tenant_from_jwt",
+    "extract_tenant_from_subdomain",
+    "get_tenant_tier_from_id",
 ]
 
