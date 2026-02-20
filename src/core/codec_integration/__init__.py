@@ -5,6 +5,7 @@ Provides message encoding/decoding with schema versioning and validation
 for type-safe, versioned communication between AI SDK components.
 """
 
+from .bootstrap import bootstrap, register_all_migrations, register_all_schemas
 from .codec_serializer import CodecSerializer
 from .exceptions import (
     CodecDecodingError,
@@ -42,6 +43,10 @@ __all__ = [
     "MigrationError",
     # Factory functions
     "create_codec_serializer",
+    # Bootstrap functions
+    "bootstrap",
+    "register_all_schemas",
+    "register_all_migrations",
     # Helper functions
     "encode_agent_message",
     "decode_agent_message",
