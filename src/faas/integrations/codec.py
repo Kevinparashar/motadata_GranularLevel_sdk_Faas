@@ -9,18 +9,11 @@ Provides message serialization/deserialization for efficient data encoding.
 """
 
 
-import asyncio
-import json
 import logging
 from typing import Any, Dict, Optional
 
-# Import core codec integration
-try:
-    from ...core.codec_integration import CodecSerializer, create_codec_serializer
-except ImportError:
-    # Fallback if core codec not available
-    CodecSerializer = None
-    create_codec_serializer = None
+# Import core codec integration (required)
+from ...core.codec_integration import create_codec_serializer
 
 logger = logging.getLogger(__name__)
 
@@ -47,13 +40,9 @@ class CodecManager:
                 f"Unsupported codec type: {codec_type}. Only 'json' is supported."
             )
         self.codec_type = codec_type
-        # Use core codec serializer if available
-        if CodecSerializer is not None:
-            self._codec = create_codec_serializer(codec_type=codec_type)
-            logger.info(f"Codec manager initialized with core serializer - type: {codec_type}")
-        else:
-            self._codec = None
-            logger.warning("Core codec serializer not available, using fallback implementation")
+        # Core codec serializer is required
+        self._codec = create_codec_serializer(codec_type=codec_type)
+        logger.info(f"Codec manager initialized with core serializer - type: {codec_type}")
 
     def create_envelope(
         self,
@@ -72,15 +61,7 @@ class CodecManager:
         Returns:
             Envelope dictionary
         """
-        if self._codec is not None:
-            return self._codec.create_envelope(message_type, schema_version, data)
-        
-        # Fallback implementation
-        return {
-            "schema_version": schema_version,
-            "message_type": message_type,
-            "data": data,
-        }
+        return self._codec.create_envelope(message_type, schema_version, data)
 
     async def encode(self, data: Dict[str, Any]) -> bytes:
         """
@@ -105,28 +86,14 @@ class CodecManager:
             # Wrap in basic envelope
             envelope = self.create_envelope("generic_message", "1.0", data)
         
-        # Use core codec if available
-        if self._codec is not None:
-            try:
-                return await self._codec.encode(envelope)
-            except Exception as e:
-                # Convert CodecEncodingError to ValueError for backward compatibility
-                if "Unsupported codec type" in str(e) or "unsupported" in str(e).lower():
-                    raise ValueError(f"Unsupported codec type: {self.codec_type}") from e
-                raise
-        
-        # Fallback implementation
-        def _encode_json() -> bytes:
-            """Encode data to JSON bytes."""
-            return json.dumps(envelope, default=str).encode("utf-8")
-        
-        if self.codec_type == "json":
-            # Wrap JSON encoding in thread pool to avoid blocking event loop
-            return await asyncio.to_thread(_encode_json)
-        else:
-            raise ValueError(
-                f"Unsupported codec type: {self.codec_type}. Only 'json' is supported."
-            )
+        # Use core codec (required)
+        try:
+            return await self._codec.encode(envelope)
+        except Exception as e:
+            # Convert CodecEncodingError to ValueError for backward compatibility
+            if "Unsupported codec type" in str(e) or "unsupported" in str(e).lower():
+                raise ValueError(f"Unsupported codec type: {self.codec_type}") from e
+            raise
 
     async def decode(self, data: bytes) -> Dict[str, Any]:
         """
@@ -141,28 +108,14 @@ class CodecManager:
         Raises:
             ValueError: Raised when this function detects an invalid state or when an underlying call fails.
         """
-        # Use core codec if available
-        if self._codec is not None:
-            try:
-                return await self._codec.decode(data)
-            except Exception as e:
-                # Convert CodecDecodingError to ValueError for backward compatibility
-                if "Unsupported codec type" in str(e) or "unsupported" in str(e).lower():
-                    raise ValueError(f"Unsupported codec type: {self.codec_type}") from e
-                raise
-        
-        # Fallback implementation
-        def _decode_json() -> Dict[str, Any]:
-            """Decode JSON bytes to dictionary."""
-            return json.loads(data.decode("utf-8"))
-        
-        if self.codec_type == "json":
-            # Wrap JSON decoding in thread pool to avoid blocking event loop
-            return await asyncio.to_thread(_decode_json)
-        else:
-            raise ValueError(
-                f"Unsupported codec type: {self.codec_type}. Only 'json' is supported."
-            )
+        # Use core codec (required)
+        try:
+            return await self._codec.decode(data)
+        except Exception as e:
+            # Convert CodecDecodingError to ValueError for backward compatibility
+            if "Unsupported codec type" in str(e) or "unsupported" in str(e).lower():
+                raise ValueError(f"Unsupported codec type: {self.codec_type}") from e
+            raise
     
     def validate_schema(self, envelope: Dict[str, Any], schema_name: Optional[str] = None) -> bool:
         """
@@ -178,19 +131,7 @@ class CodecManager:
         Raises:
             ValueError: If validation fails
         """
-        if self._codec is not None:
-            return self._codec.validate_schema(envelope, schema_name)
-        
-        # Fallback: basic validation
-        if not isinstance(envelope, dict):
-            raise ValueError("Envelope must be a dictionary")
-        if "schema_version" not in envelope:
-            raise ValueError("Envelope missing 'schema_version'")
-        if "message_type" not in envelope:
-            raise ValueError("Envelope missing 'message_type'")
-        if "data" not in envelope:
-            raise ValueError("Envelope missing 'data'")
-        return True
+        return self._codec.validate_schema(envelope, schema_name)
 
 
 def create_codec_manager(codec_type: Optional[str] = None) -> CodecManager:

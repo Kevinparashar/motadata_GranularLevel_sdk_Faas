@@ -6,7 +6,7 @@ Configuration management for FaaS services.
 import os
 from typing import Any, Optional
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 
 class ServiceConfig(BaseModel):
@@ -42,6 +42,27 @@ class ServiceConfig(BaseModel):
         None, description="OTEL OTLP exporter endpoint"
     )
     codec_type: str = Field(default="json", description="CODEC type (json only)")
+
+    @field_validator("codec_type")
+    @classmethod
+    def validate_codec_type(cls, v: str) -> str:
+        """
+        Validate codec_type is "json" only.
+        
+        Args:
+            v: Codec type value
+            
+        Returns:
+            Validated codec type
+            
+        Raises:
+            ValueError: If codec_type is not "json"
+        """
+        if v != "json":
+            raise ValueError(
+                f"Unsupported codec type: {v}. Only 'json' is supported."
+            )
+        return v
 
     # Logging
     log_level: str = Field(default="INFO", description="Logging level")
