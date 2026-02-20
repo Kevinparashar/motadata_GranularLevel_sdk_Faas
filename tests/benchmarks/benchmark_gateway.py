@@ -61,7 +61,7 @@ class TestGatewayBenchmarks:
         config = GatewayConfig(enable_caching=True, cache_ttl=3600, cache=cache)
         with patch("src.core.litellm_gateway.gateway.litellm") as mock_litellm:
             gateway = LiteLLMGateway(config=config)
-            gateway._litellm = mock_litellm  # type: ignore[attr-defined]
+            gateway._litellm = mock_litellm
             return gateway, mock_litellm
 
     @pytest.fixture
@@ -70,7 +70,7 @@ class TestGatewayBenchmarks:
         config = GatewayConfig(enable_caching=False)
         with patch("src.core.litellm_gateway.gateway.litellm") as mock_litellm:
             gateway = LiteLLMGateway(config=config)
-            gateway._litellm = mock_litellm  # type: ignore[attr-defined]
+            gateway._litellm = mock_litellm
             return gateway, mock_litellm
 
     @pytest.mark.asyncio

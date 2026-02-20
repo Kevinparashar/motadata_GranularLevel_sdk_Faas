@@ -74,7 +74,7 @@ class TestRAGBenchmarks:
         with patch("src.core.litellm_gateway.gateway.litellm") as mock_litellm:
             config = GatewayConfig(enable_caching=True)
             gateway = LiteLLMGateway(config=config)
-            gateway._litellm = mock_litellm  # type: ignore[attr-defined]
+            gateway._litellm = mock_litellm
 
             # Mock embedding response
             mock_embedding = MagicMock()

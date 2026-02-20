@@ -1,0 +1,84 @@
+# ==============================
+# 🔴 EXTREME TOKEN WASTE (IGNORE FIRST)
+# ==============================
+venv/
+.venv/
+motadata_sdk.zip
+
+# ==============================
+# 📊 COVERAGE & GENERATED REPORTS (VERY TOKEN HEAVY JSON)
+# ==============================
+coverage*.json
+coverage_reports/
+.coverage
+
+# ==============================
+# 📚 DOCUMENTATION (NOT REQUIRED FOR CODE FIXES)
+# ==============================
+docs/
+CONTRIBUTING.md
+SONARQUBE_CI_RULES_FOR_DEVOPS.md
+
+# ==============================
+# 🧪 EXAMPLES & NON-RUNTIME DEMOS
+# ==============================
+examples/
+.benchmarks
+llmops_data/
+
+# ==============================
+# 🧰 TOOLING / IDE / CACHE (ZERO VALUE FOR AGENT)
+# ==============================
+.cursor/
+.vscode/
+.sonarlint/
+.pytest_cache/
+.mypy_cache/
+__pycache__/
+*.pyc
+*.pyo
+
+# ==============================
+# 📦 BUILD & ARTIFACTS
+# ==============================
+dist/
+build/
+*.egg-info/
+
+# ==============================
+# 🧪 OPTIONAL TEST HEAVY DATA (KEEP tests/ CODE ONLY)
+# ==============================
+tests/benchmarks/
+tests/testdata/
+
+
+# ==============================
+# 🧬 GIT INTERNALS (MASSIVE TOKEN WASTE, SAFE TO IGNORE)
+# ==============================
+.git/
+
+
+
+# ==============================
+# 🤖 GENERATED / AUTO-CREATED (TOKEN HEAVY)
+# ==============================
+src/generated/
+src/migrations/
+
+# ==============================
+# 📦 LARGE BINARIES & ARCHIVES
+# ==============================
+*.zip
+*.tar
+*.gz
+*.log
+*.sqlite
+
+# ==============================
+# 📦 Extra coverage safety
+# ==============================
+coverage_*.json
+coverage.json
+
+# ==============================
+**/site-packages/
