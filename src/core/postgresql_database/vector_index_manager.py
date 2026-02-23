@@ -12,10 +12,13 @@ All methods are async-first for production scalability.
 import logging
 import re
 from enum import Enum
-from typing import Any, Dict, List, Optional
+from typing import TYPE_CHECKING, Any, Dict, List, Optional
 
 # Local application/library specific imports
 from .connection import DatabaseConnection
+
+if TYPE_CHECKING:
+    from ...faas.shared.dal.index_dal import IndexDAL
 
 
 class DatabaseError(Exception):
@@ -92,14 +95,25 @@ class VectorIndexManager:
     All methods are async-first for production scalability.
     """
 
-    def __init__(self, db: DatabaseConnection):
+    def __init__(
+        self,
+        db: DatabaseConnection,
+        index_dal: Optional["IndexDAL"] = None,
+    ):
         """
         Initialize vector index manager.
         
         Args:
             db (DatabaseConnection): Database connection/handle.
+            index_dal: Optional IndexDAL instance for database operations.
         """
         self.db = db
+        # Initialize IndexDAL if not provided
+        if index_dal is None:
+            from ...faas.shared.dal.index_dal import IndexDAL
+            self.index_dal = IndexDAL(db)
+        else:
+            self.index_dal = index_dal
 
     def _get_distance_opclass(self, distance: IndexDistance) -> str:
         """
@@ -206,35 +220,34 @@ class VectorIndexManager:
             logger.info(f"Index {index_name} already exists")
             return index_name
 
-        # Get distance operator class
-        opclass = self._get_distance_opclass(distance)
+        # Calculate lists parameter if not provided for IVFFlat
+        if index_type == IndexType.IVFFLAT and lists is None:
+            row_count = await self._get_table_row_count(table_name, tenant_id)
+            lists = max(100, int(row_count**0.5)) if row_count > 0 else 100
+            logger.info(f"Calculated IVFFlat lists: {lists} (based on {row_count} rows)")
 
-        # Build index creation query based on type
-        if index_type == IndexType.IVFFLAT:
-            # Calculate lists parameter if not provided
-            if lists is None:
-                row_count = await self._get_table_row_count(table_name, tenant_id)
-                lists = max(100, int(row_count**0.5)) if row_count > 0 else 100
-                logger.info(f"Calculated IVFFlat lists: {lists} (based on {row_count} rows)")
-            query = self._build_ivfflat_query(index_name, table_name, column_name, opclass, lists)
-        else:  # HNSW
-            # Set default parameters if not provided
-            m = m or 16
-            ef_construction = ef_construction or 64
-            query = self._build_hnsw_query(
-                index_name, table_name, column_name, opclass, m, ef_construction
-            )
+        # Use DAL to create index
+        distance_metric = distance.value
+        success = await self.index_dal.create_index(
+            index_name=index_name,
+            table_name=table_name,
+            column_name=column_name,
+            index_type=index_type.value,
+            distance_metric=distance_metric,
+            lists=lists,
+            m=m,
+            ef_construction=ef_construction,
+        )
 
-        try:
-            await self.db.execute_query(query, fetch_all=False)
+        if success:
             logger.info(
                 f"Created {index_type.value} index {index_name} on {table_name}.{column_name}"
             )
             return index_name
-        except Exception as e:
-            error_msg = f"Failed to create index {index_name}: {str(e)}"
+        else:
+            error_msg = f"Failed to create index {index_name}"
             logger.error(error_msg)
-            raise DatabaseError(message=error_msg, operation="create_index", original_error=e) from e
+            raise DatabaseError(message=error_msg, operation="create_index")
 
     async def index_exists(self, index_name: str) -> bool:
         """
@@ -246,15 +259,7 @@ class VectorIndexManager:
         Returns:
             bool: True if index exists.
         """
-        query = """
-        SELECT EXISTS (
-            SELECT 1
-            FROM pg_indexes
-            WHERE indexname = $1
-        );
-        """
-        result = await self.db.execute_query(query, (index_name,), fetch_one=True)
-        return result.get("exists", False) if result else False
+        return await self.index_dal.index_exists(index_name)
 
     async def get_index_info(self, index_name: str) -> Optional[Dict[str, Any]]:
         """
@@ -266,22 +271,7 @@ class VectorIndexManager:
         Returns:
             Optional[Dict[str, Any]]: Index information or None.
         """
-        query = """
-        SELECT
-            i.indexname,
-            i.tablename,
-            i.indexdef,
-            pg_size_pretty(pg_relation_size(i.indexname::regclass)) as index_size,
-            idx.indisvalid as is_valid,
-            idx.indisready as is_ready
-        FROM pg_indexes i
-        JOIN pg_class c ON c.relname = i.indexname
-        JOIN pg_index idx ON idx.indexrelid = c.oid
-        WHERE i.indexname = $1;
-        """
-
-        result = await self.db.execute_query(query, (index_name,), fetch_one=True)
-        return result
+        return await self.index_dal.get_index_info(index_name)
 
     async def list_indexes(
         self, table_name: Optional[str] = None
@@ -295,33 +285,13 @@ class VectorIndexManager:
         Returns:
             List[Dict[str, Any]]: List of index information.
         """
-        if table_name:
-            query = """
-            SELECT
-                i.indexname,
-                i.tablename,
-                i.indexdef,
-                pg_size_pretty(pg_relation_size(i.indexname::regclass)) as index_size
-            FROM pg_indexes i
-            WHERE i.tablename = $1
-                AND (i.indexdef LIKE '%ivfflat%' OR i.indexdef LIKE '%hnsw%')
-            ORDER BY i.indexname;
-            """
-            results = await self.db.execute_query(query, (table_name,))
-        else:
-            query = """
-            SELECT
-                i.indexname,
-                i.tablename,
-                i.indexdef,
-                pg_size_pretty(pg_relation_size(i.indexname::regclass)) as index_size
-            FROM pg_indexes i
-            WHERE i.indexdef LIKE '%ivfflat%' OR i.indexdef LIKE '%hnsw%'
-            ORDER BY i.tablename, i.indexname;
-            """
-            results = await self.db.execute_query(query)
-
-        return results or []
+        results = await self.index_dal.list_indexes(table_name=table_name)
+        # Filter for vector indexes only
+        vector_results = [
+            r for r in results
+            if "ivfflat" in r.get("indexdef", "").lower() or "hnsw" in r.get("indexdef", "").lower()
+        ]
+        return vector_results
 
     async def reindex(self, index_name: str, concurrently: bool = False) -> bool:
         """
@@ -344,12 +314,14 @@ class VectorIndexManager:
 
         try:
             if concurrently:
-                # CONCURRENTLY requires separate transaction
-                query = f"REINDEX INDEX CONCURRENTLY {index_name};"
+                # CONCURRENTLY requires separate transaction - use direct query
+                query = f'REINDEX INDEX CONCURRENTLY "{index_name}";'
+                await self.db.execute_query(query, fetch_all=False)
             else:
-                query = f"REINDEX INDEX {index_name};"
-
-            await self.db.execute_query(query, fetch_all=False)
+                # Use DAL for non-concurrent reindex
+                success = await self.index_dal.reindex(index_name)
+                if not success:
+                    raise Exception("Reindex failed")
             logger.info(f"Reindexed {index_name} (concurrent: {concurrently})")
             return True
         except Exception as e:
@@ -403,10 +375,14 @@ class VectorIndexManager:
             return None
 
         try:
-            query = f"DROP INDEX IF EXISTS {index_name};"
-            await self.db.execute_query(query, fetch_all=False)
-            logger.info(f"Dropped index {index_name}")
-            return index_name
+            success = await self.index_dal.drop_index(index_name)
+            if success:
+                logger.info(f"Dropped index {index_name}")
+                return index_name
+            else:
+                error_msg = f"Failed to drop index {index_name}"
+                logger.error(error_msg)
+                raise DatabaseError(message=error_msg, operation="drop_index")
         except Exception as e:
             error_msg = f"Failed to drop index {index_name}: {str(e)}"
             logger.error(error_msg)
@@ -507,7 +483,20 @@ class VectorIndexManager:
             base_name = f"{base_name}_{tenant_id}"
         return base_name
 
-    async def _get_table_row_count(self, table_name: str, tenant_id: Optional[str] = None) -> int:
+    async def _get_table_row_count(
+        self, table_name: str, tenant_id: Optional[str] = None
+    ) -> int:
+        """
+        Get row count for a table.
+        
+        Args:
+            table_name: Table name.
+            tenant_id: Optional tenant identifier.
+        
+        Returns:
+            int: Row count.
+        """
+        return await self.index_dal.get_table_row_count(table_name=table_name, tenant_id=tenant_id)
         """
         Get row count for a table asynchronously.
         
@@ -539,14 +528,17 @@ class VectorIndexManager:
         return result.get("count", 0) if result else 0
 
 
-def create_vector_index_manager(db: DatabaseConnection) -> VectorIndexManager:
+def create_vector_index_manager(
+    db: DatabaseConnection, index_dal: Optional["IndexDAL"] = None
+) -> VectorIndexManager:
     """
     Create a vector index manager instance.
 
     Args:
         db: Database connection
+        index_dal: Optional IndexDAL instance
 
     Returns:
         VectorIndexManager instance
     """
-    return VectorIndexManager(db)
+    return VectorIndexManager(db, index_dal=index_dal)

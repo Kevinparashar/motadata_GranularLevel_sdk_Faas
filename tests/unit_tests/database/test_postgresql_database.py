@@ -1353,9 +1353,12 @@ class TestVectorIndexManager:
     async def test_create_index_with_tenant_id(self, index_manager, mock_db):
         """Test create_index with tenant_id."""
         from src.core.postgresql_database.vector_index_manager import IndexType, IndexDistance
+        from unittest.mock import AsyncMock
 
-        index_manager.index_exists = AsyncMock(return_value=False)
-        mock_db.execute_query.return_value = None
+        # Mock IndexDAL methods
+        index_manager.index_dal.index_exists = AsyncMock(return_value=False)
+        index_manager.index_dal.get_table_row_count = AsyncMock(return_value=1000)
+        index_manager.index_dal.create_index = AsyncMock(return_value=True)
 
         result = await index_manager.create_index(
             table_name="test_table",
@@ -1402,7 +1405,7 @@ class TestVectorIndexManager:
     @pytest.mark.asyncio
     async def test_index_exists_false(self, index_manager, mock_db):
         """Test index_exists returns False."""
-        mock_db.execute_query.return_value = {"exists": False}
+        mock_db.execute_query.return_value = None  # IndexDAL returns None if not found
 
         result = await index_manager.index_exists("test_idx")
 
@@ -1446,9 +1449,11 @@ class TestVectorIndexManager:
     @pytest.mark.asyncio
     async def test_list_indexes_with_table(self, index_manager, mock_db):
         """Test list_indexes with table name."""
-        mock_db.execute_query.return_value = [
-            {"indexname": "idx1", "tablename": "test_table", "indexdef": "...", "index_size": "1 MB"}
-        ]
+        # Mock IndexDAL's list_indexes to return vector indexes
+        from unittest.mock import AsyncMock
+        index_manager.index_dal.list_indexes = AsyncMock(return_value=[
+            {"indexname": "idx1", "tablename": "test_table", "indexdef": "CREATE INDEX idx1 USING ivfflat", "index_size": "1 MB"}
+        ])
 
         result = await index_manager.list_indexes(table_name="test_table")
 
@@ -1458,10 +1463,12 @@ class TestVectorIndexManager:
     @pytest.mark.asyncio
     async def test_list_indexes_without_table(self, index_manager, mock_db):
         """Test list_indexes without table name."""
-        mock_db.execute_query.return_value = [
-            {"indexname": "idx1", "tablename": "table1", "indexdef": "...", "index_size": "1 MB"},
-            {"indexname": "idx2", "tablename": "table2", "indexdef": "...", "index_size": "2 MB"},
-        ]
+        # Mock IndexDAL's list_indexes to return vector indexes
+        from unittest.mock import AsyncMock
+        index_manager.index_dal.list_indexes = AsyncMock(return_value=[
+            {"indexname": "idx1", "tablename": "table1", "indexdef": "CREATE INDEX idx1 USING ivfflat", "index_size": "1 MB"},
+            {"indexname": "idx2", "tablename": "table2", "indexdef": "CREATE INDEX idx2 USING hnsw", "index_size": "2 MB"},
+        ])
 
         result = await index_manager.list_indexes()
 

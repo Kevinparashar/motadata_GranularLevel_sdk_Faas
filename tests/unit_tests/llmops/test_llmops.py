@@ -349,10 +349,11 @@ class TestLLMOps:
             assert len(data["operations"]) == 1
             assert data["operations"][0]["model"] == "gpt-4"
 
-    def test_get_metrics_no_operations(self):
+    @pytest.mark.asyncio
+    async def test_get_metrics_no_operations(self):
         """Test get_metrics() with no operations."""
         llmops = LLMOps()
-        metrics = llmops.get_metrics()
+        metrics = await llmops.get_metrics()
 
         assert metrics["total_operations"] == 0
         assert metrics["total_tokens"] == 0
@@ -385,7 +386,7 @@ class TestLLMOps:
             status=LLMOperationStatus.ERROR,
         )
 
-        metrics = llmops.get_metrics()
+        metrics = await llmops.get_metrics()
 
         assert metrics["total_operations"] == 2
         assert metrics["total_tokens"] == 450  # 150 + 300
@@ -413,7 +414,7 @@ class TestLLMOps:
             tenant_id="tenant-2",
         )
 
-        metrics = llmops.get_metrics(tenant_id="tenant-1")
+        metrics = await llmops.get_metrics(tenant_id="tenant-1")
 
         assert metrics["total_operations"] == 1
         assert metrics["by_model"]["gpt-4"]["count"] == 1
@@ -434,7 +435,7 @@ class TestLLMOps:
             agent_id="agent-2",
         )
 
-        metrics = llmops.get_metrics(agent_id="agent-1")
+        metrics = await llmops.get_metrics(agent_id="agent-1")
 
         assert metrics["total_operations"] == 1
 
@@ -458,7 +459,7 @@ class TestLLMOps:
             model="gpt-4",
         )
 
-        metrics = llmops.get_metrics(time_range_hours=24)
+        metrics = await llmops.get_metrics(time_range_hours=24)
 
         # Should only include the recent operation
         assert metrics["total_operations"] == 1
@@ -477,7 +478,7 @@ class TestLLMOps:
         # When time_range_hours is None, cutoff is set to datetime.now()
         # So only operations with timestamp >= now() are included
         # Since all operations have timestamps in the past, this effectively returns no operations
-        metrics = llmops.get_metrics(time_range_hours=None)
+        metrics = await llmops.get_metrics(time_range_hours=None)
 
         # Should return empty metrics (no operations match timestamp >= now())
         assert metrics["total_operations"] == 0
@@ -499,7 +500,7 @@ class TestLLMOps:
             latency_ms=200.0,
         )
 
-        metrics = llmops.get_metrics()
+        metrics = await llmops.get_metrics()
 
         # Average should be (100 + 200) / 2 = 150
         assert abs(metrics["by_model"]["gpt-4"]["avg_latency_ms"] - 150.0) < 0.001
@@ -516,7 +517,7 @@ class TestLLMOps:
             completion_tokens=500_000,
         )
 
-        summary = llmops.get_cost_summary()
+        summary = await llmops.get_cost_summary()
 
         assert summary["total_cost_usd"] > 0
         assert summary["total_tokens"] == 1_500_000
@@ -541,7 +542,7 @@ class TestLLMOps:
             tenant_id="tenant-2",
         )
 
-        summary = llmops.get_cost_summary(tenant_id="tenant-1")
+        summary = await llmops.get_cost_summary(tenant_id="tenant-1")
 
         assert summary["total_tokens"] == 1000
 
@@ -567,7 +568,7 @@ class TestLLMOps:
             prompt_tokens=2000,
         )
 
-        summary = llmops.get_cost_summary(time_range_hours=24)
+        summary = await llmops.get_cost_summary(time_range_hours=24)
 
         assert summary["total_tokens"] == 2000
 
@@ -575,7 +576,7 @@ class TestLLMOps:
     async def test_get_cost_summary_zero_tokens(self):
         """Test get_cost_summary() handles zero tokens correctly."""
         llmops = LLMOps(enable_logging=True)
-        summary = llmops.get_cost_summary()
+        summary = await llmops.get_cost_summary()
 
         assert abs(summary["total_cost_usd"] - 0.0) < 0.001
         assert summary["total_tokens"] == 0
@@ -594,7 +595,7 @@ class TestLLMOps:
             completion_tokens=1000,
         )
 
-        summary = llmops.get_cost_summary()
+        summary = await llmops.get_cost_summary()
 
         gpt4_data = summary["by_model"]["gpt-4"]
         assert gpt4_data["tokens"] == 3000

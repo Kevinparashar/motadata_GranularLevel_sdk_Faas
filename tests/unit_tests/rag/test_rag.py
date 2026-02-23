@@ -1292,10 +1292,10 @@ class TestRAGSystem:
         mock_embedding_response.embeddings = [[0.1] * 1536]
         mock_gateway.embed_async = AsyncMock(return_value=mock_embedding_response)
 
-        # Patch retriever.retrieve to return results directly (since it uses asyncio.run() which can't be called in async context)
-        rag.retriever.retrieve = lambda *args, **kwargs: [
+        # Patch vector_ops.similarity_search to return results directly
+        rag.vector_ops.similarity_search = AsyncMock(return_value=[
             {"id": 1, "document_id": 1, "content": "Test", "similarity": 0.9}
-        ]
+        ])
 
         result = await rag.query_async(query="Test query", top_k=5)
 
@@ -1367,8 +1367,8 @@ class TestRAGSystem:
         mock_gen_response.usage = {}
         mock_gateway.generate_async = AsyncMock(return_value=mock_gen_response)
 
-        # Mock retriever.retrieve() - synchronous method used by query_async
-        rag.retriever.retrieve = MagicMock(return_value=[
+        # Mock vector_ops.similarity_search() - used by retrieve_async
+        rag.vector_ops.similarity_search = AsyncMock(return_value=[
             {"id": 1, "content": "Document", "similarity": 0.9}
         ])
         
@@ -1421,8 +1421,8 @@ class TestRAGSystem:
         mock_gen_response.usage = {}
         mock_gateway.generate_async = AsyncMock(return_value=mock_gen_response)
 
-        # Patch retriever.retrieve to return results directly (since it uses asyncio.run() which can't be called in async context)
-        rag.retriever.retrieve = lambda *args, **kwargs: []
+        # Patch vector_ops.similarity_search to return results directly
+        rag.vector_ops.similarity_search = AsyncMock(return_value=[])
 
         await rag.query_async(
             query="Test query",
@@ -1676,7 +1676,7 @@ class TestRAGSystem:
         
         # Mock create_otel_tracer to return None so OTEL path is not taken
         with patch("src.core.otel_integration.create_otel_tracer", return_value=None):
-            rag.retriever.retrieve = MagicMock(side_effect=ValueError("Validation error"))
+            rag.vector_ops.similarity_search = AsyncMock(side_effect=ValueError("Validation error"))
             rag.cache.get = AsyncMock(return_value=None)
             
             # Mock memory if it exists
@@ -1957,7 +1957,7 @@ class TestRAGSystem:
         ]
         rag.memory.retrieve = AsyncMock(return_value=mock_memories)
 
-        rag.retriever.retrieve = MagicMock(return_value=[
+        rag.vector_ops.similarity_search = AsyncMock(return_value=[
             {"id": 1, "content": "Test", "similarity": 0.9}
         ])
         rag.cache.get = AsyncMock(return_value=None)
@@ -2021,7 +2021,7 @@ class TestRAGSystem:
 
         # Mock create_otel_tracer to return None so OTEL path is not taken
         with patch("src.core.otel_integration.create_otel_tracer", return_value=None):
-            rag.retriever.retrieve = MagicMock(side_effect=ConnectionError("Network error"))
+            rag.vector_ops.similarity_search = AsyncMock(side_effect=ConnectionError("Network error"))
             rag.cache.get = AsyncMock(return_value=None)
             
             # Mock memory if it exists

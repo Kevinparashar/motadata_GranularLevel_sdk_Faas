@@ -5,25 +5,43 @@ Provides functions for similarity search and vector operations using pgvector.
 """
 
 
-from typing import Any, Dict, List, Optional, Tuple
+from typing import TYPE_CHECKING, Any, Dict, List, Optional, Tuple
 
 from .connection import DatabaseConnection
+
+if TYPE_CHECKING:
+    from ...faas.shared.dal.embedding_dal import EmbeddingDAL  
 
 
 class VectorOperations:
     """Vector operations using pgvector."""
 
-    def __init__(self, db: DatabaseConnection):
+    def __init__(
+        self,
+        db: DatabaseConnection,
+        embedding_dal: Optional["EmbeddingDAL"] = None,
+    ):
         """
         Initialize vector operations.
         
         Args:
             db (DatabaseConnection): Database connection/handle.
+            embedding_dal: Optional EmbeddingDAL instance for database persistence.
         """
         self.db = db
+        # Initialize EmbeddingDAL if not provided
+        if embedding_dal is None:
+            from ...faas.shared.dal.embedding_dal import EmbeddingDAL  
+            self.embedding_dal = EmbeddingDAL(db)
+        else:
+            self.embedding_dal = embedding_dal
 
     async def insert_embedding(
-        self, document_id: int, embedding: List[float], model: str = "text-embedding-3-small"
+        self,
+        document_id: int,
+        embedding: List[float],
+        model: str = "text-embedding-3-small",
+        tenant_id: Optional[str] = None,
     ) -> int:
         """
         Insert an embedding vector asynchronously.
@@ -32,23 +50,17 @@ class VectorOperations:
             document_id (int): Document ID to associate with embedding.
             embedding (List[float]): Embedding vector.
             model (str): Model name or identifier to use.
+            tenant_id (Optional[str]): Tenant identifier for tenant isolation.
         
         Returns:
             int: Inserted embedding ID.
         """
-        query = """
-        INSERT INTO embeddings (document_id, embedding, model)
-        VALUES ($1, $2::vector, $3)
-        RETURNING id;
-        """
-
-        # Convert list to string format for pgvector
-        embedding_str = "[" + ",".join(map(str, embedding)) + "]"
-
-        result = await self.db.execute_query(
-            query, (document_id, embedding_str, model), fetch_one=True
+        return await self.embedding_dal.insert_embedding(
+            document_id=document_id,
+            embedding=embedding,
+            model=model,
+            tenant_id=tenant_id,
         )
-        return result["id"] if result else 0
 
     async def similarity_search(
         self,
@@ -71,146 +83,75 @@ class VectorOperations:
         Returns:
             List[Dict[str, Any]]: List of similar documents with similarity scores.
         """
-        embedding_str = "[" + ",".join(map(str, query_embedding)) + "]"
-
-        if model and tenant_id:
-            query = """
-            SELECT 
-                e.id,
-                e.document_id,
-                d.title,
-                d.content,
-                d.metadata,
-                d.source,
-                1 - (e.embedding <=> $1::vector) as similarity
-            FROM embeddings e
-            JOIN documents d ON e.document_id = d.id
-            WHERE e.model = $2
-                AND d.tenant_id = $3
-                AND 1 - (e.embedding <=> $1::vector) >= $4
-            ORDER BY e.embedding <=> $1::vector
-            LIMIT $5;
-            """
-            params = (embedding_str, model, tenant_id, threshold, limit)
-        elif model:
-            query = """
-            SELECT 
-                e.id,
-                e.document_id,
-                d.title,
-                d.content,
-                d.metadata,
-                d.source,
-                1 - (e.embedding <=> $1::vector) as similarity
-            FROM embeddings e
-            JOIN documents d ON e.document_id = d.id
-            WHERE e.model = $2
-                AND 1 - (e.embedding <=> $1::vector) >= $3
-            ORDER BY e.embedding <=> $1::vector
-            LIMIT $4;
-            """
-            params = (embedding_str, model, threshold, limit)
-        elif tenant_id:
-            query = """
-            SELECT 
-                e.id,
-                e.document_id,
-                d.title,
-                d.content,
-                d.metadata,
-                d.source,
-                1 - (e.embedding <=> $1::vector) as similarity
-            FROM embeddings e
-            JOIN documents d ON e.document_id = d.id
-            WHERE d.tenant_id = $2
-                AND 1 - (e.embedding <=> $1::vector) >= $3
-            ORDER BY e.embedding <=> $1::vector
-            LIMIT $4;
-            """
-            params = (embedding_str, tenant_id, threshold, limit)
-        else:
-            query = """
-            SELECT 
-                e.id,
-                e.document_id,
-                d.title,
-                d.content,
-                d.metadata,
-                d.source,
-                1 - (e.embedding <=> $1::vector) as similarity
-            FROM embeddings e
-            JOIN documents d ON e.document_id = d.id
-            WHERE 1 - (e.embedding <=> $1::vector) >= $2
-            ORDER BY e.embedding <=> $1::vector
-            LIMIT $3;
-            """
-            params = (embedding_str, threshold, limit)
-
-        return await self.db.execute_query(query, params)
+        return await self.embedding_dal.similarity_search(
+            query_embedding=query_embedding,
+            limit=limit,
+            threshold=threshold,
+            model=model,
+            tenant_id=tenant_id,
+        )
 
     async def batch_insert_embeddings(
-        self, embeddings: List[Tuple[int, List[float], str]]
+        self,
+        embeddings: List[Tuple[int, List[float], str]],
+        tenant_id: Optional[str] = None,
     ) -> None:
         """
         Batch insert multiple embeddings asynchronously.
         
         Args:
             embeddings (List[Tuple[int, List[float], str]]): List of (doc_id, embedding, model) tuples.
+            tenant_id (Optional[str]): Tenant identifier for tenant isolation.
         
         Returns:
             None: Result of the operation.
         """
-        if not embeddings:
-            return
+        await self.embedding_dal.batch_insert_embeddings(
+            embeddings_data=embeddings,
+            tenant_id=tenant_id,
+        )
 
-        # Prepare batch insert queries
-        queries = []
-        for doc_id, embedding, model in embeddings:
-            embedding_str = "[" + ",".join(map(str, embedding)) + "]"
-            query = """
-            INSERT INTO embeddings (document_id, embedding, model)
-            VALUES ($1, $2::vector, $3)
-            """
-            queries.append((query, (doc_id, embedding_str, model)))
-
-        # Execute all in a transaction
-        await self.db.execute_transaction(queries)
-
-    async def get_embedding(self, embedding_id: int) -> Optional[Dict[str, Any]]:
+    async def get_embedding(
+        self, embedding_id: int, tenant_id: Optional[str] = None
+    ) -> Optional[Dict[str, Any]]:
         """
         Get an embedding by ID asynchronously.
         
         Args:
             embedding_id (int): Embedding ID.
+            tenant_id (Optional[str]): Tenant identifier for tenant isolation.
         
         Returns:
             Optional[Dict[str, Any]]: Embedding data or None.
         """
-        query = """
-        SELECT id, document_id, embedding::text, model
-        FROM embeddings
-        WHERE id = $1;
-        """
-        return await self.db.execute_query(query, (embedding_id,), fetch_one=True)
+        return await self.embedding_dal.get_embedding(
+            embedding_id=embedding_id,
+            tenant_id=tenant_id,
+        )
 
-    async def delete_embeddings(self, document_id: int) -> int:
+    async def delete_embeddings(
+        self, document_id: int, tenant_id: Optional[str] = None
+    ) -> int:
         """
         Delete all embeddings for a document asynchronously.
         
         Args:
             document_id (int): Document ID.
+            tenant_id (Optional[str]): Tenant identifier for tenant isolation.
         
         Returns:
             int: Number of embeddings deleted.
         """
-        query = """
-        DELETE FROM embeddings
-        WHERE document_id = $1;
-        """
-        return await self.db.execute_query(query, (document_id,), fetch_all=False)
+        return await self.embedding_dal.delete_embeddings(
+            document_id=document_id,
+            tenant_id=tenant_id,
+        )
 
     async def update_embedding(
-        self, embedding_id: int, new_embedding: List[float]
+        self,
+        embedding_id: int,
+        new_embedding: List[float],
+        tenant_id: Optional[str] = None,
     ) -> bool:
         """
         Update an existing embedding asynchronously.
@@ -218,17 +159,13 @@ class VectorOperations:
         Args:
             embedding_id (int): Embedding ID to update.
             new_embedding (List[float]): New embedding vector.
+            tenant_id (Optional[str]): Tenant identifier for tenant isolation.
         
         Returns:
             bool: True if update successful.
         """
-        embedding_str = "[" + ",".join(map(str, new_embedding)) + "]"
-        query = """
-        UPDATE embeddings
-        SET embedding = $1::vector
-        WHERE id = $2;
-        """
-        result = await self.db.execute_query(
-            query, (embedding_str, embedding_id), fetch_all=False
+        return await self.embedding_dal.update_embedding(
+            embedding_id=embedding_id,
+            new_embedding=new_embedding,
+            tenant_id=tenant_id,
         )
-        return result > 0

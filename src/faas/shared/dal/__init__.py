@@ -8,6 +8,9 @@ Tables are assumed to exist (managed by migrations/DAL).
 from .agent_dal import AgentDAL
 from .document_dal import DocumentDAL
 from .document_version_dal import DocumentVersionDAL
+from .embedding_dal import EmbeddingDAL
+from .index_dal import IndexDAL
+from .llmops_dal import LLMOpsDAL
 from .memory_dal import MemoryDAL
 from .model_dal import ModelDAL
 from .model_version_dal import ModelVersionDAL
@@ -24,6 +27,9 @@ __all__ = [
     "AgentDAL",
     "DocumentDAL",
     "DocumentVersionDAL",
+    "EmbeddingDAL",
+    "IndexDAL",
+    "LLMOpsDAL",
     "ModelDAL",
     "ModelVersionDAL",
     "PromptTemplateDAL",

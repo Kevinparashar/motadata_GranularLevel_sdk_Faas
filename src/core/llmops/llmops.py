@@ -72,6 +72,7 @@ class LLMOps:
         enable_cost_tracking: bool = True,
         otel_tracer: Optional[Any] = None,
         otel_metrics: Optional[Any] = None,
+        llmops_dal: Optional[Any] = None,
     ):
         """
         Initialize LLMOps.
@@ -82,10 +83,12 @@ class LLMOps:
             enable_cost_tracking (bool): Flag to enable or disable cost tracking.
             otel_tracer: Optional OTEL tracer for distributed tracing
             otel_metrics: Optional OTEL metrics for metrics collection
+            llmops_dal: Optional LLMOpsDAL instance for database persistence.
         """
         self.storage_path = Path(storage_path) if storage_path else None
         self.enable_logging = enable_logging
         self.enable_cost_tracking = enable_cost_tracking
+        self.llmops_dal = llmops_dal
 
         self.operations: List[LLMOperation] = []
         self.max_operations_in_memory = 10000
@@ -222,7 +225,29 @@ class LLMOps:
                     if len(self.operations) > self.max_operations_in_memory:
                         self.operations = self.operations[-self.max_operations_in_memory :]
 
-                    await self._persist()
+                    # Persist to database if DAL is available, otherwise use file-based
+                    if self.llmops_dal:
+                        try:
+                            await self.llmops_dal.save_operation(
+                                operation_id=operation_id,
+                                operation_type=operation_type.value,
+                                model=model,
+                                prompt_tokens=prompt_tokens,
+                                completion_tokens=completion_tokens,
+                                total_tokens=total_tokens,
+                                latency_ms=latency_ms,
+                                cost_usd=cost_usd,
+                                status=status.value,
+                                error_message=error_message,
+                                tenant_id=tenant_id,
+                                agent_id=agent_id,
+                                metadata=metadata or {},
+                            )
+                        except Exception as e:
+                            logger.warning(f"Failed to persist operation to database: {e}, falling back to file-based storage")
+                            await self._persist()
+                    else:
+                        await self._persist()
 
                     trace.set_attribute("llmops.operation_id", operation_id)
                     trace.set_attribute("llmops.total_tokens", total_tokens)
@@ -301,11 +326,33 @@ class LLMOps:
             if len(self.operations) > self.max_operations_in_memory:
                 self.operations = self.operations[-self.max_operations_in_memory :]
 
-            await self._persist()
+            # Persist to database if DAL is available, otherwise use file-based
+            if self.llmops_dal:
+                try:
+                    await self.llmops_dal.save_operation(
+                        operation_id=operation_id,
+                        operation_type=operation_type.value,
+                        model=model,
+                        prompt_tokens=prompt_tokens,
+                        completion_tokens=completion_tokens,
+                        total_tokens=total_tokens,
+                        latency_ms=latency_ms,
+                        cost_usd=cost_usd,
+                        status=status.value,
+                        error_message=error_message,
+                        tenant_id=tenant_id,
+                        agent_id=agent_id,
+                        metadata=metadata or {},
+                    )
+                except Exception as e:
+                    logger.warning(f"Failed to persist operation to database: {e}, falling back to file-based storage")
+                    await self._persist()
+            else:
+                await self._persist()
 
             return operation_id
 
-    def get_metrics(
+    async def get_metrics(
         self,
         tenant_id: Optional[str] = None,
         agent_id: Optional[str] = None,
@@ -323,6 +370,18 @@ class LLMOps:
             Dict[str, Any]: Dictionary result of the operation.
         """
         start_time = time.time()
+
+        # Use DAL if available for metrics
+        if self.llmops_dal:
+            try:
+                return await self.llmops_dal.get_metrics(
+                    tenant_id=tenant_id,
+                    agent_id=agent_id,
+                    time_range_hours=time_range_hours,
+                )
+            except Exception as e:
+                logger.warning(f"Failed to get metrics from database: {e}, falling back to in-memory operations")
+                # Fall through to in-memory metrics
 
         # OTEL Integration
         if self.otel_tracer:
@@ -511,7 +570,7 @@ class LLMOps:
                 "time_range_hours": time_range_hours,
             }
 
-    def get_cost_summary(
+    async def get_cost_summary(
         self, tenant_id: Optional[str] = None, time_range_hours: Optional[int] = 24
     ) -> Dict[str, Any]:
         """
@@ -524,7 +583,7 @@ class LLMOps:
         Returns:
             Dict[str, Any]: Dictionary result of the operation.
         """
-        metrics = self.get_metrics(tenant_id=tenant_id, time_range_hours=time_range_hours)
+        metrics = await self.get_metrics(tenant_id=tenant_id, time_range_hours=time_range_hours)
 
         return {
             "total_cost_usd": metrics["total_cost_usd"],

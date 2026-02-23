@@ -118,7 +118,8 @@ class TestLLMOpsOTELIntegration:
         assert len(llmops.operations) == 2
         assert llmops.otel_tracer is not None
 
-    def test_get_metrics_with_otel(self):
+    @pytest.mark.asyncio
+    async def test_get_metrics_with_otel(self):
         """Test get_metrics with OTEL tracing."""
         tracer = OTELTracer(service_name="test-llmops")
         metrics = OTELMetrics(service_name="test-llmops")
@@ -129,7 +130,7 @@ class TestLLMOpsOTELIntegration:
         )
         
         # Execute get_metrics - should not raise exception
-        result = llmops.get_metrics()
+        result = await llmops.get_metrics()
         
         assert result is not None
         assert "total_operations" in result
@@ -137,18 +138,20 @@ class TestLLMOpsOTELIntegration:
         assert "total_cost_usd" in result
         assert llmops.otel_tracer is not None
 
-    def test_get_metrics_without_otel(self):
+    @pytest.mark.asyncio
+    async def test_get_metrics_without_otel(self):
         """Test get_metrics without OTEL."""
         llmops = LLMOps()
         llmops.otel_tracer = None
         llmops.otel_metrics = None
         
-        result = llmops.get_metrics()
+        result = await llmops.get_metrics()
         
         assert result is not None
         assert "total_operations" in result
 
-    def test_get_metrics_with_tenant_id_otel(self):
+    @pytest.mark.asyncio
+    async def test_get_metrics_with_tenant_id_otel(self):
         """Test get_metrics with tenant_id and OTEL."""
         tracer = OTELTracer(service_name="test-llmops")
         metrics = OTELMetrics(service_name="test-llmops")
@@ -158,13 +161,14 @@ class TestLLMOpsOTELIntegration:
             otel_metrics=metrics,
         )
         
-        result = llmops.get_metrics(tenant_id="tenant_123")
+        result = await llmops.get_metrics(tenant_id="tenant_123")
         
         assert result is not None
         assert "total_operations" in result
         assert llmops.otel_tracer is not None
 
-    def test_get_cost_summary_with_otel(self):
+    @pytest.mark.asyncio
+    async def test_get_cost_summary_with_otel(self):
         """Test get_cost_summary with OTEL tracing."""
         tracer = OTELTracer(service_name="test-llmops")
         metrics = OTELMetrics(service_name="test-llmops")
@@ -175,7 +179,7 @@ class TestLLMOpsOTELIntegration:
         )
         
         # Execute get_cost_summary - should not raise exception
-        result = llmops.get_cost_summary()
+        result = await llmops.get_cost_summary()
         
         assert result is not None
         assert "total_cost_usd" in result

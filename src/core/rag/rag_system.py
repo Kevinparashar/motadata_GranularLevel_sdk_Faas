@@ -96,7 +96,9 @@ class RAGSystem:
             )
 
         # Initialize components
-        self.vector_ops = VectorOperations(db)
+        # Allow embedding_dal to be passed via kwargs
+        embedding_dal = kwargs.get("embedding_dal")
+        self.vector_ops = VectorOperations(db, embedding_dal=embedding_dal)
 
         # Initialize vector index manager
         self.index_manager = create_vector_index_manager(db)
