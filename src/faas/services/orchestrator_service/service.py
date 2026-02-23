@@ -80,13 +80,18 @@ class OrchestratorService:
         setup_middleware(self.app)
 
         # Initialize cache mechanism
+        # Auto-detect backend: use Dragonfly if URL is provided, otherwise use memory
+        cache_backend = "dragonfly" if config.dragonfly_url else "memory"
         cache_config = CacheConfig(
-            backend="memory",
+            backend=cache_backend,
             default_ttl=300,
             max_size=2048,
             dragonfly_url=config.dragonfly_url,
             namespace="orchestrator",
         )
+        logger.info(f"Initializing orchestrator cache with backend: {cache_backend}")
+        if cache_backend == "dragonfly":
+            logger.info(f"Dragonfly URL: {config.dragonfly_url}")
         self.cache_mechanism = CacheMechanism(
             config=cache_config,
             otel_tracer=self.otel_tracer,
