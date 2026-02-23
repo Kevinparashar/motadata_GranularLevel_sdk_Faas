@@ -8,7 +8,7 @@ import logging
 import os
 from typing import Any, Optional
 
-from fastapi import FastAPI, Header, HTTPException, status
+from fastapi import Depends, FastAPI, HTTPException, status
 
 from ....core.cache_mechanism import CacheConfig, CacheMechanism
 from ....core.litellm_gateway import create_gateway
@@ -19,7 +19,7 @@ from ...orchestrator import (
     create_service_selector,
 )
 from ...shared.config import ServiceConfig
-from ...shared.contracts import extract_headers
+from ...shared.contracts import extract_headers, StandardHeaders
 from ...shared.http_client import ServiceClientManager, ServiceClientError
 from ...shared.middleware import setup_middleware
 from .models import (
@@ -129,34 +129,36 @@ class OrchestratorService:
 
     def _register_routes(self):
         """Register FastAPI routes."""
-        self.app.post("/api/v1/orchestrate", response_model=OrchestrateResponse)(
-            self._handle_orchestrate
-        )
-
-        self.app.post("/api/v1/intent/analyze", response_model=IntentAnalysisResponse)(
-            self._handle_analyze_intent
-        )
-
-        self.app.post("/api/v1/cache/invalidate", response_model=CacheInvalidateResponse)(
-            self._handle_invalidate_cache
-        )
+        from fastapi import Depends
+        
+        @self.app.post("/api/v1/orchestrate", response_model=OrchestrateResponse)
+        async def orchestrate_route(request: OrchestrateRequest, headers: StandardHeaders = Depends(extract_headers)):
+            return await self._handle_orchestrate(request, headers)
+        
+        @self.app.post("/api/v1/intent/analyze", response_model=IntentAnalysisResponse)
+        async def analyze_intent_route(request: IntentAnalysisRequest, headers: StandardHeaders = Depends(extract_headers)):
+            return await self._handle_analyze_intent(request, headers)
+        
+        @self.app.post("/api/v1/cache/invalidate", response_model=CacheInvalidateResponse)
+        async def invalidate_cache_route(request: CacheInvalidateRequest, headers: StandardHeaders = Depends(extract_headers)):
+            return await self._handle_invalidate_cache(request, headers)
 
         self.app.get("/health")(self._handle_health_check)
 
     async def _handle_orchestrate(
-        self, request: OrchestrateRequest, headers: dict = Header(...)
+        self, request: OrchestrateRequest, headers: StandardHeaders
     ):
         """
         Orchestrate a query - route to appropriate service.
 
         Args:
             request: Orchestration request
-            headers: HTTP headers
+            headers: Standard headers (extracted via extract_headers dependency)
 
         Returns:
             Orchestration response
         """
-        standard_headers = extract_headers(**headers)
+        standard_headers = headers
 
         # Start OTEL trace
         span = None
@@ -232,6 +234,9 @@ class OrchestratorService:
             # Route to service
             service_client = self.service_clients.get_client(service_name)
             if not service_client:
+                if span:
+                    span.set_attribute("orchestrator.error", "service_unavailable")
+                    span.end()
                 raise HTTPException(
                     status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
                     detail=f"Service {service_name} is not available",
@@ -291,15 +296,22 @@ class OrchestratorService:
                 logger.error(f"Service call failed: {e}")
                 if span:
                     span.record_exception(e)
+                    span.end()
                 raise HTTPException(
                     status_code=status.HTTP_502_BAD_GATEWAY,
                     detail=f"Service {service_name} call failed: {str(e)}",
                 )
 
+        except HTTPException:
+            # Re-raise HTTP exceptions (they have correct status codes)
+            if span:
+                span.end()
+            raise
         except Exception as e:
             logger.error(f"Orchestration failed: {e}", exc_info=True)
             if span:
                 span.record_exception(e)
+                span.end()
             raise HTTPException(
                 status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
                 detail=f"Orchestration failed: {str(e)}",
@@ -309,19 +321,19 @@ class OrchestratorService:
                 span.end()
 
     async def _handle_analyze_intent(
-        self, request: IntentAnalysisRequest, headers: dict = Header(...)
+        self, request: IntentAnalysisRequest, headers: StandardHeaders
     ):
         """
         Analyze query intent only (no routing).
 
         Args:
             request: Intent analysis request
-            headers: HTTP headers
+            headers: Standard headers
 
         Returns:
             Intent analysis response
         """
-        standard_headers = extract_headers(**headers)
+        standard_headers = headers
 
         try:
             intent_result = await self.query_router.analyze_intent(
@@ -354,20 +366,18 @@ class OrchestratorService:
             )
 
     async def _handle_invalidate_cache(
-        self, request: CacheInvalidateRequest, headers: dict = Header(...)
+        self, request: CacheInvalidateRequest, standard_headers: StandardHeaders = Depends(extract_headers)
     ):
         """
         Invalidate cache entries.
 
         Args:
             request: Cache invalidation request
-            headers: HTTP headers
+            standard_headers: Standard headers from dependency injection
 
         Returns:
             Cache invalidation response
         """
-        standard_headers = extract_headers(**headers)
-
         try:
             tenant_id = request.tenant_id or standard_headers.tenant_id
 

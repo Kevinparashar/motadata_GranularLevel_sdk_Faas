@@ -151,11 +151,11 @@ class TestOTELMetricsTenantAttributes:
         """Test _merge_tenant_attributes when baggage has tenant context."""
         metrics = OTELMetrics(service_name="test-service")
         
-        with patch("src.core.otel_integration.otel_metrics.baggage") as mock_baggage, \
-             patch("src.core.otel_integration.otel_metrics.context") as mock_context:
+        with patch("opentelemetry.baggage.get_baggage") as mock_get_baggage, \
+             patch("opentelemetry.context.get_current") as mock_get_current:
             mock_ctx = MagicMock()
-            mock_context.get_current.return_value = mock_ctx
-            mock_baggage.get_baggage.side_effect = ["abc-123", "premium"]
+            mock_get_current.return_value = mock_ctx
+            mock_get_baggage.side_effect = ["abc-123", "premium"]
             
             result = metrics._merge_tenant_attributes({"custom": "value"})
             
@@ -169,11 +169,11 @@ class TestOTELMetricsTenantAttributes:
         """Test _merge_tenant_attributes when baggage has no tenant context."""
         metrics = OTELMetrics(service_name="test-service")
         
-        with patch("src.core.otel_integration.otel_metrics.baggage") as mock_baggage, \
-             patch("src.core.otel_integration.otel_metrics.context") as mock_context:
+        with patch("opentelemetry.baggage.get_baggage") as mock_get_baggage, \
+             patch("opentelemetry.context.get_current") as mock_get_current:
             mock_ctx = MagicMock()
-            mock_context.get_current.return_value = mock_ctx
-            mock_baggage.get_baggage.return_value = None
+            mock_get_current.return_value = mock_ctx
+            mock_get_baggage.return_value = None
             
             result = metrics._merge_tenant_attributes({"custom": "value"})
             
@@ -183,23 +183,23 @@ class TestOTELMetricsTenantAttributes:
         """Test _merge_tenant_attributes when tenant.id already exists in attributes."""
         metrics = OTELMetrics(service_name="test-service")
         
-        with patch("src.core.otel_integration.otel_metrics.baggage") as mock_baggage, \
-             patch("src.core.otel_integration.otel_metrics.context") as mock_context:
+        with patch("opentelemetry.baggage.get_baggage") as mock_get_baggage, \
+             patch("opentelemetry.context.get_current") as mock_get_current:
             mock_ctx = MagicMock()
-            mock_context.get_current.return_value = mock_ctx
+            mock_get_current.return_value = mock_ctx
             
             # Should not override existing tenant.id
             result = metrics._merge_tenant_attributes({"tenant.id": "existing", "custom": "value"})
             
             assert result == {"tenant.id": "existing", "custom": "value"}
             # Should not call baggage.get_baggage if tenant.id already exists
-            mock_baggage.get_baggage.assert_not_called()
+            mock_get_baggage.assert_not_called()
 
     def test_merge_tenant_attributes_otel_not_available(self):
         """Test _merge_tenant_attributes when OTEL is not available."""
         metrics = OTELMetrics(service_name="test-service")
         
-        with patch("src.core.otel_integration.otel_metrics.baggage", None):
+        with patch("opentelemetry.baggage.get_baggage", side_effect=ImportError("OTEL not available")):
             result = metrics._merge_tenant_attributes({"custom": "value"})
             
             assert result == {"custom": "value"}
@@ -208,9 +208,7 @@ class TestOTELMetricsTenantAttributes:
         """Test _merge_tenant_attributes exception handling."""
         metrics = OTELMetrics(service_name="test-service")
         
-        with patch("src.core.otel_integration.otel_metrics.context") as mock_context:
-            mock_context.get_current.side_effect = Exception("OTEL error")
-            
+        with patch("opentelemetry.context.get_current", side_effect=Exception("OTEL error")):
             result = metrics._merge_tenant_attributes({"custom": "value"})
             
             # Should return original attributes on exception

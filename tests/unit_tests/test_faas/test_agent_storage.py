@@ -48,49 +48,8 @@ def mock_gateway():
     return Mock(spec=LiteLLMGateway)
 
 
-@pytest.mark.asyncio
-async def test_ensure_table(agent_storage, mock_db):
-    """Test _ensure_table creates table."""
-    await agent_storage._ensure_table()
-    
-    # Verify execute_query was called
-    assert mock_db.execute_query.called
-
-
-@pytest.mark.asyncio
-async def test_ensure_table_index_error(agent_storage, mock_db):
-    """Test _ensure_table handles index creation error - covers lines 64-66."""
-    # First call succeeds (table creation)
-    # Second call raises exception (index creation)
-    call_count = 0
-    
-    def side_effect(*args, **kwargs):  # noqa: ARG001
-        nonlocal call_count
-        call_count += 1
-        if call_count == 2:  # Second call is index creation
-            raise RuntimeError("Index creation failed")
-        return None
-    
-    mock_db.execute_query = AsyncMock(side_effect=side_effect)
-    
-    # Should not raise exception, should handle gracefully
-    await agent_storage._ensure_table()
-    
-    # Verify execute_query was called at least twice (table + index)
-    assert mock_db.execute_query.call_count >= 2
-
-
-@pytest.mark.asyncio
-async def test_ensure_table_creation_error(agent_storage, mock_db):
-    """Test _ensure_table handles table creation error - covers lines 67-68."""
-    # Make table creation raise an exception
-    mock_db.execute_query = AsyncMock(side_effect=RuntimeError("Table creation failed"))
-    
-    # Should not raise exception, should handle gracefully with warning
-    await agent_storage._ensure_table()
-    
-    # Verify execute_query was called
-    assert mock_db.execute_query.called
+# Note: _ensure_table() method was removed - tables are now managed by migrations/DAL
+# These tests are no longer applicable
 
 
 @pytest.mark.asyncio

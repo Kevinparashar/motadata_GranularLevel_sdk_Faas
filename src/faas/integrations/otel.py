@@ -78,7 +78,10 @@ def create_otel_tracer(
             service_version=service_version,
         )
     except RuntimeError:
-        # Config not loaded, use provided values or defaults
+        # Config not loaded, use provided values or return None if no params
+        if service_name is None and otlp_endpoint is None:
+            # No config and no params - return None
+            return None
         final_service_name = service_name or "faas-service"
         return _create_otel_tracer(
             service_name=final_service_name,

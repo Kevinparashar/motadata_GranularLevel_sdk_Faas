@@ -56,13 +56,15 @@ def mock_db():
 def orchestrator_service(mock_config, mock_db):
     """Create orchestrator service instance for testing."""
     with patch("src.faas.services.orchestrator_service.service.create_gateway") as mock_create_gateway, \
-         patch("src.faas.services.orchestrator_service.service.create_nats_client", return_value=None), \
-         patch("src.faas.services.orchestrator_service.service.create_otel_tracer", return_value=None):
+         patch("src.core.litellm_gateway.create_gateway") as mock_core_gateway, \
+         patch("src.faas.integrations.codec.create_codec_manager", return_value=None), \
+         patch("src.faas.integrations.otel.create_otel_tracer", return_value=None):
         
         # Mock gateway
         mock_gateway = MagicMock()
         mock_gateway.generate_async = AsyncMock()
         mock_create_gateway.return_value = mock_gateway
+        mock_core_gateway.return_value = mock_gateway
         
         service = OrchestratorService(
             config=mock_config,

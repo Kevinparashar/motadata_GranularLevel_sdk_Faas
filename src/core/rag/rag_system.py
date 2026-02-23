@@ -66,6 +66,13 @@ class RAGSystem:
             **kwargs (Any): Input parameter for this operation.
         """
         self.db = db
+        # Initialize DocumentDAL if not provided
+        document_dal = kwargs.get("document_dal")
+        if document_dal is None:
+            from ...faas.shared.dal.document_dal import DocumentDAL
+            self.document_dal = DocumentDAL(db)
+        else:
+            self.document_dal = document_dal
         self.gateway = gateway
         self.embedding_model = embedding_model
         self.generation_model = generation_model
@@ -75,12 +82,17 @@ class RAGSystem:
         self.memory: Optional[AgentMemory] = None
         if enable_memory:
             memory_config = memory_config or {}
+            # Get memory_dal from kwargs if provided (for database persistence)
+            memory_dal = kwargs.get("memory_dal")
+            tenant_id = kwargs.get("tenant_id")
             self.memory = AgentMemory(
                 agent_id="rag_system",
                 max_episodic=memory_config.get("max_episodic", 100),
                 max_semantic=memory_config.get("max_semantic", 200),
                 max_age_days=memory_config.get("max_age_days", 30),
                 persistence_path=memory_config.get("persistence_path"),
+                memory_dal=memory_dal,
+                tenant_id=tenant_id,
             )
 
         # Initialize components
@@ -169,18 +181,15 @@ class RAGSystem:
         Returns:
             str: Returned text value.
         """
-        import json
-
-        query = """
-        INSERT INTO documents (title, content, metadata, source, tenant_id)
-        VALUES (%s, %s, %s::jsonb, %s, %s)
-        RETURNING id;
-        """
-        metadata_json = json.dumps(metadata or {})
-        result = await self.db.execute_query(
-            query, (title, content, metadata_json, source, tenant_id), fetch_one=True
+        # Use DAL to save document
+        document_id = await self.document_dal.save_document(
+            title=title,
+            content=content,
+            source=source,
+            metadata=metadata,
+            tenant_id=tenant_id,
         )
-        return str(result["id"])
+        return document_id
 
     def _generate_embeddings_batch(
         self, chunk_texts: List[str], document_id: str
@@ -312,15 +321,30 @@ class RAGSystem:
         """
         import asyncio
 
+        def _run_async(coro):
+            """Helper to run async code from sync context, handling both cases."""
+            try:
+                asyncio.get_running_loop()
+                # We're in an async context - can't use asyncio.run()
+                # Best solution: raise error telling user to use async version
+                raise RuntimeError(
+                    "Cannot call sync method from async context. Use ingest_document_async() instead."
+                )
+            except RuntimeError as e:
+                if "Cannot call sync method" in str(e):
+                    raise  # Re-raise our custom error
+                # No running loop, safe to use asyncio.run()
+                return asyncio.run(coro)
+
         if file_path:
             # Call async method from sync context
-            content, metadata, source = asyncio.run(self._load_document_from_file(file_path, metadata))
+            content, metadata, source = _run_async(self._load_document_from_file(file_path, metadata))
 
         if not content:
             raise ValueError("Either 'content' or 'file_path' must be provided")
 
         # Call async method from sync context
-        document_id = asyncio.run(self._insert_document_to_db(title, content, metadata, source, tenant_id))
+        document_id = _run_async(self._insert_document_to_db(title, content, metadata, source, tenant_id))
 
         chunks = self.document_processor.chunk_document(
             content=content, document_id=document_id, metadata=metadata
@@ -330,7 +354,7 @@ class RAGSystem:
             return document_id
 
         embeddings_data = self._process_embeddings(chunks, document_id)
-        asyncio.run(self._store_embeddings(embeddings_data))
+        _run_async(self._store_embeddings(embeddings_data))
 
         return document_id
 
@@ -398,11 +422,25 @@ class RAGSystem:
         """
         import asyncio
 
+        def _run_async(coro):
+            """Helper to run async code from sync context, handling both cases."""
+            try:
+                asyncio.get_running_loop()
+                # We're in an async context - can't use asyncio.run()
+                raise RuntimeError(
+                    "Cannot call sync method from async context. Use query_async() instead."
+                )
+            except RuntimeError as e:
+                if "Cannot call sync method" in str(e):
+                    raise  # Re-raise our custom error
+                # No running loop, safe to use asyncio.run()
+                return asyncio.run(coro)
+
         # Retrieve relevant memories if memory is enabled
         memories = []
         memory_context = ""
         if self.memory:
-            memories = asyncio.run(self.memory.retrieve(
+            memories = _run_async(self.memory.retrieve(
                 query=query, limit=5
             ))
             if memories:
@@ -415,7 +453,7 @@ class RAGSystem:
 
         # Include tenant_id in cache key for tenant isolation
         cache_key = f"rag:query:{tenant_id or 'global'}:{query}:{top_k}:{threshold}:{max_tokens}:{retrieval_strategy}"
-        cached = asyncio.run(self.cache.get(cache_key, tenant_id=tenant_id))
+        cached = _run_async(self.cache.get(cache_key, tenant_id=tenant_id))
         if cached:
             return cached
 
@@ -453,11 +491,11 @@ class RAGSystem:
             }
 
             # Store in cache
-            asyncio.run(self.cache.set(cache_key, result, ttl=300, tenant_id=tenant_id))
+            _run_async(self.cache.set(cache_key, result, ttl=300, tenant_id=tenant_id))
 
             # Store in memory for future context
             if self.memory:
-                asyncio.run(self.memory.store(
+                _run_async(self.memory.store(
                     content=f"Query: {original_query}\nAnswer: {answer}",
                     memory_type=MemoryType.EPISODIC,
                     importance=0.7,
@@ -589,13 +627,25 @@ class RAGSystem:
                     # STEP 4: Document retrieval (vector search in database)
                     with tracer.start_span("rag.retrieve", parent=trace) as retrieve_span:
                         if retrieval_strategy == "hybrid":
-                            retrieved_docs = self.retriever.retrieve_hybrid(
-                                query=query, top_k=top_k, threshold=threshold, tenant_id=tenant_id
-                            )
+                            # Use async version when available, fallback to sync
+                            if hasattr(self.retriever, "retrieve_hybrid_async"):
+                                retrieved_docs = await self.retriever.retrieve_hybrid_async(
+                                    query=query, top_k=top_k, threshold=threshold, tenant_id=tenant_id
+                                )
+                            else:
+                                retrieved_docs = self.retriever.retrieve_hybrid(
+                                    query=query, top_k=top_k, threshold=threshold, tenant_id=tenant_id
+                                )
                         else:
-                            retrieved_docs = self.retriever.retrieve(
-                                query=query, top_k=top_k, threshold=threshold, tenant_id=tenant_id
-                            )
+                            # Use async version when available
+                            if hasattr(self.retriever, "retrieve_async"):
+                                retrieved_docs = await self.retriever.retrieve_async(
+                                    query=query, top_k=top_k, threshold=threshold, tenant_id=tenant_id
+                                )
+                            else:
+                                retrieved_docs = self.retriever.retrieve(
+                                    query=query, top_k=top_k, threshold=threshold, tenant_id=tenant_id
+                                )
                         retrieve_span.set_attribute("rag.documents.retrieved", len(retrieved_docs))
 
                     # STEP 5: Enhance context with memory if available
@@ -721,14 +771,26 @@ class RAGSystem:
             # Cost: ~$0.0001-0.001 per query (embedding generation for query)
             if retrieval_strategy == "hybrid":
                 # Hybrid: Combines vector search + keyword search for better results
-                retrieved_docs = self.retriever.retrieve_hybrid(
-                    query=query, top_k=top_k, threshold=threshold, tenant_id=tenant_id
-                )
+                # Use async version when available
+                if hasattr(self.retriever, "retrieve_hybrid_async"):
+                    retrieved_docs = await self.retriever.retrieve_hybrid_async(
+                        query=query, top_k=top_k, threshold=threshold, tenant_id=tenant_id
+                    )
+                else:
+                    retrieved_docs = self.retriever.retrieve_hybrid(
+                        query=query, top_k=top_k, threshold=threshold, tenant_id=tenant_id
+                    )
             else:
                 # Vector-only: Fast, semantic similarity search
-                retrieved_docs = self.retriever.retrieve(
-                    query=query, top_k=top_k, threshold=threshold, tenant_id=tenant_id
-                )
+                # Use async version when available
+                if hasattr(self.retriever, "retrieve_async"):
+                    retrieved_docs = await self.retriever.retrieve_async(
+                        query=query, top_k=top_k, threshold=threshold, tenant_id=tenant_id
+                    )
+                else:
+                    retrieved_docs = self.retriever.retrieve(
+                        query=query, top_k=top_k, threshold=threshold, tenant_id=tenant_id
+                    )
 
             # STEP 5: Enhance context with memory if available
             # Combines retrieved documents with conversation memory for richer context
@@ -900,22 +962,14 @@ class RAGSystem:
         Returns:
             str: Returned text value.
         """
-        # Insert document
-        query = """
-        INSERT INTO documents (title, content, metadata, source)
-        VALUES (%s, %s, %s::jsonb, %s)
-        RETURNING id;
-        """
-
-        import json
-
-        metadata_json = json.dumps(metadata or {})
-
-        result = await self.db.execute_query(
-            query, (title, content, metadata_json, source), fetch_one=True
+        # Insert document using DAL
+        document_id = await self.document_dal.save_document(
+            title=title,
+            content=content,
+            source=source,
+            metadata=metadata,
+            tenant_id=None,  # RAGSystem doesn't have tenant context, can be added later
         )
-
-        document_id = str(result["id"])
 
         # Process and chunk document
         chunks = self.document_processor.chunk_document(
@@ -1167,9 +1221,13 @@ class RAGSystem:
         except Exception as e:
             logger.warning(f"Auto-reindexing failed (non-critical): {str(e)}")
         
-        # Update content in database
-        query = "UPDATE documents SET content = %s WHERE id = %s;"
-        await self.db.execute_query(query, (content, document_id))
+        # Update content in database using DAL
+        await self.document_dal.update_document(
+            document_id=document_id,
+            content=content,
+            metadata=metadata,
+            tenant_id=None,  # RAGSystem doesn't have tenant context in this method
+        )
 
     async def update_document(
         self,
@@ -1191,19 +1249,19 @@ class RAGSystem:
             bool: True if the operation succeeds, else False.
         """
         try:
-            # Update document metadata
-            updates, params = self._build_document_update_query(title, metadata)
-            
-            if updates:
-                query = f"""
-                UPDATE documents
-                SET {', '.join(updates)}
-                WHERE id = %s;
-                """
-                params.append(document_id)
-                await self.db.execute_query(query, tuple(params))
+            # Update document using DAL
+            updated = await self.document_dal.update_document(
+                document_id=document_id,
+                title=title,
+                content=content,
+                metadata=metadata,
+                tenant_id=None,  # RAGSystem doesn't have tenant context in this method
+            )
 
-            # If content changed, re-process document
+            if not updated:
+                return False
+
+            # If content changed, re-process document (chunks and embeddings)
             if content is not None:
                 await self._update_document_content(document_id, content, metadata)
 
@@ -1234,9 +1292,11 @@ class RAGSystem:
             # Delete document chunks and embeddings
             await self._delete_document_chunks(document_id)
 
-            # Delete document
-            query = "DELETE FROM documents WHERE id = %s;"
-            await self.db.execute_query(query, (document_id,))
+            # Delete document using DAL
+            await self.document_dal.delete_document(
+                document_id=document_id,
+                tenant_id=None,  # RAGSystem doesn't have tenant context in this method
+            )
 
             # Invalidate cache
             await self.cache.invalidate_pattern(f"rag:doc:{document_id}")

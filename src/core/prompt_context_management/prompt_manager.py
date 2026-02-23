@@ -9,7 +9,11 @@ simple token estimation and truncation.
 import re
 import time
 from dataclasses import dataclass, field
-from typing import Any, Dict, List, Optional
+from typing import TYPE_CHECKING, Any, Dict, List, Optional
+
+if TYPE_CHECKING:
+    from ...faas.shared.dal.prompt_history_dal import PromptHistoryDAL  
+    from ...faas.shared.dal.prompt_template_dal import PromptTemplateDAL
 
 
 @dataclass
@@ -28,14 +32,21 @@ class PromptTemplate:
 
 
 class PromptStore:
-    """In-memory prompt template store with version support and tenant isolation."""
+    """Prompt template store with version support and tenant isolation.
+    
+    Supports both in-memory storage (default) and database persistence via PromptTemplateDAL.
+    """
 
-    def __init__(self) -> None:
-        # Structure: {tenant_id: {template_name: {version: PromptTemplate}}}
+    def __init__(self, template_dal: Optional["PromptTemplateDAL"] = None) -> None:
         """
         Initialize PromptStore.
+        
+        Args:
+            template_dal: Optional PromptTemplateDAL instance for database persistence.
         """
+        # Structure: {tenant_id: {template_name: {version: PromptTemplate}}}
         self._templates: Dict[Optional[str], Dict[str, Dict[str, PromptTemplate]]] = {}
+        self._template_dal = template_dal
 
     def add(self, template: PromptTemplate) -> None:
         """
@@ -51,6 +62,45 @@ class PromptStore:
         self._templates.setdefault(tenant_id, {}).setdefault(template.name, {})[
             template.version
         ] = template
+        
+        # Persist to database if DAL is available
+        if self._template_dal:
+            import asyncio
+            try:
+                # Run async save in event loop
+                loop = asyncio.get_event_loop()
+                if loop.is_running():
+                    # If loop is running, create task
+                    asyncio.create_task(
+                        self._template_dal.save_template(
+                            name=template.name,
+                            version=template.version,
+                            content=template.content,
+                            tenant_id=tenant_id,
+                            metadata=template.metadata,
+                        )
+                    )
+                else:
+                    loop.run_until_complete(
+                        self._template_dal.save_template(
+                            name=template.name,
+                            version=template.version,
+                            content=template.content,
+                            tenant_id=tenant_id,
+                            metadata=template.metadata,
+                        )
+                    )
+            except RuntimeError:
+                # No event loop, create new one
+                asyncio.run(
+                    self._template_dal.save_template(
+                        name=template.name,
+                        version=template.version,
+                        content=template.content,
+                        tenant_id=tenant_id,
+                        metadata=template.metadata,
+                    )
+                )
 
     def get(
         self, name: str, tenant_id: Optional[str] = None, version: Optional[str] = None
@@ -66,15 +116,62 @@ class PromptStore:
         Returns:
             Optional[PromptTemplate]: Result if available, else None.
         """
+        # Try in-memory first
         tenant_templates = self._templates.get(tenant_id, {})
         versions = tenant_templates.get(name)
-        if not versions:
-            return None
-        if version:
-            return versions.get(version)
-        # return latest version by lexical order
-        latest_version = sorted(versions.keys())[-1]
-        return versions[latest_version]
+        if versions:
+            if version:
+                return versions.get(version)
+            # return latest version by lexical order
+            latest_version = sorted(versions.keys())[-1]
+            return versions[latest_version]
+        
+        # If not in memory and DAL is available, load from database
+        if self._template_dal:
+            import asyncio
+            try:
+                loop = asyncio.get_event_loop()
+                if loop.is_running():
+                    # If loop is running, we can't use run_until_complete
+                    # Return None and let caller handle async loading
+                    return None
+                else:
+                    template_data = loop.run_until_complete(
+                        self._template_dal.load_template(name, tenant_id, version)
+                    )
+                if template_data:
+                    template = PromptTemplate(
+                        name=template_data["name"],
+                        version=template_data["version"],
+                        content=template_data["content"],
+                        tenant_id=tenant_id,
+                        metadata=template_data.get("metadata", {}),
+                    )
+                    # Cache in memory
+                    self._templates.setdefault(tenant_id, {}).setdefault(template.name, {})[
+                        template.version
+                    ] = template
+                    return template
+            except RuntimeError:
+                # No event loop, create new one
+                template_data = asyncio.run(
+                    self._template_dal.load_template(name, tenant_id, version)
+                )
+                if template_data:
+                    template = PromptTemplate(
+                        name=template_data["name"],
+                        version=template_data["version"],
+                        content=template_data["content"],
+                        tenant_id=tenant_id,
+                        metadata=template_data.get("metadata", {}),
+                    )
+                    # Cache in memory
+                    self._templates.setdefault(tenant_id, {}).setdefault(template.name, {})[
+                        template.version
+                    ] = template
+                    return template
+        
+        return None
 
 
 class ContextWindowManager:
@@ -160,6 +257,9 @@ class PromptContextManager:
         otel_tracer: Optional[Any] = None,
         otel_metrics: Optional[Any] = None,
         codec_serializer: Optional[Any] = None,
+        template_dal: Optional["PromptTemplateDAL"] = None,
+        history_dal: Optional["PromptHistoryDAL"] = None,
+        tenant_id: Optional[str] = None,
     ) -> None:
         """
         __init__.
@@ -170,9 +270,14 @@ class PromptContextManager:
             otel_tracer: Optional OTEL tracer for distributed tracing
             otel_metrics: Optional OTEL metrics for metrics collection
             codec_serializer: Optional CodecSerializer instance for message encoding/decoding
+            template_dal: Optional PromptTemplateDAL instance for template persistence
+            history_dal: Optional PromptHistoryDAL instance for history persistence
+            tenant_id: Optional tenant ID for multi-tenant isolation
         """
-        self.store = PromptStore()
+        self.store = PromptStore(template_dal=template_dal)
         self.history: List[str] = []
+        self._history_dal = history_dal
+        self._tenant_id = tenant_id
         self.window = ContextWindowManager(max_tokens=max_tokens, safety_margin=safety_margin)
 
         # OTEL Integration (optional)
@@ -388,17 +493,64 @@ class PromptContextManager:
             )
             self.store.add(tmpl)
 
-    def record_history(self, prompt: str) -> None:
+    def record_history(
+        self,
+        prompt: str,
+        user_id: Optional[str] = None,
+        context_id: Optional[str] = None,
+        metadata: Optional[Dict[str, Any]] = None,
+    ) -> None:
         """
         record_history.
         
         Args:
             prompt (str): Prompt text sent to the model.
+            user_id: Optional user identifier.
+            context_id: Optional context identifier (e.g., conversation_id, agent_id).
+            metadata: Optional metadata.
         
         Returns:
             None: Result of the operation.
         """
         self.history.append(prompt)
+        
+        # Persist to database if DAL is available
+        if self._history_dal and self._tenant_id:
+            import asyncio
+            try:
+                loop = asyncio.get_event_loop()
+                if loop.is_running():
+                    # If loop is running, create task
+                    asyncio.create_task(
+                        self._history_dal.save_history(
+                            prompt=prompt,
+                            tenant_id=self._tenant_id,
+                            user_id=user_id,
+                            context_id=context_id,
+                            metadata=metadata,
+                        )
+                    )
+                else:
+                    loop.run_until_complete(
+                        self._history_dal.save_history(
+                            prompt=prompt,
+                            tenant_id=self._tenant_id,
+                            user_id=user_id,
+                            context_id=context_id,
+                            metadata=metadata,
+                        )
+                    )
+            except RuntimeError:
+                # No event loop, create new one
+                asyncio.run(
+                    self._history_dal.save_history(
+                        prompt=prompt,
+                        tenant_id=self._tenant_id,
+                        user_id=user_id,
+                        context_id=context_id,
+                        metadata=metadata,
+                    )
+                )
 
     def build_context_with_history(self, new_message: str) -> str:
         """

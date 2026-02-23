@@ -5,9 +5,14 @@ Model versioning and registry management.
 """
 
 
+from __future__ import annotations
+
 import logging
 from datetime import datetime, timezone
-from typing import Any, Dict, List, Optional
+from typing import TYPE_CHECKING, Any, Dict, List, Optional
+
+if TYPE_CHECKING:
+    from ...faas.shared.dal.model_version_dal import ModelVersionDAL  # type: ignore[import-untyped]
 
 from ...postgresql_database.connection import DatabaseConnection
 from .exceptions import ModelNotFoundError
@@ -34,15 +39,14 @@ class ModelRegistry:
         self.db = db
         self.tenant_id = tenant_id
 
-        # Note: _ensure_tables() is now async, so it should be called externally after __init__
-        # await self._ensure_tables()  # Cannot await in __init__
         logger.info(f"ModelRegistry initialized for tenant: {tenant_id}")
 
     async def initialize(self) -> None:
         """
-        Initialize ModelRegistry asynchronously (creates database tables).
+        Initialize ModelRegistry asynchronously.
         
-        This should be called after __init__ to ensure database tables exist.
+        This method is kept for backward compatibility but no longer creates tables.
+        Tables are assumed to exist (managed by migrations/DAL).
         
         Example:
             >>> registry = ModelRegistry(db, tenant_id="tenant_123")
@@ -51,7 +55,8 @@ class ModelRegistry:
         Returns:
             None: Result of the operation.
         """
-        await self._ensure_tables()
+        # Tables are assumed to exist (managed by migrations/DAL)
+        pass
 
     async def register_version(
         self,
@@ -76,48 +81,19 @@ class ModelRegistry:
         Returns:
             str: Returned text value.
         """
-        import json
-
-        full_metadata = {
-            "metrics": metrics or {},
-            "hyperparameters": hyperparameters or {},
-            **(metadata or {}),
-        }
-
-        query = """
-        INSERT INTO ml_model_versions (
-            model_id, version, model_path, metrics, hyperparameters,
-            metadata, tenant_id, created_at
-        )
-        VALUES ($1, $2, $3, $4::jsonb, $5::jsonb, $6::jsonb, $7, $8)
-        ON CONFLICT (model_id, version, tenant_id) DO UPDATE
-        SET model_path = EXCLUDED.model_path,
-            metrics = EXCLUDED.metrics,
-            hyperparameters = EXCLUDED.hyperparameters,
-            metadata = EXCLUDED.metadata,
-            updated_at = $9
-        RETURNING id;
-        """
-
-        now = datetime.now(timezone.utc)
-        result = await self.db.execute_query(
-            query,
-            (
-                model_id,
-                version,
-                model_path,
-                json.dumps(metrics or {}),
-                json.dumps(hyperparameters or {}),
-                json.dumps(full_metadata),
-                self.tenant_id,
-                now,
-                now,
-            ),
-            fetch_one=True,
+        # Use DAL to register version
+        version_record_id = await self.model_version_dal.register_version(
+            model_id=model_id,
+            version=version,
+            model_path=model_path,
+            tenant_id=self.tenant_id,
+            metrics=metrics,
+            hyperparameters=hyperparameters,
+            metadata=metadata,
         )
 
         logger.info(f"Model version registered: {model_id} v{version}")
-        return str(result["id"])
+        return version_record_id
 
     async def get_model_version(
         self, model_id: str, version: Optional[str] = None
@@ -132,22 +108,15 @@ class ModelRegistry:
         Returns:
             Optional[Dict[str, Any]]: Dictionary result of the operation.
         """
-        if version:
-            query = """
-            SELECT * FROM ml_model_versions
-            WHERE model_id = $1 AND version = $2 AND tenant_id = $3;
-            """
-            params = (model_id, version, self.tenant_id)
-        else:
-            query = """
-            SELECT * FROM ml_model_versions
-            WHERE model_id = $1 AND tenant_id = $2
-            ORDER BY created_at DESC
-            LIMIT 1;
-            """
-            params = (model_id, self.tenant_id)
-
-        result = await self.db.execute_query(query, params, fetch_one=True)
+        # Use DAL to get version
+        result = await self.model_version_dal.get_version(model_id, version or "latest", self.tenant_id)
+        
+        # If version is None, get latest
+        if not result and version is None:
+            versions = await self.model_version_dal.list_versions(
+                model_id, self.tenant_id, limit=1, offset=0
+            )
+            result = versions[0] if versions else None
         return dict(result) if result else None
 
     async def list_versions(self, model_id: str, limit: int = 100) -> List[Dict[str, Any]]:
@@ -210,18 +179,24 @@ class ModelRegistry:
         Raises:
             ModelNotFoundError: Raised when this function detects an invalid state or when an underlying call fails.
         """
-        v1 = await self.get_model_version(model_id, version1)
-        v2 = await self.get_model_version(model_id, version2)
+        # Use DAL to compare versions
+        diff = await self.model_version_dal.compare_versions(
+            model_id, version1, version2, self.tenant_id
+        )
 
-        if not v1 or not v2:
+        if "error" in diff:
             raise ModelNotFoundError(
                 f"One or both versions not found: {version1}, {version2}", model_id=model_id
             )
 
+        v1 = await self.get_model_version(model_id, version1)
+        v2 = await self.get_model_version(model_id, version2)
+
         return {
             "version1": v1,
             "version2": v2,
-            "metrics_diff": self._compare_metrics(v1.get("metrics", {}), v2.get("metrics", {})),
+            "metrics_diff": diff.get("metrics", {}),
+            "hyperparameters_diff": diff.get("hyperparameters", {}),
         }
 
     async def get_lineage(self, model_id: str, version: Optional[str] = None) -> Dict[str, Any]:
@@ -271,32 +246,3 @@ class ModelRegistry:
                 diff[key] = {"version1": val1, "version2": val2, "difference": val2 - val1}
 
         return diff
-
-    async def _ensure_tables(self) -> None:
-        """
-        Ensure required database tables exist asynchronously.
-        
-        Returns:
-            None: Result of the operation.
-        """
-        query = """
-        CREATE TABLE IF NOT EXISTS ml_model_versions (
-            id SERIAL PRIMARY KEY,
-            model_id VARCHAR(255) NOT NULL,
-            version VARCHAR(50) NOT NULL,
-            model_path TEXT NOT NULL,
-            metrics JSONB,
-            hyperparameters JSONB,
-            metadata JSONB,
-            environment VARCHAR(50) DEFAULT 'dev',
-            tenant_id VARCHAR(255),
-            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-            updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-            UNIQUE(model_id, version, tenant_id)
-        );
-        
-        CREATE INDEX IF NOT EXISTS idx_ml_versions_model ON ml_model_versions(model_id, tenant_id);
-        CREATE INDEX IF NOT EXISTS idx_ml_versions_env ON ml_model_versions(environment);
-        """
-
-        await self.db.execute_query(query)

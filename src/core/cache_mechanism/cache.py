@@ -334,8 +334,11 @@ class CacheMechanism:
                             keys_deleted = len(keys_to_delete)
                     else:
                         async with self._lock:
-                            # More efficient: iterate once and delete in place
-                            keys_to_delete = [k for k in self._store.keys() if pattern in k]
+                            # Use fnmatch for wildcard pattern matching
+                            import fnmatch
+                            # Build full pattern with namespace
+                            full_pattern = f"{self.config.namespace}:{pattern}*"
+                            keys_to_delete = [k for k in self._store.keys() if fnmatch.fnmatch(k, full_pattern)]
                             keys_deleted = len(keys_to_delete)
                             for k in keys_to_delete:
                                 self._store.pop(k, None)

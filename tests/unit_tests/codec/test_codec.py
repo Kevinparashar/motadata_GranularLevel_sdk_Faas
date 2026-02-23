@@ -85,10 +85,9 @@ class TestCodecManager:
     @pytest.mark.asyncio
     async def test_encode_unsupported_type(self):
         """Test encode with unsupported codec type."""
-        manager = CodecManager(codec_type="unsupported")
-
+        # CodecManager now raises ValueError at initialization for unsupported types
         with pytest.raises(ValueError, match="Unsupported codec type"):
-            await manager.encode({"key": "value"})
+            CodecManager(codec_type="unsupported")
 
     @pytest.mark.asyncio
     async def test_decode_json(self):
@@ -136,10 +135,9 @@ class TestCodecManager:
     @pytest.mark.asyncio
     async def test_decode_unsupported_type(self):
         """Test decode with unsupported codec type."""
-        manager = CodecManager(codec_type="unsupported")
-
+        # CodecManager now raises ValueError at initialization for unsupported types
         with pytest.raises(ValueError, match="Unsupported codec type"):
-            await manager.decode(b"test data")
+            CodecManager(codec_type="unsupported")
 
     @pytest.mark.asyncio
     async def test_encode_decode_roundtrip(self):

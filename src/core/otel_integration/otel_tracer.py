@@ -142,6 +142,7 @@ class OTELTracer:
         parent: Optional[Any] = None,
         attributes: Optional[Dict[str, Any]] = None,
         kind: Optional[str] = None,
+        **kwargs: Any,
     ) -> "OTELSpan":
         """
         Start a new span.
@@ -151,12 +152,17 @@ class OTELTracer:
             parent: Parent span (optional)
             attributes: Optional attributes to set on the span
             kind: Span kind ("server", "client", "internal", "producer", "consumer")
+            **kwargs: Additional attributes as keyword arguments
             
         Returns:
             OTELSpan instance
         """
+        # Merge kwargs into attributes
+        merged_attributes = dict(attributes or {})
+        merged_attributes.update(kwargs)
+        
         if not self._enabled or not self._tracer:
-            return OTELSpan(name, attributes=attributes or {})
+            return OTELSpan(name, attributes=merged_attributes)
         
         try:
             # Determine span kind
@@ -183,11 +189,11 @@ class OTELTracer:
                 span = self._tracer.start_span(name, kind=span_kind)
             
             # Set attributes
-            if attributes:
-                for key, value in attributes.items():
+            if merged_attributes:
+                for key, value in merged_attributes.items():
                     span.set_attribute(key, value)
             
-            return OTELSpan(name, span=span, attributes=attributes or {})
+            return OTELSpan(name, span=span, attributes=merged_attributes)
         except Exception as e:
             logger.error(f"Failed to start span '{name}': {e}")
             raise OTELTracingError(f"Failed to start span: {e}", span_name=name, original_error=e)
@@ -223,6 +229,7 @@ class OTELSpan:
         name: str,
         span: Optional[Any] = None,
         attributes: Optional[Dict[str, Any]] = None,
+        **kwargs: Any,
     ):
         """
         Initialize span.
@@ -231,11 +238,26 @@ class OTELSpan:
             name: Span name
             span: OpenTelemetry span object (optional)
             attributes: Span attributes dictionary
+            **kwargs: Additional attributes as keyword arguments
         """
+        # Merge kwargs into attributes
+        merged_attributes = dict(attributes or {})
+        merged_attributes.update(kwargs)
+        
         self.name = name
         self._span = span
-        self._attributes = attributes or {}
+        self._attributes = merged_attributes
         self._ended = False
+
+    @property
+    def attributes(self) -> Dict[str, Any]:
+        """
+        Get span attributes.
+        
+        Returns:
+            Dictionary of span attributes
+        """
+        return self._attributes
 
     def set_attribute(self, key: str, value: Any) -> None:
         """

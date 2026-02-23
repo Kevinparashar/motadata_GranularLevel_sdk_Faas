@@ -36,6 +36,7 @@ def mock_config():
         data_ingestion_service_url=None,
         prompt_generator_service_url=None,
         llmops_service_url=None,
+        orchestrator_service_url=None,
         dragonfly_url=None,
         nats_url=None,
         otel_exporter_otlp_endpoint=None,
@@ -113,6 +114,7 @@ def test_create_agent_endpoint(agent_service):
     mock_agent.status = AgentStatus.IDLE
     mock_agent.capabilities = []
     mock_agent.add_capability = Mock()
+    mock_agent.memory = None  # Agent service will initialize this if None
     
     with patch("src.faas.services.agent_service.service.create_agent", return_value=mock_agent):
         client = TestClient(agent_service.app)
@@ -154,6 +156,7 @@ def test_get_agent_endpoint(agent_service):
     mock_agent.description = "Test description"
     mock_agent.status = AgentStatus.IDLE
     mock_agent.capabilities = []
+    mock_agent.memory = None  # Agent service will initialize this if None
     
     # Set load_agent to return the mock agent
     agent_service.agent_storage.load_agent = AsyncMock(return_value=mock_agent)
@@ -369,12 +372,19 @@ async def test_get_agent_success(agent_service):
     mock_agent.description = "Test description"
     mock_agent.status = AgentStatus.IDLE
     mock_agent.capabilities = []
+    mock_agent.memory = None  # Agent service will initialize this if None
     
     agent_service.agent_storage.load_agent = AsyncMock(return_value=mock_agent)
     
-    with patch("src.faas.services.agent_service.service.create_gateway") as mock_create_gateway:
+    with patch("src.faas.services.agent_service.service.create_gateway") as mock_create_gateway, \
+         patch("src.core.agno_agent_framework.memory.AgentMemory") as mock_memory_class:
         mock_gateway = Mock()
         mock_create_gateway.return_value = mock_gateway
+        
+        # Mock AgentMemory initialization
+        mock_memory = Mock()
+        mock_memory.initialize = AsyncMock()
+        mock_memory_class.return_value = mock_memory
         
         headers = {
             "x_tenant_id": "tenant_123",
@@ -399,6 +409,7 @@ async def test_execute_task_endpoint(agent_service):
     mock_agent = Mock(spec=Agent)
     mock_agent.agent_id = "test_agent_123"
     mock_agent.execute_task = AsyncMock(return_value={"result": "Task completed"})
+    mock_agent.memory = None  # Agent service will initialize this if None
     
     agent_service.agent_storage.load_agent = AsyncMock(return_value=mock_agent)
     
@@ -462,6 +473,7 @@ async def test_execute_task_error_handling(agent_service):
     mock_agent = Mock(spec=Agent)
     mock_agent.agent_id = "test_agent_123"
     mock_agent.execute_task = AsyncMock(side_effect=Exception("Task execution error"))
+    mock_agent.memory = None  # Agent service will initialize this if None
     
     agent_service.agent_storage.load_agent = AsyncMock(return_value=mock_agent)
     
@@ -495,6 +507,7 @@ async def test_chat_endpoint(agent_service):
     # Mock agent
     mock_agent = Mock(spec=Agent)
     mock_agent.agent_id = "test_agent_123"
+    mock_agent.memory = None  # Agent service will initialize this if None
     
     agent_service.agent_storage.load_agent = AsyncMock(return_value=mock_agent)
     
@@ -560,13 +573,20 @@ async def test_chat_error_handling(agent_service):
     # Mock agent
     mock_agent = Mock(spec=Agent)
     mock_agent.agent_id = "test_agent_123"
+    mock_agent.memory = None  # Agent service will initialize this if None
     
     agent_service.agent_storage.load_agent = AsyncMock(return_value=mock_agent)
     
     with patch("src.faas.services.agent_service.service.chat_with_agent", side_effect=Exception("Chat error")), \
-         patch("src.faas.services.agent_service.service.create_gateway") as mock_create_gateway:
+         patch("src.faas.services.agent_service.service.create_gateway") as mock_create_gateway, \
+         patch("src.core.agno_agent_framework.memory.AgentMemory") as mock_memory_class:
         mock_gateway = Mock()
         mock_create_gateway.return_value = mock_gateway
+        
+        # Mock AgentMemory initialization
+        mock_memory = Mock()
+        mock_memory.initialize = AsyncMock()
+        mock_memory_class.return_value = mock_memory
         
         request = ChatRequest(message="Hello", session_id=None)
         headers = {

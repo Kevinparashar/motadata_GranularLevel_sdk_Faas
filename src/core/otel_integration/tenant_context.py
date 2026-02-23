@@ -142,6 +142,7 @@ def set_tenant_context_in_baggage(
     if not _OTEL_AVAILABLE or not baggage:
         return ctx
     
+    original_ctx = ctx
     try:
         if ctx is None:
             ctx = context.get_current()
@@ -156,7 +157,8 @@ def set_tenant_context_in_baggage(
         return ctx
     except Exception as e:
         logger.debug(f"Failed to set tenant context in baggage: {e}")
-        return ctx
+        # Return the original ctx if provided, otherwise None
+        return original_ctx
 
 
 def get_tenant_attributes_for_metrics(

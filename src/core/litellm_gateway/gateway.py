@@ -1178,6 +1178,23 @@ class LiteLLMGateway:
                             **kwargs,
                         )
 
+                        # Log operation to LLMOps
+                        if self.llmops:
+                            latency_ms = (time.time() - start_time) * 1000
+                            prompt_tokens = usage.get("prompt_tokens", 0) if usage else 0
+                            completion_tokens = usage.get("completion_tokens", 0) if usage else 0
+                            await self.llmops.log_operation(
+                                operation_type=LLMOperationType.COMPLETION,
+                                model=model_name,
+                                prompt_tokens=prompt_tokens,
+                                completion_tokens=completion_tokens,
+                                latency_ms=latency_ms,
+                                status=LLMOperationStatus.SUCCESS,
+                                error_message=None,
+                                tenant_id=tenant_id,
+                                metadata={"stream": stream},
+                            )
+
                         return generate_response
 
                     except Exception as e:

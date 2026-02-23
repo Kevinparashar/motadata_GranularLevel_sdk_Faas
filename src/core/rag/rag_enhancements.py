@@ -9,15 +9,20 @@ Advanced features: re-ranking, versioning, relevance scoring, incremental update
 """
 
 
+from __future__ import annotations
+
 import asyncio
 import hashlib
-import json
 from dataclasses import dataclass, field
 from datetime import datetime
-from typing import Any, Callable, Dict, List, Optional, Tuple
+from typing import TYPE_CHECKING, Any, Callable, Dict, List, Optional, Tuple
 
 # SQL constants
 TENANT_FILTER_SQL = " AND tenant_id = %s"
+
+if TYPE_CHECKING:
+    from ...faas.shared.dal.document_dal import DocumentDAL  # type: ignore[import-untyped]
+    from ...faas.shared.dal.document_version_dal import DocumentVersionDAL  # type: ignore[import-untyped]
 
 
 
@@ -146,43 +151,32 @@ class DocumentVersioning:
     Document versioning for better management and retrieval.
     """
 
-    def __init__(self, db):
+    def __init__(self, db: Any, document_version_dal: Optional[Any] = None):
         """
         Initialize document versioning.
         
         Args:
-            db (Any): Database connection/handle.
+            db: Database connection/handle.
+            document_version_dal: Optional DocumentVersionDAL instance for database persistence.
         """
         self.db = db
-        # Note: _ensure_version_table() is async, call initialize() after instantiation
+        # Initialize DocumentVersionDAL if not provided
+        if document_version_dal is None:
+            from ...faas.shared.dal.document_version_dal import DocumentVersionDAL
+            self.document_version_dal = DocumentVersionDAL(db)
+        else:
+            self.document_version_dal = document_version_dal
+        # Tables are assumed to exist (managed by migrations/DAL)
 
     async def initialize(self) -> None:
-        """Initialize the versioning system (async setup)."""
-        await self._ensure_version_table()
-
-    async def _ensure_version_table(self) -> None:
         """
-        Ensure document_versions table exists.
+        Initialize the versioning system (async setup).
         
-        Returns:
-            None: Result of the operation.
+        This method is kept for backward compatibility but no longer creates tables.
+        Tables are assumed to exist (managed by migrations/DAL).
         """
-        query = """
-        CREATE TABLE IF NOT EXISTS document_versions (
-            id SERIAL PRIMARY KEY,
-            document_id VARCHAR(255) NOT NULL,
-            version INTEGER NOT NULL,
-            content_hash VARCHAR(64) NOT NULL,
-            content TEXT,
-            metadata JSONB,
-            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-            tenant_id VARCHAR(255),
-            UNIQUE(document_id, version)
-        );
-        CREATE INDEX IF NOT EXISTS idx_doc_versions_doc_id ON document_versions(document_id);
-        CREATE INDEX IF NOT EXISTS idx_doc_versions_tenant ON document_versions(tenant_id);
-        """
-        await self.db.execute_query(query)
+        # Tables are assumed to exist (managed by migrations/DAL)
+        pass
 
     async def create_version(
         self,
@@ -203,37 +197,20 @@ class DocumentVersioning:
         Returns:
             DocumentVersion: Result of the operation.
         """
-        # Calculate content hash
-        content_hash = hashlib.sha256(content.encode()).hexdigest()
-
-        # Get current max version
-        query = """
-        SELECT MAX(version) as max_version
-        FROM document_versions
-        WHERE document_id = %s
-        """
-        result = await self.db.execute_query(query, (document_id,), fetch_one=True)
-        next_version = (result.get("max_version") or 0) + 1
-
-        # Insert new version
-        insert_query = """
-        INSERT INTO document_versions (document_id, version, content_hash, content, metadata, tenant_id)
-        VALUES (%s, %s, %s, %s, %s::jsonb, %s)
-        RETURNING id, created_at
-        """
-        metadata_json = json.dumps(metadata or {})
-        result = await self.db.execute_query(
-            insert_query,
-            (document_id, next_version, content_hash, content, metadata_json, tenant_id),
-            fetch_one=True,
+        # Use DAL to create version
+        version_data = await self.document_version_dal.create_version(
+            document_id=document_id,
+            content=content,
+            tenant_id=tenant_id,
+            metadata=metadata,
         )
 
         return DocumentVersion(
-            version=next_version,
-            document_id=document_id,
-            content_hash=content_hash,
-            created_at=result["created_at"],
-            metadata=metadata or {},
+            version=version_data["version"],
+            document_id=version_data["document_id"],
+            content_hash=version_data["content_hash"],
+            created_at=version_data["created_at"],
+            metadata=version_data["metadata"],
         )
 
     async def get_versions(
@@ -249,20 +226,8 @@ class DocumentVersioning:
         Returns:
             List[DocumentVersion]: List result of the operation.
         """
-        query = """
-        SELECT version, content_hash, created_at, metadata
-        FROM document_versions
-        WHERE document_id = %s
-        """
-        params = [document_id]
-
-        if tenant_id:
-            query += TENANT_FILTER_SQL
-            params.append(tenant_id)
-
-        query += " ORDER BY version DESC"
-
-        results = await self.db.execute_query(query, tuple(params), fetch_all=True)
+        # Use DAL to get versions
+        results = await self.document_version_dal.get_versions(document_id, tenant_id)
 
         return [
             DocumentVersion(
@@ -333,16 +298,23 @@ class IncrementalUpdater:
     Incremental updates to avoid full re-embedding when documents are updated.
     """
 
-    def __init__(self, db, vector_ops):
+    def __init__(self, db: Any, vector_ops: Any, document_dal: Optional[Any] = None):
         """
         Initialize incremental updater.
         
         Args:
-            db (Any): Database connection/handle.
-            vector_ops (Any): Input parameter for this operation.
+            db: Database connection/handle.
+            vector_ops: Vector operations instance.
+            document_dal: Optional DocumentDAL instance for database persistence.
         """
         self.db = db
         self.vector_ops = vector_ops
+        # Initialize DocumentDAL if not provided
+        if document_dal is None:
+            from ...faas.shared.dal.document_dal import DocumentDAL 
+            self.document_dal = DocumentDAL(db)
+        else:
+            self.document_dal = document_dal
 
     async def should_reembed(
         self, document_id: str, new_content: str, tenant_id: Optional[str] = None
@@ -358,24 +330,15 @@ class IncrementalUpdater:
         Returns:
             bool: True if the operation succeeds, else False.
         """
-        # Get current content hash
-        query = """
-        SELECT content_hash
-        FROM documents
-        WHERE id = %s
-        """
-        params = [document_id]
+        # Get current document using DAL
+        doc = await self.document_dal.load_document(document_id, tenant_id)
 
-        if tenant_id:
-            query += TENANT_FILTER_SQL
-            params.append(tenant_id)
-
-        result = await self.db.execute_query(query, tuple(params), fetch_one=True)
-
-        if not result:
+        if not doc:
             return True  # Document not found, needs embedding
 
-        old_hash = result.get("content_hash")
+        # Calculate hash from current content
+        old_content = doc.get("content", "")
+        old_hash = hashlib.sha256(old_content.encode()).hexdigest() if old_content else None
         new_hash = hashlib.sha256(new_content.encode()).hexdigest()
 
         return old_hash != new_hash
@@ -401,18 +364,12 @@ class IncrementalUpdater:
         """
         if not await self.should_reembed(document_id, new_content, tenant_id):
             # Only update metadata/content, no re-embedding needed
-            query = """
-            UPDATE documents
-            SET content = %s, updated_at = CURRENT_TIMESTAMP
-            WHERE id = %s
-            """
-            params = [new_content, document_id]
-
-            if tenant_id:
-                query += TENANT_FILTER_SQL
-                params.append(tenant_id)
-
-            await self.db.execute_query(query, tuple(params))
+            # Use DAL to update document
+            await self.document_dal.update_document(
+                document_id=document_id,
+                content=new_content,
+                tenant_id=tenant_id,
+            )
             return False  # No re-embedding performed
 
         # Full re-embedding needed
@@ -483,17 +440,24 @@ class RealTimeSync:
     Real-time document synchronization for up-to-date information.
     """
 
-    def __init__(self, db, rag_system):
+    def __init__(self, db, rag_system, document_dal: Optional[Any] = None):
         """
         Initialize real-time sync.
         
         Args:
             db (Any): Database connection/handle.
             rag_system (Any): Input parameter for this operation.
+            document_dal: Optional DocumentDAL instance for database persistence.
         """
         self.db = db
         self.rag_system = rag_system
         self.sync_callbacks: List[Callable] = []
+        # Initialize DocumentDAL if not provided
+        if document_dal is None:
+            from ...faas.shared.dal.document_dal import DocumentDAL 
+            self.document_dal = DocumentDAL(db)
+        else:
+            self.document_dal = document_dal
 
     def add_sync_callback(self, callback: Callable) -> None:
         """
@@ -518,19 +482,8 @@ class RealTimeSync:
         Returns:
             bool: True if the operation succeeds, else False.
         """
-        # Get document
-        query = """
-        SELECT title, content, source, metadata
-        FROM documents
-        WHERE id = %s
-        """
-        params = [document_id]
-
-        if tenant_id:
-            query += TENANT_FILTER_SQL
-            params.append(tenant_id)
-
-        result = await self.db.execute_query(query, tuple(params), fetch_one=True)
+        # Get document using DAL
+        result = await self.document_dal.load_document(document_id, tenant_id)
 
         if not result:
             return False

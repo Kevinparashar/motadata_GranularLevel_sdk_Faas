@@ -17,6 +17,7 @@ from ...integrations.codec import create_codec_manager
 from ...integrations.nats import create_nats_client
 from ...integrations.otel import create_otel_tracer
 from ...shared.agent_storage import AgentStorage
+from ...shared.dal import MemoryDAL, SessionDAL
 from ...shared.config import ServiceConfig, load_config
 from ...shared.contracts import ServiceResponse, extract_headers
 from ...shared.exceptions import NotFoundError
@@ -75,6 +76,10 @@ class AgentService:
 
         # Initialize agent storage (database-backed, stateless)
         self.agent_storage = AgentStorage(self.db)
+        
+        # Initialize DAL for session and memory persistence
+        self.session_dal = SessionDAL(self.db)
+        self.memory_dal = MemoryDAL(self.db)
 
         # Initialize service client manager for service-to-service calls
         self.service_clients = ServiceClientManager(self.config)
@@ -155,6 +160,17 @@ class AgentService:
             for capability in request.capabilities:
                 agent.add_capability(capability, f"Capability: {capability}")
 
+            # Initialize memory with DAL if memory_config is provided
+            if request.memory_config:
+                from ....core.agno_agent_framework.memory import AgentMemory
+                agent.memory = AgentMemory(
+                    agent_id=agent_id,
+                    memory_dal=self.memory_dal,
+                    tenant_id=standard_headers.tenant_id,
+                    **request.memory_config,
+                )
+                await agent.memory.initialize()
+
             # Store agent in database (stateless)
             await self.agent_storage.save_agent(agent, standard_headers.tenant_id)
 
@@ -212,6 +228,16 @@ class AgentService:
         agent = await self.agent_storage.load_agent(agent_id, standard_headers.tenant_id, gateway)
         if not agent:
             raise NotFoundError("agent", agent_id)
+        
+        # Initialize memory with DAL if agent should have memory
+        if not agent.memory:
+            from ....core.agno_agent_framework.memory import AgentMemory
+            agent.memory = AgentMemory(
+                agent_id=agent_id,
+                memory_dal=self.memory_dal,
+                tenant_id=standard_headers.tenant_id,
+            )
+            await agent.memory.initialize()
 
         return ServiceResponse(
             success=True,
@@ -251,6 +277,16 @@ class AgentService:
         agent = await self.agent_storage.load_agent(agent_id, standard_headers.tenant_id, gateway)
         if not agent:
             raise NotFoundError("agent", agent_id)
+        
+        # Initialize memory with DAL if agent should have memory
+        if not agent.memory:
+            from ....core.agno_agent_framework.memory import AgentMemory
+            agent.memory = AgentMemory(
+                agent_id=agent_id,
+                memory_dal=self.memory_dal,
+                tenant_id=standard_headers.tenant_id,
+            )
+            await agent.memory.initialize()
 
         try:
             # Create task
@@ -304,14 +340,25 @@ class AgentService:
         agent = await self.agent_storage.load_agent(agent_id, standard_headers.tenant_id, gateway)
         if not agent:
             raise NotFoundError("agent", agent_id)
+        
+        # Initialize memory with DAL if agent should have memory
+        if not agent.memory:
+            from ....core.agno_agent_framework.memory import AgentMemory
+            agent.memory = AgentMemory(
+                agent_id=agent_id,
+                memory_dal=self.memory_dal,
+                tenant_id=standard_headers.tenant_id,
+            )
+            await agent.memory.initialize()
 
         try:
-            # Chat with agent using chat_with_agent function
+            # Chat with agent using chat_with_agent function (with DAL for persistence)
             response = await chat_with_agent(
                 agent=agent,
                 message=request.message,
                 session_id=request.session_id,
                 tenant_id=standard_headers.tenant_id,
+                session_dal=self.session_dal,
             )
 
             return ServiceResponse(

@@ -4,16 +4,21 @@ Agent Memory Management
 Async-first memory management for production deployments.
 """
 
+from __future__ import annotations
+
 import asyncio
 import json
 from datetime import datetime, timedelta
 from enum import Enum
 from pathlib import Path
-from typing import Any, Dict, List, Optional
+from typing import TYPE_CHECKING, Any, Dict, List, Optional
 
 from pydantic import BaseModel, Field
 
 from .exceptions import MemoryPersistenceError, MemoryWriteError
+
+if TYPE_CHECKING:
+    from ...faas.shared.dal.memory_dal import MemoryDAL
 
 try:
     import aiofiles
@@ -59,8 +64,23 @@ class AgentMemory:
         max_semantic: int = 2000,
         max_age_days: Optional[int] = 30,
         persistence_path: Optional[str] = None,
+        memory_dal: Optional[MemoryDAL] = None,
+        tenant_id: Optional[str] = None,
     ):
-        """Initialize agent memory."""
+        """
+        Initialize agent memory.
+        
+        Args:
+            agent_id: Agent identifier.
+            max_short_term: Maximum short-term memories.
+            max_long_term: Maximum long-term memories.
+            max_episodic: Maximum episodic memories.
+            max_semantic: Maximum semantic memories.
+            max_age_days: Maximum age in days for memories.
+            persistence_path: Optional file path for file-based persistence.
+            memory_dal: Optional MemoryDAL instance for database persistence.
+            tenant_id: Optional tenant ID for multi-tenant isolation (required if using DAL).
+        """
         self.agent_id = agent_id
         self.max_short_term = max_short_term
         self.max_long_term = max_long_term
@@ -68,6 +88,8 @@ class AgentMemory:
         self.max_semantic = max_semantic
         self.max_age_days = max_age_days
         self._persistence_path = Path(persistence_path) if persistence_path else None
+        self._memory_dal = memory_dal
+        self._tenant_id = tenant_id
         self._lock = asyncio.Lock()
 
         self._short_term: List[MemoryItem] = []
@@ -77,6 +99,30 @@ class AgentMemory:
 
     async def initialize(self) -> None:
         """Initialize async resources and load persisted memory."""
+        # Load from database if DAL is available
+        if self._memory_dal and self._tenant_id:
+            try:
+                memories = await self._memory_dal.load_memories(self.agent_id, self._tenant_id)
+                # Organize memories by type
+                for memory in memories:
+                    if memory.memory_type == MemoryType.SHORT_TERM:
+                        self._short_term.append(memory)
+                    elif memory.memory_type == MemoryType.LONG_TERM:
+                        self._long_term[memory.memory_id] = memory
+                    elif memory.memory_type == MemoryType.EPISODIC:
+                        self._episodic.append(memory)
+                    elif memory.memory_type == MemoryType.SEMANTIC:
+                        self._semantic[memory.memory_id] = memory
+            except Exception as e:
+                import logging
+                logger = logging.getLogger(__name__)
+                logger.warning(
+                    f"Failed to load memory from database: {e}. "
+                    "Continuing with empty memory.",
+                    exc_info=True
+                )
+        
+        # Also try file-based persistence (for backward compatibility)
         if self._persistence_path and self._persistence_path.exists():
             try:
                 await self._load()
@@ -85,7 +131,7 @@ class AgentMemory:
                 logger = logging.getLogger(__name__)
                 logger.warning(
                     f"Failed to load memory from {self._persistence_path}: {e}. "
-                    "Continuing with empty memory.",
+                    "Continuing with existing memory.",
                     exc_info=True
                 )
 
@@ -151,6 +197,16 @@ class AgentMemory:
             elif memory_type == MemoryType.SEMANTIC:
                 self._trim_semantic(memory)
 
+        # Save to database if DAL is available
+        if self._memory_dal and self._tenant_id:
+            try:
+                await self._memory_dal.save_memory(memory, self._tenant_id)
+            except Exception as e:
+                import logging
+                logger = logging.getLogger(__name__)
+                logger.warning(f"Failed to save memory to database: {e}", exc_info=True)
+        
+        # Also persist to file (for backward compatibility)
         try:
             await self._persist()
         except Exception as e:
@@ -203,28 +259,42 @@ class AgentMemory:
 
     async def forget(self, memory_id: str) -> bool:
         """Forget memory item asynchronously."""
+        found = False
         async with self._lock:
             for i, memory in enumerate(self._short_term):
                 if memory.memory_id == memory_id:
                     self._short_term.pop(i)
-                    await self._persist()
-                    return True
+                    found = True
+                    break
 
-            if memory_id in self._long_term:
+            if not found and memory_id in self._long_term:
                 self._long_term.pop(memory_id)
-                await self._persist()
-                return True
+                found = True
 
-            for i, memory in enumerate(self._episodic):
-                if memory.memory_id == memory_id:
-                    self._episodic.pop(i)
-                    await self._persist()
-                    return True
+            if not found:
+                for i, memory in enumerate(self._episodic):
+                    if memory.memory_id == memory_id:
+                        self._episodic.pop(i)
+                        found = True
+                        break
 
-            if memory_id in self._semantic:
+            if not found and memory_id in self._semantic:
                 self._semantic.pop(memory_id)
-                await self._persist()
-                return True
+                found = True
+
+        if found:
+            # Delete from database if DAL is available
+            if self._memory_dal and self._tenant_id:
+                try:
+                    await self._memory_dal.delete_memory(memory_id, self.agent_id, self._tenant_id)
+                except Exception as e:
+                    import logging
+                    logger = logging.getLogger(__name__)
+                    logger.warning(f"Failed to delete memory from database: {e}", exc_info=True)
+            
+            # Also persist to file (for backward compatibility)
+            await self._persist()
+            return True
 
         return False
 
@@ -369,7 +439,25 @@ class AgentMemory:
         }
 
     async def _persist(self) -> None:
-        """Persist memory to disk asynchronously."""
+        """Persist memory to disk asynchronously (file-based persistence)."""
+        # Save all memories to database if DAL is available
+        if self._memory_dal and self._tenant_id:
+            try:
+                # Save all current memories
+                all_memories = (
+                    list(self._short_term)
+                    + list(self._long_term.values())
+                    + list(self._episodic)
+                    + list(self._semantic.values())
+                )
+                for memory in all_memories:
+                    await self._memory_dal.save_memory(memory, self._tenant_id)
+            except Exception as e:
+                import logging
+                logger = logging.getLogger(__name__)
+                logger.warning(f"Failed to persist memory to database: {e}", exc_info=True)
+        
+        # Also persist to file (for backward compatibility)
         if not self._persistence_path:
             return
         

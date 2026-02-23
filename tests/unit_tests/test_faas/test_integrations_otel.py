@@ -21,7 +21,7 @@ class TestFaaSOTELIntegration:
 
     def test_create_otel_tracer_with_config(self):
         """Test creating tracer with FaaS config."""
-        with patch("src.faas.integrations.otel.get_config") as mock_get_config, \
+        with patch("src.faas.shared.config.get_config") as mock_get_config, \
              patch("src.faas.integrations.otel._create_otel_tracer") as mock_create:
             mock_config = MagicMock()
             mock_config.enable_otel = True
@@ -45,7 +45,7 @@ class TestFaaSOTELIntegration:
 
     def test_create_otel_tracer_disabled(self):
         """Test creating tracer when OTEL is disabled in config."""
-        with patch("src.faas.integrations.otel.get_config") as mock_get_config:
+        with patch("src.faas.shared.config.get_config") as mock_get_config:
             mock_config = MagicMock()
             mock_config.enable_otel = False
             mock_get_config.return_value = mock_config
@@ -56,7 +56,7 @@ class TestFaaSOTELIntegration:
 
     def test_create_otel_tracer_with_parameters(self):
         """Test creating tracer with explicit parameters."""
-        with patch("src.faas.integrations.otel.get_config") as mock_get_config, \
+        with patch("src.faas.shared.config.get_config") as mock_get_config, \
              patch("src.faas.integrations.otel._create_otel_tracer") as mock_create:
             mock_config = MagicMock()
             mock_config.enable_otel = True
@@ -81,7 +81,7 @@ class TestFaaSOTELIntegration:
 
     def test_create_otel_tracer_config_not_loaded(self):
         """Test creating tracer when config is not loaded."""
-        with patch("src.faas.integrations.otel.get_config") as mock_get_config, \
+        with patch("src.faas.shared.config.get_config") as mock_get_config, \
              patch("src.faas.integrations.otel._create_otel_tracer") as mock_create:
             mock_get_config.side_effect = RuntimeError("Config not loaded")
             mock_tracer = MagicMock()
@@ -99,31 +99,29 @@ class TestFaaSOTELIntegration:
 
     def test_create_otel_tracer_default_service_name(self):
         """Test creating tracer with default service name when config not loaded."""
-        with patch("src.faas.integrations.otel.get_config") as mock_get_config, \
+        with patch("src.faas.shared.config.get_config") as mock_get_config, \
              patch("src.faas.integrations.otel._create_otel_tracer") as mock_create:
             mock_get_config.side_effect = RuntimeError("Config not loaded")
             mock_tracer = MagicMock()
             mock_create.return_value = mock_tracer
             
+            # When no config and no params, should return None
             result = create_otel_tracer()
             
-            assert result == mock_tracer
-            mock_create.assert_called_once_with(
-                service_name="faas-service",
-                otlp_endpoint=None,
-                environment=None,
-                service_version=None,
-            )
+            assert result is None
+            # Should not call _create_otel_tracer when no params provided
+            mock_create.assert_not_called()
 
     def test_create_otel_tracer_partial_config(self):
         """Test creating tracer with partial config values."""
-        with patch("src.faas.integrations.otel.get_config") as mock_get_config, \
+        with patch("src.faas.shared.config.get_config") as mock_get_config, \
              patch("src.faas.integrations.otel._create_otel_tracer") as mock_create:
-            mock_config = MagicMock()
+            # Create a mock that doesn't auto-create environment/service_version
+            mock_config = MagicMock(spec=['enable_otel', 'service_name', 'otel_exporter_otlp_endpoint'])
             mock_config.enable_otel = True
             mock_config.service_name = "test-service"
             mock_config.otel_exporter_otlp_endpoint = None
-            # environment and service_version not set
+            # environment and service_version not in spec - getattr will use defaults
             mock_get_config.return_value = mock_config
             mock_tracer = MagicMock()
             mock_create.return_value = mock_tracer
@@ -131,10 +129,11 @@ class TestFaaSOTELIntegration:
             result = create_otel_tracer()
             
             assert result == mock_tracer
-            mock_create.assert_called_once_with(
-                service_name="test-service",
-                otlp_endpoint=None,
-                environment="development",  # Default
-                service_version=None,
-            )
+            # Verify call - environment should default to "development", service_version to None
+            mock_create.assert_called_once()
+            call_kwargs = mock_create.call_args[1]
+            assert call_kwargs['service_name'] == "test-service"
+            assert call_kwargs['otlp_endpoint'] is None
+            assert call_kwargs['environment'] == "development"
+            assert call_kwargs['service_version'] is None
 

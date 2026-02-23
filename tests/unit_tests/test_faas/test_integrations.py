@@ -46,16 +46,16 @@ class TestCodecManager:
     @pytest.mark.asyncio
     async def test_encode_unsupported_codec(self):
         """Test encode with unsupported codec type."""
-        codec = CodecManager(codec_type="unsupported")
+        # CodecManager now raises ValueError at initialization for unsupported types
         with pytest.raises(ValueError, match="Unsupported codec type"):
-            await codec.encode({"key": "value"})
+            CodecManager(codec_type="unsupported")
 
     @pytest.mark.asyncio
     async def test_decode_unsupported_codec(self):
         """Test decode with unsupported codec type."""
-        codec = CodecManager(codec_type="unsupported")
+        # CodecManager now raises ValueError at initialization for unsupported types
         with pytest.raises(ValueError, match="Unsupported codec type"):
-            await codec.decode(b'{"key": "value"}')
+            CodecManager(codec_type="unsupported")
 
     def test_create_codec_manager_default(self):
         """Test create_codec_manager with default."""

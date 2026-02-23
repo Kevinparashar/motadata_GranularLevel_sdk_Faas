@@ -197,8 +197,10 @@ class TestSetTenantContextInBaggage:
     def test_set_tenant_context_exception_handling(self):
         """Test exception handling in set_tenant_context_in_baggage."""
         with patch("src.core.otel_integration.tenant_context._OTEL_AVAILABLE", True):
-            with patch("src.core.otel_integration.tenant_context.context") as mock_context:
+            with patch("src.core.otel_integration.tenant_context.baggage") as mock_baggage, \
+                 patch("src.core.otel_integration.tenant_context.context") as mock_context:
                 mock_context.get_current.side_effect = Exception("OTEL error")
+                mock_baggage.set_baggage.side_effect = Exception("Baggage error")
                 mock_ctx = MagicMock()
                 
                 result = set_tenant_context_in_baggage("abc-123", ctx=mock_ctx)

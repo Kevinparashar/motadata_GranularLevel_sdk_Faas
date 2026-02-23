@@ -337,12 +337,15 @@ class TestCacheMonitor:
         assert monitor.metrics["misses"] == 0
         assert monitor.metrics["total_requests"] == 0
 
-    @patch("psutil.Process")
-    def test_get_memory_usage(self, mock_process, monitor):
+    @patch("src.core.cache_mechanism.cache_enhancements.psutil")
+    def test_get_memory_usage(self, mock_psutil, monitor):
         """Test get_memory_usage method."""
+        # Mock psutil module
         mock_memory = Mock()
         mock_memory.rss = 1024 * 1024 * 100  # 100 MB
-        mock_process.return_value.memory_info.return_value = mock_memory
+        mock_process = Mock()
+        mock_process.memory_info.return_value = mock_memory
+        mock_psutil.Process.return_value = mock_process
 
         metrics = monitor.get_memory_usage()
 
@@ -351,16 +354,19 @@ class TestCacheMonitor:
         assert "cache_memory_bytes" in metrics
         assert "last_check" in metrics
 
-    @patch("psutil.Process")
-    def test_get_memory_usage_dragonfly_backend(self, mock_process):
+    @patch("src.core.cache_mechanism.cache_enhancements.psutil")
+    def test_get_memory_usage_dragonfly_backend(self, mock_psutil):
         """Test get_memory_usage with dragonfly backend."""
         cache = Mock(spec=CacheMechanism)
         cache.backend = "dragonfly"
         monitor = CacheMonitor(cache)
 
+        # Mock psutil module
         mock_memory = Mock()
         mock_memory.rss = 1024 * 1024 * 100
-        mock_process.return_value.memory_info.return_value = mock_memory
+        mock_process = Mock()
+        mock_process.memory_info.return_value = mock_memory
+        mock_psutil.Process.return_value = mock_process
 
         metrics = monitor.get_memory_usage()
 

@@ -311,6 +311,7 @@ async def chat_with_agent(
     tenant_id: Optional[str] = None,
     session_id: Optional[str] = None,
     context: Optional[Dict[str, Any]] = None,
+    session_dal: Optional[Any] = None,
 ) -> Dict[str, Any]:
     """
     Chat with an agent using session management (high-level convenience).
@@ -318,8 +319,10 @@ async def chat_with_agent(
     Args:
         agent: Agent instance
         message: User message
+        tenant_id: Optional tenant ID for multi-tenant isolation
         session_id: Optional session ID (creates new if not provided)
         context: Optional context variables
+        session_dal: Optional SessionDAL instance for database persistence
 
     Returns:
         Dictionary with response and session info
@@ -337,13 +340,16 @@ async def chat_with_agent(
     if not hasattr(chat_with_agent, "_session_managers"):
         chat_with_agent._session_managers = {}
 
-    if agent.agent_id not in chat_with_agent._session_managers:
-        chat_with_agent._session_managers[agent.agent_id] = SessionManager()
+    manager_key = f"{agent.agent_id}_{tenant_id or 'default'}"
+    if manager_key not in chat_with_agent._session_managers:
+        chat_with_agent._session_managers[manager_key] = SessionManager(
+            session_dal=session_dal, tenant_id=tenant_id
+        )
 
-    session_manager = chat_with_agent._session_managers[agent.agent_id]
+    session_manager = chat_with_agent._session_managers[manager_key]
 
     if session_id:
-        session = session_manager.get_session(session_id)
+        session = await session_manager.get_session(session_id)
         if not session:
             session = session_manager.create_session(agent.agent_id)
     else:
@@ -370,6 +376,10 @@ async def chat_with_agent(
 
     # Add assistant response to session
     session.add_message("assistant", answer)
+    
+    # Save session if DAL is available
+    if session_dal and tenant_id:
+        await session_manager.save_session(session)
 
     return {"answer": answer, "session_id": session.session_id, "result": result}
 

@@ -161,6 +161,7 @@ class CacheManager:
                 await self.cache.invalidate_pattern(cache_key_pattern, tenant_id=tenant_id)
             elif tenant_id:
                 # Invalidate all for tenant
+                # Pattern should match keys like: orchestrator:*:tenant:{tenant_id}:*
                 cache_key_pattern = f"orchestrator:*:tenant:{tenant_id}:*"
                 await self.cache.invalidate_pattern(cache_key_pattern, tenant_id=tenant_id)
             else:

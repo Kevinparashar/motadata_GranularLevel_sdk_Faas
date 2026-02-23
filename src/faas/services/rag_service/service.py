@@ -18,6 +18,7 @@ from ...integrations.nats import create_nats_client
 from ...integrations.otel import create_otel_tracer
 from ...shared.config import ServiceConfig, load_config
 from ...shared.contracts import ServiceResponse, extract_headers
+from ...shared.dal import MemoryDAL
 from ...shared.database import get_database_connection
 from ...shared.middleware import setup_middleware
 from .models import (
@@ -65,6 +66,9 @@ class RAGService:
         self.otel_tracer = otel_tracer
         self.codec_manager = codec_manager or create_codec_manager()
 
+        # Initialize DAL for memory persistence
+        self.memory_dal = MemoryDAL(self.db)
+
         # RAG systems are created on-demand per request (stateless)
         # No in-memory caching to ensure statelessness
 
@@ -102,12 +106,16 @@ class RAGService:
         # Get gateway client
         gateway = self._get_gateway_client(tenant_id)
 
-        # Create RAG system
+        # Create RAG system with memory persistence
         rag_system = create_rag_system(
             db=self.db,
             gateway=gateway,
             embedding_model="text-embedding-3-small",
             generation_model="gpt-4",
+            enable_memory=True,
+            memory_config={},
+            memory_dal=self.memory_dal,
+            tenant_id=tenant_id,
         )
 
         return rag_system

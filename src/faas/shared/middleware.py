@@ -82,6 +82,11 @@ class AuthMiddleware(BaseHTTPMiddleware):
         Returns:
             Response: Result of the operation.
         """
+        # Skip auth for health check endpoints
+        if request.url.path in ["/health", "/healthz", "/ready", "/live"]:
+            response = await call_next(request)
+            return response
+        
         # Extract tenant_id from header (set by API Gateway)
         tenant_id = request.headers.get("X-Tenant-ID")
 

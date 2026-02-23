@@ -7,9 +7,13 @@ Tools that agents can use to extend their capabilities.
 
 import inspect
 from enum import Enum
-from typing import Any, Callable, Dict, List, Optional
+from typing import TYPE_CHECKING, Any, Callable, Dict, List, Optional
 
 from pydantic import BaseModel, Field
+
+if TYPE_CHECKING:
+    from ...faas.shared.dal.tool_dal import ToolDAL  # type: ignore[import-untyped]
+    from ...faas.shared.dal.tool_execution_dal import ToolExecutionDAL  # type: ignore[import-untyped]
 
 from .exceptions import (
     ToolInvocationError,
@@ -166,11 +170,22 @@ class Tool(BaseModel):
 
 
 class ToolRegistry:
-    """Registry for managing agent tools."""
+    """Registry for managing agent tools.
+    
+    Supports both in-memory storage (default) and database persistence via ToolDAL.
+    """
 
-    def __init__(self):
-        """Initialize tool registry."""
+    def __init__(self, tool_dal: Optional["ToolDAL"] = None, tenant_id: Optional[str] = None):
+        """
+        Initialize tool registry.
+        
+        Args:
+            tool_dal: Optional ToolDAL instance for database persistence.
+            tenant_id: Optional tenant ID for multi-tenant isolation.
+        """
         self._tools: Dict[str, Tool] = {}
+        self._tool_dal = tool_dal
+        self._tenant_id = tenant_id
 
     def _detect_param_type(self, param: inspect.Parameter) -> str:
         """
@@ -246,6 +261,53 @@ class ToolRegistry:
             tool.parameters = self._auto_detect_parameters(tool.function)
 
         self._tools[tool.tool_id] = tool
+        
+        # Persist to database if DAL is available
+        if self._tool_dal and self._tenant_id:
+            import asyncio
+            try:
+                loop = asyncio.get_event_loop()
+                if loop.is_running():
+                    # If loop is running, create task
+                    asyncio.create_task(
+                        self._tool_dal.save_tool(
+                            tool_id=tool.tool_id,
+                            name=tool.name,
+                            description=tool.description,
+                            tool_type=tool.tool_type.value if hasattr(tool.tool_type, "value") else str(tool.tool_type),
+                            parameters=[p.model_dump() if hasattr(p, "model_dump") else p.dict() if hasattr(p, "dict") else vars(p) for p in tool.parameters] if tool.parameters else [],
+                            tenant_id=self._tenant_id,
+                            metadata=tool.metadata,
+                            tags=tool.tags,
+                        )
+                    )
+                else:
+                    loop.run_until_complete(
+                        self._tool_dal.save_tool(
+                            tool_id=tool.tool_id,
+                            name=tool.name,
+                            description=tool.description,
+                            tool_type=tool.tool_type.value if hasattr(tool.tool_type, "value") else str(tool.tool_type),
+                            parameters=[p.model_dump() if hasattr(p, "model_dump") else p.dict() if hasattr(p, "dict") else vars(p) for p in tool.parameters] if tool.parameters else [],
+                            tenant_id=self._tenant_id,
+                            metadata=tool.metadata,
+                            tags=tool.tags,
+                        )
+                    )
+            except RuntimeError:
+                # No event loop, create new one
+                asyncio.run(
+                    self._tool_dal.save_tool(
+                        tool_id=tool.tool_id,
+                        name=tool.name,
+                        description=tool.description,
+                        tool_type=tool.tool_type.value if hasattr(tool.tool_type, "value") else str(tool.tool_type),
+                        parameters=[p.model_dump() if hasattr(p, "model_dump") else p.dict() if hasattr(p, "dict") else vars(p) for p in tool.parameters] if tool.parameters else [],
+                        tenant_id=self._tenant_id,
+                        metadata=tool.metadata,
+                        tags=tool.tags,
+                    )
+                )
 
     def register_function(
         self, name: str, function: Callable, description: str, tool_id: Optional[str] = None
@@ -285,7 +347,61 @@ class ToolRegistry:
         Returns:
             Optional[Tool]: Result if available, else None.
         """
-        return self._tools.get(tool_id)
+        # Try in-memory first
+        tool = self._tools.get(tool_id)
+        if tool:
+            return tool
+        
+        # If not in memory and DAL is available, load from database
+        if self._tool_dal and self._tenant_id:
+            import asyncio
+            try:
+                loop = asyncio.get_event_loop()
+                if loop.is_running():
+                    # If loop is running, we can't use run_until_complete
+                    # Return None and let caller handle async loading
+                    return None
+                else:
+                    tool_data = loop.run_until_complete(
+                        self._tool_dal.load_tool(tool_id, self._tenant_id)
+                    )
+                if tool_data:
+                    # Reconstruct Tool from database data
+                    # Note: function cannot be restored from database, must be provided separately
+                    tool = Tool(
+                        tool_id=tool_data["tool_id"],
+                        name=tool_data["name"],
+                        description=tool_data["description"],
+                        tool_type=ToolType(tool_data["tool_type"]),
+                        parameters=[ToolParameter(**p) for p in tool_data.get("parameters", [])],
+                        metadata=tool_data.get("metadata", {}),
+                        tags=tool_data.get("tags", []),
+                        function=None,  # Function must be provided separately
+                    )
+                    # Cache in memory
+                    self._tools[tool_id] = tool
+                    return tool
+            except RuntimeError:
+                # No event loop, create new one
+                tool_data = asyncio.run(
+                    self._tool_dal.load_tool(tool_id, self._tenant_id)
+                )
+                if tool_data:
+                    tool = Tool(
+                        tool_id=tool_data["tool_id"],
+                        name=tool_data["name"],
+                        description=tool_data["description"],
+                        tool_type=ToolType(tool_data["tool_type"]),
+                        parameters=[ToolParameter(**p) for p in tool_data.get("parameters", [])],
+                        metadata=tool_data.get("metadata", {}),
+                        tags=tool_data.get("tags", []),
+                        function=None,  # Function must be provided separately
+                    )
+                    # Cache in memory
+                    self._tools[tool_id] = tool
+                    return tool
+        
+        return None
 
     def get_tool_by_name(self, name: str) -> Optional[Tool]:
         """
@@ -330,16 +446,31 @@ class ToolRegistry:
 
 
 class ToolExecutor:
-    """Executor for agent tool calls."""
+    """Executor for agent tool calls.
+    
+    Supports execution history tracking via ToolExecutionDAL.
+    """
 
-    def __init__(self, registry: ToolRegistry):
+    def __init__(
+        self,
+        registry: ToolRegistry,
+        execution_dal: Optional["ToolExecutionDAL"] = None,
+        tenant_id: Optional[str] = None,
+        agent_id: Optional[str] = None,
+    ):
         """
         Initialize tool executor.
         
         Args:
-            registry (ToolRegistry): Input parameter for this operation.
+            registry: Tool registry instance.
+            execution_dal: Optional ToolExecutionDAL instance for execution history.
+            tenant_id: Optional tenant ID for multi-tenant isolation.
+            agent_id: Optional agent ID that owns this executor.
         """
         self.registry = registry
+        self._execution_dal = execution_dal
+        self._tenant_id = tenant_id
+        self._agent_id = agent_id
 
     async def execute_tool_call(self, tool_name: str, arguments: Dict[str, Any]) -> Any:
         """
@@ -355,9 +486,46 @@ class ToolExecutor:
         Raises:
             ToolNotFoundError: Raised when this function detects an invalid state or when an underlying call fails.
         """
+        import time
+        
         tool = self.registry.get_tool_by_name(tool_name)
 
         if tool is None:
             raise ToolNotFoundError(tool_name)
 
-        return await tool.execute(**arguments)
+        # Track execution start time
+        start_time = time.time()
+        status = "success"
+        error = None
+        result = None
+
+        try:
+            result = await tool.execute(**arguments)
+        except Exception as e:
+            status = "error"
+            error = str(e)
+            raise
+        finally:
+            # Calculate execution time
+            execution_time_ms = (time.time() - start_time) * 1000
+            
+            # Save execution history if DAL is available
+            if self._execution_dal and self._tenant_id:
+                try:
+                    await self._execution_dal.save_execution(
+                        tool_id=tool.tool_id,
+                        agent_id=self._agent_id,
+                        arguments=arguments,
+                        result=result,
+                        status=status,
+                        error=error,
+                        tenant_id=self._tenant_id,
+                        execution_time_ms=execution_time_ms,
+                    )
+                except Exception as e:
+                    # Log but don't fail execution if history save fails
+                    import logging
+                    logger = logging.getLogger(__name__)
+                    logger.warning(f"Failed to save tool execution history: {e}", exc_info=True)
+
+        return result

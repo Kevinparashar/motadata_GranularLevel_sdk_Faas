@@ -144,6 +144,13 @@ class SchemaRegistry:
         Raises:
             SchemaValidationError: If validation fails with details
         """
+        # Validate envelope is a dictionary
+        if not isinstance(envelope, dict):
+            raise SchemaValidationError(
+                "Envelope must be a dictionary",
+                validation_errors=[f"Expected dict, got {type(envelope).__name__}"],
+            )
+        
         # Extract schema name from envelope if not provided
         if schema_name is None:
             schema_name = envelope.get("message_type")

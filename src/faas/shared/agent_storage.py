@@ -2,16 +2,16 @@
 Agent Storage for Stateless FaaS Services
 
 Provides database-backed agent storage to replace in-memory state.
+Uses AgentDAL for all database operations.
 """
 
 
-import json
 import logging
 from typing import Any, Dict, Optional
 
 from ...core.agno_agent_framework import Agent, create_agent
 from ...core.litellm_gateway import LiteLLMGateway
-from ...core.postgresql_database import DatabaseConnection
+from .dal.agent_dal import AgentDAL
 
 logger = logging.getLogger(__name__)
 
@@ -21,51 +21,17 @@ class AgentStorage:
     Database-backed agent storage for stateless services.
 
     Stores agent definitions in database and recreates Agent instances on demand.
+    Uses AgentDAL for all database operations.
     """
 
-    def __init__(self, db_connection: DatabaseConnection):
+    def __init__(self, db_connection: Any):
         """
         Initialize agent storage.
         
         Args:
             db_connection: Database connection instance.
         """
-        self.db = db_connection
-        # Table creation will be done on first use or via async initialization
-
-    async def _ensure_table(self):
-        """Ensure agents table exists."""
-        try:
-            # Create table
-            await self.db.execute_query(
-                """
-                CREATE TABLE IF NOT EXISTS agents (
-                    agent_id VARCHAR(255) PRIMARY KEY,
-                    tenant_id VARCHAR(255) NOT NULL,
-                    name VARCHAR(255) NOT NULL,
-                    description TEXT,
-                    llm_model VARCHAR(255),
-                    llm_provider VARCHAR(255),
-                    system_prompt TEXT,
-                    capabilities JSONB,
-                    config JSONB,
-                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-                )
-                """,
-                fetch_all=False,
-            )
-            # Create index
-            try:
-                await self.db.execute_query(
-                    "CREATE INDEX IF NOT EXISTS idx_tenant_id ON agents(tenant_id)",
-                    fetch_all=False,
-                )
-            except Exception:
-                # Index might already exist or syntax differs
-                pass
-        except Exception as e:
-            logger.warning(f"Could not create agents table (may already exist): {e}")
+        self.agent_dal = AgentDAL(db_connection)
 
     async def save_agent(
         self,
@@ -82,40 +48,16 @@ class AgentStorage:
         Returns:
             None: Result of the operation.
         """
-        # Ensure table exists
-        await self._ensure_table()
-        
-        await self.db.execute_query(
-            """
-            INSERT INTO agents (
-                agent_id, tenant_id, name, description,
-                llm_model, llm_provider, system_prompt,
-                capabilities, config, updated_at
-            ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, CURRENT_TIMESTAMP)
-            ON CONFLICT (agent_id) DO UPDATE SET
-                name = EXCLUDED.name,
-                description = EXCLUDED.description,
-                llm_model = EXCLUDED.llm_model,
-                llm_provider = EXCLUDED.llm_provider,
-                system_prompt = EXCLUDED.system_prompt,
-                capabilities = EXCLUDED.capabilities,
-                config = EXCLUDED.config,
-                updated_at = CURRENT_TIMESTAMP
-            """,
-            params=(
-                agent.agent_id,
-                tenant_id,
-                agent.name,
-                agent.description,
-                agent.llm_model,
-                agent.llm_provider,
-                agent.system_prompt,
-                json.dumps(
-                    [cap.name for cap in agent.capabilities] if agent.capabilities else []
-                ),
-                json.dumps(agent.metadata if agent.metadata else {}),
-            ),
-            fetch_all=False,
+        await self.agent_dal.save_agent(
+            agent_id=agent.agent_id,
+            tenant_id=tenant_id,
+            name=agent.name,
+            description=agent.description,
+            llm_model=agent.llm_model,
+            llm_provider=agent.llm_provider,
+            system_prompt=agent.system_prompt,
+            capabilities=[cap.name for cap in agent.capabilities] if agent.capabilities else [],
+            config=agent.metadata if agent.metadata else {},
         )
 
     async def load_agent(
@@ -135,21 +77,7 @@ class AgentStorage:
         Returns:
             Optional[Agent]: Result if available, else None.
         """
-        # Ensure table exists
-        await self._ensure_table()
-        
-        row = await self.db.execute_query(
-            """
-            SELECT 
-                agent_id, name, description,
-                llm_model, llm_provider, system_prompt,
-                capabilities, config
-            FROM agents
-            WHERE agent_id = $1 AND tenant_id = $2
-            """,
-            params=(agent_id, tenant_id),
-            fetch_one=True,
-        )
+        row = await self.agent_dal.load_agent(agent_id, tenant_id)
 
         if not row:
             return None
@@ -168,21 +96,13 @@ class AgentStorage:
 
         # Restore capabilities
         if row.get("capabilities"):
-            capabilities = (
-                json.loads(row["capabilities"])
-                if isinstance(row["capabilities"], str)
-                else row["capabilities"]
-            )
+            capabilities = row["capabilities"]
             for capability_name in capabilities:
                 agent.add_capability(capability_name, f"Capability: {capability_name}")
 
         # Restore metadata/config
         if row.get("config"):
-            config_data = (
-                json.loads(row["config"])
-                if isinstance(row["config"], str)
-                else row["config"]
-            )
+            config_data = row["config"]
             if isinstance(config_data, dict):
                 agent.metadata.update(config_data)
 
@@ -205,25 +125,7 @@ class AgentStorage:
         Returns:
             List of agent dictionaries.
         """
-        # Ensure table exists
-        await self._ensure_table()
-        
-        results = await self.db.execute_query(
-            """
-            SELECT 
-                agent_id, name, description,
-                llm_model, llm_provider,
-                created_at, updated_at
-            FROM agents
-            WHERE tenant_id = $1
-            ORDER BY created_at DESC
-            LIMIT $2 OFFSET $3
-            """,
-            params=(tenant_id, limit, offset),
-            fetch_all=True,
-        )
-
-        return results if results else []
+        return await self.agent_dal.list_agents(tenant_id, limit, offset)
 
     async def delete_agent(
         self,
@@ -240,20 +142,7 @@ class AgentStorage:
         Returns:
             bool: True if the operation succeeds, else False.
         """
-        # Ensure table exists
-        await self._ensure_table()
-        
-        result = await self.db.execute_query(
-            """
-            DELETE FROM agents
-            WHERE agent_id = $1 AND tenant_id = $2
-            """,
-            params=(agent_id, tenant_id),
-            fetch_all=False,
-        )
-
-        # result is row count (int)
-        return result > 0
+        return await self.agent_dal.delete_agent(agent_id, tenant_id)
 
     async def agent_exists(
         self,
@@ -270,17 +159,4 @@ class AgentStorage:
         Returns:
             bool: True if the operation succeeds, else False.
         """
-        # Ensure table exists
-        await self._ensure_table()
-        
-        result = await self.db.execute_query(
-            """
-            SELECT 1 FROM agents
-            WHERE agent_id = $1 AND tenant_id = $2
-            LIMIT 1
-            """,
-            params=(agent_id, tenant_id),
-            fetch_one=True,
-        )
-
-        return result is not None
+        return await self.agent_dal.agent_exists(agent_id, tenant_id)

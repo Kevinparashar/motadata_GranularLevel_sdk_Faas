@@ -75,9 +75,10 @@ def mock_db():
 def test_orchestrator_service_uses_dragonfly_when_url_provided(mock_config_with_dragonfly, mock_db):
     """Test that OrchestratorService uses Dragonfly backend when URL is provided."""
     with patch("src.faas.services.orchestrator_service.service.create_gateway") as mock_create_gateway, \
-         patch("src.faas.services.orchestrator_service.service.create_nats_client", return_value=None), \
-         patch("src.faas.services.orchestrator_service.service.create_otel_tracer", return_value=None), \
-         patch("src.core.cache_mechanism.cache.CacheMechanism") as mock_cache_class:
+         patch("src.core.litellm_gateway.create_gateway"), \
+         patch("src.faas.integrations.codec.create_codec_manager", return_value=None), \
+         patch("src.faas.integrations.otel.create_otel_tracer", return_value=None), \
+         patch("src.faas.services.orchestrator_service.service.CacheMechanism") as mock_cache_class:
         
         # Mock gateway
         mock_gateway = MagicMock()
@@ -106,14 +107,16 @@ def test_orchestrator_service_uses_dragonfly_when_url_provided(mock_config_with_
 def test_orchestrator_service_uses_memory_when_no_dragonfly_url(mock_config_without_dragonfly, mock_db):
     """Test that OrchestratorService uses memory backend when no Dragonfly URL is provided."""
     with patch("src.faas.services.orchestrator_service.service.create_gateway") as mock_create_gateway, \
-         patch("src.faas.services.orchestrator_service.service.create_nats_client", return_value=None), \
-         patch("src.faas.services.orchestrator_service.service.create_otel_tracer", return_value=None), \
-         patch("src.core.cache_mechanism.cache.CacheMechanism") as mock_cache_class:
+         patch("src.core.litellm_gateway.create_gateway") as mock_core_gateway, \
+         patch("src.faas.integrations.codec.create_codec_manager", return_value=None), \
+         patch("src.faas.integrations.otel.create_otel_tracer", return_value=None), \
+         patch("src.faas.services.orchestrator_service.service.CacheMechanism") as mock_cache_class:
         
         # Mock gateway
         mock_gateway = MagicMock()
         mock_gateway.generate_async = AsyncMock()
         mock_create_gateway.return_value = mock_gateway
+        mock_core_gateway.return_value = mock_gateway
         
         # Mock cache mechanism
         mock_cache_instance = MagicMock()

@@ -234,13 +234,13 @@ class TestSessionManager:
         session = manager.create_session("agent1")
         session_id = session.session_id
 
-        retrieved = manager.get_session(session_id)
+        retrieved = manager.get_session_sync(session_id)
 
         assert retrieved == session
 
     def test_get_session_not_found(self, manager):
         """Test get_session with nonexistent session."""
-        retrieved = manager.get_session("nonexistent")
+        retrieved = manager.get_session_sync("nonexistent")
 
         assert retrieved is None
 
@@ -250,7 +250,7 @@ class TestSessionManager:
         session.expires_at = datetime.now() - timedelta(hours=1)
         session_id = session.session_id
 
-        retrieved = manager.get_session(session_id)
+        retrieved = manager.get_session_sync(session_id)
 
         assert retrieved is None
         assert session.status == SessionStatus.EXPIRED
@@ -261,7 +261,7 @@ class TestSessionManager:
         session2 = manager.create_session("agent1")
         manager.create_session("agent2")  # Different agent
 
-        sessions = manager.get_agent_sessions("agent1")
+        sessions = manager.get_agent_sessions_sync("agent1")
 
         assert len(sessions) == 2
         assert session1 in sessions
@@ -273,7 +273,7 @@ class TestSessionManager:
         session2 = manager.create_session("agent1")
         session2.expires_at = datetime.now() - timedelta(hours=1)
 
-        sessions = manager.get_agent_sessions("agent1")
+        sessions = manager.get_agent_sessions_sync("agent1")
 
         assert len(sessions) == 1
         assert session1 in sessions
@@ -284,14 +284,14 @@ class TestSessionManager:
         session = manager.create_session("agent1")
         session_id = session.session_id
 
-        manager.delete_session(session_id)
+        manager.delete_session_sync(session_id)
 
         assert session_id not in manager._sessions
 
     def test_delete_session_nonexistent(self, manager):
         """Test delete_session with nonexistent session."""
         # Should not raise
-        manager.delete_session("nonexistent")
+        manager.delete_session_sync("nonexistent")
 
     def test_cleanup_expired(self, manager):
         """Test cleanup_expired method to cover lines 287-294."""
@@ -301,7 +301,7 @@ class TestSessionManager:
         session3 = manager.create_session("agent1")
         session3.expires_at = datetime.now() - timedelta(hours=1)
 
-        count = manager.cleanup_expired()
+        count = manager.cleanup_expired_sync()
 
         assert count == 2
         assert session1.session_id in manager._sessions
@@ -312,7 +312,7 @@ class TestSessionManager:
         """Test cleanup_expired when no expired sessions."""
         manager.create_session("agent1")
 
-        count = manager.cleanup_expired()
+        count = manager.cleanup_expired_sync()
 
         assert count == 0
 

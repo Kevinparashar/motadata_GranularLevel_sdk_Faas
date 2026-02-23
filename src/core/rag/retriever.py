@@ -117,7 +117,18 @@ class Retriever:
 
                     # Perform similarity search
                     import asyncio
-                    results = asyncio.run(self.vector_ops.similarity_search(
+                    def _run_async(coro):
+                        """Helper to run async code from sync context."""
+                        try:
+                            loop = asyncio.get_running_loop()
+                            raise RuntimeError(
+                                "Cannot call sync retrieve() from async context. Use retrieve_async() instead."
+                            )
+                        except RuntimeError as e:
+                            if "Cannot call sync" in str(e):
+                                raise
+                            return asyncio.run(coro)
+                    results = _run_async(self.vector_ops.similarity_search(
                         query_embedding=query_embedding,
                         limit=top_k,
                         threshold=threshold,
@@ -176,12 +187,138 @@ class Retriever:
 
             # Perform similarity search
             import asyncio
-            results = asyncio.run(self.vector_ops.similarity_search(
+            def _run_async(coro):
+                """Helper to run async code from sync context."""
+                try:
+                    loop = asyncio.get_running_loop()
+                    raise RuntimeError(
+                        "Cannot call sync retrieve() from async context. Use retrieve_async() instead."
+                    )
+                except RuntimeError as e:
+                    if "Cannot call sync" in str(e):
+                        raise
+                    return asyncio.run(coro)
+            results = _run_async(self.vector_ops.similarity_search(
                 query_embedding=query_embedding,
                 limit=top_k,
                 threshold=threshold,
                 model=self.embedding_model,
             ))
+
+            # Apply additional filters if provided
+            if filters:
+                results = self._apply_filters(results, filters)
+
+            return results
+
+    async def retrieve_async(
+        self,
+        query: str,
+        tenant_id: Optional[str] = None,
+        top_k: int = 5,
+        threshold: float = 0.7,
+        filters: Optional[Dict[str, Any]] = None,
+    ) -> List[Dict[str, Any]]:
+        """
+        Retrieve relevant documents for a query (async version).
+        
+        Args:
+            query (str): Input parameter for this operation.
+            tenant_id (Optional[str]): Tenant identifier used for tenant isolation.
+            top_k (int): Input parameter for this operation.
+            threshold (float): Input parameter for this operation.
+            filters (Optional[Dict[str, Any]]): Input parameter for this operation.
+        
+        Returns:
+            List[Dict[str, Any]]: Dictionary result of the operation.
+        """
+        start_time = time.time()
+
+        # OTEL Integration
+        if self.otel_tracer:
+            with self.otel_tracer.start_trace("retriever.retrieve") as trace:
+                trace.set_attribute("retriever.query", query[:100])
+                trace.set_attribute("retriever.top_k", top_k)
+                trace.set_attribute("retriever.threshold", threshold)
+                trace.set_attribute("retriever.embedding_model", self.embedding_model)
+                from ..utils.tenant_utils import add_tenant_attributes_to_span
+                add_tenant_attributes_to_span(trace, tenant_id, attribute_prefix="retriever")
+
+                try:
+                    # Generate query embedding
+                    query_embedding = self._get_embedding(query)
+
+                    # Add tenant_id to filters for tenant isolation
+                    if tenant_id:
+                        if filters is None:
+                            filters = {}
+                        filters["tenant_id"] = tenant_id
+
+                    # Perform similarity search (async)
+                    results = await self.vector_ops.similarity_search(
+                        query_embedding=query_embedding,
+                        limit=top_k,
+                        threshold=threshold,
+                        model=self.embedding_model,
+                    )
+
+                    # Apply additional filters if provided
+                    if filters:
+                        results = self._apply_filters(results, filters)
+
+                    duration = time.time() - start_time
+                    trace.set_attribute("retriever.results_count", len(results))
+
+                    if self.otel_metrics:
+                        self.otel_metrics.record_histogram(
+                            "retriever.retrieve.duration", duration, {"embedding_model": self.embedding_model}
+                        )
+                        self.otel_metrics.increment_counter(
+                            "retriever.operations",
+                            amount=1.0,
+                            attributes={
+                                "status": "success",
+                                "embedding_model": self.embedding_model,
+                                "results_count": len(results),
+                            },
+                        )
+
+                    return results
+                except Exception as e:
+                    trace.record_exception(e)
+                    duration = time.time() - start_time
+                    if self.otel_metrics:
+                        self.otel_metrics.record_histogram(
+                            "retriever.retrieve.duration", duration, {"embedding_model": self.embedding_model}
+                        )
+                        self.otel_metrics.increment_counter(
+                            "retriever.operations",
+                            amount=1.0,
+                            attributes={
+                                "status": "error",
+                                "embedding_model": self.embedding_model,
+                                "error_type": type(e).__name__,
+                            },
+                        )
+                    raise
+        else:
+            # No OTEL - execute without tracing
+            # Generate query embedding
+            query_embedding = self._get_embedding(query)
+
+            # Add tenant_id to filters for tenant isolation
+            if tenant_id:
+                if filters is None:
+                    filters = {}
+                filters["tenant_id"] = tenant_id
+
+            # Perform similarity search (async)
+            results = await self.vector_ops.similarity_search(
+                query_embedding=query_embedding,
+                limit=top_k,
+                threshold=threshold,
+                model=self.embedding_model,
+            )
 
             # Apply additional filters if provided
             if filters:

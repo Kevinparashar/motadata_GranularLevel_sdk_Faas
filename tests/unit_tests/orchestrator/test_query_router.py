@@ -173,7 +173,8 @@ class TestQueryRouter:
     async def test_analyze_intent_pattern_matching_unknown(self, router):
         """Test pattern matching for unknown intent."""
         router.enable_llm_classification = False
-        result = await router.analyze_intent("random text without keywords")
+        # Use a longer query (10+ words) that doesn't match any patterns
+        result = await router.analyze_intent("random text without keywords that does not match any specific pattern or intent")
         assert result["intent"] == QueryIntent.UNKNOWN.value
         assert result["confidence"] == 0.5
 

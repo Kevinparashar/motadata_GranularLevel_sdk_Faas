@@ -21,6 +21,7 @@ from .exceptions import AgentNotFoundError, WorkflowNotFoundError
 
 if TYPE_CHECKING:
     from .agent import AgentManager
+    from ...faas.shared.dal.workflow_dal import WorkflowDAL  # type: ignore[import-untyped]
 
 
 class WorkflowStatus(str, Enum):
@@ -111,21 +112,35 @@ class WorkflowPipeline:
     """
 
     def __init__(
-        self, pipeline_id: Optional[str] = None, name: str = "workflow", description: str = ""
+        self,
+        pipeline_id: Optional[str] = None,
+        name: str = "workflow",
+        description: str = "",
+        workflow_dal: Optional["WorkflowDAL"] = None,
+        tenant_id: Optional[str] = None,
     ):
         """
         __init__.
         
         Args:
-            pipeline_id (Optional[str]): Input parameter for this operation.
-            name (str): Name value.
-            description (str): Human-readable description text.
+            pipeline_id: Optional pipeline identifier.
+            name: Workflow name.
+            description: Workflow description.
+            workflow_dal: Optional WorkflowDAL instance for state persistence.
+            tenant_id: Optional tenant ID for multi-tenant isolation.
         """
         self.pipeline_id = pipeline_id or str(uuid.uuid4())
         self.name = name
         self.description = description
         self.steps: List[WorkflowStep] = []
         self.state = WorkflowState(workflow_id=self.pipeline_id)
+        self._workflow_dal = workflow_dal
+        self._tenant_id = tenant_id
+        
+        # Load state from database if DAL is available and pipeline_id is provided
+        if self._workflow_dal and self._tenant_id and pipeline_id:
+            # Note: Loading is async, so we'll do it in execute() or provide a separate load() method
+            pass
 
     def add_step(
         self,
@@ -200,9 +215,19 @@ class WorkflowPipeline:
         Returns:
             Dict[str, Any]: Dictionary result of the operation.
         """
-        self.state.status = WorkflowStatus.RUNNING
-        self.state.started_at = datetime.now()
+        # Load state from database if DAL is available and workflow was previously started
+        if self._workflow_dal and self._tenant_id:
+            await self._load_state()
+        
+        # Only update status if not already running/resuming
+        if self.state.status == WorkflowStatus.PENDING:
+            self.state.status = WorkflowStatus.RUNNING
+            self.state.started_at = datetime.now()
+        
         self.state.context.update(context or {})
+        
+        # Save initial state if DAL is available
+        await self._save_state()
 
         try:
             while True:
@@ -221,6 +246,9 @@ class WorkflowPipeline:
                 # Execute ready steps (can be parallel)
                 tasks = [self._execute_step(step, agent_manager) for step in ready_steps]
                 await asyncio.gather(*tasks, return_exceptions=True)
+                
+                # Save state after each batch of steps
+                await self._save_state()
 
             # Check if workflow succeeded
             if self.state.failed_steps:
@@ -229,11 +257,16 @@ class WorkflowPipeline:
             else:
                 self.state.status = WorkflowStatus.COMPLETED
                 self.state.completed_at = datetime.now()
+            
+            # Save final state
+            await self._save_state()
 
         except Exception as e:
             self.state.status = WorkflowStatus.FAILED
             self.state.error = str(e)
             self.state.completed_at = datetime.now()
+            # Save error state
+            await self._save_state()
 
         return {
             "workflow_id": self.pipeline_id,
@@ -242,6 +275,51 @@ class WorkflowPipeline:
             "context": self.state.context,
             "error": self.state.error,
         }
+    
+    async def _load_state(self) -> None:
+        """Load workflow state from database if DAL is available."""
+        if self._workflow_dal and self._tenant_id:
+            try:
+                state_data = await self._workflow_dal.load_workflow_state(self.pipeline_id, self._tenant_id)
+                if state_data:
+                    # Restore state
+                    self.state.status = WorkflowStatus(state_data["status"])
+                    self.state.current_step = state_data.get("current_step")
+                    self.state.completed_steps = set(state_data.get("completed_steps", []))
+                    self.state.failed_steps = set(state_data.get("failed_steps", []))
+                    self.state.step_results = state_data.get("step_results", {})
+                    self.state.context = state_data.get("context", {})
+                    self.state.error = state_data.get("error")
+                    self.state.started_at = state_data.get("started_at")
+                    self.state.completed_at = state_data.get("completed_at")
+            except Exception as e:
+                # Log but don't fail workflow if state load fails
+                import logging
+                logger = logging.getLogger(__name__)
+                logger.warning(f"Failed to load workflow state: {e}", exc_info=True)
+    
+    async def _save_state(self) -> None:
+        """Save workflow state to database if DAL is available."""
+        if self._workflow_dal and self._tenant_id:
+            try:
+                await self._workflow_dal.save_workflow_state(
+                    workflow_id=self.pipeline_id,
+                    status=self.state.status.value if hasattr(self.state.status, "value") else str(self.state.status),
+                    current_step=self.state.current_step,
+                    completed_steps=list(self.state.completed_steps),
+                    failed_steps=list(self.state.failed_steps),
+                    step_results=self.state.step_results,
+                    context=self.state.context,
+                    error=self.state.error,
+                    tenant_id=self._tenant_id,
+                    started_at=self.state.started_at,
+                    completed_at=self.state.completed_at,
+                )
+            except Exception as e:
+                # Log but don't fail workflow if state save fails
+                import logging
+                logger = logging.getLogger(__name__)
+                logger.warning(f"Failed to save workflow state: {e}", exc_info=True)
 
     async def _execute_step(self, step: WorkflowStep, agent_manager: "AgentManager") -> None:
         """
@@ -259,6 +337,8 @@ class WorkflowPipeline:
             step.status = WorkflowStatus.FAILED
             step.error = f"Agent {step.agent_id} not found"
             self.state.failed_steps.add(step.step_id)
+            # Save state after step failure
+            await self._save_state()
             return
 
         step.status = WorkflowStatus.RUNNING
@@ -295,6 +375,8 @@ class WorkflowPipeline:
                 if isinstance(result, dict):
                     self.state.context.update(result)
 
+                # Save state after step completion
+                await self._save_state()
                 return
 
             except Exception as e:
@@ -304,6 +386,8 @@ class WorkflowPipeline:
                     step.error = str(e)
                     step.completed_at = datetime.now()
                     self.state.failed_steps.add(step.step_id)
+                    # Save state after step failure
+                    await self._save_state()
                     return
                 await asyncio.sleep(0.1 * attempt)  # Exponential backoff
 

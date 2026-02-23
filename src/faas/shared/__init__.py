@@ -7,6 +7,15 @@ used across all AI component services.
 
 
 from .agent_storage import AgentStorage
+from .dal import (
+    AgentDAL,
+    DocumentDAL,
+    DocumentVersionDAL,
+    MemoryDAL,
+    ModelDAL,
+    ModelVersionDAL,
+    SessionDAL,
+)
 from .config import (
     ServiceConfig,
     get_config,
@@ -68,6 +77,14 @@ __all__ = [
     "ServiceTimeoutError",
     # Agent Storage
     "AgentStorage",
+    # Data Access Layer
+    "SessionDAL",
+    "MemoryDAL",
+    "AgentDAL",
+    "DocumentDAL",
+    "DocumentVersionDAL",
+    "ModelDAL",
+    "ModelVersionDAL",
     # Exceptions
     "ServiceException",
     "ValidationError",

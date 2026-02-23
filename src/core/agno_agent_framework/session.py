@@ -4,13 +4,17 @@ Agent Session Management
 Manages agent sessions, conversation history, and session state.
 """
 
+from __future__ import annotations
 
 import uuid
 from datetime import datetime
 from enum import Enum
-from typing import Any, Dict, List, Optional
+from typing import TYPE_CHECKING, Any, Dict, List, Optional
 
 from pydantic import BaseModel, Field
+
+if TYPE_CHECKING:
+    from ...faas.shared.dal.session_dal import SessionDAL
 
 
 class SessionStatus(str, Enum):
@@ -206,11 +210,27 @@ class AgentSession(BaseModel):
 
 
 class SessionManager:
-    """Manager for agent sessions."""
+    """
+    Manager for agent sessions.
+    
+    Supports both in-memory storage (default) and database persistence via SessionDAL.
+    """
 
-    def __init__(self):
-        """Initialize session manager."""
+    def __init__(
+        self,
+        session_dal: Optional[SessionDAL] = None,
+        tenant_id: Optional[str] = None,
+    ):
+        """
+        Initialize session manager.
+        
+        Args:
+            session_dal: Optional SessionDAL instance for database persistence.
+            tenant_id: Optional tenant ID for multi-tenant isolation (required if using DAL).
+        """
         self._sessions: Dict[str, AgentSession] = {}
+        self._session_dal = session_dal
+        self._tenant_id = tenant_id
 
     def create_session(
         self, agent_id: str, max_history: int = 100, expires_at: Optional[datetime] = None
@@ -228,12 +248,43 @@ class SessionManager:
         """
         session = AgentSession(agent_id=agent_id, max_history=max_history, expires_at=expires_at)
 
+        # Store in-memory (for backward compatibility and caching)
         self._sessions[session.session_id] = session
+        
+        # Persist to database if DAL is available (will be saved on next async operation)
+        # Note: create_session is sync, so we can't await here. Persistence happens in save_session().
+        
         return session
 
-    def get_session(self, session_id: str) -> Optional[AgentSession]:
+    async def get_session(self, session_id: str) -> Optional[AgentSession]:
         """
         Get a session by ID.
+        
+        Args:
+            session_id (str): Input parameter for this operation.
+        
+        Returns:
+            Optional[AgentSession]: Result if available, else None.
+        """
+        # Try in-memory first
+        session = self._sessions.get(session_id)
+
+        # If not in memory and DAL is available, load from database
+        if not session and self._session_dal and self._tenant_id:
+            session = await self._session_dal.load_session(session_id, self._tenant_id)
+            if session:
+                # Cache in memory
+                self._sessions[session_id] = session
+
+        if session and session.is_expired():
+            session.status = SessionStatus.EXPIRED
+            return None
+
+        return session
+    
+    def get_session_sync(self, session_id: str) -> Optional[AgentSession]:
+        """
+        Get a session by ID (synchronous version for backward compatibility).
         
         Args:
             session_id (str): Input parameter for this operation.
@@ -249,9 +300,34 @@ class SessionManager:
 
         return session
 
-    def get_agent_sessions(self, agent_id: str) -> List[AgentSession]:
+    async def get_agent_sessions(self, agent_id: str) -> List[AgentSession]:
         """
         Get all sessions for an agent.
+        
+        Args:
+            agent_id (str): Input parameter for this operation.
+        
+        Returns:
+            List[AgentSession]: List result of the operation.
+        """
+        # If DAL is available, load from database
+        if self._session_dal and self._tenant_id:
+            sessions = await self._session_dal.list_agent_sessions(agent_id, self._tenant_id)
+            # Cache in memory
+            for session in sessions:
+                self._sessions[session.session_id] = session
+            return sessions
+        
+        # Fallback to in-memory
+        return [
+            session
+            for session in self._sessions.values()
+            if session.agent_id == agent_id and not session.is_expired()
+        ]
+    
+    def get_agent_sessions_sync(self, agent_id: str) -> List[AgentSession]:
+        """
+        Get all sessions for an agent (synchronous version for backward compatibility).
         
         Args:
             agent_id (str): Input parameter for this operation.
@@ -265,7 +341,7 @@ class SessionManager:
             if session.agent_id == agent_id and not session.is_expired()
         ]
 
-    def delete_session(self, session_id: str) -> None:
+    async def delete_session(self, session_id: str) -> None:
         """
         Delete a session.
         
@@ -275,11 +351,50 @@ class SessionManager:
         Returns:
             None: Result of the operation.
         """
+        # Delete from memory
+        self._sessions.pop(session_id, None)
+        
+        # Delete from database if DAL is available
+        if self._session_dal and self._tenant_id:
+            await self._session_dal.delete_session(session_id, self._tenant_id)
+    
+    def delete_session_sync(self, session_id: str) -> None:
+        """
+        Delete a session (synchronous version for backward compatibility).
+        
+        Args:
+            session_id (str): Input parameter for this operation.
+        
+        Returns:
+            None: Result of the operation.
+        """
         self._sessions.pop(session_id, None)
 
-    def cleanup_expired(self) -> int:
+    async def cleanup_expired(self) -> int:
         """
         Clean up expired sessions.
+        
+        Returns:
+            int: Result of the operation.
+        """
+        # Clean up in-memory
+        expired = [
+            session_id for session_id, session in self._sessions.items() if session.is_expired()
+        ]
+
+        for session_id in expired:
+            self._sessions.pop(session_id, None)
+        
+        # Clean up from database if DAL is available
+        if self._session_dal:
+            db_count = await self._session_dal.cleanup_expired_sessions()
+            return len(expired) + db_count
+
+        return len(expired)
+    
+    def cleanup_expired_sync(self) -> int:
+        """
+        Clean up expired sessions (synchronous version for backward compatibility).
         
         Returns:
             int: Result of the operation.
@@ -292,3 +407,20 @@ class SessionManager:
             self._sessions.pop(session_id, None)
 
         return len(expired)
+    
+    async def save_session(self, session: AgentSession) -> None:
+        """
+        Save session to database (if DAL is available).
+        
+        Args:
+            session: Session to save.
+        
+        Returns:
+            None: Result of the operation.
+        """
+        # Update in-memory cache
+        self._sessions[session.session_id] = session
+        
+        # Persist to database if DAL is available
+        if self._session_dal and self._tenant_id:
+            await self._session_dal.save_session(session, self._tenant_id)

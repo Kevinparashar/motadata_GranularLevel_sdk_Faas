@@ -11,7 +11,7 @@ import io
 import sys
 from datetime import datetime
 from pathlib import Path
-from unittest.mock import AsyncMock, MagicMock
+from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
@@ -1357,7 +1357,9 @@ class TestRAGSystem:
         # Mock gateway responses
         mock_embedding_response = MagicMock()
         mock_embedding_response.embeddings = [[0.1] * 1536]
+        # Mock both embed_async and embed methods
         mock_gateway.embed_async = AsyncMock(return_value=mock_embedding_response)
+        mock_gateway.embed = MagicMock(return_value=mock_embedding_response)
 
         mock_gen_response = MagicMock()
         mock_gen_response.text = "Answer with context"
@@ -1365,10 +1367,21 @@ class TestRAGSystem:
         mock_gen_response.usage = {}
         mock_gateway.generate_async = AsyncMock(return_value=mock_gen_response)
 
-        # Mock vector search - similarity_search is async
-        rag.retriever.vector_ops.similarity_search = AsyncMock(return_value=[
+        # Mock retriever.retrieve() - synchronous method used by query_async
+        rag.retriever.retrieve = MagicMock(return_value=[
             {"id": 1, "content": "Document", "similarity": 0.9}
         ])
+        
+        # Mock memory retrieval - query_async uses memory.retrieve()
+        rag.memory.retrieve = AsyncMock(return_value=[])
+        rag.memory.store = AsyncMock(return_value=None)
+        
+        # Mock generator.generate_async() - async method used by query_async
+        rag.generator.generate_async = AsyncMock(return_value="Answer with context")
+        
+        # Mock cache
+        rag.cache.get = AsyncMock(return_value=None)
+        rag.cache.set = AsyncMock(return_value=None)
 
         result = await rag.query_async(
             query="Tell me more",
@@ -1397,10 +1410,10 @@ class TestRAGSystem:
 
         initial_memory_size = len(rag.memory._episodic)
 
-        # Mock gateway responses
+        # Mock gateway responses - retriever uses gateway.embed() (synchronous)
         mock_embedding_response = MagicMock()
         mock_embedding_response.embeddings = [[0.1] * 1536]
-        mock_gateway.embed_async = AsyncMock(return_value=mock_embedding_response)
+        mock_gateway.embed = MagicMock(return_value=mock_embedding_response)
 
         mock_gen_response = MagicMock()
         mock_gen_response.text = "Answer"
@@ -1508,15 +1521,18 @@ class TestRAGSystem:
     @pytest.mark.asyncio
     async def test_update_document(self, mock_rag_system):
         """Test document update."""
-        rag, mock_db, mock_gateway = mock_rag_system
+        rag, _mock_db, mock_gateway = mock_rag_system
 
         mock_embedding_response = MagicMock()
         mock_embedding_response.embeddings = [[0.1] * 1536]
-        mock_gateway.embed_async = AsyncMock(return_value=mock_embedding_response)
+        mock_gateway.embed = MagicMock(return_value=mock_embedding_response)
 
         rag.vector_ops.batch_insert_embeddings = AsyncMock(return_value=None)
         rag.index_manager.auto_reindex_on_embedding_change = AsyncMock(return_value=None)
         rag.vector_ops.delete_embeddings_by_document = AsyncMock(return_value=None)
+        
+        # Mock DAL update_document method
+        rag.document_dal.update_document = AsyncMock(return_value=True)
 
         result = await rag.update_document(
             document_id="1",
@@ -1526,20 +1542,27 @@ class TestRAGSystem:
         )
 
         assert result is True
-        mock_db.execute_query.assert_called()
+        # update_document may be called multiple times (once for metadata update, once for content)
+        assert rag.document_dal.update_document.called
 
     @pytest.mark.asyncio
     async def test_delete_document(self, mock_rag_system):
         """Test document deletion."""
-        rag, mock_db, _ = mock_rag_system
+        rag, _mock_db, _ = mock_rag_system
 
         rag.vector_ops.delete_embeddings_by_document = AsyncMock(return_value=None)
         rag.cache.invalidate_pattern = AsyncMock(return_value=None)
+        
+        # Mock DAL delete_document method
+        rag.document_dal.delete_document = AsyncMock(return_value=None)
+        
+        # Mock _delete_document_chunks (internal method)
+        rag._delete_document_chunks = AsyncMock(return_value=None)
 
         result = await rag.delete_document(document_id="1")
 
         assert result is True
-        mock_db.execute_query.assert_called()
+        rag.document_dal.delete_document.assert_called_once()
 
     @pytest.mark.asyncio
     async def test_create_index(self, mock_rag_system):
@@ -1648,13 +1671,22 @@ class TestRAGSystem:
         """Test async query error handling."""
         rag, _, _ = mock_rag_system
 
-        rag.retriever.retrieve = MagicMock(side_effect=ValueError("Validation error"))
-        rag.cache.get = AsyncMock(return_value=None)
+        # Disable OTEL to test error handling path that returns errors in result
+        rag.otel_tracer = None
+        
+        # Mock create_otel_tracer to return None so OTEL path is not taken
+        with patch("src.core.otel_integration.create_otel_tracer", return_value=None):
+            rag.retriever.retrieve = MagicMock(side_effect=ValueError("Validation error"))
+            rag.cache.get = AsyncMock(return_value=None)
+            
+            # Mock memory if it exists
+            if rag.memory:
+                rag.memory.retrieve = AsyncMock(return_value=[])
 
-        result = await rag.query_async(query="Test query")
+            result = await rag.query_async(query="Test query")
 
-        assert "error" in result
-        assert "Validation error" in result["error"]
+            assert "error" in result
+            assert "Validation error" in result["error"]
 
     def test_rewrite_query(self, mock_rag_system):
         """Test query rewriting."""
@@ -1984,13 +2016,22 @@ class TestRAGSystem:
         """Test async query with network error."""
         rag, _, _ = mock_rag_system
 
-        rag.retriever.retrieve = MagicMock(side_effect=ConnectionError("Network error"))
-        rag.cache.get = AsyncMock(return_value=None)
+        # Disable OTEL to test error handling path that returns errors in result
+        rag.otel_tracer = None
 
-        result = await rag.query_async(query="Test query")
+        # Mock create_otel_tracer to return None so OTEL path is not taken
+        with patch("src.core.otel_integration.create_otel_tracer", return_value=None):
+            rag.retriever.retrieve = MagicMock(side_effect=ConnectionError("Network error"))
+            rag.cache.get = AsyncMock(return_value=None)
+            
+            # Mock memory if it exists
+            if rag.memory:
+                rag.memory.retrieve = AsyncMock(return_value=[])
 
-        assert "error" in result
-        assert "Network error" in result["error"]
+            result = await rag.query_async(query="Test query")
+
+            assert "error" in result
+            assert "Network error" in result["error"]
 
     @pytest.mark.asyncio
     async def test_try_batch_embeddings_success(self, mock_rag_system):
@@ -2409,12 +2450,12 @@ class TestDocumentVersioning:
         versioning = DocumentVersioning(db=mock_db)
         mock_db.execute_query.return_value = None
 
+        # initialize() is now a no-op (tables managed by DAL/migrations)
         await versioning.initialize()
 
-        # Verify table creation query was called
-        assert mock_db.execute_query.called
-        call_args = mock_db.execute_query.call_args[0][0]
-        assert "CREATE TABLE IF NOT EXISTS document_versions" in call_args
+        # Verify initialize() completes without error
+        # Tables are assumed to exist (managed by migrations/DAL)
+        assert versioning.document_version_dal is not None
 
     @pytest.mark.asyncio
     async def test_create_version_first_version(self, mock_db):
@@ -2554,7 +2595,8 @@ class TestIncrementalUpdater:
     async def test_should_reembed_new_document(self, mock_db, mock_vector_ops):
         """Test should_reembed returns True for new document."""
         updater = IncrementalUpdater(db=mock_db, vector_ops=mock_vector_ops)
-        mock_db.execute_query.return_value = None  # Document not found
+        # Mock DAL load_document to return None (document not found)
+        updater.document_dal.load_document = AsyncMock(return_value=None)
 
         result = await updater.should_reembed(
             document_id="doc-1", new_content="content", tenant_id="tenant-1"
@@ -2567,8 +2609,8 @@ class TestIncrementalUpdater:
         """Test should_reembed returns False when content unchanged."""
         updater = IncrementalUpdater(db=mock_db, vector_ops=mock_vector_ops)
         content = "test content"
-        content_hash = hashlib.sha256(content.encode()).hexdigest()
-        mock_db.execute_query.return_value = {"content_hash": content_hash}
+        # Mock DAL load_document to return document with same content
+        updater.document_dal.load_document = AsyncMock(return_value={"content": content})
 
         result = await updater.should_reembed(
             document_id="doc-1", new_content=content, tenant_id="tenant-1"
@@ -2580,8 +2622,8 @@ class TestIncrementalUpdater:
     async def test_should_reembed_different_content(self, mock_db, mock_vector_ops):
         """Test should_reembed returns True when content changed."""
         updater = IncrementalUpdater(db=mock_db, vector_ops=mock_vector_ops)
-        old_hash = hashlib.sha256("old content".encode()).hexdigest()
-        mock_db.execute_query.return_value = {"content_hash": old_hash}
+        # Mock DAL load_document to return document with different content
+        updater.document_dal.load_document = AsyncMock(return_value={"content": "old content"})
 
         result = await updater.should_reembed(
             document_id="doc-1", new_content="new content", tenant_id="tenant-1"
@@ -2594,11 +2636,9 @@ class TestIncrementalUpdater:
         """Test incremental_update when re-embedding not needed."""
         updater = IncrementalUpdater(db=mock_db, vector_ops=mock_vector_ops)
         content = "test content"
-        content_hash = hashlib.sha256(content.encode()).hexdigest()
-        mock_db.execute_query.side_effect = [
-            {"content_hash": content_hash},  # should_reembed check
-            None,  # UPDATE query
-        ]
+        # Mock DAL methods
+        updater.document_dal.load_document = AsyncMock(return_value={"content": content})
+        updater.document_dal.update_document = AsyncMock(return_value=True)
 
         result = await updater.incremental_update(
             document_id="doc-1", new_content=content, gateway=MagicMock(), tenant_id="tenant-1"
@@ -2851,8 +2891,6 @@ class TestRealTimeSync:
 # ============================================================================
 # MultiModalLoader Tests
 # ============================================================================
-
-from unittest.mock import patch
 
 from src.core.rag.multimodal_loader import MultiModalLoader, create_multimodal_loader
 
@@ -3140,7 +3178,7 @@ class TestMultiModalLoader:
     async def test_load_audio_unknown_value_error(self, loader, tmp_path):
         """Test loading audio with UnknownValueError."""
         try:
-            import speech_recognition as sr
+            import speech_recognition as sr  # type: ignore[import-not-found]
         except ImportError:
             pytest.skip("speech_recognition not available")
 
@@ -3170,7 +3208,7 @@ class TestMultiModalLoader:
     async def test_load_audio_request_error(self, loader, tmp_path):
         """Test loading audio with RequestError."""
         try:
-            import speech_recognition as sr
+            import speech_recognition as sr  # type: ignore[import-not-found]
         except ImportError:
             pytest.skip("speech_recognition not available")
 
@@ -3458,7 +3496,7 @@ class TestMultiModalLoader:
     def test_extract_video_properties(self, loader):
         """Test _extract_video_properties method."""
         try:
-            import cv2
+            import cv2  # type: ignore[import-not-found]
         except ImportError:
             pytest.skip("cv2 not available")
 
@@ -3643,7 +3681,7 @@ class TestMultiModalLoader:
             pytest.skip("PyPDF2 not available")
         
         try:
-            import PyPDF2
+            import PyPDF2  # type: ignore[import-not-found]
         except ImportError:
             pytest.skip("PyPDF2 not available")
         
@@ -3714,7 +3752,7 @@ class TestMultiModalLoader:
         test_file.write_bytes(b"fake video")
         
         try:
-            import cv2  # Import check for availability
+            import cv2  # type: ignore[import-not-found]  # Import check for availability
             _ = cv2  # Mark as used
             # This will fail to open, but tests the VideoCapture code path
             with pytest.raises(DocumentProcessingError):
@@ -3752,7 +3790,7 @@ class TestMultiModalLoader:
             # OCR if enabled
             if loader.enable_image_ocr:
                 try:
-                    import pytesseract
+                    import pytesseract  # type: ignore[import-not-found]
                     ocr_text = pytesseract.image_to_string(image)
                     content_parts.append(f"[OCR Text]\n{ocr_text}")
                     img_metadata["ocr_performed"] = True
@@ -3784,10 +3822,15 @@ class TestMultiModalLoader:
 
     def test_loader_init_with_audio_available(self):
         """Test loader initialization when audio libraries are available."""
-        with patch("src.core.rag.multimodal_loader.AUDIO_AVAILABLE", True):
-            with patch("src.core.rag.multimodal_loader.sr.Recognizer", return_value=MagicMock()):
-                loader = MultiModalLoader(enable_audio_transcription=True)
-                assert loader.recognizer is not None
+        from src.core.rag.multimodal_loader import AUDIO_AVAILABLE, MultiModalLoader
+        
+        if not AUDIO_AVAILABLE:
+            # Skip test if audio libraries are not available
+            pytest.skip("Audio libraries (speech_recognition, pydub) not available")
+        
+        # Audio libraries are available - test with real implementation
+        loader = MultiModalLoader(enable_audio_transcription=True)
+        assert loader.recognizer is not None
 
     def test_loader_init_without_audio_available(self):
         """Test loader initialization when audio libraries are not available."""
@@ -3899,7 +3942,7 @@ class TestMultiModalLoader:
         test_file.write_bytes(b"fake video")
 
         try:
-            import cv2
+            import cv2  # type: ignore[import-not-found]
         except ImportError:
             pytest.skip("cv2 not available")
 
@@ -3956,7 +3999,7 @@ class TestMultiModalLoader:
             if loader.enable_image_ocr:
                 content_parts = []
                 try:
-                    import pytesseract  # Import check for availability
+                    import pytesseract  # type: ignore[import-not-found]  # Import check for availability
                     _ = pytesseract  # Mark as used
                     ocr_text = "Extracted OCR text"
                     content_parts.append(f"[OCR Text]\n{ocr_text}")

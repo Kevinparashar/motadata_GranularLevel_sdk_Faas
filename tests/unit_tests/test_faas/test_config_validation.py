@@ -58,7 +58,9 @@ class TestCodecTypeValidation:
             assert len(e.errors()) > 0
             error = e.errors()[0]
             assert error["loc"] == ("codec_type",)
-            assert "Unsupported codec type" in str(error["msg"]).lower() or "unsupported codec type" in str(e)
+            # Pydantic V2 error format includes "Value error, " prefix
+            error_str = str(error.get("msg", "")).lower() + " " + str(e).lower()
+            assert "unsupported codec type" in error_str
 
     def test_codec_type_invalid_protobuf(self):
         """Test that 'protobuf' codec_type is rejected."""
@@ -85,7 +87,9 @@ class TestCodecTypeValidation:
             assert len(e.errors()) > 0
             error = e.errors()[0]
             assert error["loc"] == ("codec_type",)
-            assert "Unsupported codec type" in str(error["msg"]).lower() or "unsupported codec type" in str(e)
+            # Pydantic V2 error format includes "Value error, " prefix
+            error_str = str(error.get("msg", "")).lower() + " " + str(e).lower()
+            assert "unsupported codec type" in error_str
 
     def test_codec_type_invalid_other(self):
         """Test that other invalid codec_type values are rejected."""

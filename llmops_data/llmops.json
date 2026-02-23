@@ -1,7 +1,7 @@
 {
   "operations": [
     {
-      "operation_id": "41fbf80a-fe9b-4ab4-a61b-a54fe55fc91f",
+      "operation_id": "e965d300-3f46-48ed-bd4d-8e1843fd0fc1",
       "operation_type": "completion",
       "model": "gpt-4",
       "tenant_id": "test_tenant",
@@ -9,17 +9,17 @@
       "prompt_tokens": 0,
       "completion_tokens": 0,
       "total_tokens": 0,
-      "latency_ms": 0.05459785461425781,
+      "latency_ms": 0.522613525390625,
       "cost_usd": 0.0,
       "status": "success",
       "error_message": null,
-      "timestamp": "2026-02-18T15:04:14.611458",
+      "timestamp": "2026-02-23T19:25:41.518230",
       "metadata": {
         "stream": false
       }
     },
     {
-      "operation_id": "c1de4cf3-343a-489f-91fb-076629bc901b",
+      "operation_id": "0347d188-8104-44d3-8fab-545acb7f2ea7",
       "operation_type": "completion",
       "model": "gpt-4",
       "tenant_id": "test_tenant",
@@ -27,17 +27,17 @@
       "prompt_tokens": 0,
       "completion_tokens": 0,
       "total_tokens": 0,
-      "latency_ms": 0.04696846008300781,
+      "latency_ms": 0.43201446533203125,
       "cost_usd": 0.0,
       "status": "success",
       "error_message": null,
-      "timestamp": "2026-02-18T15:04:14.612214",
+      "timestamp": "2026-02-23T19:25:41.520832",
       "metadata": {
         "stream": false
       }
     },
     {
-      "operation_id": "7e7a49c3-fca8-4092-bea8-ff9b358f8741",
+      "operation_id": "505fbc29-29da-4a10-a254-8d18cc468713",
       "operation_type": "completion",
       "model": "gpt-4",
       "tenant_id": "test_tenant",
@@ -45,11 +45,11 @@
       "prompt_tokens": 0,
       "completion_tokens": 0,
       "total_tokens": 0,
-      "latency_ms": 0.03743171691894531,
+      "latency_ms": 0.24175643920898438,
       "cost_usd": 0.0,
       "status": "success",
       "error_message": null,
-      "timestamp": "2026-02-18T15:04:14.612597",
+      "timestamp": "2026-02-23T19:25:41.522561",
       "metadata": {
         "stream": false
       }
