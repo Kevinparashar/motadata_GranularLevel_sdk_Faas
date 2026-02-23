@@ -53,6 +53,15 @@ Integration tests verify that multiple components work together correctly. They 
   - Service-to-service error handling
   - HTTP request/response validation
 
+### Orchestrator Integration Tests
+
+- **`test_orchestrator_integration.py`**: Tests Orchestrator integration with other components
+  - Orchestrator-Cache integration (cache manager with cache mechanism)
+  - Orchestrator-Gateway integration (intent classification with LLM)
+  - Orchestrator-Service integration (routing to different services)
+  - End-to-end orchestration flow (intent → routing → caching)
+  - Tenant isolation in integration scenarios
+
 ## Purpose
 
 Integration tests ensure:

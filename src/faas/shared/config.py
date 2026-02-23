@@ -31,6 +31,9 @@ class ServiceConfig(BaseModel):
         None, description="Prompt Generator service URL"
     )
     llmops_service_url: Optional[str] = Field(None, description="LLMOps service URL")
+    orchestrator_service_url: Optional[str] = Field(
+        None, description="Orchestrator service URL"
+    )
 
     # Database
     database_url: str = Field(..., description="Database connection URL")
@@ -106,6 +109,7 @@ def load_config(service_name: str, **overrides: Any) -> ServiceConfig:
         "data_ingestion_service_url": os.getenv("DATA_INGESTION_SERVICE_URL"),
         "prompt_generator_service_url": os.getenv("PROMPT_GENERATOR_SERVICE_URL"),
         "llmops_service_url": os.getenv("LLMOPS_SERVICE_URL"),
+        "orchestrator_service_url": os.getenv("ORCHESTRATOR_SERVICE_URL"),
         "database_url": os.getenv("DATABASE_URL", "postgresql://user:pass@localhost/db"),
         "dragonfly_url": os.getenv("DRAGONFLY_URL"),
         "nats_url": os.getenv("NATS_URL"),
