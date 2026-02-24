@@ -11,7 +11,7 @@ import logging
 import time
 from collections import OrderedDict
 from dataclasses import dataclass
-from typing import Any, Optional
+from typing import Any, Dict, Optional
 
 try:
     import aioredis
@@ -41,6 +41,7 @@ class CacheMechanism:
         config: Optional[CacheConfig] = None,
         otel_tracer: Optional[Any] = None,
         otel_metrics: Optional[Any] = None,
+        cache_context_dal: Optional[Any] = None,
     ) -> None:
         """
         Initialize cache mechanism.
@@ -49,12 +50,16 @@ class CacheMechanism:
             config: Cache configuration
             otel_tracer: Optional OTEL tracer for distributed tracing
             otel_metrics: Optional OTEL metrics for metrics collection
+            cache_context_dal: Optional CacheContextDAL for context persistence
         """
         self.config = config or CacheConfig()
         self.backend = self.config.backend
         self._async_client: Optional[Any] = None
         self._lock = asyncio.Lock()
         self._store: OrderedDict[str, tuple[Any, float]] = OrderedDict()
+
+        # Cache Context DAL (optional)
+        self.cache_context_dal = cache_context_dal
 
         # OTEL Integration (optional)
         self.otel_tracer: Optional[Any] = otel_tracer
@@ -95,14 +100,72 @@ class CacheMechanism:
             return f"{self.config.namespace}:{tenant_id}:{key}"
         return f"{self.config.namespace}:{key}"
 
+    def _build_context_aware_key(
+        self,
+        base_key: str,
+        tenant_id: Optional[str] = None,
+        user_id: Optional[str] = None,
+        conversation_id: Optional[str] = None,
+        session_id: Optional[str] = None,
+    ) -> str:
+        """
+        Build context-aware cache key.
+
+        Args:
+            base_key: Base cache key.
+            tenant_id: Optional tenant ID.
+            user_id: Optional user ID.
+            conversation_id: Optional conversation ID.
+            session_id: Optional session ID.
+
+        Returns:
+            Context-aware cache key.
+        """
+        key_parts = [base_key]
+        if conversation_id:
+            key_parts.insert(0, f"conv:{conversation_id}")
+        if session_id:
+            key_parts.insert(0, f"session:{session_id}")
+        if user_id:
+            key_parts.insert(0, f"user:{user_id}")
+        
+        context_key = ":".join(key_parts)
+        return self._namespaced_key(context_key, tenant_id=tenant_id)
+
     async def set(
-        self, key: str, value: Any, tenant_id: Optional[str] = None, ttl: Optional[int] = None
+        self,
+        key: str,
+        value: Any,
+        tenant_id: Optional[str] = None,
+        ttl: Optional[int] = None,
+        user_id: Optional[str] = None,
+        conversation_id: Optional[str] = None,
+        session_id: Optional[str] = None,
+        reason: Optional[str] = None,
     ) -> None:
-        """Store value in cache asynchronously."""
+        """
+        Store value in cache asynchronously.
+        
+        Args:
+            key: Cache key.
+            value: Value to cache.
+            tenant_id: Optional tenant ID.
+            ttl: Optional time-to-live in seconds.
+            user_id: Optional user ID for context.
+            conversation_id: Optional conversation ID for context.
+            session_id: Optional session ID for context.
+            reason: Optional reason for caching (e.g., "query_result", "embedding").
+        """
         start_time = time.time()
         ttl = ttl or self.config.default_ttl
         expires_at = time.time() + ttl
         namespaced = self._namespaced_key(key, tenant_id=tenant_id)
+        
+        # Calculate value size for tracking
+        try:
+            value_size = len(json.dumps(value).encode('utf-8')) if value else 0
+        except (TypeError, ValueError):
+            value_size = None
 
         # OTEL Integration
         if self.otel_tracer:
@@ -133,6 +196,25 @@ class CacheMechanism:
                             amount=1.0,
                             attributes={"operation": "set", "backend": self.backend, "status": "success"},
                         )
+                    
+                    # Save cache context (non-blocking)
+                    if self.cache_context_dal:
+                        try:
+                            await self.cache_context_dal.save_cache_operation(
+                                cache_key=key,
+                                operation="set",
+                                tenant_id=tenant_id,
+                                user_id=user_id,
+                                conversation_id=conversation_id,
+                                session_id=session_id,
+                                cache_hit=None,
+                                value_size=value_size,
+                                ttl=ttl,
+                                reason=reason,
+                                metadata={"backend": self.backend, "duration_ms": duration * 1000},
+                            )
+                        except Exception as e:
+                            logger.debug(f"Failed to save cache context (non-critical): {e}")
                 except Exception as e:
                     trace.record_exception(e)
                     duration = time.time() - start_time
@@ -156,9 +238,47 @@ class CacheMechanism:
                     self._store[namespaced] = (value, expires_at)
                     self._store.move_to_end(namespaced)
                     self._evict_if_needed()
+            
+            # Save cache context (non-blocking)
+            if self.cache_context_dal:
+                try:
+                    await self.cache_context_dal.save_cache_operation(
+                        cache_key=key,
+                        operation="set",
+                        tenant_id=tenant_id,
+                        user_id=user_id,
+                        conversation_id=conversation_id,
+                        session_id=session_id,
+                        cache_hit=None,
+                        value_size=value_size,
+                        ttl=ttl,
+                        reason=reason,
+                        metadata={"backend": self.backend},
+                    )
+                except Exception as e:
+                    logger.debug(f"Failed to save cache context (non-critical): {e}")
 
-    async def get(self, key: str, tenant_id: Optional[str] = None) -> Optional[Any]:
-        """Retrieve value from cache asynchronously."""
+    async def get(
+        self,
+        key: str,
+        tenant_id: Optional[str] = None,
+        user_id: Optional[str] = None,
+        conversation_id: Optional[str] = None,
+        session_id: Optional[str] = None,
+    ) -> Optional[Any]:
+        """
+        Retrieve value from cache asynchronously.
+        
+        Args:
+            key: Cache key.
+            tenant_id: Optional tenant ID.
+            user_id: Optional user ID for context.
+            conversation_id: Optional conversation ID for context.
+            session_id: Optional session ID for context.
+        
+        Returns:
+            Cached value or None.
+        """
         start_time = time.time()
         namespaced = self._namespaced_key(key, tenant_id=tenant_id)
 
@@ -216,6 +336,25 @@ class CacheMechanism:
                                 amount=1.0,
                                 attributes={"backend": self.backend},
                             )
+                    
+                    # Save cache context (non-blocking)
+                    if self.cache_context_dal:
+                        try:
+                            await self.cache_context_dal.save_cache_operation(
+                                cache_key=key,
+                                operation="get",
+                                tenant_id=tenant_id,
+                                user_id=user_id,
+                                conversation_id=conversation_id,
+                                session_id=session_id,
+                                cache_hit=cache_hit,
+                                value_size=None,
+                                ttl=None,
+                                reason=None,
+                                metadata={"backend": self.backend, "duration_ms": duration * 1000},
+                            )
+                        except Exception as e:
+                            logger.debug(f"Failed to save cache context (non-critical): {e}")
 
                     return result
                 except Exception as e:
@@ -235,22 +374,60 @@ class CacheMechanism:
             # No OTEL - execute without tracing
             if self.backend == "dragonfly":
                 client = await self._ensure_async_client()
-                return await client.get(namespaced)
+                result = await client.get(namespaced)
+            else:
+                if namespaced not in self._store:
+                    result = None
+                else:
+                    value, expires_at = self._store[namespaced]
+                    if expires_at < time.time():
+                        self._store.pop(namespaced, None)
+                        result = None
+                    else:
+                        async with self._lock:
+                            self._store.move_to_end(namespaced)
+                        result = value
+            
+            # Save cache context (non-blocking)
+            if self.cache_context_dal:
+                try:
+                    cache_hit = result is not None
+                    await self.cache_context_dal.save_cache_operation(
+                        cache_key=key,
+                        operation="get",
+                        tenant_id=tenant_id,
+                        user_id=user_id,
+                        conversation_id=conversation_id,
+                        session_id=session_id,
+                        cache_hit=cache_hit,
+                        value_size=None,
+                        ttl=None,
+                        reason=None,
+                        metadata={"backend": self.backend},
+                    )
+                except Exception as e:
+                    logger.debug(f"Failed to save cache context (non-critical): {e}")
+            
+            return result
 
-            if namespaced not in self._store:
-                return None
-
-            value, expires_at = self._store[namespaced]
-            if expires_at < time.time():
-                self._store.pop(namespaced, None)
-                return None
-
-            async with self._lock:
-                self._store.move_to_end(namespaced)
-            return value
-
-    async def delete(self, key: str, tenant_id: Optional[str] = None) -> None:
-        """Delete key from cache asynchronously."""
+    async def delete(
+        self,
+        key: str,
+        tenant_id: Optional[str] = None,
+        user_id: Optional[str] = None,
+        conversation_id: Optional[str] = None,
+        session_id: Optional[str] = None,
+    ) -> None:
+        """
+        Delete key from cache asynchronously.
+        
+        Args:
+            key: Cache key.
+            tenant_id: Optional tenant ID.
+            user_id: Optional user ID for context.
+            conversation_id: Optional conversation ID for context.
+            session_id: Optional session ID for context.
+        """
         start_time = time.time()
         namespaced = self._namespaced_key(key, tenant_id=tenant_id)
 
@@ -280,6 +457,25 @@ class CacheMechanism:
                             amount=1.0,
                             attributes={"operation": "delete", "backend": self.backend, "status": "success"},
                         )
+                    
+                    # Save cache context (non-blocking)
+                    if self.cache_context_dal:
+                        try:
+                            await self.cache_context_dal.save_cache_operation(
+                                cache_key=key,
+                                operation="delete",
+                                tenant_id=tenant_id,
+                                user_id=user_id,
+                                conversation_id=conversation_id,
+                                session_id=session_id,
+                                cache_hit=None,
+                                value_size=None,
+                                ttl=None,
+                                reason=None,
+                                metadata={"backend": self.backend, "duration_ms": duration * 1000},
+                            )
+                        except Exception as e:
+                            logger.debug(f"Failed to save cache context (non-critical): {e}")
                 except Exception as e:
                     trace.record_exception(e)
                     duration = time.time() - start_time
@@ -301,6 +497,25 @@ class CacheMechanism:
             else:
                 async with self._lock:
                     self._store.pop(namespaced, None)
+            
+            # Save cache context (non-blocking)
+            if self.cache_context_dal:
+                try:
+                    await self.cache_context_dal.save_cache_operation(
+                        cache_key=key,
+                        operation="delete",
+                        tenant_id=tenant_id,
+                        user_id=user_id,
+                        conversation_id=conversation_id,
+                        session_id=session_id,
+                        cache_hit=None,
+                        value_size=None,
+                        ttl=None,
+                        reason=None,
+                        metadata={"backend": self.backend},
+                    )
+                except Exception as e:
+                    logger.debug(f"Failed to save cache context (non-critical): {e}")
 
     async def invalidate_pattern(self, pattern: str, tenant_id: Optional[str] = None) -> None:
         """Invalidate keys matching pattern asynchronously."""
@@ -492,6 +707,202 @@ class CacheMechanism:
                             self._store.pop(k, None)
                     else:
                         self._store.clear()
+
+    async def invalidate_conversation(
+        self,
+        conversation_id: str,
+        tenant_id: Optional[str] = None,
+    ) -> int:
+        """
+        Invalidate all cache entries for a conversation.
+
+        Args:
+            conversation_id: Conversation identifier.
+            tenant_id: Optional tenant ID.
+
+        Returns:
+            Number of keys invalidated.
+        """
+        if not self.cache_context_dal:
+            logger.warning("CacheContextDAL not available for conversation invalidation")
+            return 0
+
+        try:
+            # Get cache keys for conversation
+            cache_keys = await self.cache_context_dal.invalidate_conversation_cache(
+                conversation_id=conversation_id,
+                tenant_id=tenant_id,
+            )
+
+            # Delete each key
+            deleted_count = 0
+            for key in cache_keys:
+                try:
+                    await self.delete(key, tenant_id=tenant_id)
+                    deleted_count += 1
+                except Exception as e:
+                    logger.debug(f"Failed to delete cache key {key}: {e}")
+
+            # Log invalidation operation
+            if self.cache_context_dal:
+                try:
+                    await self.cache_context_dal.save_cache_operation(
+                        cache_key=f"conversation:{conversation_id}",
+                        operation="invalidate",
+                        tenant_id=tenant_id,
+                        conversation_id=conversation_id,
+                        cache_hit=None,
+                        value_size=None,
+                        ttl=None,
+                        reason="conversation_invalidation",
+                        metadata={"keys_invalidated": deleted_count},
+                    )
+                except Exception as e:
+                    logger.debug(f"Failed to save invalidation context: {e}")
+
+            return deleted_count
+        except Exception as e:
+            logger.error(f"Failed to invalidate conversation cache: {e}")
+            return 0
+
+    async def invalidate_session(
+        self,
+        session_id: str,
+        tenant_id: Optional[str] = None,
+    ) -> int:
+        """
+        Invalidate all cache entries for a session.
+
+        Args:
+            session_id: Session identifier.
+            tenant_id: Optional tenant ID.
+
+        Returns:
+            Number of keys invalidated.
+        """
+        if not self.cache_context_dal:
+            logger.warning("CacheContextDAL not available for session invalidation")
+            return 0
+
+        try:
+            # Get cache keys for session
+            cache_keys = await self.cache_context_dal.invalidate_session_cache(
+                session_id=session_id,
+                tenant_id=tenant_id,
+            )
+
+            # Delete each key
+            deleted_count = 0
+            for key in cache_keys:
+                try:
+                    await self.delete(key, tenant_id=tenant_id)
+                    deleted_count += 1
+                except Exception as e:
+                    logger.debug(f"Failed to delete cache key {key}: {e}")
+
+            # Log invalidation operation
+            if self.cache_context_dal:
+                try:
+                    await self.cache_context_dal.save_cache_operation(
+                        cache_key=f"session:{session_id}",
+                        operation="invalidate",
+                        tenant_id=tenant_id,
+                        session_id=session_id,
+                        cache_hit=None,
+                        value_size=None,
+                        ttl=None,
+                        reason="session_invalidation",
+                        metadata={"keys_invalidated": deleted_count},
+                    )
+                except Exception as e:
+                    logger.debug(f"Failed to save invalidation context: {e}")
+
+            return deleted_count
+        except Exception as e:
+            logger.error(f"Failed to invalidate session cache: {e}")
+            return 0
+
+    async def invalidate_by_reason(
+        self,
+        reason: str,
+        tenant_id: Optional[str] = None,
+        limit: int = 100,
+    ) -> int:
+        """
+        Invalidate cache entries by reason (e.g., "query_result", "embedding").
+
+        Args:
+            reason: Reason for caching.
+            tenant_id: Optional tenant ID.
+            limit: Maximum number of keys to invalidate.
+
+        Returns:
+            Number of keys invalidated.
+        """
+        if not self.cache_context_dal:
+            logger.warning("CacheContextDAL not available for reason-based invalidation")
+            return 0
+
+        try:
+            # Get cache keys by reason
+            cache_keys = await self.cache_context_dal.get_cache_keys_by_reason(
+                reason=reason,
+                tenant_id=tenant_id,
+                limit=limit,
+            )
+
+            # Delete each key
+            deleted_count = 0
+            for key in cache_keys:
+                try:
+                    await self.delete(key, tenant_id=tenant_id)
+                    deleted_count += 1
+                except Exception as e:
+                    logger.debug(f"Failed to delete cache key {key}: {e}")
+
+            return deleted_count
+        except Exception as e:
+            logger.error(f"Failed to invalidate cache by reason: {e}")
+            return 0
+
+    async def get_cache_stats(
+        self,
+        tenant_id: Optional[str] = None,
+        user_id: Optional[str] = None,
+        conversation_id: Optional[str] = None,
+        time_range_hours: Optional[int] = None,
+    ) -> Dict[str, Any]:
+        """
+        Get cache statistics.
+
+        Args:
+            tenant_id: Optional tenant ID.
+            user_id: Optional user ID.
+            conversation_id: Optional conversation ID.
+            time_range_hours: Optional time range in hours.
+
+        Returns:
+            Dictionary with cache statistics.
+        """
+        if not self.cache_context_dal:
+            return {
+                "total_operations": 0,
+                "get_operations": 0,
+                "set_operations": 0,
+                "delete_operations": 0,
+                "cache_hits": 0,
+                "cache_misses": 0,
+                "hit_rate": 0.0,
+                "avg_value_size": 0.0,
+                "total_value_size": 0,
+            }
+
+        return await self.cache_context_dal.get_cache_stats(
+            tenant_id=tenant_id,
+            user_id=user_id,
+            conversation_id=conversation_id,
+            time_range_hours=time_range_hours,
+        )
 
     async def close(self) -> None:
         """Close async client connections."""

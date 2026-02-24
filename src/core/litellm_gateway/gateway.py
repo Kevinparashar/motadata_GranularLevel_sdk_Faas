@@ -11,6 +11,7 @@ import hashlib
 import json
 import logging
 import time
+import uuid
 from datetime import datetime
 from pathlib import Path
 from typing import Any, Dict, List, Optional
@@ -265,17 +266,26 @@ class LiteLLMGateway:
         else:
             self.cache = None
 
-    def __init__(self, config: Optional[GatewayConfig] = None, router: Optional[Router] = None):
+    def __init__(
+        self,
+        config: Optional[GatewayConfig] = None,
+        router: Optional[Router] = None,
+        gateway_request_history_dal: Optional[Any] = None,
+    ):
         """
         Initialize LiteLLM Gateway.
         
         Args:
             config (Optional[GatewayConfig]): Configuration object or settings.
             router (Optional[Router]): Input parameter for this operation.
+            gateway_request_history_dal: Optional GatewayRequestHistoryDAL for request history persistence.
         """
         self.config = config or GatewayConfig()
         self.provider_health: Dict[str, Dict[str, Any]] = {}
         self.storage_path = Path("./llmops_data")
+
+        # Gateway Request History DAL (optional)
+        self.gateway_request_history_dal = gateway_request_history_dal
 
         self._initialize_router(router)
         self._initialize_circuit_breaker()
@@ -1219,6 +1229,41 @@ class LiteLLMGateway:
                                 "status": "error",
                                 "error_type": type(e).__name__,
                             })
+                        
+                        # Save error to request history (non-blocking)
+                        if self.gateway_request_history_dal:
+                            try:
+                                request_id = f"gateway_req_{uuid.uuid4().hex[:16]}"
+                                correlation_id = kwargs.get("correlation_id") or f"corr_{uuid.uuid4().hex[:16]}"
+                                error_classification = self._classify_error(e)
+                                await self.gateway_request_history_dal.save_request(
+                                    request_id=request_id,
+                                    operation_type="generate",
+                                    model=model,
+                                    tenant_id=tenant_id,
+                                    user_id=kwargs.get("user_id"),
+                                    conversation_id=kwargs.get("conversation_id"),
+                                    session_id=kwargs.get("session_id"),
+                                    correlation_id=correlation_id,
+                                    prompt=prompt,
+                                    messages=messages,
+                                    latency_ms=duration * 1000,
+                                    status="error",
+                                    error_message=str(e),
+                                    error_type=type(e).__name__,
+                                    retry_count=kwargs.get("retry_count", 0),
+                                    fallback_used=kwargs.get("fallback_used", False),
+                                    fallback_model=kwargs.get("fallback_model"),
+                                    cache_hit=False,
+                                    metadata={
+                                        "stream": stream,
+                                        "error_category": error_classification.get("category"),
+                                        "retryable": error_classification.get("retryable"),
+                                    },
+                                )
+                            except Exception as hist_e:
+                                logger.debug(f"Failed to save gateway error history (non-critical): {hist_e}")
+                        
                         raise
         else:
             # No OTEL - execute without tracing
@@ -1327,6 +1372,43 @@ class LiteLLMGateway:
                 **kwargs,
             )
 
+            # Save request history (non-blocking)
+            if self.gateway_request_history_dal:
+                try:
+                    request_id = f"gateway_req_{uuid.uuid4().hex[:16]}"
+                    correlation_id = kwargs.get("correlation_id") or f"corr_{uuid.uuid4().hex[:16]}"
+                    await self.gateway_request_history_dal.save_request(
+                        request_id=request_id,
+                        operation_type="generate",
+                        model=model_name or model,
+                        tenant_id=tenant_id,
+                        user_id=kwargs.get("user_id"),
+                        conversation_id=kwargs.get("conversation_id"),
+                        session_id=kwargs.get("session_id"),
+                        correlation_id=correlation_id,
+                        prompt=prompt,
+                        messages=messages,
+                        response_text=text,
+                        response_data=raw_response,
+                        usage=usage,
+                        latency_ms=(time.time() - start_time) * 1000,
+                        status="success" if status == LLMOperationStatus.SUCCESS else "error",
+                        error_message=no_otel_error_message[0],
+                        error_type=type(no_otel_error_message[0]).__name__ if no_otel_error_message[0] else None,
+                        retry_count=kwargs.get("retry_count", 0),
+                        fallback_used=kwargs.get("fallback_used", False),
+                        fallback_model=kwargs.get("fallback_model"),
+                        cache_hit=cached_response is not None,
+                        metadata={
+                            "stream": stream,
+                            "finish_reason": finish_reason,
+                            "model_requested": model,
+                            "model_used": model_name,
+                        },
+                    )
+                except Exception as e:
+                    logger.debug(f"Failed to save gateway request history (non-critical): {e}")
+
             return generate_response
 
     def embed(
@@ -1413,7 +1495,7 @@ class LiteLLMGateway:
         return embeddings, model_name, usage
 
     async def embed_async(
-        self, texts: List[str], model: str = "text-embedding-3-small", **kwargs: Any
+        self, texts: List[str], model: str = "text-embedding-3-small", tenant_id: Optional[str] = None, **kwargs: Any
     ) -> EmbedResponse:
         """
         Generate embeddings asynchronously.
@@ -1421,23 +1503,95 @@ class LiteLLMGateway:
         Args:
             texts (List[str]): Input parameter for this operation.
             model (str): Model name or identifier to use.
+            tenant_id: Optional tenant identifier.
             **kwargs (Any): Input parameter for this operation.
         
         Returns:
             EmbedResponse: Result of the operation.
         """
-        if self.router:
-            response = await self.router.aembedding(model=model, input=texts, **kwargs)
-        else:
-            response = await aembedding(model=model, input=texts, **kwargs)
+        start_time = time.time()
+        
+        try:
+            if self.router:
+                response = await self.router.aembedding(model=model, input=texts, **kwargs)
+            else:
+                response = await aembedding(model=model, input=texts, **kwargs)
 
-        # Extract embeddings (litellm types are incomplete, using runtime checks)
-        if isinstance(response, dict):
-            embeddings, model_name, usage = self._extract_embeddings_from_dict(response, model)
-        else:
-            embeddings, model_name, usage = self._extract_embeddings_from_object(response, model)
+            # Extract embeddings (litellm types are incomplete, using runtime checks)
+            if isinstance(response, dict):
+                embeddings, model_name, usage = self._extract_embeddings_from_dict(response, model)
+            else:
+                embeddings, model_name, usage = self._extract_embeddings_from_object(response, model)
 
-        return EmbedResponse(embeddings=embeddings, model=model_name or model, usage=usage)
+            result = EmbedResponse(embeddings=embeddings, model=model_name or model, usage=usage)
+
+            # Save request history (non-blocking)
+            if self.gateway_request_history_dal:
+                try:
+                    request_id = f"gateway_req_{uuid.uuid4().hex[:16]}"
+                    correlation_id = kwargs.get("correlation_id") or f"corr_{uuid.uuid4().hex[:16]}"
+                    await self.gateway_request_history_dal.save_request(
+                        request_id=request_id,
+                        operation_type="embed",
+                        model=model_name or model,
+                        tenant_id=tenant_id,
+                        user_id=kwargs.get("user_id"),
+                        conversation_id=kwargs.get("conversation_id"),
+                        session_id=kwargs.get("session_id"),
+                        correlation_id=correlation_id,
+                        prompt=", ".join(texts[:3]) if texts else None,  # First 3 texts as prompt preview
+                        response_data={"embeddings_count": len(embeddings), "texts_count": len(texts)},
+                        usage=usage,
+                        latency_ms=(time.time() - start_time) * 1000,
+                        status="success",
+                        retry_count=kwargs.get("retry_count", 0),
+                        fallback_used=kwargs.get("fallback_used", False),
+                        fallback_model=kwargs.get("fallback_model"),
+                        cache_hit=False,
+                        metadata={
+                            "model_requested": model,
+                            "model_used": model_name,
+                            "texts_count": len(texts),
+                        },
+                    )
+                except Exception as e:
+                    logger.debug(f"Failed to save gateway embed history (non-critical): {e}")
+
+            return result
+        except Exception as e:
+            # Save error to request history (non-blocking)
+            if self.gateway_request_history_dal:
+                try:
+                    request_id = f"gateway_req_{uuid.uuid4().hex[:16]}"
+                    correlation_id = kwargs.get("correlation_id") or f"corr_{uuid.uuid4().hex[:16]}"
+                    error_classification = self._classify_error(e)
+                    await self.gateway_request_history_dal.save_request(
+                        request_id=request_id,
+                        operation_type="embed",
+                        model=model,
+                        tenant_id=tenant_id,
+                        user_id=kwargs.get("user_id"),
+                        conversation_id=kwargs.get("conversation_id"),
+                        session_id=kwargs.get("session_id"),
+                        correlation_id=correlation_id,
+                        prompt=", ".join(texts[:3]) if texts else None,
+                        latency_ms=(time.time() - start_time) * 1000,
+                        status="error",
+                        error_message=str(e),
+                        error_type=type(e).__name__,
+                        retry_count=kwargs.get("retry_count", 0),
+                        fallback_used=kwargs.get("fallback_used", False),
+                        fallback_model=kwargs.get("fallback_model"),
+                        cache_hit=False,
+                        metadata={
+                            "error_category": error_classification.get("category"),
+                            "retryable": error_classification.get("retryable"),
+                            "texts_count": len(texts) if texts else 0,
+                        },
+                    )
+                except Exception as hist_e:
+                    logger.debug(f"Failed to save gateway embed error history (non-critical): {hist_e}")
+            raise
 
     async def encode_llm_request(
         self,

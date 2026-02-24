@@ -73,6 +73,14 @@ class RAGSystem:
             self.document_dal = DocumentDAL(db)
         else:
             self.document_dal = document_dal
+        
+        # Initialize RAGQueryHistoryDAL if not provided
+        query_history_dal = kwargs.get("query_history_dal")
+        if query_history_dal is None:
+            from ...faas.shared.dal.rag_query_history_dal import RAGQueryHistoryDAL
+            self.query_history_dal = RAGQueryHistoryDAL(db)
+        else:
+            self.query_history_dal = query_history_dal
         self.gateway = gateway
         self.embedding_model = embedding_model
         self.generation_model = generation_model
@@ -509,6 +517,34 @@ class RAGSystem:
                     },
                 ))
 
+            # Save query history (non-blocking, fire and forget)
+            # Note: In sync context, we use _run_async but don't wait for it
+            # This is acceptable as query history is non-critical
+            try:
+                _run_async(
+                    self.query_history_dal.save_query(
+                        query=original_query,
+                        answer=answer if isinstance(answer, str) else str(answer),
+                        tenant_id=tenant_id,
+                        user_id=user_id,
+                        conversation_id=conversation_id,
+                        original_query=original_query,
+                        query_used=query if use_query_rewriting else original_query,
+                        retrieved_documents=retrieved_docs,
+                        num_documents=len(retrieved_docs),
+                        memory_used=len(memories) if memories else 0,
+                        retrieval_strategy=retrieval_strategy,
+                        metadata={
+                            "top_k": top_k,
+                            "threshold": threshold,
+                            "max_tokens": max_tokens,
+                        },
+                    )
+                )
+            except Exception as e:
+                # Log but don't fail query if history save fails
+                logger.debug(f"Failed to save query history (non-critical): {e}")
+
             return result
         except (ConnectionError, TimeoutError) as e:
             # Network/connection errors
@@ -691,6 +727,30 @@ class RAGSystem:
                                 "num_documents": len(retrieved_docs),
                             },
                         )
+
+                    # Save query history (non-blocking, fire and forget)
+                    try:
+                        await self.query_history_dal.save_query(
+                            query=original_query,
+                            answer=answer if isinstance(answer, str) else str(answer),
+                            tenant_id=tenant_id,
+                            user_id=user_id,
+                            conversation_id=conversation_id,
+                            original_query=original_query,
+                            query_used=query if use_query_rewriting else original_query,
+                            retrieved_documents=retrieved_docs,
+                            num_documents=len(retrieved_docs),
+                            memory_used=len(memories) if memories else 0,
+                            retrieval_strategy=retrieval_strategy,
+                            metadata={
+                                "top_k": top_k,
+                                "threshold": threshold,
+                                "max_tokens": max_tokens,
+                            },
+                        )
+                    except Exception as e:
+                        # Log but don't fail query if history save fails
+                        logger.debug(f"Failed to save query history (non-critical): {e}")
 
                     # Record metrics
                     duration = time.time() - start_time

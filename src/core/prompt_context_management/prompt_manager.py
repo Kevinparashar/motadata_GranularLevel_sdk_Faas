@@ -260,6 +260,10 @@ class PromptContextManager:
         template_dal: Optional["PromptTemplateDAL"] = None,
         history_dal: Optional["PromptHistoryDAL"] = None,
         tenant_id: Optional[str] = None,
+        user_id: Optional[str] = None,
+        context_id: Optional[str] = None,
+        load_history_on_init: bool = True,
+        require_persistence: bool = True,
     ) -> None:
         """
         __init__.
@@ -271,14 +275,38 @@ class PromptContextManager:
             otel_metrics: Optional OTEL metrics for metrics collection
             codec_serializer: Optional CodecSerializer instance for message encoding/decoding
             template_dal: Optional PromptTemplateDAL instance for template persistence
-            history_dal: Optional PromptHistoryDAL instance for history persistence
+            history_dal: Optional PromptHistoryDAL instance for history persistence (required for guaranteed persistence when tenant_id is set)
             tenant_id: Optional tenant ID for multi-tenant isolation
+            user_id: Optional user ID for user-specific history
+            context_id: Optional context ID (e.g., conversation_id, agent_id) for context-specific history
+            load_history_on_init: Whether to load history from DAL on initialization (default: True)
+            require_persistence: If True, raise ValueError when tenant_id is set but history_dal is not provided (default: True)
+        
+        Raises:
+            ValueError: If require_persistence is True and tenant_id is set but history_dal is not provided.
         """
+        # Guaranteed persistence: require history_dal when tenant_id is set
+        if require_persistence and tenant_id and not history_dal:
+            raise ValueError(
+                "history_dal is required when tenant_id is provided for guaranteed persistence. "
+                "Provide history_dal or set require_persistence=False to allow in-memory-only storage."
+            )
+        
         self.store = PromptStore(template_dal=template_dal)
         self.history: List[str] = []
         self._history_dal = history_dal
         self._tenant_id = tenant_id
+        self._user_id = user_id
+        self._context_id = context_id
         self.window = ContextWindowManager(max_tokens=max_tokens, safety_margin=safety_margin)
+        
+        # Load context window state from DAL if available
+        if self._history_dal and self._tenant_id and load_history_on_init:
+            self._load_context_window_state()
+        
+        # Load history from DAL if available
+        if self._history_dal and self._tenant_id and load_history_on_init:
+            self._load_history()
 
         # OTEL Integration (optional)
         self.otel_tracer: Optional[Any] = otel_tracer
@@ -312,6 +340,158 @@ class PromptContextManager:
                 self.codec_serializer = create_codec_serializer(codec_type="json")
             except (ImportError, Exception):
                 self.codec_serializer = None
+
+    def _load_history(self) -> None:
+        """
+        Load history from DAL on initialization.
+        
+        This method is called during initialization to restore history from persistent storage.
+        """
+        if not self._history_dal or not self._tenant_id:
+            return
+        
+        try:
+            import asyncio
+            try:
+                loop = asyncio.get_event_loop()
+                if loop.is_running():
+                    # If loop is running, create task
+                    asyncio.create_task(self._load_history_async())
+                else:
+                    loop.run_until_complete(self._load_history_async())
+            except RuntimeError:
+                # No event loop, create new one
+                asyncio.run(self._load_history_async())
+        except Exception as e:
+            logger = __import__("logging").getLogger(__name__)
+            logger.debug(f"Failed to load history from DAL: {e}")
+
+    async def _load_history_async(self) -> None:
+        """Async helper to load history from DAL."""
+        if not self._history_dal or not self._tenant_id:
+            return
+        
+        try:
+            history_records = await self._history_dal.get_history(
+                tenant_id=self._tenant_id,
+                user_id=self._user_id,
+                context_id=self._context_id,
+                limit=1000,  # Load up to 1000 recent prompts
+                offset=0,
+            )
+            
+            # Restore history in chronological order (oldest first)
+            if history_records:
+                self.history = [record["prompt"] for record in reversed(history_records)]
+        except Exception as e:
+            logger = __import__("logging").getLogger(__name__)
+            logger.debug(f"Failed to load history from DAL: {e}")
+
+    def _load_context_window_state(self) -> None:
+        """
+        Load context window state from DAL on initialization.
+        
+        This method is called during initialization to restore context window state from persistent storage.
+        """
+        if not self._history_dal or not self._tenant_id:
+            return
+        
+        try:
+            import asyncio
+            try:
+                loop = asyncio.get_event_loop()
+                if loop.is_running():
+                    # If loop is running, create task
+                    asyncio.create_task(self._load_context_window_state_async())
+                else:
+                    loop.run_until_complete(self._load_context_window_state_async())
+            except RuntimeError:
+                # No event loop, create new one
+                asyncio.run(self._load_context_window_state_async())
+        except Exception as e:
+            logger = __import__("logging").getLogger(__name__)
+            logger.debug(f"Failed to load context window state from DAL: {e}")
+
+    async def _load_context_window_state_async(self) -> None:
+        """Async helper to load context window state from DAL."""
+        if not self._history_dal or not self._tenant_id:
+            return
+        
+        try:
+            state = await self._history_dal.get_context_window_state(
+                tenant_id=self._tenant_id,
+                user_id=self._user_id,
+                context_id=self._context_id,
+            )
+            
+            if state:
+                # Restore context window settings
+                self.window.max_tokens = state.get("max_tokens", self.window.max_tokens)
+                self.window.safety_margin = state.get("safety_margin", self.window.safety_margin)
+                
+                # Restore window state if available
+                window_state = state.get("window_state")
+                if window_state:
+                    # Store window state for future use
+                    self._window_state = window_state
+        except Exception as e:
+            logger = __import__("logging").getLogger(__name__)
+            logger.debug(f"Failed to load context window state from DAL: {e}")
+
+    def _save_context_window_state(self) -> None:
+        """
+        Save context window state to DAL.
+        
+        This method saves the current context window state for persistence.
+        """
+        if not self._history_dal or not self._tenant_id:
+            return
+        
+        try:
+            import asyncio
+            try:
+                loop = asyncio.get_event_loop()
+                if loop.is_running():
+                    # If loop is running, create task
+                    asyncio.create_task(
+                        self._history_dal.save_context_window_state(
+                            tenant_id=self._tenant_id,
+                            user_id=self._user_id,
+                            context_id=self._context_id,
+                            max_tokens=self.window.max_tokens,
+                            safety_margin=self.window.safety_margin,
+                            current_tokens=sum(self.window.estimate_tokens(p) for p in self.history),
+                            window_state=getattr(self, "_window_state", None),
+                        )
+                    )
+                else:
+                    loop.run_until_complete(
+                        self._history_dal.save_context_window_state(
+                            tenant_id=self._tenant_id,
+                            user_id=self._user_id,
+                            context_id=self._context_id,
+                            max_tokens=self.window.max_tokens,
+                            safety_margin=self.window.safety_margin,
+                            current_tokens=sum(self.window.estimate_tokens(p) for p in self.history),
+                            window_state=getattr(self, "_window_state", None),
+                        )
+                    )
+            except RuntimeError:
+                # No event loop, create new one
+                asyncio.run(
+                    self._history_dal.save_context_window_state(
+                        tenant_id=self._tenant_id,
+                        user_id=self._user_id,
+                        context_id=self._context_id,
+                        max_tokens=self.window.max_tokens,
+                        safety_margin=self.window.safety_margin,
+                        current_tokens=sum(self.window.estimate_tokens(p) for p in self.history),
+                        window_state=getattr(self, "_window_state", None),
+                    )
+                )
+        except Exception as e:
+            logger = __import__("logging").getLogger(__name__)
+            logger.debug(f"Failed to save context window state to DAL: {e}")
 
     def render(
         self,
@@ -511,10 +691,27 @@ class PromptContextManager:
         
         Returns:
             None: Result of the operation.
+        
+        Raises:
+            ValueError: If history_dal is required but not provided (guaranteed persistence mode).
         """
         self.history.append(prompt)
         
-        # Persist to database if DAL is available
+        # Use provided user_id/context_id or fall back to instance defaults
+        effective_user_id = user_id or self._user_id
+        effective_context_id = context_id or self._context_id
+        
+        # Guaranteed persistence: history_dal should be available if tenant_id is set
+        # (This should have been validated in __init__, but check again for safety)
+        if self._tenant_id and not self._history_dal:
+            logger = __import__("logging").getLogger(__name__)
+            logger.warning(
+                "History DAL not available but tenant_id is set. "
+                "History will be stored in-memory only. "
+                "This should not happen if require_persistence=True (default)."
+            )
+        
+        # Persist to database if DAL is available (guaranteed when tenant_id is set)
         if self._history_dal and self._tenant_id:
             import asyncio
             try:
@@ -525,8 +722,8 @@ class PromptContextManager:
                         self._history_dal.save_history(
                             prompt=prompt,
                             tenant_id=self._tenant_id,
-                            user_id=user_id,
-                            context_id=context_id,
+                            user_id=effective_user_id,
+                            context_id=effective_context_id,
                             metadata=metadata,
                         )
                     )
@@ -535,8 +732,8 @@ class PromptContextManager:
                         self._history_dal.save_history(
                             prompt=prompt,
                             tenant_id=self._tenant_id,
-                            user_id=user_id,
-                            context_id=context_id,
+                            user_id=effective_user_id,
+                            context_id=effective_context_id,
                             metadata=metadata,
                         )
                     )
@@ -546,11 +743,14 @@ class PromptContextManager:
                     self._history_dal.save_history(
                         prompt=prompt,
                         tenant_id=self._tenant_id,
-                        user_id=user_id,
-                        context_id=context_id,
+                        user_id=effective_user_id,
+                        context_id=effective_context_id,
                         metadata=metadata,
                     )
                 )
+            
+            # Save context window state after recording history
+            self._save_context_window_state()
 
     def build_context_with_history(self, new_message: str) -> str:
         """
@@ -577,6 +777,29 @@ class PromptContextManager:
             str: Returned text value.
         """
         return self.window.truncate(prompt, max_tokens=max_tokens)
+
+    def update_context_window(
+        self,
+        max_tokens: Optional[int] = None,
+        safety_margin: Optional[int] = None,
+    ) -> None:
+        """
+        Update context window settings and persist to DAL.
+        
+        Args:
+            max_tokens: Optional new maximum tokens value.
+            safety_margin: Optional new safety margin value.
+        
+        Returns:
+            None: Result of the operation.
+        """
+        if max_tokens is not None:
+            self.window.max_tokens = max_tokens
+        if safety_margin is not None:
+            self.window.safety_margin = safety_margin
+        
+        # Persist context window state
+        self._save_context_window_state()
 
     def strip_sensitive(self, text: str, patterns: Optional[List[str]] = None) -> str:
         """

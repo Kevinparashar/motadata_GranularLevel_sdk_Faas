@@ -52,6 +52,7 @@ class OTELTracer:
         otlp_endpoint: Optional[str] = None,
         environment: Optional[str] = None,
         service_version: Optional[str] = None,
+        otel_trace_context_dal: Optional[Any] = None,
     ):
         """
         Initialize OTEL tracer.
@@ -66,6 +67,7 @@ class OTELTracer:
         self.otlp_endpoint = otlp_endpoint
         self.environment = environment or "development"
         self.service_version = service_version
+        self.otel_trace_context_dal = otel_trace_context_dal
         
         if _OTEL_AVAILABLE and otlp_endpoint:
             try:
@@ -192,6 +194,110 @@ class OTELTracer:
             if merged_attributes:
                 for key, value in merged_attributes.items():
                     span.set_attribute(key, value)
+            
+            # Save trace context (non-blocking) - schedule async task if DAL available
+            if self.otel_trace_context_dal:
+                try:
+                    span_context = span.get_span_context()
+                    if span_context and span_context.is_valid:
+                        # Extract trace context
+                        trace_id = format(span_context.trace_id, "032x")
+                        span_id = format(span_context.span_id, "016x")
+                        trace_flags = span_context.trace_flags
+                        trace_state = str(span_context.trace_state) if hasattr(span_context, "trace_state") else None
+                        
+                        # Get parent span context if available
+                        parent_span_id = None
+                        if parent_context and _OTEL_AVAILABLE:
+                            try:
+                                parent_span = trace.get_current_span(parent_context)
+                                if parent_span:
+                                    parent_span_context = parent_span.get_span_context()
+                                    if parent_span_context and parent_span_context.is_valid:
+                                        parent_span_id = format(parent_span_context.span_id, "016x")
+                            except Exception:
+                                pass
+                        
+                        # Extract baggage
+                        baggage_dict = {}
+                        if _OTEL_AVAILABLE:
+                            try:
+                                from opentelemetry import baggage
+                                from opentelemetry import context as otel_context
+                                
+                                current_ctx = otel_context.get_current()
+                                if current_ctx:
+                                    bag = baggage.from_context(current_ctx)
+                                    if bag:
+                                        for member in bag.get_all():
+                                            baggage_dict[member.key] = member.value
+                            except Exception:
+                                pass
+                        
+                        # Extract correlation_id and tenant context from attributes or baggage
+                        correlation_id = merged_attributes.get("correlation_id") or baggage_dict.get("correlation_id")
+                        tenant_id = merged_attributes.get("tenant.id") or merged_attributes.get("tenant_id") or baggage_dict.get("tenant_id")
+                        user_id = merged_attributes.get("user.id") or merged_attributes.get("user_id") or baggage_dict.get("user_id")
+                        operation_name = merged_attributes.get("operation.name") or merged_attributes.get("operation_name")
+                        
+                        # Schedule async save (fire and forget)
+                        try:
+                            import asyncio
+                            try:
+                                # Try to get running loop
+                                loop = asyncio.get_running_loop()
+                                # If loop is running, create task
+                                asyncio.create_task(
+                                    self.otel_trace_context_dal.save_trace_context(
+                                        trace_id=trace_id,
+                                        span_id=span_id,
+                                        correlation_id=correlation_id,
+                                        parent_span_id=parent_span_id,
+                                        trace_flags=trace_flags,
+                                        trace_state=trace_state,
+                                        baggage=baggage_dict if baggage_dict else None,
+                                        service_name=self.service_name,
+                                        span_name=name,
+                                        tenant_id=tenant_id,
+                                        user_id=user_id,
+                                        operation_name=operation_name,
+                                        metadata={"environment": self.environment, "service_version": self.service_version},
+                                    )
+                                )
+                            except RuntimeError:
+                                # No running loop, try to get event loop
+                                try:
+                                    loop = asyncio.get_event_loop()
+                                    if loop.is_running():
+                                        # Loop is running but get_running_loop failed, create task anyway
+                                        asyncio.create_task(
+                                            self.otel_trace_context_dal.save_trace_context(
+                                                trace_id=trace_id,
+                                                span_id=span_id,
+                                                correlation_id=correlation_id,
+                                                parent_span_id=parent_span_id,
+                                                trace_flags=trace_flags,
+                                                trace_state=trace_state,
+                                                baggage=baggage_dict if baggage_dict else None,
+                                                service_name=self.service_name,
+                                                span_name=name,
+                                                tenant_id=tenant_id,
+                                                user_id=user_id,
+                                                operation_name=operation_name,
+                                                metadata={"environment": self.environment, "service_version": self.service_version},
+                                            )
+                                        )
+                                    else:
+                                        # No loop running, skip persistence (can't run async from sync)
+                                        logger.debug("No running event loop for trace context persistence")
+                                except RuntimeError:
+                                    # No event loop at all, skip persistence
+                                    logger.debug("No event loop available for trace context persistence")
+                        except Exception as e:
+                            # Any other error, skip persistence
+                            logger.debug(f"Failed to schedule trace context persistence: {e}")
+                except Exception as e:
+                    logger.debug(f"Failed to save trace context (non-critical): {e}")
             
             return OTELSpan(name, span=span, attributes=merged_attributes)
         except Exception as e:

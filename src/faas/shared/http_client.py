@@ -8,6 +8,8 @@ inter-service communication in FaaS architecture.
 
 import asyncio
 import logging
+import time
+import uuid
 from typing import Any, Dict, Optional
 
 import httpx
@@ -56,6 +58,7 @@ class ServiceHTTPClient:
         timeout: float = 30.0,
         max_retries: int = 3,
         circuit_breaker_config: Optional[CircuitBreakerConfig] = None,
+        faas_request_context_dal: Optional[Any] = None,
     ):
         """
         Initialize service HTTP client.
@@ -67,12 +70,14 @@ class ServiceHTTPClient:
             timeout (float): Input parameter for this operation.
             max_retries (int): Input parameter for this operation.
             circuit_breaker_config (Optional[CircuitBreakerConfig]): Input parameter for this operation.
+            faas_request_context_dal: Optional FaaSRequestContextDAL for request context tracking.
         """
         self.service_name = service_name
         self.service_url = service_url.rstrip("/")
         self.config = config
         self.timeout = timeout
         self.max_retries = max_retries
+        self.faas_request_context_dal = faas_request_context_dal
 
         # Initialize circuit breaker
         self.circuit_breaker = CircuitBreaker(
@@ -225,25 +230,74 @@ class ServiceHTTPClient:
             ServiceClientError: Raised when this function detects an invalid state or when an underlying call fails.
             last_error: Raised when this function detects an invalid state or when an underlying call fails.
         """
+        start_time = time.time()
+        request_id = f"req_{uuid.uuid4().hex[:16]}"
+        correlation_id = headers.get("X-Correlation-ID") if headers else None
+        parent_request_id = headers.get("X-Request-ID") if headers else None
+        tenant_id = headers.get("X-Tenant-ID") if headers else None
+        user_id = headers.get("X-User-ID") if headers else None
+        
+        # Generate new request ID for child call
+        child_headers = (headers or {}).copy()
+        child_headers["X-Request-ID"] = request_id
+        if not correlation_id:
+            correlation_id = f"corr_{uuid.uuid4().hex[:16]}"
+            child_headers["X-Correlation-ID"] = correlation_id
+        
         max_retries = self.max_retries
         last_error = None
+        status = "success"
+        status_code = None
+        error_message = None
+        response_data = None
 
         for attempt in range(max_retries):
             try:
                 response = await self._make_request(
-                    "POST", endpoint, headers=headers, json_data=json_data, params=params
+                    "POST", endpoint, headers=child_headers, json_data=json_data, params=params
                 )
-                return response.json()
+                response_data = response.json()
+                status_code = response.status_code
+                return response_data
             except ServiceUnavailableError:
+                status = "error"
+                error_message = "Service unavailable"
                 # Circuit breaker is open, don't retry
                 raise
             except ServiceClientError as e:
                 last_error = e
+                status = "error"
+                error_message = str(e)
                 if attempt < max_retries - 1:
                     wait_time = min(2**attempt, 10)  # Cap at 10 seconds
                     await asyncio.sleep(wait_time)
                     continue
                 raise
+
+        # Save service call context (non-blocking) - always execute
+        if self.faas_request_context_dal:
+            try:
+                latency_ms = (time.time() - start_time) * 1000
+                await self.faas_request_context_dal.save_service_call(
+                    service_name=self.service_name,
+                    endpoint=endpoint,
+                    method="POST",
+                    correlation_id=correlation_id or f"corr_{uuid.uuid4().hex[:16]}",
+                    request_id=request_id,
+                    parent_request_id=parent_request_id,
+                    parent_service=None,  # Could be extracted from headers if needed
+                    tenant_id=tenant_id,
+                    user_id=user_id,
+                    status_code=status_code,
+                    status=status,
+                    error_message=error_message,
+                    latency_ms=latency_ms,
+                    request_data=json_data,
+                    response_data=response_data,
+                    metadata={"attempts": max_retries if last_error else 1},
+                )
+            except Exception as e:
+                logger.debug(f"Failed to save service call context (non-critical): {e}")
 
         if last_error:
             raise last_error

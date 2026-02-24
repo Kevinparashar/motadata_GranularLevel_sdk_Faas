@@ -5,9 +5,12 @@ Maps query intents to appropriate service endpoints and routing strategies.
 """
 
 import logging
-from typing import Any, Dict, Optional
+from typing import Any, Dict, Optional, TYPE_CHECKING
 
 from .query_router import QueryIntent
+
+if TYPE_CHECKING:
+    from ...faas.shared.dal.orchestrator_context_dal import OrchestratorContextDAL
 
 logger = logging.getLogger(__name__)
 
@@ -19,14 +22,20 @@ class ServiceSelector:
     Maps intents to service endpoints and provides routing configuration.
     """
 
-    def __init__(self, config: Optional[Any] = None):
+    def __init__(
+        self,
+        config: Optional[Any] = None,
+        orchestrator_context_dal: Optional["OrchestratorContextDAL"] = None,
+    ):
         """
         Initialize service selector.
 
         Args:
             config: Optional service configuration
+            orchestrator_context_dal: Optional OrchestratorContextDAL for persistence
         """
         self.config = config
+        self.orchestrator_context_dal = orchestrator_context_dal
 
         # Intent to service mapping
         self._intent_service_map: Dict[str, Dict[str, Any]] = {
@@ -94,6 +103,9 @@ class ServiceSelector:
         query: str,
         context: Optional[Dict[str, Any]] = None,
         tenant_id: Optional[str] = None,
+        user_id: Optional[str] = None,
+        correlation_id: Optional[str] = None,
+        request_id: Optional[str] = None,
     ) -> Dict[str, Any]:
         """
         Select service and endpoint based on intent.
@@ -103,6 +115,9 @@ class ServiceSelector:
             query: User query text
             context: Optional context (agent_id, model_id, etc.)
             tenant_id: Optional tenant ID
+            user_id: Optional user identifier
+            correlation_id: Optional correlation ID
+            request_id: Optional request ID
 
         Returns:
             Service routing configuration
@@ -119,33 +134,73 @@ class ServiceSelector:
 
         # Resolve endpoint with context
         endpoint = endpoint_template
+        fallback_used = False
+        routing_reason = None
         if requires_agent_id:
             agent_id = self._extract_agent_id(context, query)
             if agent_id:
                 endpoint = endpoint_template.replace("{agent_id}", agent_id)
+                routing_reason = f"Agent ID {agent_id} found in context"
             elif fallback_service:
                 # Fallback to gateway if agent_id not available
                 logger.warning(f"Agent ID required but not found, falling back to {fallback_service}")
-                return self._get_fallback_config(fallback_service, query)
+                result = self._get_fallback_config(fallback_service, query)
+                fallback_used = True
+                # Save routing decision (fire-and-forget)
+                self._save_routing_decision_async(
+                    intent, query, result["service"], result["endpoint"],
+                    f"Fallback to {fallback_service} (agent_id not found)",
+                    tenant_id, user_id, correlation_id, request_id,
+                    fallback_used, fallback_service, result,
+                )
+                return result
             else:
                 # Cannot route without agent_id
                 logger.error(f"Cannot route {intent} without agent_id")
-                return self._get_fallback_config("gateway", query)
+                result = self._get_fallback_config("gateway", query)
+                fallback_used = True
+                # Save routing decision (fire-and-forget)
+                self._save_routing_decision_async(
+                    intent, query, result["service"], result["endpoint"],
+                    "Fallback to gateway (agent_id required but not found)",
+                    tenant_id, user_id, correlation_id, request_id,
+                    fallback_used, "gateway", result,
+                )
+                return result
 
         # Handle model_id for ML predictions
         if "{model_id}" in endpoint:
             model_id = self._extract_model_id(context, query)
             if model_id:
                 endpoint = endpoint.replace("{model_id}", model_id)
+                routing_reason = f"Model ID {model_id} found in context"
             elif fallback_service:
-                return self._get_fallback_config(fallback_service, query)
+                result = self._get_fallback_config(fallback_service, query)
+                fallback_used = True
+                # Save routing decision (fire-and-forget)
+                self._save_routing_decision_async(
+                    intent, query, result["service"], result["endpoint"],
+                    f"Fallback to {fallback_service} (model_id not found)",
+                    tenant_id, user_id, correlation_id, request_id,
+                    fallback_used, fallback_service, result,
+                )
+                return result
             else:
-                return self._get_fallback_config("gateway", query)
+                result = self._get_fallback_config("gateway", query)
+                fallback_used = True
+                # Save routing decision (fire-and-forget)
+                self._save_routing_decision_async(
+                    intent, query, result["service"], result["endpoint"],
+                    "Fallback to gateway (model_id required but not found)",
+                    tenant_id, user_id, correlation_id, request_id,
+                    fallback_used, "gateway", result,
+                )
+                return result
 
         # Build request payload based on intent
         payload = self._build_payload(intent, query, context)
 
-        return {
+        result = {
             "service": service_name,
             "endpoint": endpoint,
             "method": method,
@@ -153,6 +208,61 @@ class ServiceSelector:
             "intent": intent,
             "fallback_service": fallback_service,
         }
+
+        # Save routing decision (fire-and-forget)
+        self._save_routing_decision_async(
+            intent, query, service_name, endpoint, routing_reason or "Standard routing",
+            tenant_id, user_id, correlation_id, request_id,
+            fallback_used, fallback_service, result,
+        )
+
+        return result
+
+    def _save_routing_decision_async(
+        self,
+        intent: str,
+        query: str,
+        service_name: str,
+        endpoint: str,
+        routing_reason: Optional[str],
+        tenant_id: Optional[str],
+        user_id: Optional[str],
+        correlation_id: Optional[str],
+        request_id: Optional[str],
+        fallback_used: bool,
+        fallback_service: Optional[str],
+        routing_config: Dict[str, Any],
+    ) -> None:
+        """Helper method to save routing decision asynchronously (fire-and-forget)."""
+        if not self.orchestrator_context_dal:
+            return
+        
+        try:
+            import asyncio
+            try:
+                asyncio.get_running_loop()
+                # We're in an async context, create a task
+                asyncio.create_task(
+                    self.orchestrator_context_dal.save_routing_decision(
+                        intent=intent,
+                        query=query,
+                        service_name=service_name,
+                        endpoint=endpoint,
+                        routing_reason=routing_reason,
+                        tenant_id=tenant_id,
+                        user_id=user_id,
+                        correlation_id=correlation_id,
+                        request_id=request_id,
+                        fallback_used=fallback_used,
+                        fallback_service=fallback_service,
+                        routing_config=routing_config,
+                    )
+                )
+            except RuntimeError:
+                # No event loop running, skip
+                pass
+        except Exception as e:
+            logger.debug(f"Failed to save routing decision to DAL: {e}")
 
     def _extract_agent_id(self, context: Optional[Dict[str, Any]], query: str) -> Optional[str]:
         """
@@ -313,15 +423,19 @@ class ServiceSelector:
         }
 
 
-def create_service_selector(config: Optional[Any] = None) -> ServiceSelector:
+def create_service_selector(
+    config: Optional[Any] = None,
+    orchestrator_context_dal: Optional["OrchestratorContextDAL"] = None,
+) -> ServiceSelector:
     """
     Create a service selector instance.
 
     Args:
         config: Optional service configuration
+        orchestrator_context_dal: Optional OrchestratorContextDAL for persistence
 
     Returns:
         ServiceSelector instance
     """
-    return ServiceSelector(config=config)
+    return ServiceSelector(config=config, orchestrator_context_dal=orchestrator_context_dal)
 

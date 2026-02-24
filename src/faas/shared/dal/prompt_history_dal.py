@@ -182,3 +182,113 @@ class PromptHistoryDAL:
         )
         return result if result else 0
 
+    async def save_context_window_state(
+        self,
+        tenant_id: str,
+        user_id: Optional[str] = None,
+        context_id: Optional[str] = None,
+        max_tokens: int = 4000,
+        safety_margin: int = 200,
+        current_tokens: int = 0,
+        window_state: Optional[Dict[str, Any]] = None,
+        metadata: Optional[Dict[str, Any]] = None,
+    ) -> str:
+        """
+        Save context window state.
+
+        Args:
+            tenant_id: Tenant identifier.
+            user_id: Optional user identifier.
+            context_id: Optional context identifier.
+            max_tokens: Maximum tokens for context window.
+            safety_margin: Safety margin for token estimation.
+            current_tokens: Current token count.
+            window_state: Optional window state dictionary.
+            metadata: Optional metadata.
+
+        Returns:
+            State record ID.
+        """
+        import uuid
+        state_id = f"context_window_state_{uuid.uuid4().hex[:16]}"
+
+        result = await self.db.execute_query(
+            """
+            INSERT INTO prompt_context_window_state (
+                state_id, tenant_id, user_id, context_id, max_tokens, safety_margin,
+                current_tokens, window_state, metadata, created_at, updated_at
+            ) VALUES (
+                $1, $2, $3, $4, $5, $6, $7, $8::jsonb, $9::jsonb, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP
+            )
+            ON CONFLICT (tenant_id, COALESCE(user_id, ''), COALESCE(context_id, '')) DO UPDATE SET
+                max_tokens = EXCLUDED.max_tokens,
+                safety_margin = EXCLUDED.safety_margin,
+                current_tokens = EXCLUDED.current_tokens,
+                window_state = EXCLUDED.window_state,
+                metadata = EXCLUDED.metadata,
+                updated_at = CURRENT_TIMESTAMP
+            RETURNING state_id;
+            """,
+            params=(
+                state_id,
+                tenant_id,
+                user_id,
+                context_id,
+                max_tokens,
+                safety_margin,
+                current_tokens,
+                json.dumps(window_state) if window_state else None,
+                json.dumps(metadata or {}),
+            ),
+            fetch_one=True,
+        )
+        return str(result["state_id"]) if result else state_id
+
+    async def get_context_window_state(
+        self,
+        tenant_id: str,
+        user_id: Optional[str] = None,
+        context_id: Optional[str] = None,
+    ) -> Optional[Dict[str, Any]]:
+        """
+        Get context window state.
+
+        Args:
+            tenant_id: Tenant identifier.
+            user_id: Optional user identifier.
+            context_id: Optional context identifier.
+
+        Returns:
+            Context window state record or None.
+        """
+        result = await self.db.execute_query(
+            """
+            SELECT 
+                state_id, tenant_id, user_id, context_id, max_tokens, safety_margin,
+                current_tokens, window_state, metadata, created_at, updated_at
+            FROM prompt_context_window_state
+            WHERE tenant_id = $1
+                AND COALESCE(user_id, '') = COALESCE($2, '')
+                AND COALESCE(context_id, '') = COALESCE($3, '')
+            ORDER BY updated_at DESC
+            LIMIT 1
+            """,
+            params=(tenant_id, user_id, context_id),
+            fetch_one=True,
+        )
+
+        if result:
+            if result.get("window_state"):
+                result["window_state"] = (
+                    json.loads(result["window_state"])
+                    if isinstance(result["window_state"], str)
+                    else result["window_state"]
+                )
+            if result.get("metadata"):
+                result["metadata"] = (
+                    json.loads(result["metadata"])
+                    if isinstance(result["metadata"], str)
+                    else result["metadata"]
+                )
+        return result
+

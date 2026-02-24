@@ -8,9 +8,12 @@ import hashlib
 import json
 import logging
 from enum import Enum
-from typing import Any, Dict, Optional
+from typing import Any, Dict, Optional, TYPE_CHECKING
 
 from ...core.utils.type_helpers import GatewayProtocol
+
+if TYPE_CHECKING:
+    from ...faas.shared.dal.orchestrator_context_dal import OrchestratorContextDAL
 
 logger = logging.getLogger(__name__)
 
@@ -40,6 +43,7 @@ class QueryRouter:
         gateway: GatewayProtocol,
         enable_llm_classification: bool = True,
         cache: Optional[Any] = None,
+        orchestrator_context_dal: Optional["OrchestratorContextDAL"] = None,
     ):
         """
         Initialize query router.
@@ -48,10 +52,12 @@ class QueryRouter:
             gateway: LiteLLM Gateway instance for intent classification
             enable_llm_classification: Whether to use LLM for intent analysis
             cache: Optional cache for intent classification results
+            orchestrator_context_dal: Optional OrchestratorContextDAL for persistence
         """
         self.gateway = gateway
         self.enable_llm_classification = enable_llm_classification
         self.cache = cache
+        self.orchestrator_context_dal = orchestrator_context_dal
 
         # Intent classification prompt template
         self._intent_prompt_template = """Analyze the following user query and determine the most appropriate intent.
@@ -83,7 +89,14 @@ Respond with ONLY the intent name (e.g., "agent_chat") and optionally a confiden
         return hashlib.sha256(query.encode()).hexdigest()
 
     async def analyze_intent(
-        self, query: str, tenant_id: Optional[str] = None, context: Optional[Dict[str, Any]] = None
+        self,
+        query: str,
+        tenant_id: Optional[str] = None,
+        context: Optional[Dict[str, Any]] = None,
+        user_id: Optional[str] = None,
+        conversation_id: Optional[str] = None,
+        session_id: Optional[str] = None,
+        correlation_id: Optional[str] = None,
     ) -> Dict[str, Any]:
         """
         Analyze query intent using LLM or pattern matching.
@@ -92,6 +105,10 @@ Respond with ONLY the intent name (e.g., "agent_chat") and optionally a confiden
             query: User query text
             tenant_id: Optional tenant ID for caching
             context: Optional context (conversation history, metadata)
+            user_id: Optional user identifier
+            conversation_id: Optional conversation identifier
+            session_id: Optional session identifier
+            correlation_id: Optional correlation ID
 
         Returns:
             Dictionary with intent, confidence, and reasoning
@@ -104,24 +121,69 @@ Respond with ONLY the intent name (e.g., "agent_chat") and optionally a confiden
             }
 
         # Check cache first
+        cache_hit = False
+        analysis_method = "llm" if self.enable_llm_classification else "pattern"
         if self.cache and tenant_id:
             cache_key = f"intent:{tenant_id}:{self._hash_query(query)}"
             cached = await self.cache.get(cache_key, tenant_id=tenant_id)
             if cached:
                 logger.debug(f"Cache hit for intent analysis: {query[:50]}")
+                cache_hit = True
+                analysis_method = "cached"
+                # Save to DAL if available
+                if self.orchestrator_context_dal:
+                    try:
+                        await self.orchestrator_context_dal.save_intent_analysis(
+                            query=query,
+                            intent=cached.get("intent", QueryIntent.UNKNOWN.value),
+                            confidence=cached.get("confidence", 0.0),
+                            reasoning=cached.get("reasoning"),
+                            tenant_id=tenant_id,
+                            user_id=user_id,
+                            conversation_id=conversation_id,
+                            session_id=session_id,
+                            correlation_id=correlation_id,
+                            analysis_method=analysis_method,
+                            cache_hit=True,
+                            context_used=context,
+                        )
+                    except Exception as e:
+                        logger.debug(f"Failed to save intent analysis to DAL: {e}")
                 return cached
 
         # Use LLM classification if enabled
         if self.enable_llm_classification:
             intent_result = await self._classify_with_llm(query, context)
+            analysis_method = "llm"
         else:
             # Fallback to pattern matching
             intent_result = self._classify_with_patterns(query)
+            analysis_method = "pattern"
 
         # Cache result
         if self.cache and tenant_id:
             cache_key = f"intent:{tenant_id}:{self._hash_query(query)}"
             await self.cache.set(cache_key, intent_result, tenant_id=tenant_id, ttl=3600)
+
+        # Save to DAL if available
+        if self.orchestrator_context_dal:
+            try:
+                await self.orchestrator_context_dal.save_intent_analysis(
+                    query=query,
+                    intent=intent_result.get("intent", QueryIntent.UNKNOWN.value),
+                    confidence=intent_result.get("confidence", 0.0),
+                    reasoning=intent_result.get("reasoning"),
+                    tenant_id=tenant_id,
+                    user_id=user_id,
+                    conversation_id=conversation_id,
+                    session_id=session_id,
+                    correlation_id=correlation_id,
+                    analysis_method=analysis_method,
+                    cache_hit=cache_hit,
+                    context_used=context,
+                )
+            except Exception as e:
+                logger.debug(f"Failed to save intent analysis to DAL: {e}")
 
         return intent_result
 
@@ -283,6 +345,7 @@ def create_query_router(
     gateway: GatewayProtocol,
     enable_llm_classification: bool = True,
     cache: Optional[Any] = None,
+    orchestrator_context_dal: Optional["OrchestratorContextDAL"] = None,
 ) -> QueryRouter:
     """
     Create a query router instance.
@@ -291,6 +354,7 @@ def create_query_router(
         gateway: LiteLLM Gateway instance
         enable_llm_classification: Whether to use LLM for intent analysis
         cache: Optional cache for intent classification results
+        orchestrator_context_dal: Optional OrchestratorContextDAL for persistence
 
     Returns:
         QueryRouter instance
@@ -299,5 +363,6 @@ def create_query_router(
         gateway=gateway,
         enable_llm_classification=enable_llm_classification,
         cache=cache,
+        orchestrator_context_dal=orchestrator_context_dal,
     )
 

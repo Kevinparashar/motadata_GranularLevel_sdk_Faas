@@ -20,6 +20,7 @@ from ...orchestrator import (
 )
 from ...shared.config import ServiceConfig
 from ...shared.contracts import extract_headers, StandardHeaders
+from ...shared.dal.orchestrator_context_dal import OrchestratorContextDAL
 from ...shared.http_client import ServiceClientManager, ServiceClientError
 from ...shared.middleware import setup_middleware
 from .models import (
@@ -111,15 +112,22 @@ class OrchestratorService:
             api_keys={"openai": openai_api_key},
         )
 
+        # Initialize orchestrator context DAL
+        self.orchestrator_context_dal = OrchestratorContextDAL(self.db) if self.db else None
+
         # Initialize query router
         self.query_router = create_query_router(
             gateway=self.gateway,
             enable_llm_classification=True,
             cache=self.cache_mechanism,
+            orchestrator_context_dal=self.orchestrator_context_dal,
         )
 
         # Initialize service selector
-        self.service_selector = create_service_selector(config=self.config)
+        self.service_selector = create_service_selector(
+            config=self.config,
+            orchestrator_context_dal=self.orchestrator_context_dal,
+        )
 
         # Initialize service client manager
         self.service_clients = ServiceClientManager(self.config)
@@ -158,7 +166,9 @@ class OrchestratorService:
         Returns:
             Orchestration response
         """
+        import time
         standard_headers = headers
+        start_time = time.time()
 
         # Start OTEL trace
         span = None
@@ -182,7 +192,8 @@ class OrchestratorService:
                     logger.info(f"Cache hit for query: {request.query[:50]}")
                     if span:
                         span.set_attribute("orchestrator.cached", True)
-                    return OrchestrateResponse(
+                    latency_ms = (time.time() - start_time) * 1000
+                    orchestrate_response = OrchestrateResponse(
                         success=True,
                         data=cached_response.get("data"),
                         intent=cached_response.get("intent", "unknown"),
@@ -194,6 +205,31 @@ class OrchestratorService:
                         request_id=standard_headers.request_id,
                         metadata=cached_response.get("metadata", {}),
                     )
+
+                    # Save orchestration request to history (cached case)
+                    if self.orchestrator_context_dal:
+                        try:
+                            await self.orchestrator_context_dal.save_orchestration_request(
+                                request_id=standard_headers.request_id,
+                                correlation_id=standard_headers.correlation_id,
+                                query=request.query,
+                                intent=cached_response.get("intent", "unknown"),
+                                service_name=cached_response.get("service", "unknown"),
+                                endpoint=cached_response.get("endpoint", ""),
+                                tenant_id=standard_headers.tenant_id,
+                                user_id=standard_headers.user_id,
+                                conversation_id=request.context.get("conversation_id") if request.context else None,
+                                session_id=request.context.get("session_id") if request.context else None,
+                                request_context=request.context,
+                                response_data=cached_response.get("data"),
+                                status="success",
+                                latency_ms=latency_ms,
+                                cached=True,
+                            )
+                        except Exception as e:
+                            logger.debug(f"Failed to save orchestration request to DAL: {e}")
+
+                    return orchestrate_response
 
             # Analyze intent if not provided
             intent_result = None
@@ -208,6 +244,10 @@ class OrchestratorService:
                     query=request.query,
                     tenant_id=standard_headers.tenant_id,
                     context=request.context,
+                    user_id=standard_headers.user_id,
+                    conversation_id=request.context.get("conversation_id") if request.context else None,
+                    session_id=request.context.get("session_id") if request.context else None,
+                    correlation_id=standard_headers.correlation_id,
                 )
 
             intent = intent_result.get("intent", "unknown")
@@ -221,6 +261,9 @@ class OrchestratorService:
                 query=request.query,
                 context=request.context,
                 tenant_id=standard_headers.tenant_id,
+                user_id=standard_headers.user_id,
+                correlation_id=standard_headers.correlation_id,
+                request_id=standard_headers.request_id,
             )
 
             service_name = routing_config["service"]
@@ -279,7 +322,8 @@ class OrchestratorService:
                         context=request.context,
                     )
 
-                return OrchestrateResponse(
+                latency_ms = (time.time() - start_time) * 1000
+                orchestrate_response = OrchestrateResponse(
                     success=response.get("success", True),
                     data=response_data,
                     intent=intent,
@@ -292,20 +336,98 @@ class OrchestratorService:
                     metadata=response.get("metadata", {}),
                 )
 
+                # Save orchestration request to history
+                if self.orchestrator_context_dal:
+                    try:
+                        await self.orchestrator_context_dal.save_orchestration_request(
+                            request_id=standard_headers.request_id,
+                            correlation_id=standard_headers.correlation_id,
+                            query=request.query,
+                            intent=intent,
+                            service_name=service_name,
+                            endpoint=endpoint,
+                            tenant_id=standard_headers.tenant_id,
+                            user_id=standard_headers.user_id,
+                            conversation_id=request.context.get("conversation_id") if request.context else None,
+                            session_id=request.context.get("session_id") if request.context else None,
+                            request_context=request.context,
+                            routing_config=routing_config,
+                            response_data=response_data,
+                            status="success",
+                            latency_ms=latency_ms,
+                            cached=False,
+                        )
+                    except Exception as e:
+                        logger.debug(f"Failed to save orchestration request to DAL: {e}")
+
+                return orchestrate_response
+
             except ServiceClientError as e:
                 logger.error(f"Service call failed: {e}")
+                latency_ms = (time.time() - start_time) * 1000
                 if span:
                     span.record_exception(e)
                     span.end()
+                
+                # Save orchestration request to history (error case)
+                if self.orchestrator_context_dal:
+                    try:
+                        await self.orchestrator_context_dal.save_orchestration_request(
+                            request_id=standard_headers.request_id,
+                            correlation_id=standard_headers.correlation_id,
+                            query=request.query,
+                            intent=intent,
+                            service_name=service_name,
+                            endpoint=endpoint,
+                            tenant_id=standard_headers.tenant_id,
+                            user_id=standard_headers.user_id,
+                            conversation_id=request.context.get("conversation_id") if request.context else None,
+                            session_id=request.context.get("session_id") if request.context else None,
+                            request_context=request.context,
+                            routing_config=routing_config,
+                            status="error",
+                            error_message=str(e),
+                            latency_ms=latency_ms,
+                            cached=False,
+                        )
+                    except Exception as dal_error:
+                        logger.debug(f"Failed to save orchestration request to DAL: {dal_error}")
+                
                 raise HTTPException(
                     status_code=status.HTTP_502_BAD_GATEWAY,
                     detail=f"Service {service_name} call failed: {str(e)}",
                 )
 
-        except HTTPException:
+        except HTTPException as http_ex:
             # Re-raise HTTP exceptions (they have correct status codes)
+            latency_ms = (time.time() - start_time) * 1000
             if span:
                 span.end()
+            
+            # Save orchestration request to history (HTTP error case)
+            if self.orchestrator_context_dal and hasattr(http_ex, 'status_code'):
+                try:
+                    await self.orchestrator_context_dal.save_orchestration_request(
+                        request_id=standard_headers.request_id,
+                        correlation_id=standard_headers.correlation_id,
+                        query=request.query,
+                        intent=intent if 'intent' in locals() else "unknown",
+                        service_name=service_name if 'service_name' in locals() else "unknown",
+                        endpoint=endpoint if 'endpoint' in locals() else "",
+                        tenant_id=standard_headers.tenant_id,
+                        user_id=standard_headers.user_id,
+                        conversation_id=request.context.get("conversation_id") if request.context else None,
+                        session_id=request.context.get("session_id") if request.context else None,
+                        request_context=request.context,
+                        routing_config=routing_config if 'routing_config' in locals() else None,
+                        status="error",
+                        error_message=http_ex.detail if hasattr(http_ex, 'detail') else str(http_ex),
+                        latency_ms=latency_ms,
+                        cached=False,
+                    )
+                except Exception as dal_error:
+                    logger.debug(f"Failed to save orchestration request to DAL: {dal_error}")
+            
             raise
         except Exception as e:
             logger.error(f"Orchestration failed: {e}", exc_info=True)
