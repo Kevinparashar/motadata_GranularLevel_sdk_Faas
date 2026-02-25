@@ -16,6 +16,10 @@ env/
 .coverage
 coverage.xml
 htmlcov/
+# Pipeline-generated test results
+test-results.xml
+# Coverage JSON (if not already covered by coverage_*.json pattern)
+coverage.json
 
 # Build / packaging
 build/
@@ -30,6 +34,12 @@ dist/
 .vscode/*
 !.vscode/settings.json
 !.vscode/extensions.json
+
+# Environment files (keep .env.example)
+.env
+.env.local
+.env.*
+!.env.example
 
 
 llmops_data/
