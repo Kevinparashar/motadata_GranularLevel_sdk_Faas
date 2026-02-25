@@ -6,7 +6,6 @@ Follows @cursorrules.md: Success ≥2, Edge ≥2, Failure ≥2
 """
 
 
-import hashlib
 import json
 from datetime import datetime
 from unittest.mock import AsyncMock, MagicMock

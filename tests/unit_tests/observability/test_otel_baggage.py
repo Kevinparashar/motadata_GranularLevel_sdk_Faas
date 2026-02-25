@@ -27,7 +27,7 @@ class TestBaggagePropagation:
 
     def test_set_baggage_with_otel_available(self):
         """Test setting baggage when OTEL is available."""
-        with patch("src.core.otel_integration.context_propagation._OTEL_AVAILABLE", True):
+        with patch("src.core.otel_integration.context_propagation._OTEL_AVAILABLE", new=True):
             with patch("src.core.otel_integration.context_propagation.baggage") as mock_baggage:
                 mock_context = MagicMock()
                 mock_baggage.get_current.return_value = mock_context
@@ -41,7 +41,7 @@ class TestBaggagePropagation:
 
     def test_set_baggage_with_context(self):
         """Test setting baggage with provided context."""
-        with patch("src.core.otel_integration.context_propagation._OTEL_AVAILABLE", True):
+        with patch("src.core.otel_integration.context_propagation._OTEL_AVAILABLE", new=True):
             with patch("src.core.otel_integration.context_propagation.baggage") as mock_baggage:
                 provided_context = MagicMock()
                 mock_baggage.set_baggage.return_value = provided_context
@@ -54,7 +54,7 @@ class TestBaggagePropagation:
 
     def test_set_baggage_otel_not_available(self):
         """Test setting baggage when OTEL is not available."""
-        with patch("src.core.otel_integration.context_propagation._OTEL_AVAILABLE", False):
+        with patch("src.core.otel_integration.context_propagation._OTEL_AVAILABLE", new=False):
             context = MagicMock()
             result = set_baggage("tenant_id", "abc-123", context=context)
             
@@ -62,7 +62,7 @@ class TestBaggagePropagation:
 
     def test_set_baggage_exception_handling(self):
         """Test set_baggage handles exceptions gracefully."""
-        with patch("src.core.otel_integration.context_propagation._OTEL_AVAILABLE", True):
+        with patch("src.core.otel_integration.context_propagation._OTEL_AVAILABLE", new=True):
             with patch("src.core.otel_integration.context_propagation.baggage") as mock_baggage:
                 mock_baggage.get_current.side_effect = Exception("Baggage error")
                 context = MagicMock()
@@ -74,7 +74,7 @@ class TestBaggagePropagation:
 
     def test_get_baggage_with_otel_available(self):
         """Test getting baggage when OTEL is available."""
-        with patch("src.core.otel_integration.context_propagation._OTEL_AVAILABLE", True):
+        with patch("src.core.otel_integration.context_propagation._OTEL_AVAILABLE", new=True):
             with patch("src.core.otel_integration.context_propagation.baggage") as mock_baggage:
                 mock_member = MagicMock()
                 mock_member.value = "abc-123"
@@ -93,7 +93,7 @@ class TestBaggagePropagation:
 
     def test_get_baggage_with_context(self):
         """Test getting baggage with provided context."""
-        with patch("src.core.otel_integration.context_propagation._OTEL_AVAILABLE", True):
+        with patch("src.core.otel_integration.context_propagation._OTEL_AVAILABLE", new=True):
             with patch("src.core.otel_integration.context_propagation.baggage") as mock_baggage:
                 mock_member = MagicMock()
                 mock_member.value = "premium"
@@ -110,7 +110,7 @@ class TestBaggagePropagation:
 
     def test_get_baggage_not_found(self):
         """Test getting baggage when key is not found."""
-        with patch("src.core.otel_integration.context_propagation._OTEL_AVAILABLE", True):
+        with patch("src.core.otel_integration.context_propagation._OTEL_AVAILABLE", new=True):
             with patch("src.core.otel_integration.context_propagation.baggage") as mock_baggage:
                 mock_bag = MagicMock()
                 mock_bag.get_member.return_value = None
@@ -123,7 +123,7 @@ class TestBaggagePropagation:
 
     def test_get_baggage_no_bag(self):
         """Test getting baggage when no bag exists."""
-        with patch("src.core.otel_integration.context_propagation._OTEL_AVAILABLE", True):
+        with patch("src.core.otel_integration.context_propagation._OTEL_AVAILABLE", new=True):
             with patch("src.core.otel_integration.context_propagation.baggage") as mock_baggage:
                 mock_baggage.from_context.return_value = None
                 mock_baggage.get_current.return_value = MagicMock()
@@ -134,14 +134,14 @@ class TestBaggagePropagation:
 
     def test_get_baggage_otel_not_available(self):
         """Test getting baggage when OTEL is not available."""
-        with patch("src.core.otel_integration.context_propagation._OTEL_AVAILABLE", False):
+        with patch("src.core.otel_integration.context_propagation._OTEL_AVAILABLE", new=False):
             result = get_baggage("tenant_id")
             
             assert result is None
 
     def test_get_baggage_exception_handling(self):
         """Test get_baggage handles exceptions gracefully."""
-        with patch("src.core.otel_integration.context_propagation._OTEL_AVAILABLE", True):
+        with patch("src.core.otel_integration.context_propagation._OTEL_AVAILABLE", new=True):
             with patch("src.core.otel_integration.context_propagation.baggage") as mock_baggage:
                 mock_baggage.get_current.side_effect = Exception("Baggage error")
                 
@@ -151,7 +151,7 @@ class TestBaggagePropagation:
 
     def test_set_tenant_context_both_values(self):
         """Test setting tenant context with both tenant_id and tenant_tier."""
-        with patch("src.core.otel_integration.context_propagation._OTEL_AVAILABLE", True):
+        with patch("src.core.otel_integration.context_propagation._OTEL_AVAILABLE", new=True):
             with patch("src.core.otel_integration.context_propagation.baggage") as mock_baggage:
                 mock_context1 = MagicMock()
                 mock_context2 = MagicMock()
@@ -167,7 +167,7 @@ class TestBaggagePropagation:
 
     def test_set_tenant_context_tenant_id_only(self):
         """Test setting tenant context with only tenant_id."""
-        with patch("src.core.otel_integration.context_propagation._OTEL_AVAILABLE", True):
+        with patch("src.core.otel_integration.context_propagation._OTEL_AVAILABLE", new=True):
             with patch("src.core.otel_integration.context_propagation.baggage") as mock_baggage:
                 mock_context = MagicMock()
                 mock_baggage.get_current.return_value = None
@@ -181,7 +181,7 @@ class TestBaggagePropagation:
 
     def test_set_tenant_context_with_context(self):
         """Test setting tenant context with provided context."""
-        with patch("src.core.otel_integration.context_propagation._OTEL_AVAILABLE", True):
+        with patch("src.core.otel_integration.context_propagation._OTEL_AVAILABLE", new=True):
             with patch("src.core.otel_integration.context_propagation.baggage") as mock_baggage:
                 provided_context = MagicMock()
                 mock_context2 = MagicMock()
@@ -196,7 +196,7 @@ class TestBaggagePropagation:
 
     def test_set_tenant_context_otel_not_available(self):
         """Test setting tenant context when OTEL is not available."""
-        with patch("src.core.otel_integration.context_propagation._OTEL_AVAILABLE", False):
+        with patch("src.core.otel_integration.context_propagation._OTEL_AVAILABLE", new=False):
             context = MagicMock()
             result = set_tenant_context("abc-123", "premium", context=context)
             
@@ -204,7 +204,7 @@ class TestBaggagePropagation:
 
     def test_set_tenant_context_exception_handling(self):
         """Test set_tenant_context handles exceptions gracefully."""
-        with patch("src.core.otel_integration.context_propagation._OTEL_AVAILABLE", True):
+        with patch("src.core.otel_integration.context_propagation._OTEL_AVAILABLE", new=True):
             with patch("src.core.otel_integration.context_propagation.set_baggage") as mock_set_baggage:
                 mock_set_baggage.side_effect = Exception("Baggage error")
                 context = MagicMock()
@@ -215,7 +215,7 @@ class TestBaggagePropagation:
 
     def test_get_tenant_context_both_values(self):
         """Test getting tenant context with both tenant_id and tenant_tier."""
-        with patch("src.core.otel_integration.context_propagation._OTEL_AVAILABLE", True):
+        with patch("src.core.otel_integration.context_propagation._OTEL_AVAILABLE", new=True):
             with patch("src.core.otel_integration.context_propagation.get_baggage") as mock_get_baggage:
                 mock_get_baggage.side_effect = ["abc-123", "premium"]
                 
@@ -228,7 +228,7 @@ class TestBaggagePropagation:
 
     def test_get_tenant_context_tenant_id_only(self):
         """Test getting tenant context with only tenant_id."""
-        with patch("src.core.otel_integration.context_propagation._OTEL_AVAILABLE", True):
+        with patch("src.core.otel_integration.context_propagation._OTEL_AVAILABLE", new=True):
             with patch("src.core.otel_integration.context_propagation.get_baggage") as mock_get_baggage:
                 mock_get_baggage.side_effect = ["abc-123", None]
                 
@@ -239,7 +239,7 @@ class TestBaggagePropagation:
 
     def test_get_tenant_context_no_values(self):
         """Test getting tenant context when no values are set."""
-        with patch("src.core.otel_integration.context_propagation._OTEL_AVAILABLE", True):
+        with patch("src.core.otel_integration.context_propagation._OTEL_AVAILABLE", new=True):
             with patch("src.core.otel_integration.context_propagation.get_baggage") as mock_get_baggage:
                 mock_get_baggage.return_value = None
                 
@@ -250,7 +250,7 @@ class TestBaggagePropagation:
 
     def test_get_tenant_context_with_context(self):
         """Test getting tenant context with provided context."""
-        with patch("src.core.otel_integration.context_propagation._OTEL_AVAILABLE", True):
+        with patch("src.core.otel_integration.context_propagation._OTEL_AVAILABLE", new=True):
             with patch("src.core.otel_integration.context_propagation.get_baggage") as mock_get_baggage:
                 mock_get_baggage.side_effect = ["abc-123", "premium"]
                 provided_context = MagicMock()
@@ -264,14 +264,14 @@ class TestBaggagePropagation:
 
     def test_get_tenant_context_otel_not_available(self):
         """Test getting tenant context when OTEL is not available."""
-        with patch("src.core.otel_integration.context_propagation._OTEL_AVAILABLE", False):
+        with patch("src.core.otel_integration.context_propagation._OTEL_AVAILABLE", new=False):
             result = get_tenant_context()
             
             assert result == {}
 
     def test_get_tenant_context_exception_handling(self):
         """Test get_tenant_context handles exceptions gracefully."""
-        with patch("src.core.otel_integration.context_propagation._OTEL_AVAILABLE", True):
+        with patch("src.core.otel_integration.context_propagation._OTEL_AVAILABLE", new=True):
             with patch("src.core.otel_integration.context_propagation.get_baggage") as mock_get_baggage:
                 mock_get_baggage.side_effect = Exception("Baggage error")
                 
@@ -285,7 +285,7 @@ class TestBaggageIntegration:
 
     def test_set_and_get_baggage_roundtrip(self):
         """Test setting and getting baggage in a roundtrip."""
-        with patch("src.core.otel_integration.context_propagation._OTEL_AVAILABLE", True):
+        with patch("src.core.otel_integration.context_propagation._OTEL_AVAILABLE", new=True):
             with patch("src.core.otel_integration.context_propagation.baggage") as mock_baggage:
                 # Setup mocks for set_baggage
                 mock_context = MagicMock()
@@ -310,7 +310,7 @@ class TestBaggageIntegration:
 
     def test_set_and_get_tenant_context_roundtrip(self):
         """Test setting and getting tenant context in a roundtrip."""
-        with patch("src.core.otel_integration.context_propagation._OTEL_AVAILABLE", True):
+        with patch("src.core.otel_integration.context_propagation._OTEL_AVAILABLE", new=True):
             with patch("src.core.otel_integration.context_propagation.set_baggage") as mock_set_baggage:
                 with patch("src.core.otel_integration.context_propagation.get_baggage") as mock_get_baggage:
                     mock_context = MagicMock()
@@ -331,7 +331,7 @@ class TestTraceContextPropagation:
 
     def test_inject_trace_context_with_otel_available(self):
         """Test injecting trace context when OTEL is available."""
-        with patch("src.core.otel_integration.context_propagation._OTEL_AVAILABLE", True):
+        with patch("src.core.otel_integration.context_propagation._OTEL_AVAILABLE", new=True):
             with patch("src.core.otel_integration.context_propagation.inject") as mock_inject:
                 with patch("src.core.otel_integration.context_propagation._dict_setter") as mock_setter:
                     carrier = {}
@@ -344,7 +344,7 @@ class TestTraceContextPropagation:
 
     def test_inject_trace_context_otel_not_available(self):
         """Test injecting trace context when OTEL is not available."""
-        with patch("src.core.otel_integration.context_propagation._OTEL_AVAILABLE", False):
+        with patch("src.core.otel_integration.context_propagation._OTEL_AVAILABLE", new=False):
             carrier = {"existing": "value"}
             
             result = inject_trace_context(carrier)
@@ -353,7 +353,7 @@ class TestTraceContextPropagation:
 
     def test_inject_trace_context_exception_handling(self):
         """Test inject_trace_context handles exceptions gracefully."""
-        with patch("src.core.otel_integration.context_propagation._OTEL_AVAILABLE", True):
+        with patch("src.core.otel_integration.context_propagation._OTEL_AVAILABLE", new=True):
             with patch("src.core.otel_integration.context_propagation.inject") as mock_inject:
                 with patch("src.core.otel_integration.context_propagation._dict_setter") as mock_setter:
                     mock_inject.side_effect = Exception("Injection error")
@@ -366,7 +366,7 @@ class TestTraceContextPropagation:
 
     def test_extract_trace_context_with_otel_available(self):
         """Test extracting trace context when OTEL is available."""
-        with patch("src.core.otel_integration.context_propagation._OTEL_AVAILABLE", True):
+        with patch("src.core.otel_integration.context_propagation._OTEL_AVAILABLE", new=True):
             with patch("src.core.otel_integration.context_propagation.extract") as mock_extract:
                 with patch("src.core.otel_integration.context_propagation._dict_getter") as mock_getter:
                     mock_context = MagicMock()
@@ -381,7 +381,7 @@ class TestTraceContextPropagation:
 
     def test_extract_trace_context_otel_not_available(self):
         """Test extracting trace context when OTEL is not available."""
-        with patch("src.core.otel_integration.context_propagation._OTEL_AVAILABLE", False):
+        with patch("src.core.otel_integration.context_propagation._OTEL_AVAILABLE", new=False):
             carrier = {"traceparent": "00-abc-123-01"}
             
             result = extract_trace_context(carrier)
@@ -390,7 +390,7 @@ class TestTraceContextPropagation:
 
     def test_extract_trace_context_exception_handling(self):
         """Test extract_trace_context handles exceptions gracefully."""
-        with patch("src.core.otel_integration.context_propagation._OTEL_AVAILABLE", True):
+        with patch("src.core.otel_integration.context_propagation._OTEL_AVAILABLE", new=True):
             with patch("src.core.otel_integration.context_propagation.extract") as mock_extract:
                 with patch("src.core.otel_integration.context_propagation._dict_getter") as mock_getter:
                     mock_extract.side_effect = Exception("Extraction error")
@@ -403,7 +403,7 @@ class TestTraceContextPropagation:
 
     def test_get_trace_context_with_otel_available(self):
         """Test getting trace context when OTEL is available."""
-        with patch("src.core.otel_integration.context_propagation._OTEL_AVAILABLE", True):
+        with patch("src.core.otel_integration.context_propagation._OTEL_AVAILABLE", new=True):
             with patch("src.core.otel_integration.context_propagation.trace") as mock_trace:
                 with patch("src.core.otel_integration.context_propagation.inject") as mock_inject:
                     with patch("src.core.otel_integration.context_propagation._dict_setter") as mock_setter:
@@ -423,7 +423,7 @@ class TestTraceContextPropagation:
 
     def test_get_trace_context_no_current_span(self):
         """Test getting trace context when no current span exists."""
-        with patch("src.core.otel_integration.context_propagation._OTEL_AVAILABLE", True):
+        with patch("src.core.otel_integration.context_propagation._OTEL_AVAILABLE", new=True):
             with patch("src.core.otel_integration.context_propagation.trace") as mock_trace:
                 mock_trace.get_current_span.return_value = None
                 
@@ -433,7 +433,7 @@ class TestTraceContextPropagation:
 
     def test_get_trace_context_span_not_recording(self):
         """Test getting trace context when span is not recording."""
-        with patch("src.core.otel_integration.context_propagation._OTEL_AVAILABLE", True):
+        with patch("src.core.otel_integration.context_propagation._OTEL_AVAILABLE", new=True):
             with patch("src.core.otel_integration.context_propagation.trace") as mock_trace:
                 mock_span = MagicMock()
                 mock_trace.get_current_span.return_value = mock_span
@@ -445,7 +445,7 @@ class TestTraceContextPropagation:
 
     def test_get_trace_context_no_span_context(self):
         """Test getting trace context when span has no context."""
-        with patch("src.core.otel_integration.context_propagation._OTEL_AVAILABLE", True):
+        with patch("src.core.otel_integration.context_propagation._OTEL_AVAILABLE", new=True):
             with patch("src.core.otel_integration.context_propagation.trace") as mock_trace:
                 mock_span = MagicMock()
                 mock_span.get_span_context.return_value = None
@@ -458,7 +458,7 @@ class TestTraceContextPropagation:
 
     def test_get_trace_context_exception_handling(self):
         """Test get_trace_context handles exceptions gracefully."""
-        with patch("src.core.otel_integration.context_propagation._OTEL_AVAILABLE", True):
+        with patch("src.core.otel_integration.context_propagation._OTEL_AVAILABLE", new=True):
             with patch("src.core.otel_integration.context_propagation.trace") as mock_trace:
                 mock_trace.get_current_span.side_effect = Exception("Trace error")
                 
@@ -468,7 +468,7 @@ class TestTraceContextPropagation:
 
     def test_get_trace_context_otel_not_available(self):
         """Test getting trace context when OTEL is not available."""
-        with patch("src.core.otel_integration.context_propagation._OTEL_AVAILABLE", False):
+        with patch("src.core.otel_integration.context_propagation._OTEL_AVAILABLE", new=False):
             result = get_trace_context()
             
             assert result is None

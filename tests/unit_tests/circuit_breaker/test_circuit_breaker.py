@@ -423,3 +423,101 @@ class TestCircuitBreaker:
         assert breaker.stats.state_changes == 1
         assert breaker.stats.successes == 0  # Reset for half-open
 
+    @pytest.mark.asyncio
+    async def test_get_stats_async(self):
+        """Test get_stats method (lines 179-200)."""
+        breaker = CircuitBreaker("test_breaker")
+        
+        def success_func() -> str:
+            return "success"
+        
+        await breaker.call(success_func)
+        
+        stats = breaker.get_stats()
+        assert stats["name"] == "test_breaker"
+        assert stats["state"] == "closed"
+        assert stats["failures"] == 0
+        assert stats["successes"] == 1
+        assert stats["total_calls"] == 1
+        assert stats["last_success_time"] is not None
+        assert stats["last_failure_time"] is None
+        assert stats["state_changes"] == 0
+        assert stats["opened_at"] is None
+
+    @pytest.mark.asyncio
+    async def test_get_stats_with_failures(self):
+        """Test get_stats with failures and opened circuit."""
+        config = CircuitBreakerConfig(failure_threshold=2)
+        breaker = CircuitBreaker("test_breaker", config=config)
+        
+        def failing_func() -> None:
+            raise ValueError("Test error")
+        
+        # Cause failures to open circuit
+        for _ in range(2):
+            with pytest.raises(ValueError):
+                await breaker.call(failing_func)
+        
+        stats = breaker.get_stats()
+        assert stats["state"] == "open"
+        assert stats["failures"] == 2
+        assert stats["opened_at"] is not None
+
+    def test_reset_second(self):
+        """Test reset method (lines 202-211)."""
+        breaker = CircuitBreaker("test_breaker")
+        breaker.state = CircuitState.OPEN
+        breaker.stats.failures = 5
+        breaker.stats.successes = 10
+        breaker.stats.total_calls = 15
+        breaker._opened_at = datetime.now()
+        
+        breaker.reset()
+        
+        assert breaker.state == CircuitState.CLOSED
+        assert breaker.stats.failures == 0
+        assert breaker.stats.successes == 0
+        assert breaker.stats.total_calls == 0
+        assert breaker._opened_at is None
+
+    @pytest.mark.asyncio
+    async def test_check_state_transition_open_no_opened_at(self):
+        """Test _check_state_transition when OPEN but _opened_at is None (edge case)."""
+        breaker = CircuitBreaker("test_breaker")
+        breaker.state = CircuitState.OPEN
+        breaker._opened_at = None
+        
+        # Should not crash, but also shouldn't transition
+        breaker._check_state_transition()
+        assert breaker.state == CircuitState.OPEN
+
+    @pytest.mark.asyncio
+    async def test_on_failure_in_half_open_state(self):
+        """Test _on_failure when in HALF_OPEN state (lines 172-177)."""
+        breaker = CircuitBreaker("test_breaker")
+        breaker.state = CircuitState.HALF_OPEN
+        breaker.stats.successes = 1
+        
+        breaker._on_failure()
+        
+        assert breaker.state == CircuitState.OPEN
+        assert breaker.stats.failures == 1
+        assert breaker.stats.successes == 0  # Reset
+        assert breaker._opened_at is not None
+
+    @pytest.mark.asyncio
+    async def test_on_success_in_half_open_closes_circuit(self):
+        """Test _on_success closes circuit from HALF_OPEN after threshold (lines 146-152)."""
+        config = CircuitBreakerConfig(success_threshold=2)
+        breaker = CircuitBreaker("test_breaker", config=config)
+        breaker.state = CircuitState.HALF_OPEN
+        breaker.stats.successes = 1
+        breaker._opened_at = datetime.now()
+        
+        breaker._on_success()
+        
+        assert breaker.state == CircuitState.CLOSED
+        assert breaker.stats.successes == 2
+        assert breaker.stats.failures == 0  # Reset
+        assert breaker._opened_at is None
+

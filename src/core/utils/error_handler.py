@@ -8,7 +8,7 @@ Provides consistent error handling patterns across all SDK components.
 import asyncio
 import logging
 from functools import wraps
-from typing import Any, Awaitable, Callable, Optional, Type, TypeVar, cast
+from typing import Any, Awaitable, Callable, Optional, Type, TypeVar, cast, overload
 
 from ..exceptions import SDKError
 
@@ -240,16 +240,16 @@ class ErrorHandler:
 
     @staticmethod
     def _create_async_fallback_wrapper(
-        func: Callable[..., T],
-        fallback_value: T,
+        func: Callable[..., Any],
+        fallback_value: Any,
         fallback_exceptions: tuple[Type[Exception], ...],
         log_error: bool,
-    ) -> Callable[..., Awaitable[T]]:
+    ) -> Callable[..., Awaitable[Any]]:
         """Create async wrapper for fallback decorator."""
         @wraps(func)
-        async def async_wrapper(*args: Any, **kwargs: Any) -> T:
+        async def async_wrapper(*args: Any, **kwargs: Any) -> Any:
             try:
-                async_func = cast(Callable[..., Awaitable[T]], func)
+                async_func = cast(Callable[..., Awaitable[Any]], func)
                 return await async_func(*args, **kwargs)
             except fallback_exceptions as e:
                 if log_error:
@@ -259,14 +259,14 @@ class ErrorHandler:
 
     @staticmethod
     def _create_sync_fallback_wrapper(
-        func: Callable[..., T],
-        fallback_value: T,
+        func: Callable[..., Any],
+        fallback_value: Any,
         fallback_exceptions: tuple[Type[Exception], ...],
         log_error: bool,
-    ) -> Callable[..., T]:
+    ) -> Callable[..., Any]:
         """Create sync wrapper for fallback decorator."""
         @wraps(func)
-        def sync_wrapper(*args: Any, **kwargs: Any) -> T:
+        def sync_wrapper(*args: Any, **kwargs: Any) -> Any:
             try:
                 return func(*args, **kwargs)
             except fallback_exceptions as e:
@@ -276,32 +276,53 @@ class ErrorHandler:
         return sync_wrapper
 
     @staticmethod
+    @overload
+    def handle_with_fallback(
+        func: Callable[..., Awaitable[T]],
+        fallback_value: T,
+        fallback_exceptions: tuple[Type[Exception], ...] = ...,
+        log_error: bool = ...,
+    ) -> Callable[..., Awaitable[T]]:
+        ...
+    
+    @staticmethod
+    @overload
     def handle_with_fallback(
         func: Callable[..., T],
         fallback_value: T,
+        fallback_exceptions: tuple[Type[Exception], ...] = ...,
+        log_error: bool = ...,
+    ) -> Callable[..., T]:
+        ...
+    
+    @staticmethod
+    def handle_with_fallback(
+        func: Callable[..., Any],
+        fallback_value: Any,
         fallback_exceptions: tuple[Type[Exception], ...] = (Exception,),
         log_error: bool = True,
-    ) -> Callable[..., T]:
+    ) -> Callable[..., Any]:
         """
         Decorator for fallback value on error.
         Supports both sync and async functions.
         
         Args:
-            func (Callable[..., T]): Input parameter for this operation.
+            func (Callable[..., Any]): Input parameter for this operation.
             fallback_value (T): Input parameter for this operation.
             fallback_exceptions (tuple[Type[Exception], ...]): Input parameter for this operation.
             log_error (bool): Input parameter for this operation.
         
         Returns:
-            Callable[..., T]: Result of the operation.
+            Callable[..., Any]: Result of the operation.
+            Returns sync wrapper for sync functions, async wrapper for async functions.
         """
         if asyncio.iscoroutinefunction(func):
-            return cast(Callable[..., T], ErrorHandler._create_async_fallback_wrapper(
-                func, fallback_value, fallback_exceptions, log_error
-            ))
+            return ErrorHandler._create_async_fallback_wrapper(
+                cast(Callable[..., Any], func), fallback_value, fallback_exceptions, log_error
+            )
         else:
             return ErrorHandler._create_sync_fallback_wrapper(
-                func, fallback_value, fallback_exceptions, log_error
+                cast(Callable[..., Any], func), fallback_value, fallback_exceptions, log_error
             )
 
     @staticmethod

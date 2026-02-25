@@ -802,42 +802,46 @@ class TestLiteLLMGateway:
         )
         assert result is None
 
-    def test_get_llmops_metrics(self, mock_gateway):
+    @pytest.mark.asyncio
+    async def test_get_llmops_metrics(self, mock_gateway):
         """Test get_llmops_metrics method."""
         gateway = mock_gateway
         mock_llmops = MagicMock()
-        mock_llmops.get_metrics.return_value = {"total_requests": 100}
+        mock_llmops.get_metrics = AsyncMock(return_value={"total_requests": 100})
         gateway.llmops = mock_llmops
 
-        metrics = gateway.get_llmops_metrics(tenant_id="tenant1", time_range_hours=24)
+        metrics = await gateway.get_llmops_metrics(tenant_id="tenant1", time_range_hours=24)
         assert metrics["total_requests"] == 100
         mock_llmops.get_metrics.assert_called_once_with(tenant_id="tenant1", time_range_hours=24)
 
-    def test_get_llmops_metrics_disabled(self, mock_gateway):
+    @pytest.mark.asyncio
+    async def test_get_llmops_metrics_disabled(self, mock_gateway):
         """Test get_llmops_metrics when LLMOps is disabled."""
         gateway = mock_gateway
         gateway.llmops = None
 
-        metrics = gateway.get_llmops_metrics()
+        metrics = await gateway.get_llmops_metrics()
         assert metrics == {"error": "LLMOps not enabled"}
 
-    def test_get_cost_summary(self, mock_gateway):
+    @pytest.mark.asyncio
+    async def test_get_cost_summary(self, mock_gateway):
         """Test get_cost_summary method."""
         gateway = mock_gateway
         mock_llmops = MagicMock()
-        mock_llmops.get_cost_summary.return_value = {"total_cost": 10.50}
+        mock_llmops.get_cost_summary = AsyncMock(return_value={"total_cost": 10.50})
         gateway.llmops = mock_llmops
 
-        cost = gateway.get_cost_summary(tenant_id="tenant1", time_range_hours=48)
+        cost = await gateway.get_cost_summary(tenant_id="tenant1", time_range_hours=48)
         assert abs(cost["total_cost"] - 10.50) < 0.01  # Use approximate comparison for float
         mock_llmops.get_cost_summary.assert_called_once_with(tenant_id="tenant1", time_range_hours=48)
 
-    def test_get_cost_summary_disabled(self, mock_gateway):
+    @pytest.mark.asyncio
+    async def test_get_cost_summary_disabled(self, mock_gateway):
         """Test get_cost_summary when LLMOps is disabled."""
         gateway = mock_gateway
         gateway.llmops = None
 
-        cost = gateway.get_cost_summary()
+        cost = await gateway.get_cost_summary()
         assert cost == {"error": "LLMOps not enabled"}
 
     @pytest.mark.asyncio

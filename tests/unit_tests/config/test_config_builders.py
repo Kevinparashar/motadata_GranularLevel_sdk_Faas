@@ -4,7 +4,6 @@ Unit Tests for Configuration Builders
 Tests builder pattern for complex configurations.
 """
 
-import pytest
 
 from src.core.utils.config_builders import (
     AgentConfigBuilder,

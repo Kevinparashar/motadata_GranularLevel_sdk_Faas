@@ -120,7 +120,7 @@ class Retriever:
                     def _run_async(coro):
                         """Helper to run async code from sync context."""
                         try:
-                            loop = asyncio.get_running_loop()
+                            _ = asyncio.get_running_loop()
                             raise RuntimeError(
                                 "Cannot call sync retrieve() from async context. Use retrieve_async() instead."
                             )
@@ -190,7 +190,7 @@ class Retriever:
             def _run_async(coro):
                 """Helper to run async code from sync context."""
                 try:
-                    loop = asyncio.get_running_loop()
+                    _ = asyncio.get_running_loop()
                     raise RuntimeError(
                         "Cannot call sync retrieve() from async context. Use retrieve_async() instead."
                     )

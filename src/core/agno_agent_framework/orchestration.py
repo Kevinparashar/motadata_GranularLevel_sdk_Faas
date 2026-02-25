@@ -16,12 +16,13 @@ from enum import Enum
 from typing import TYPE_CHECKING, Any, Callable, Dict, List, Optional, Set
 
 # Local application/library specific imports
-from .agent import AgentTask
+# Import from compatibility layer (uses real Agno)
+from .compatibility import AgentTask
 from .exceptions import AgentNotFoundError, WorkflowNotFoundError
 
 if TYPE_CHECKING:
-    from .agent import AgentManager
-    from ...faas.shared.dal.workflow_dal import WorkflowDAL  # type: ignore[import-untyped]
+    from .compatibility import AgentManager
+    from ...faas.shared.dal.workflow_dal import WorkflowDAL 
 
 
 class WorkflowStatus(str, Enum):

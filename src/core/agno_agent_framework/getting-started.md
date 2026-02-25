@@ -229,7 +229,7 @@ if result['status'] == 'completed':
 
 ```python
 # Agent can send result to another agent
-from src.core.agno_agent_framework.agent import AgentMessage
+from src.core.agno_agent_framework import AgentMessage
 
 message = AgentMessage(
     from_agent="assistant_001",

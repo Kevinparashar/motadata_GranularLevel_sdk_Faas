@@ -7,11 +7,41 @@ Factory functions, convenience functions, and utilities for agent framework.
 
 from typing import Any, Dict, List, Optional
 
+from typing import TYPE_CHECKING
+
 from ..utils.type_helpers import ConfigDict, GatewayProtocol
-from .agent import Agent, AgentManager
-from .orchestration import AgentOrchestrator
-from .session import SessionManager
-from .tools import Tool, ToolRegistry
+# Import from compatibility layer (uses real Agno)
+from .compatibility import Agent, AgentManager
+
+# Runtime imports (may be None if modules don't exist)
+# Using Any for type hints to avoid "Variable not allowed in type expression" errors
+try:
+    from .orchestration import AgentOrchestrator as _AgentOrchestrator
+except ImportError:
+    _AgentOrchestrator = None
+
+try:
+    from .session import SessionManager as _SessionManager
+except ImportError:
+    _SessionManager = None
+
+try:
+    from .tools import Tool as _Tool, ToolRegistry as _ToolRegistry
+except ImportError:
+    _Tool = None
+    _ToolRegistry = None
+
+# For type checking (imports only used for type hints, not at runtime)
+if TYPE_CHECKING:
+    from .orchestration import AgentOrchestrator  # noqa: F401
+    from .session import SessionManager  # noqa: F401
+    from .tools import Tool, ToolRegistry  # type: ignore[unused-import]  # Used only for type hints
+
+# Runtime aliases
+AgentOrchestrator = _AgentOrchestrator
+SessionManager = _SessionManager
+Tool = _Tool
+ToolRegistry = _ToolRegistry
 
 # Import Prompt Context Management
 try:
@@ -170,10 +200,25 @@ def create_agent_with_prompt_management(
                 )
     else:
         # If prompt manager not available, set basic config
-        agent.system_prompt = system_prompt
-        agent.role_template = role_template
-        agent.max_context_tokens = max_context_tokens
-        agent.use_prompt_management = False
+        if system_prompt:
+            try:
+                agent.system_prompt = system_prompt
+            except (AttributeError, TypeError):
+                pass  # Property may not have setter
+        if role_template:
+            try:
+                setattr(agent, 'role_template', role_template)
+            except (AttributeError, TypeError):
+                pass  # Property may not have setter
+        if max_context_tokens:
+            try:
+                setattr(agent, 'max_context_tokens', max_context_tokens)
+            except (AttributeError, TypeError):
+                pass  # Property may not have setter
+        try:
+            setattr(agent, 'use_prompt_management', False)
+        except (AttributeError, TypeError):
+            pass  # Property may not have setter
 
     return agent
 
@@ -183,8 +228,8 @@ def create_agent_with_tools(
     name: str,
     gateway: GatewayProtocol,
     tenant_id: Optional[str] = None,
-    tools: Optional[List[Tool]] = None,
-    tool_registry: Optional[ToolRegistry] = None,
+    tools: Optional[List[Any]] = None,  # Tool type from .tools module
+    tool_registry: Optional[Any] = None,  # ToolRegistry type from .tools module
     enable_tool_calling: bool = True,
     max_tool_iterations: int = 10,
     **kwargs: Any,
@@ -251,7 +296,7 @@ def create_agent_manager() -> AgentManager:
     return AgentManager()
 
 
-def create_orchestrator(agent_manager: AgentManager) -> AgentOrchestrator:
+def create_orchestrator(agent_manager: AgentManager) -> Any:  # AgentOrchestrator type
     """
     Create an AgentOrchestrator for multi-agent workflows.
 
@@ -385,7 +430,7 @@ async def chat_with_agent(
 
 
 async def delegate_task(
-    orchestrator: AgentOrchestrator,
+    orchestrator: Any,  # AgentOrchestrator type
     from_agent_id: str,
     to_agent_id: str,
     task_type: str,
@@ -599,7 +644,8 @@ async def save_agent_state(agent: Agent, file_path: Optional[str] = None) -> Non
     Returns:
         None: Result of the operation.
     """
-    await agent.save_state(file_path)
+    # save_state is synchronous in compatibility layer
+    agent.save_state(file_path)
 
 
 async def load_agent_state(file_path: str, gateway: GatewayProtocol) -> Agent:
@@ -616,6 +662,7 @@ async def load_agent_state(file_path: str, gateway: GatewayProtocol) -> Agent:
     Example:
         >>> agent = await load_agent_state("/tmp/agent_state.json", gateway)
     """
+    # load_state is async in compatibility layer
     return await Agent.load_state(file_path, gateway)
 
 

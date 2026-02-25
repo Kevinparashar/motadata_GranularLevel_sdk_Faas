@@ -273,11 +273,12 @@ results = batch_process_agents(
 ## Connection to Other Components
 
 ### Agent Class
-These functions create and configure `Agent` instances from `agent.py`:
-- All factory functions return `Agent` instances
+These functions create and configure `Agent` instances from the compatibility layer (uses real Agno framework):
+- All factory functions return `Agent` instances from `compatibility.py`
 - Execution functions use `Agent` methods internally
+- All agents use the real Agno Agent Framework from agno.com
 
-**Integration Point:** Functions wrap `Agent` class instantiation and methods
+**Integration Point:** Functions wrap `Agent` class instantiation and methods (real Agno underneath)
 
 ### LiteLLM Gateway
 All agent creation requires a gateway instance:
@@ -308,11 +309,11 @@ Tool integration via `create_agent_with_tools()`:
 **Integration Point:** `tools` parameter
 
 ### Agent Manager
-Management functions use `AgentManager` from `agent.py`:
+Management functions use `AgentManager` from the compatibility layer:
 - `create_agent_manager()` creates manager instance
 - `find_agents_by_capability()` uses manager to search
 
-**Integration Point:** `AgentManager` class
+**Integration Point:** `AgentManager` class (from compatibility layer)
 
 ### Where Used
 - **Examples**: All agent examples use these functions

@@ -536,7 +536,7 @@ class TestErrorHandlerHandleWithFallback:
             test_func, fallback_value="fallback", fallback_exceptions=(ValueError,)
         )
         # Type ignore: handle_with_fallback returns async wrapper for async functions
-        result = await wrapped_func()  # type: ignore[misc]
+        result = await wrapped_func()
         assert result == "success"
 
     @pytest.mark.asyncio
@@ -550,7 +550,7 @@ class TestErrorHandlerHandleWithFallback:
             failing_func, fallback_value="fallback", fallback_exceptions=(ValueError,)
         )
         # Type ignore: handle_with_fallback returns async wrapper for async functions
-        result = await wrapped_func()  # type: ignore[misc]
+        result = await wrapped_func() 
         assert result == "fallback"
 
     @pytest.mark.asyncio
@@ -565,7 +565,7 @@ class TestErrorHandlerHandleWithFallback:
             failing_func, fallback_value="fallback", fallback_exceptions=(ValueError,), log_error=True
         )
         # Type ignore: handle_with_fallback returns async wrapper for async functions
-        result = await wrapped_func()  # type: ignore[misc]
+        result = await wrapped_func() 
         assert result == "fallback"
         mock_logger.warning.assert_called_once()
 
@@ -622,8 +622,105 @@ class TestErrorHandlerWrapSDKError:
         assert result == "success"
 
     @pytest.mark.asyncio
-    async def test_wrap_sdk_error_async_wraps_exception(self):
-        """Test wrap_sdk_error wraps exception in async function."""
+    async def test_wrap_sdk_error_async_preserves_sdk_error(self):
+        """Test wrap_sdk_error doesn't wrap SDKError exceptions (lines 326-328)."""
+        async def raises_sdk_error() -> str:
+            await asyncio.sleep(0)
+            raise SDKError("Already an SDK error")
+
+        wrapped_func = ErrorHandler.wrap_sdk_error(
+            raises_sdk_error, SDKError, "Operation failed"
+        )
+        with pytest.raises(SDKError, match="Already an SDK error"):
+            await wrapped_func()
+
+    def test_wrap_sdk_error_sync_preserves_sdk_error_additional(self):
+        """Test wrap_sdk_error doesn't wrap SDKError exceptions (lines 343-345)."""
+        def raises_sdk_error() -> str:
+            raise SDKError("Already an SDK error")
+
+        wrapped_func = ErrorHandler.wrap_sdk_error(
+            raises_sdk_error, SDKError, "Operation failed"
+        )
+        with pytest.raises(SDKError, match="Already an SDK error"):
+            wrapped_func()
+
+    def test_wrap_exception(self):
+        """Test _wrap_exception method (lines 308-314)."""
+        original_error = ValueError("Original error")
+        wrapped = ErrorHandler._wrap_exception(
+            SDKError, "Operation failed", original_error
+        )
+        
+        assert isinstance(wrapped, SDKError)
+        assert "Operation failed" in wrapped.message
+        assert wrapped.original_error == original_error
+
+    def test_handle_with_fallback_sync_no_log(self):
+        """Test handle_with_fallback with log_error=False (lines 273-275)."""
+        from unittest.mock import patch
+        
+        def failing_func() -> str:
+            raise ValueError("Failed")
+
+        wrapped_func = ErrorHandler.handle_with_fallback(
+            failing_func, fallback_value="fallback", fallback_exceptions=(ValueError,), log_error=False
+        )
+        
+        with patch("src.core.utils.error_handler.logger") as mock_logger:
+            result = wrapped_func()
+            assert result == "fallback"
+            mock_logger.warning.assert_not_called()
+
+    @pytest.mark.asyncio
+    async def test_handle_with_fallback_async_no_log(self):
+        """Test handle_with_fallback async with log_error=False (lines 255-257)."""
+        from unittest.mock import patch
+        
+        async def failing_func() -> str:
+            await asyncio.sleep(0)
+            raise ValueError("Failed")
+
+        wrapped_func = ErrorHandler.handle_with_fallback(
+            failing_func, fallback_value="fallback", fallback_exceptions=(ValueError,), log_error=False
+        )
+        
+        # Type assertion: wrapped_func is awaitable for async functions
+        from typing import Awaitable, Callable, cast
+        wrapped_func_async = cast(Callable[[], Awaitable[str]], wrapped_func)
+        
+        with patch("src.core.utils.error_handler.logger") as mock_logger:
+            result = await wrapped_func_async()
+            assert result == "fallback"
+            mock_logger.warning.assert_not_called()
+
+    def test_execute_with_retry_unexpected_error_path(self):
+        """Test _execute_with_retry success path (lines 97-100)."""
+        from src.core.utils.error_handler import _execute_with_retry
+        
+        def test_func() -> str:
+            return "success"
+        
+        result = _execute_with_retry(
+            test_func, (), {}, max_retries=1, retry_delay=0.01, 
+            retryable_exceptions=(ValueError,), on_retry=None
+        )
+        assert result == "success"
+
+    @pytest.mark.asyncio
+    async def test_execute_with_retry_async_success_path(self):
+        """Test _execute_with_retry_async success path (lines 177-180)."""
+        from src.core.utils.error_handler import _execute_with_retry_async
+        
+        async def test_func() -> str:
+            await asyncio.sleep(0)
+            return "success"
+        
+        result = await _execute_with_retry_async(
+            test_func, (), {}, max_retries=1, retry_delay=0.01,
+            retryable_exceptions=(ValueError,), on_retry=None
+        )
+        assert result == "success"
         async def failing_func() -> str:
             await asyncio.sleep(0)
             raise ValueError("Original error")

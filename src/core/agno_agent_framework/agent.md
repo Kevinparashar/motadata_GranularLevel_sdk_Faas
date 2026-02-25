@@ -4,7 +4,9 @@
 
 ## Overview
 
-The `agent.py` file contains the core `Agent` class implementation for the Agno Agent Framework. This class provides the foundation for creating autonomous AI agents that can execute tasks, manage memory, communicate with other agents, and coordinate complex workflows. The Agent class is designed to be flexible, extensible, and production-ready with built-in error handling, health monitoring, and circuit breaker patterns.
+**Note:** The SDK uses the real Agno Agent Framework from https://www.agno.com/ via the compatibility layer (`compatibility.py`). The `Agent` class in `compatibility.py` wraps the real Agno Agent to maintain backward compatibility while using the official framework underneath. The `agent.py` file contains legacy code that is not used in the active code path.
+
+The `Agent` class (from `compatibility.py`) provides the foundation for creating autonomous AI agents that can execute tasks, manage memory, communicate with other agents, and coordinate complex workflows. The Agent class is designed to be flexible, extensible, and production-ready with built-in error handling, health monitoring, and circuit breaker patterns.
 
 **Primary Functionality:**
 - Agent lifecycle management (creation, execution, state management)
@@ -144,18 +146,18 @@ Performs health check on the agent.
 ### Basic Agent Creation
 
 ```python
-from src.core.agno_agent_framework.agent import Agent, AgentStatus
+from src.core.agno_agent_framework import Agent, AgentStatus, create_agent
 from src.core.litellm_gateway import create_gateway
 
 # Create gateway
 gateway = create_gateway(api_keys={"openai": "your-api-key"})
 
-# Create agent
-agent = Agent(
+# Create agent (uses real Agno framework)
+agent = create_agent(
     agent_id="agent_001",
     name="Customer Support Agent",
-    description="Handles customer support inquiries",
     gateway=gateway,
+    description="Handles customer support inquiries",
     llm_model="gpt-4",
     llm_provider="openai"
 )
@@ -167,7 +169,7 @@ print(f"Agent status: {agent.status}")
 ### Executing a Task
 
 ```python
-from src.core.agno_agent_framework.agent import AgentTask
+from src.core.agno_agent_framework import AgentTask
 
 # Create a task
 task = AgentTask(

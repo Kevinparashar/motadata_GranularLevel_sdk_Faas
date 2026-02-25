@@ -335,12 +335,12 @@ class DocumentProcessor:
         )
 
         # Initialize preprocessing pipeline
-        preprocessing_steps = []
+        preprocessing_steps: List[Callable[[str], str]] = []
         if enable_preprocessing:
             preprocessing_steps = [
-                self._normalize_whitespace,
-                self._remove_control_characters,
-                self._normalize_unicode,
+                lambda text: self._normalize_whitespace(text),
+                lambda text: self._remove_control_characters(text),
+                lambda text: self._normalize_unicode(text),
             ]
 
         # Initialize chunk validators
@@ -355,9 +355,13 @@ class DocumentProcessor:
         )
 
         # Initialize metadata handler
-        extractors = []
+        extractors: List[Callable[[str, Dict[str, Any]], Dict[str, Any]]] = []
         if enable_metadata_extraction:
-            extractors = [self._extract_title, self._extract_dates, self._extract_tags]
+            extractors = [
+                lambda content, metadata: self._extract_title(content, metadata),
+                lambda content, metadata: self._extract_dates(content, metadata),
+                lambda content, metadata: self._extract_tags(content, metadata),
+            ]
 
         self.metadata_handler = MetadataHandler(
             schema=metadata_schema,
@@ -778,7 +782,7 @@ class DocumentProcessor:
         paragraphs = re.split(r"\n\s*\n|\n{2,}", content)
         paragraphs = [p.strip() for p in paragraphs if p.strip()]
 
-        chunks = []
+        chunks: List[DocumentChunk] = []
         current_chunk: List[str] = []
         current_size = 0
         chunk_index = 0
@@ -916,7 +920,7 @@ class DocumentProcessor:
         html_header_pattern = r"^<h[1-6]>[^<]{1,500}</h[1-6]>$"
 
         lines = content.split("\n")
-        chunks = []
+        chunks: List[DocumentChunk] = []
         current_section: List[str] = []
         current_size = 0
         chunk_index = 0

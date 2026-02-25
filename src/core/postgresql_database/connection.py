@@ -13,7 +13,7 @@ from typing import Any, List, Optional, Tuple
 
 # Third-party imports
 try:
-    import asyncpg  # type: ignore[import-untyped]
+    import asyncpg
 except ImportError:
     asyncpg = None
 
@@ -165,6 +165,9 @@ class DatabaseConnection:
         """
         if not self.pool:
             await self.connect()
+        
+        if not self.pool:
+            raise ConnectionError("Failed to establish database connection")
 
         async with self.pool.acquire() as conn:
             query_converted = self._convert_placeholders(query, len(params)) if params else query
@@ -200,6 +203,9 @@ class DatabaseConnection:
         """
         if not self.pool:
             await self.connect()
+        
+        if not self.pool:
+            raise ConnectionError("Failed to establish database connection")
 
         async with self.pool.acquire() as conn:
             async with conn.transaction():
@@ -220,6 +226,10 @@ class DatabaseConnection:
         try:
             if not self.pool:
                 await self.connect()
+            
+            if not self.pool:
+                return False
+            
             async with self.pool.acquire() as conn:
                 await conn.fetchval("SELECT 1")
                 return True

@@ -174,7 +174,7 @@ class TestTenantContextMiddleware:
     
     def test_middleware_init_without_fastapi(self):
         """Test middleware initialization without FastAPI."""
-        with patch("src.core.otel_integration.tenant_middleware.FASTAPI_AVAILABLE", False):
+        with patch("src.core.otel_integration.tenant_middleware.FASTAPI_AVAILABLE", new=False):
             with pytest.raises(ImportError):
                 TenantContextMiddleware(MagicMock())
     

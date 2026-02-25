@@ -12,8 +12,8 @@ from typing import TYPE_CHECKING, Any, Callable, Dict, List, Optional
 from pydantic import BaseModel, Field
 
 if TYPE_CHECKING:
-    from ...faas.shared.dal.tool_dal import ToolDAL  # type: ignore[import-untyped]
-    from ...faas.shared.dal.tool_execution_dal import ToolExecutionDAL  # type: ignore[import-untyped]
+    from ...faas.shared.dal.tool_dal import ToolDAL
+    from ...faas.shared.dal.tool_execution_dal import ToolExecutionDAL 
 
 from .exceptions import (
     ToolInvocationError,

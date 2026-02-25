@@ -128,8 +128,8 @@ class TestPromptContextAgentIntegration:
             name="Test Agent",
             gateway=mock_gateway,
         )
-        # Attach prompt manager to agent
-        agent.prompt_manager = prompt_manager
+        # Attach prompt manager to agent using attach_prompt_manager method
+        agent.attach_prompt_manager(prompt_manager=prompt_manager)
         return agent, prompt_manager, mock_gateway
 
     @pytest.mark.asyncio

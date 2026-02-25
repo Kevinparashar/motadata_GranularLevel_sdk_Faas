@@ -549,7 +549,7 @@ class LiteLLMGateway:
             tenant_id=tenant_id,
         )
 
-    def get_llmops_metrics(
+    async def get_llmops_metrics(
         self, tenant_id: Optional[str] = None, time_range_hours: int = 24
     ) -> Dict[str, Any]:
         """
@@ -565,9 +565,9 @@ class LiteLLMGateway:
         if not self.llmops:
             return {"error": "LLMOps not enabled"}
 
-        return self.llmops.get_metrics(tenant_id=tenant_id, time_range_hours=time_range_hours)
+        return await self.llmops.get_metrics(tenant_id=tenant_id, time_range_hours=time_range_hours)
 
-    def get_cost_summary(
+    async def get_cost_summary(
         self, tenant_id: Optional[str] = None, time_range_hours: int = 24
     ) -> Dict[str, Any]:
         """
@@ -583,7 +583,7 @@ class LiteLLMGateway:
         if not self.llmops:
             return {"error": "LLMOps not enabled"}
 
-        return self.llmops.get_cost_summary(tenant_id=tenant_id, time_range_hours=time_range_hours)
+        return await self.llmops.get_cost_summary(tenant_id=tenant_id, time_range_hours=time_range_hours)
 
     def _execute_sync_generation(
         self,

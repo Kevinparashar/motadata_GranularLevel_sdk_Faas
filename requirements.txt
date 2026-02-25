@@ -70,9 +70,7 @@ python-dotenv==1.2.1
 pytokens==0.3.0
 PyYAML==6.0.3
 python-multipart==0.0.20
-# Dragonfly is Redis-compatible, so we use Redis client libraries
-# No separate dragonflydb package needed - use aioredis/redis to connect
-redis==7.1.0  # Required for Dragonfly (Dragonfly is Redis-compatible)
+redis==7.1.0 
 aioredis==2.0.1
 referencing==0.37.0
 regex==2025.11.3
@@ -97,3 +95,4 @@ urllib3==2.6.2
 uvicorn==0.40.0
 yarl==1.22.0
 zipp==3.23.0
+agno>=2.5.3

@@ -27,7 +27,7 @@ class MockDatabaseConnection:
             config: Optional database configuration (not used in mock)
         """
         self.config = config
-        self.pool = MagicMock()
+        self.pool: Optional[MagicMock] = MagicMock()
         self._mock_data: Dict[str, List[Dict[str, Any]]] = {}
         self._connected = False
 

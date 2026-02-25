@@ -316,3 +316,107 @@ class TestSessionManager:
 
         assert count == 0
 
+    @pytest.mark.asyncio
+    async def test_get_session_with_dal_loading(self):
+        """Test get_session loads from DAL when not in memory (lines 274-277)."""
+        from unittest.mock import AsyncMock, MagicMock
+        from src.core.agno_agent_framework.session import SessionManager, SessionStatus
+
+        mock_dal = MagicMock()
+        mock_session = AgentSession(agent_id="agent1", session_id="session1")
+        mock_dal.load_session = AsyncMock(return_value=mock_session)
+
+        manager = SessionManager(session_dal=mock_dal, tenant_id="tenant1")
+        
+        # Session not in memory, should load from DAL
+        session = await manager.get_session("session1")
+        
+        assert session is not None
+        assert session.session_id == "session1"
+        mock_dal.load_session.assert_called_once_with("session1", "tenant1")
+
+    @pytest.mark.asyncio
+    async def test_get_session_expired_handling(self):
+        """Test get_session handles expired sessions (lines 280-281)."""
+        from unittest.mock import AsyncMock, MagicMock
+
+        mock_dal = MagicMock()
+        expired_session = AgentSession(agent_id="agent1", session_id="session1")
+        expired_session.expires_at = datetime.now() - timedelta(hours=1)
+        mock_dal.load_session = AsyncMock(return_value=expired_session)
+
+        manager = SessionManager(session_dal=mock_dal, tenant_id="tenant1")
+        
+        session = await manager.get_session("session1")
+        
+        assert session is None
+        assert expired_session.status == SessionStatus.EXPIRED
+
+    @pytest.mark.asyncio
+    async def test_get_agent_sessions_with_dal(self):
+        """Test get_agent_sessions loads from DAL (lines 314-322)."""
+        from unittest.mock import AsyncMock, MagicMock
+
+        mock_dal = MagicMock()
+        session1 = AgentSession(agent_id="agent1", session_id="session1")
+        session2 = AgentSession(agent_id="agent1", session_id="session2")
+        mock_dal.list_agent_sessions = AsyncMock(return_value=[session1, session2])
+
+        manager = SessionManager(session_dal=mock_dal, tenant_id="tenant1")
+        
+        sessions = await manager.get_agent_sessions("agent1")
+        
+        assert len(sessions) == 2
+        mock_dal.list_agent_sessions.assert_called_once_with("agent1", "tenant1")
+
+    @pytest.mark.asyncio
+    async def test_delete_session_with_dal(self):
+        """Test delete_session deletes from DAL (lines 355-359)."""
+        from unittest.mock import AsyncMock, MagicMock
+
+        mock_dal = MagicMock()
+        mock_dal.delete_session = AsyncMock()
+
+        manager = SessionManager(session_dal=mock_dal, tenant_id="tenant1")
+        session = manager.create_session("agent1")
+        session_id = session.session_id
+        
+        await manager.delete_session(session_id)
+        
+        assert session_id not in manager._sessions
+        mock_dal.delete_session.assert_called_once_with(session_id, "tenant1")
+
+    @pytest.mark.asyncio
+    async def test_cleanup_expired_with_dal(self):
+        """Test cleanup_expired with DAL (lines 381-393)."""
+        from unittest.mock import AsyncMock, MagicMock
+
+        mock_dal = MagicMock()
+        mock_dal.cleanup_expired_sessions = AsyncMock(return_value=2)
+
+        manager = SessionManager(session_dal=mock_dal, tenant_id="tenant1")
+        session1 = manager.create_session("agent1")
+        session2 = manager.create_session("agent1")
+        session2.expires_at = datetime.now() - timedelta(hours=1)
+        
+        count = await manager.cleanup_expired()
+        
+        assert count >= 1  # At least 1 from memory, plus DAL count
+        mock_dal.cleanup_expired_sessions.assert_called_once()
+
+    @pytest.mark.asyncio
+    async def test_save_session_with_dal(self):
+        """Test save_session persists to DAL (lines 422-426)."""
+        from unittest.mock import AsyncMock, MagicMock
+
+        mock_dal = MagicMock()
+        mock_dal.save_session = AsyncMock()
+
+        manager = SessionManager(session_dal=mock_dal, tenant_id="tenant1")
+        session = manager.create_session("agent1")
+        
+        await manager.save_session(session)
+        
+        # Verify DAL was called
+        mock_dal.save_session.assert_called_once_with(session, "tenant1")
+

@@ -1,5 +1,9 @@
 # MOTADATA - AGNO AGENT FRAMEWORK
 
+**✅ Uses REAL Agno Agent Framework from https://www.agno.com/**
+
+This module uses the official open-source Agno Agent Framework with compatibility wrappers to maintain existing API while leveraging the real Agno framework underneath.
+
 **Complete framework for creating, managing, and orchestrating autonomous AI agents with memory, tools, and session management.**
 
 ## When to Use This Component

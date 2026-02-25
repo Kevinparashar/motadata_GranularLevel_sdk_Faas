@@ -447,7 +447,7 @@ class TestInstrumentationTracking:
     def test_get_enabled_instrumentations_empty(self):
         """Test getting enabled instrumentations when none are enabled."""
         # Clear any existing instrumentations by patching the list
-        with patch("src.core.otel_integration.auto_instrumentation._enabled_instrumentations", []):
+        with patch("src.core.otel_integration.auto_instrumentation._enabled_instrumentations", new=[]):
             result = get_enabled_instrumentations()
             
             assert result == []
@@ -455,7 +455,7 @@ class TestInstrumentationTracking:
 
     def test_get_enabled_instrumentations_after_setup(self):
         """Test getting enabled instrumentations after setup."""
-        with patch("src.core.otel_integration.auto_instrumentation._enabled_instrumentations", ["fastapi", "httpx"]):
+        with patch("src.core.otel_integration.auto_instrumentation._enabled_instrumentations", new=["fastapi", "httpx"]):
             result = get_enabled_instrumentations()
             
             assert result == ["fastapi", "httpx"]
@@ -465,21 +465,21 @@ class TestInstrumentationTracking:
 
     def test_is_instrumentation_enabled_true(self):
         """Test checking if instrumentation is enabled when it is."""
-        with patch("src.core.otel_integration.auto_instrumentation._enabled_instrumentations", ["fastapi", "httpx"]):
+        with patch("src.core.otel_integration.auto_instrumentation._enabled_instrumentations", new=["fastapi", "httpx"]):
             result = is_instrumentation_enabled("fastapi")
             
             assert result is True
 
     def test_is_instrumentation_enabled_false(self):
         """Test checking if instrumentation is enabled when it is not."""
-        with patch("src.core.otel_integration.auto_instrumentation._enabled_instrumentations", ["fastapi"]):
+        with patch("src.core.otel_integration.auto_instrumentation._enabled_instrumentations", new=["fastapi"]):
             result = is_instrumentation_enabled("httpx")
             
             assert result is False
 
     def test_is_instrumentation_enabled_empty_list(self):
         """Test checking if instrumentation is enabled when list is empty."""
-        with patch("src.core.otel_integration.auto_instrumentation._enabled_instrumentations", []):
+        with patch("src.core.otel_integration.auto_instrumentation._enabled_instrumentations", new=[]):
             result = is_instrumentation_enabled("fastapi")
             
             assert result is False

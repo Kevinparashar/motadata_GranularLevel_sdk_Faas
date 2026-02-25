@@ -1,7 +1,17 @@
 """
 Agno Agent Framework - Core Agent Implementation
 
-Provides the base agent class and agent management functionality.
+
+The SDK uses the REAL Agno Agent Framework from https://www.agno.com/ via the
+compatibility layer (`compatibility.py`). All agent creation goes through:
+- `compatibility.py` - Wraps real Agno Agent
+- `functions.py` - Factory functions that use compatibility layer
+- `__init__.py` - Exports from compatibility layer
+
+DO NOT import from this file. Use:
+    from src.core.agno_agent_framework import Agent, create_agent
+
+This file is kept for reference only and may be removed in future versions.
 """
 
 

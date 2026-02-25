@@ -29,6 +29,7 @@ def mock_config():
         service_port=8080,
         database_url="",
         gateway_service_url=None,
+        orchestrator_service_url=None,
         cache_service_url=None,
         rag_service_url=None,
         agent_service_url=None,

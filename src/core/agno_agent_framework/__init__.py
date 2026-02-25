@@ -1,12 +1,48 @@
 """
 Agno Agent Framework Integration
 
-Interface for agent framework integration with LiteLLM Gateway.
-Designed to be swappable with other agent frameworks (e.g., LangChain).
+✅ USES REAL AGNO AGENT FRAMEWORK from https://www.agno.com/
+This module provides compatibility wrappers to maintain existing API while using real Agno.
+
+The real Agno framework is imported from the 'agno' package (pip install agno>=2.5.3).
+All Agent instances are created using the real AgnoAgent from agno.com.
 """
 
+# Import real Agno framework (REQUIRED - this is the real framework from agno.com)
+# Note: Import errors are expected until 'pip install agno>=2.5.3' is run
+try:
+    from agno import AgentOS, Team, Workflow, Knowledge 
+    from agno.agent import Agent as RealAgnoAgent  
+    import logging
+    logging.getLogger(__name__).info("✅ Real Agno Agent Framework loaded from agno.com")
+except ImportError as e:
+    # Set to None when agno is not installed (expected until pip install)
+    AgentOS = None
+    Team = None
+    Workflow = None
+    Knowledge = None
+    RealAgnoAgent = None
+    import logging
+    logging.getLogger(__name__).error(
+        f"❌ Real Agno framework not installed. Install with: pip install agno>=2.5.3\n"
+        f"   Error: {e}"
+    )
 
-from .agent import Agent, AgentCapability, AgentManager, AgentMessage, AgentStatus, AgentTask
+# Import compatibility wrappers (uses real Agno underneath)
+from .compatibility import (
+    Agent,
+    AgentCapability,
+    AgentManager,
+    AgentMessage,
+    AgentStatus,
+    AgentTask,
+    AgentOS,
+    Team,
+    Workflow,
+    Knowledge,
+    RealAgnoAgent,
+)
+# Import functions (will use compatibility layer)
 from .functions import (
     batch_process_agents,
     chat_with_agent,
@@ -23,18 +59,56 @@ from .functions import (
     retry_on_failure,
     save_agent_state,
 )
-from .memory import AgentMemory, MemoryItem, MemoryType
-from .orchestration import (
-    AgentOrchestrator,
-    CoordinationPattern,
-    WorkflowPipeline,
-    WorkflowState,
-    WorkflowStatus,
-    WorkflowStep,
-)
-from .plugins import AgentPlugin, PluginHook, PluginManager, PluginStatus
-from .session import AgentSession, SessionManager, SessionMessage, SessionStatus
-from .tools import Tool, ToolExecutor, ToolParameter, ToolRegistry, ToolType
+
+# Import memory, orchestration, etc. (may need migration later)
+try:
+    from .memory import AgentMemory, MemoryItem, MemoryType
+except ImportError:
+    AgentMemory = None
+    MemoryItem = None
+    MemoryType = None
+
+try:
+    from .orchestration import (
+        AgentOrchestrator,
+        CoordinationPattern,
+        WorkflowPipeline,
+        WorkflowState,
+        WorkflowStatus,
+        WorkflowStep,
+    )
+except ImportError:
+    AgentOrchestrator = None
+    CoordinationPattern = None
+    WorkflowPipeline = None
+    WorkflowState = None
+    WorkflowStatus = None
+    WorkflowStep = None
+
+try:
+    from .plugins import AgentPlugin, PluginHook, PluginManager, PluginStatus
+except ImportError:
+    AgentPlugin = None
+    PluginHook = None
+    PluginManager = None
+    PluginStatus = None
+
+try:
+    from .session import AgentSession, SessionManager, SessionMessage, SessionStatus
+except ImportError:
+    AgentSession = None
+    SessionManager = None
+    SessionMessage = None
+    SessionStatus = None
+
+try:
+    from .tools import Tool, ToolExecutor, ToolParameter, ToolRegistry, ToolType
+except ImportError:
+    Tool = None
+    ToolExecutor = None
+    ToolParameter = None
+    ToolRegistry = None
+    ToolType = None
 
 # Import Prompt-Based Generator functions (optional)
 try:
@@ -51,13 +125,20 @@ except ImportError:
     rate_tool = None
 
 __all__ = [
-    # Core classes
+    # Core classes (from compatibility layer - uses real Agno)
     "Agent",
     "AgentManager",
     "AgentStatus",
     "AgentCapability",
     "AgentMessage",
     "AgentTask",
+    # Real Agno classes (direct access)
+    "AgentOS",
+    "Team",
+    "Workflow",
+    "Knowledge",
+    "RealAgnoAgent",
+    # Legacy classes (may need migration)
     "AgentSession",
     "SessionManager",
     "SessionStatus",

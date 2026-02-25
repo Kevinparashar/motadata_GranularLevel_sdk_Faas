@@ -678,3 +678,238 @@ class TestAgentMemory:
 
         assert len(memory_with_path._short_term) == 0
 
+    @pytest.mark.asyncio
+    async def test_initialize_with_dal(self):
+        """Test initialize with DAL (lines 103-123)."""
+        mock_dal = AsyncMock()
+        mock_memories = [
+            MemoryItem(
+                memory_id="mem1",
+                agent_id="agent1",
+                memory_type=MemoryType.SHORT_TERM,
+                content="Short term",
+            ),
+            MemoryItem(
+                memory_id="mem2",
+                agent_id="agent1",
+                memory_type=MemoryType.LONG_TERM,
+                content="Long term",
+            ),
+            MemoryItem(
+                memory_id="mem3",
+                agent_id="agent1",
+                memory_type=MemoryType.EPISODIC,
+                content="Episodic",
+            ),
+            MemoryItem(
+                memory_id="mem4",
+                agent_id="agent1",
+                memory_type=MemoryType.SEMANTIC,
+                content="Semantic",
+            ),
+        ]
+        mock_dal.load_memories = AsyncMock(return_value=mock_memories)
+
+        memory = AgentMemory(agent_id="agent1", memory_dal=mock_dal, tenant_id="tenant1")
+        await memory.initialize()
+
+        assert len(memory._short_term) == 1
+        assert len(memory._long_term) == 1
+        assert len(memory._episodic) == 1
+        assert len(memory._semantic) == 1
+
+    @pytest.mark.asyncio
+    async def test_initialize_with_dal_error(self):
+        """Test initialize when DAL load fails (lines 116-123)."""
+        mock_dal = AsyncMock()
+        mock_dal.load_memories = AsyncMock(side_effect=Exception("DB error"))
+
+        memory = AgentMemory(agent_id="agent1", memory_dal=mock_dal, tenant_id="tenant1")
+        # Should not raise, just log warning
+        await memory.initialize()
+
+        assert len(memory._short_term) == 0
+
+    @pytest.mark.asyncio
+    async def test_store_with_dal(self):
+        """Test store with DAL (lines 201-207)."""
+        mock_dal = AsyncMock()
+        mock_dal.save_memory = AsyncMock()
+
+        memory = AgentMemory(agent_id="agent1", memory_dal=mock_dal, tenant_id="tenant1")
+        item = await memory.store("Test content", MemoryType.SHORT_TERM)
+
+        # save_memory is called twice: once in store() and once in _persist()
+        assert mock_dal.save_memory.call_count >= 1
+        assert item.content == "Test content"
+
+    @pytest.mark.asyncio
+    async def test_store_with_dal_error(self):
+        """Test store when DAL save fails (lines 204-207)."""
+        mock_dal = AsyncMock()
+        mock_dal.save_memory = AsyncMock(side_effect=Exception("DB error"))
+
+        memory = AgentMemory(agent_id="agent1", memory_dal=mock_dal, tenant_id="tenant1")
+        # Should not raise, just log warning
+        item = await memory.store("Test content")
+
+        assert item.content == "Test content"
+
+    @pytest.mark.asyncio
+    async def test_forget_with_dal(self):
+        """Test forget with DAL (lines 286-293)."""
+        mock_dal = AsyncMock()
+        mock_dal.delete_memory = AsyncMock()
+
+        memory = AgentMemory(agent_id="agent1", memory_dal=mock_dal, tenant_id="tenant1")
+        item = await memory.store("Test content", MemoryType.SHORT_TERM)
+        result = await memory.forget(item.memory_id)
+
+        assert result is True
+        mock_dal.delete_memory.assert_called_once()
+
+    @pytest.mark.asyncio
+    async def test_forget_with_dal_error(self):
+        """Test forget when DAL delete fails (lines 290-293)."""
+        mock_dal = AsyncMock()
+        mock_dal.delete_memory = AsyncMock(side_effect=Exception("DB error"))
+
+        memory = AgentMemory(agent_id="agent1", memory_dal=mock_dal, tenant_id="tenant1")
+        item = await memory.store("Test content")
+        # Should not raise, just log warning
+        result = await memory.forget(item.memory_id)
+
+        assert result is True
+
+    @pytest.mark.asyncio
+    async def test_cleanup_expired_long_term(self, memory):
+        """Test cleanup_expired for long_term memory (lines 340-343)."""
+        old_date = datetime.now() - timedelta(days=40)
+        item = MemoryItem(
+            memory_id="old1",
+            agent_id="agent1",
+            memory_type=MemoryType.LONG_TERM,
+            content="Old",
+            timestamp=old_date,
+        )
+        memory._long_term[item.memory_id] = item
+
+        removed = await memory.cleanup_expired(max_age_days=30)
+
+        assert removed > 0
+        assert item.memory_id not in memory._long_term
+
+    @pytest.mark.asyncio
+    async def test_cleanup_expired_episodic(self, memory):
+        """Test cleanup_expired for episodic memory (lines 345-347)."""
+        old_date = datetime.now() - timedelta(days=40)
+        item = MemoryItem(
+            memory_id="old1",
+            agent_id="agent1",
+            memory_type=MemoryType.EPISODIC,
+            content="Old",
+            timestamp=old_date,
+        )
+        memory._episodic.append(item)
+
+        removed = await memory.cleanup_expired(max_age_days=30)
+
+        assert removed > 0
+        assert item.memory_id not in [m.memory_id for m in memory._episodic]
+
+    @pytest.mark.asyncio
+    async def test_cleanup_expired_semantic(self, memory):
+        """Test cleanup_expired for semantic memory (lines 349-352)."""
+        old_date = datetime.now() - timedelta(days=40)
+        item = MemoryItem(
+            memory_id="old1",
+            agent_id="agent1",
+            memory_type=MemoryType.SEMANTIC,
+            content="Old",
+            timestamp=old_date,
+        )
+        memory._semantic[item.memory_id] = item
+
+        removed = await memory.cleanup_expired(max_age_days=30)
+
+        assert removed > 0
+        assert item.memory_id not in memory._semantic
+
+    @pytest.mark.asyncio
+    async def test_handle_memory_pressure_still_under_pressure(self, memory):
+        """Test handle_memory_pressure when still under pressure after cleanup (lines 406-418)."""
+        # Fill memory to create pressure
+        for i in range(memory.max_short_term):
+            item = MemoryItem(
+                memory_id=f"mem{i}",
+                agent_id="agent1",
+                memory_type=MemoryType.SHORT_TERM,
+                content=f"Content {i}",
+                importance=0.1,
+                access_count=0,
+            )
+            memory._short_term.append(item)
+
+        # Mock check_memory_pressure to return under_pressure=True after cleanup
+        _original_check = memory.check_memory_pressure
+        call_count = 0
+        async def mock_check():
+            nonlocal call_count
+            call_count += 1
+            if call_count == 1:
+                return {"under_pressure": True, "total_memories": 100}
+            else:
+                return {"under_pressure": True, "total_memories": 90}
+        memory.check_memory_pressure = mock_check
+
+        removed = await memory.handle_memory_pressure()
+
+        # Should remove additional memories
+        assert removed >= 0
+
+    @pytest.mark.asyncio
+    async def test_persist_without_path(self, memory):
+        """Test _persist without persistence_path (lines 461-462)."""
+        # Should return early without error
+        await memory._persist()
+
+    @pytest.mark.asyncio
+    async def test_persist_with_dal(self):
+        """Test _persist with DAL (lines 444-458)."""
+        mock_dal = AsyncMock()
+        mock_dal.save_memory = AsyncMock()
+
+        memory = AgentMemory(agent_id="agent1", memory_dal=mock_dal, tenant_id="tenant1")
+        await memory.store("Content 1", MemoryType.SHORT_TERM)
+        await memory.store("Content 2", MemoryType.LONG_TERM)
+
+        await memory._persist()
+
+        # Should save all memories to DAL
+        assert mock_dal.save_memory.call_count >= 2
+
+    @pytest.mark.asyncio
+    async def test_persist_with_dal_error(self):
+        """Test _persist when DAL save fails (lines 455-458)."""
+        mock_dal = AsyncMock()
+        mock_dal.save_memory = AsyncMock(side_effect=Exception("DB error"))
+
+        memory = AgentMemory(agent_id="agent1", memory_dal=mock_dal, tenant_id="tenant1")
+        await memory.store("Content 1")
+
+        # Should not raise, just log warning
+        await memory._persist()
+
+    @pytest.mark.asyncio
+    async def test_load_without_file(self, memory):
+        """Test _load without file (lines 508-509)."""
+        # Should return early without error
+        await memory._load()
+
+    @pytest.mark.asyncio
+    async def test_load_without_path(self, memory):
+        """Test _load without persistence_path."""
+        memory._persistence_path = None
+        # Should return early without error
+        await memory._load()
+

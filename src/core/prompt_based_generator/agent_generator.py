@@ -8,7 +8,8 @@ Generates agents from natural language prompts using LLM interpretation.
 import uuid
 from typing import Optional
 
-from ..agno_agent_framework import Agent, AgentCapability
+# Import from compatibility layer (uses real Agno)
+from ..agno_agent_framework.compatibility import Agent, AgentCapability
 from ..utils.type_helpers import ConfigDict, GatewayProtocol
 from .exceptions import AgentGenerationError
 from .generator_cache import GeneratorCache
@@ -101,13 +102,18 @@ class AgentGenerator:
 
             # Configure memory if specified
             if requirements.memory_config:
-                agent.attach_memory(
+                from ..agno_agent_framework.memory import AgentMemory
+                memory = AgentMemory(
+                    agent_id=agent.agent_id,
                     persistence_path=requirements.memory_config.get("persistence_path"),
+                    max_short_term=requirements.memory_config.get("max_short_term", 50),
+                    max_long_term=requirements.memory_config.get("max_long_term", 1000),
                     max_episodic=requirements.memory_config.get("max_episodic", 500),
                     max_semantic=requirements.memory_config.get("max_semantic", 2000),
                     max_age_days=requirements.memory_config.get("max_age_days", 30),
                     tenant_id=tenant_id,
                 )
+                agent.attach_memory(memory)
 
             # Set system prompt if provided
             if requirements.system_prompt:

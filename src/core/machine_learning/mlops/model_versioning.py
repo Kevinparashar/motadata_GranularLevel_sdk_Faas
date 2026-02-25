@@ -35,7 +35,7 @@ class ModelVersioning:
 
         logger.info(f"ModelVersioning initialized for tenant: {tenant_id}")
 
-    def version_model(
+    async def version_model(
         self,
         model_id: str,
         version: str,
@@ -64,7 +64,7 @@ class ModelVersioning:
         RETURNING id;
         """
 
-        result = self.db.execute_query(
+        result = await self.db.execute_query(
             query,
             (
                 model_id,
@@ -78,7 +78,9 @@ class ModelVersioning:
         )
 
         logger.info(f"Model versioned: {model_id} v{version}")
-        return str(result["id"])
+        if result and isinstance(result, dict) and "id" in result:
+            return str(result["id"])
+        raise ValueError("Failed to create model version")
 
     def get_lineage(self, model_id: str, version: Optional[str] = None) -> Dict[str, Any]:
         """

@@ -244,7 +244,7 @@ class MultiModalLoader:
 
                 with open(p, "r", encoding="utf-8") as f:
                     soup = BeautifulSoup(f.read(), "html.parser")
-                return soup.get_text(separator=" ", strip=True)
+                return str(soup.get_text(separator=" ", strip=True))
             except ImportError:
                 # Fallback: basic HTML tag removal
                 import re
@@ -540,8 +540,8 @@ class MultiModalLoader:
             )
 
         def _process_video(p: Path) -> Tuple[str, Dict[str, Any]]:
-            content_parts = []
-            video_metadata = {}
+            content_parts: List[str] = []
+            video_metadata: Dict[str, Any] = {}
 
             cap = cv2.VideoCapture(str(p))
             if not cap.isOpened():
@@ -659,7 +659,7 @@ class MultiModalLoader:
                 "image_height": image.height,
                 "image_format": image.format,
             }
-            content_parts = []
+            content_parts: List[str] = []
 
             # OCR if enabled
             if self.enable_image_ocr:

@@ -74,7 +74,9 @@ class TestAgentBenchmarks:
     def agent_with_memory(self, mock_gateway):
         """Agent with memory enabled."""
         agent = Agent(agent_id="benchmark_agent", name="Benchmark Agent", gateway=mock_gateway)
-        agent.attach_memory(persistence_path=None, max_episodic=100, max_semantic=200)
+        from src.core.agno_agent_framework.memory import AgentMemory
+        memory = AgentMemory(agent_id="benchmark_agent", max_episodic=100, max_semantic=200)
+        agent.attach_memory(memory)
         return agent
 
     @pytest.fixture

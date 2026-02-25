@@ -161,7 +161,7 @@ class TestCacheOTELIntegration:
         metrics = OTELMetrics(service_name="test-cache")
         
         cache = CacheMechanism(
-            config=CacheConfig(backend="memory", namespace="test"),
+            config=CacheConfig(backend="memory"),
             otel_tracer=tracer,
             otel_metrics=metrics,
         )
@@ -181,7 +181,7 @@ class TestCacheOTELIntegration:
     @pytest.mark.asyncio
     async def test_invalidate_pattern_without_otel(self):
         """Test invalidate_pattern operation without OTEL."""
-        cache = CacheMechanism(config=CacheConfig(backend="memory", namespace="test"))
+        cache = CacheMechanism(config=CacheConfig(backend="memory"))
         cache.otel_tracer = None
         cache.otel_metrics = None
         

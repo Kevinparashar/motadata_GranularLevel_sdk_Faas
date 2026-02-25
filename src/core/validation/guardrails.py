@@ -291,8 +291,8 @@ class Guardrail:
 
         # Wrap CPU-intensive regex operations in thread pool
         def _check_patterns() -> tuple[List[str], List[str]]:
-            pattern_errors = []
-            pattern_warnings = []
+            pattern_errors: List[str] = []
+            pattern_warnings: List[str] = []
             
             # Check for blocked patterns
             for pattern in self.blocked_patterns:

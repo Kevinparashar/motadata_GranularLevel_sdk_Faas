@@ -6,7 +6,8 @@ Tests for OpenTelemetry integration within the Agent Framework.
 
 import pytest
 
-from src.core.agno_agent_framework.agent import Agent, AgentTask
+# Import from compatibility layer (uses real Agno)
+from src.core.agno_agent_framework import Agent, AgentTask
 from src.core.otel_integration import OTELMetrics, OTELTracer
 
 

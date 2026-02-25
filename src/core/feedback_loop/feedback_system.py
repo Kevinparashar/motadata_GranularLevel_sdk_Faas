@@ -341,9 +341,10 @@ class FeedbackLoop:
                     ],
                 }
 
-                self.storage_path.parent.mkdir(parents=True, exist_ok=True)
-                with self.storage_path.open("w", encoding="utf-8") as f:
-                    json.dump(data, f, default=str, indent=2)
+                if self.storage_path:
+                    self.storage_path.parent.mkdir(parents=True, exist_ok=True)
+                    with self.storage_path.open("w", encoding="utf-8") as f:
+                        json.dump(data, f, default=str, indent=2)
             except (OSError, IOError) as e:
                 # Silently fail persistence - log for debugging
                 import logging
@@ -368,6 +369,8 @@ class FeedbackLoop:
 
         def _load_sync() -> tuple[List[FeedbackItem], List[FeedbackItem]]:
             try:
+                if not self.storage_path:
+                    return [], []
                 with self.storage_path.open("r", encoding="utf-8") as f:
                     data = json.load(f)
 

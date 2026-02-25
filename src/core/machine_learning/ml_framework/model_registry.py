@@ -38,6 +38,9 @@ class ModelRegistry:
         """
         self.db = db
         self.tenant_id = tenant_id
+        # Initialize ModelVersionDAL
+        from ...faas.shared.dal.model_version_dal import ModelVersionDAL  # type: ignore[import-untyped]
+        self.model_version_dal = ModelVersionDAL(db)
 
         logger.info(f"ModelRegistry initialized for tenant: {tenant_id}")
 

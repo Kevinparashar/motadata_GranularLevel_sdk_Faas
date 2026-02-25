@@ -7,7 +7,8 @@ Factory functions and convenience functions for prompt-based agent and tool crea
 
 from typing import Optional
 
-from ..agno_agent_framework.agent import Agent
+# Import from compatibility layer (uses real Agno)
+from ..agno_agent_framework.compatibility import Agent
 from ..agno_agent_framework.tools import Tool
 from ..utils.error_handler import create_error_with_suggestion
 from ..utils.type_helpers import ConfigDict, GatewayProtocol, ResultDict
