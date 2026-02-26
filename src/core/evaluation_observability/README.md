@@ -93,7 +93,10 @@ The **Governance Framework** (root level) can use observability data for:
 
 ## OpenTelemetry (OTEL) Implementation
 
+This component provides the **high-level interface** for observability. The actual OpenTelemetry implementation is provided by the **OTEL Integration** module (`src/core/otel_integration/`).
+
 For detailed information on how OpenTelemetry is implemented in this SDK, see:
+- **[OTEL Integration README](../otel_integration/README.md)**: Complete documentation of the OTEL implementation module
 - **[OTEL Integration Guide](../../../docs/integration_guides/otel_integration_guide.md)**: Comprehensive guide covering:
   - Architecture and integration points
   - Component instrumentation (Agent, RAG, Gateway, Database, NATS)

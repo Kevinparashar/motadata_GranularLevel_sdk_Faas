@@ -84,8 +84,11 @@ The **API Backend Services** (`src/core/api_backend_services/`) can use caching 
 
 ## Backends
 
-- **Memory**: OrderedDict-based LRU with TTL and max-size enforcement
-- **Dragonfly**: Optional; enabled when `redis` dependency (Dragonfly is Redis-compatible) and URL are provided
+- **Memory**: OrderedDict-based LRU with TTL and max-size enforcement (default, always available)
+- **Dragonfly**: Optional; enabled when `aioredis` dependency is available and URL is provided
+  - **Note**: `aioredis==2.0.1` has Python 3.12 compatibility issues. The cache mechanism gracefully falls back to in-memory cache if `aioredis` is unavailable or fails to initialize.
+  - For Python 3.12, use in-memory cache or wait for `aioredis` compatibility updates.
+  - Dragonfly is Redis-compatible and can be used as a distributed cache backend.
 
 ## Function-Driven API
 

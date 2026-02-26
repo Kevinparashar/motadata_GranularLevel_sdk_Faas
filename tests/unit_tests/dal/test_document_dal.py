@@ -206,3 +206,129 @@ class TestDocumentDAL:
                 content="Test content",
             )
 
+    # Keyword Search Tests (Success ≥2, Edge ≥2, Failure ≥2)
+    @pytest.mark.asyncio
+    async def test_keyword_search_success_with_tenant(self, document_dal, mock_db):
+        """Test successfully searching keywords with tenant_id."""
+        mock_db.execute_query.return_value = [
+            {
+                "id": "doc_1",
+                "title": "Test Document",
+                "content": "This is a test document with keywords",
+                "metadata": json.dumps({"key": "value"}),
+                "source": "test_source",
+                "keyword_matches": 2,
+            }
+        ]
+
+        result = await document_dal.keyword_search(
+            keywords=["test", "document"],
+            tenant_id="tenant_456",
+            limit=10,
+        )
+
+        assert len(result) == 1
+        assert result[0]["id"] == "doc_1"
+        assert result[0]["score_type"] == "keyword"
+        assert result[0]["similarity"] > 0
+        mock_db.execute_query.assert_called_once()
+
+    @pytest.mark.asyncio
+    async def test_keyword_search_success_without_tenant(self, document_dal, mock_db):
+        """Test successfully searching keywords without tenant_id."""
+        mock_db.execute_query.return_value = [
+            {
+                "id": "doc_1",
+                "title": "Test Document",
+                "content": "This is a test document",
+                "metadata": json.dumps({"key": "value"}),
+                "source": "test_source",
+                "keyword_matches": 1,
+            }
+        ]
+
+        result = await document_dal.keyword_search(
+            keywords=["test"],
+            limit=10,
+        )
+
+        assert len(result) == 1
+        assert result[0]["id"] == "doc_1"
+        assert result[0]["score_type"] == "keyword"
+
+    @pytest.mark.asyncio
+    async def test_keyword_search_empty_keywords(self, document_dal, mock_db):
+        """Test keyword search with empty keywords list."""
+        result = await document_dal.keyword_search(keywords=[], limit=10)
+
+        assert result == []
+        mock_db.execute_query.assert_not_called()
+
+    @pytest.mark.asyncio
+    async def test_keyword_search_no_results(self, document_dal, mock_db):
+        """Test keyword search with no matching results."""
+        mock_db.execute_query.return_value = []
+
+        result = await document_dal.keyword_search(
+            keywords=["nonexistent"],
+            limit=10,
+        )
+
+        assert result == []
+
+    @pytest.mark.asyncio
+    async def test_keyword_search_with_dict_metadata(self, document_dal, mock_db):
+        """Test keyword search with dict metadata (not string)."""
+        mock_db.execute_query.return_value = [
+            {
+                "id": "doc_1",
+                "title": "Test Document",
+                "content": "Test content",
+                "metadata": {"key": "value"},  # Already a dict
+                "source": "test_source",
+                "keyword_matches": 1,
+            }
+        ]
+
+        result = await document_dal.keyword_search(
+            keywords=["test"],
+            limit=10,
+        )
+
+        assert len(result) == 1
+        assert isinstance(result[0]["metadata"], dict)
+
+    @pytest.mark.asyncio
+    async def test_keyword_search_database_error(self, document_dal, mock_db):
+        """Test keyword search handles database errors gracefully."""
+        mock_db.execute_query.side_effect = Exception("Database error")
+
+        result = await document_dal.keyword_search(
+            keywords=["test"],
+            limit=10,
+        )
+
+        assert result == []
+
+    @pytest.mark.asyncio
+    async def test_keyword_search_invalid_json_metadata(self, document_dal, mock_db):
+        """Test keyword search handles invalid JSON metadata."""
+        mock_db.execute_query.return_value = [
+            {
+                "id": "doc_1",
+                "title": "Test Document",
+                "content": "Test content",
+                "metadata": "invalid json{",  # Invalid JSON
+                "source": "test_source",
+                "keyword_matches": 1,
+            }
+        ]
+
+        result = await document_dal.keyword_search(
+            keywords=["test"],
+            limit=10,
+        )
+
+        assert len(result) == 1
+        assert result[0]["metadata"] == {}  # Should default to empty dict
+

@@ -348,6 +348,9 @@ cache = create_dragonfly_cache(
 
 # Supports multiple Dragonfly instances
 # Shared cache across multiple application instances
+
+# Note: If aioredis is unavailable (e.g., Python 3.12 compatibility issues),
+# the cache automatically falls back to in-memory cache
 ```
 
 ### Batch Operations

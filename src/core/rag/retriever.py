@@ -13,9 +13,14 @@ import logging
 import time
 from typing import Any, Dict, List, Optional
 
+from typing import TYPE_CHECKING
+
 from ..litellm_gateway import LiteLLMGateway
 from ..postgresql_database.vector_operations import VectorOperations
 from .exceptions import EmbeddingError
+
+if TYPE_CHECKING:
+    from ...faas.shared.dal.document_dal import DocumentDAL
 
 logger = logging.getLogger(__name__)
 
@@ -34,6 +39,7 @@ class Retriever:
         embedding_model: str = "text-embedding-3-small",
         otel_tracer: Optional[Any] = None,
         otel_metrics: Optional[Any] = None,
+        document_dal: Optional["DocumentDAL"] = None,
     ):
         """
         Initialize retriever.
@@ -44,12 +50,22 @@ class Retriever:
             embedding_model (str): Input parameter for this operation.
             otel_tracer: Optional OTEL tracer for distributed tracing
             otel_metrics: Optional OTEL metrics for metrics collection
+            document_dal: Optional DocumentDAL instance for keyword search operations.
         """
         self.vector_ops = vector_ops
         self.gateway = gateway
         self.embedding_model = embedding_model
-        # Access database connection from vector_ops for keyword search
-        self.db = vector_ops.db if hasattr(vector_ops, "db") else None
+        # Initialize DocumentDAL if not provided
+        if document_dal is None:
+            from ...faas.shared.dal.document_dal import DocumentDAL
+            # Get database connection from vector_ops
+            db = vector_ops.db if hasattr(vector_ops, "db") else None
+            if db:
+                self.document_dal = DocumentDAL(db)
+            else:
+                self.document_dal = None
+        else:
+            self.document_dal = document_dal
 
         # OTEL Integration (optional)
         self.otel_tracer: Optional[Any] = otel_tracer
@@ -512,76 +528,43 @@ class Retriever:
         Returns:
             List[Dict[str, Any]]: Dictionary result of the operation.
         """
+        # Use DocumentDAL for keyword search (proper DAL architecture)
+        if not self.document_dal:
+            logger.warning("DocumentDAL not available, cannot perform keyword search")
+            return []
+
         # Extract keywords from query
         keywords = query.lower().split()
-
-        # Simple keyword matching query with tenant filtering
-        # In production, you might use full-text search (tsvector in PostgreSQL)
-        if tenant_id:
-            query_sql = """
-            SELECT d.id, d.title, d.content, d.metadata, d.source,
-                   COUNT(*) as keyword_matches
-            FROM documents d
-            WHERE (LOWER(d.content) LIKE ANY(ARRAY[%s])
-               OR LOWER(d.title) LIKE ANY(ARRAY[%s]))
-              AND d.tenant_id = %s
-            GROUP BY d.id, d.title, d.content, d.metadata, d.source
-            ORDER BY keyword_matches DESC, d.id
-            LIMIT %s;
-            """
-        else:
-            query_sql = """
-            SELECT d.id, d.title, d.content, d.metadata, d.source,
-                   COUNT(*) as keyword_matches
-            FROM documents d
-            WHERE LOWER(d.content) LIKE ANY(ARRAY[%s])
-               OR LOWER(d.title) LIKE ANY(ARRAY[%s])
-            GROUP BY d.id, d.title, d.content, d.metadata, d.source
-            ORDER BY keyword_matches DESC, d.id
-            LIMIT %s;
-            """
-
-        # Create LIKE patterns for each keyword
-        like_patterns = [f"%{keyword}%" for keyword in keywords]
-
-        # Get database connection from vector_ops
-        db = getattr(self.vector_ops, "db", None)
-        if not db:
-            # Fallback: try to get from vector_ops connection attribute
-            db = getattr(self.vector_ops, "connection", None)
-
-        if not db:
-            return []  # Cannot perform keyword search without database
+        if not keywords:
+            return []
 
         try:
-            if tenant_id:
-                results = db.execute_query(
-                    query_sql, (like_patterns, like_patterns, tenant_id, top_k), fetch_all=True
-                )
-            else:
-                results = db.execute_query(
-                    query_sql, (like_patterns, like_patterns, top_k), fetch_all=True
-                )
+            # Use DocumentDAL for keyword search
+            import asyncio
 
-            # Format results similar to vector search
-            formatted_results = []
-            for row in results:
-                formatted_results.append(
-                    {
-                        "id": str(row["id"]),
-                        "title": row.get("title", ""),
-                        "content": row.get("content", ""),
-                        "metadata": row.get("metadata", {}),
-                        "source": row.get("source"),
-                        "similarity": row.get("keyword_matches", 0)
-                        / len(keywords),  # Normalize score
-                        "score_type": "keyword",
-                    }
-                )
+            def _run_async(coro):
+                """Helper to run async code from sync context."""
+                try:
+                    _ = asyncio.get_running_loop()
+                    raise RuntimeError(
+                        "Cannot call sync _keyword_search() from async context. Use retrieve_async() instead."
+                    )
+                except RuntimeError as e:
+                    if "Cannot call sync" in str(e):
+                        raise
+                    return asyncio.run(coro)
 
-            return formatted_results
-        except Exception:
-            # Fallback to empty results if keyword search fails
+            results = _run_async(
+                self.document_dal.keyword_search(
+                    keywords=keywords,
+                    tenant_id=tenant_id,
+                    limit=top_k,
+                )
+            )
+
+            return results
+        except Exception as e:
+            logger.warning(f"Keyword search failed: {str(e)}")
             return []
 
     def _combine_results(

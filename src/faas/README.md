@@ -236,12 +236,14 @@ CREATE TABLE agents (
 ### OTEL Integration
 - **Purpose**: Distributed tracing, metrics, and logging
 - **Usage**: Observability across all services
-- **Placeholder**: Ready for OpenTelemetry SDK integration
+- **Implementation**: Uses `src/core/otel_integration/` module (fully implemented)
+- **See**: [OTEL Integration README](../../core/otel_integration/README.md) for details
 
 ### CODEC Integration
 - **Purpose**: Message serialization/deserialization
 - **Usage**: Efficient data encoding for NATS messages
-- **Placeholder**: Ready for CODEC library integration
+- **Implementation**: Uses `src/core/codec_integration/` module (fully implemented)
+- **See**: [CODEC Integration README](../../core/codec_integration/README.md) for details
 
 ## Service Integration Flow
 

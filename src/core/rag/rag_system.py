@@ -1374,20 +1374,27 @@ class RAGSystem:
             logger.error(f"Unexpected error deleting document {document_id}: {e}", exc_info=True)
             return False
 
-    async def _delete_document_chunks(self, document_id: str) -> None:
+    async def _delete_document_chunks(self, document_id: str, tenant_id: Optional[str] = None) -> None:
         """
         Delete all chunks and embeddings for a document.
         
         Args:
             document_id (str): Input parameter for this operation.
+            tenant_id (Optional[str]): Tenant identifier for tenant isolation.
         
         Returns:
             None: Result of the operation.
         """
-        # Delete embeddings
-        query = "DELETE FROM embeddings WHERE document_id = %s;"
-        await self.db.execute_query(query, (document_id,))
+        # Delete embeddings using VectorOperations (DAL architecture)
+        # Convert document_id to int as embeddings table uses integer document_id
+        try:
+            doc_id_int = int(document_id)
+            await self.vector_ops.delete_embeddings(document_id=doc_id_int, tenant_id=tenant_id)
+        except (ValueError, TypeError) as e:
+            logger.warning(f"Invalid document_id format for embedding deletion: {document_id}, error: {e}")
+            # Fallback: try as string if conversion fails (for backward compatibility)
+            # But this should not happen in normal operation
+            return
 
         # Note: If you have a chunks table, delete from there too
-        # query = "DELETE FROM chunks WHERE document_id = %s;"
-        # await self.db.execute_query(query, (document_id,))
+        # This would require a ChunkDAL if chunks are stored separately

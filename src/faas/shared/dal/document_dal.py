@@ -277,3 +277,88 @@ class DocumentDAL:
 
         return result is not None
 
+    async def keyword_search(
+        self,
+        keywords: List[str],
+        tenant_id: Optional[str] = None,
+        limit: int = 10,
+    ) -> List[Dict[str, Any]]:
+        """
+        Perform keyword-based search on document content.
+
+        Args:
+            keywords: List of keywords to search for.
+            tenant_id: Tenant identifier for tenant isolation.
+            limit: Maximum number of results to return.
+
+        Returns:
+            List[Dict[str, Any]]: List of documents matching keywords with similarity scores.
+        """
+        if not keywords:
+            return []
+
+        # Create LIKE patterns for each keyword
+        like_patterns = [f"%{keyword.lower()}%" for keyword in keywords]
+
+        # Build query with tenant filtering
+        if tenant_id:
+            query = """
+            SELECT d.id, d.title, d.content, d.metadata, d.source,
+                   COUNT(*) as keyword_matches
+            FROM documents d
+            WHERE (LOWER(d.content) LIKE ANY($1::text[])
+               OR LOWER(d.title) LIKE ANY($1::text[]))
+              AND d.tenant_id = $2
+            GROUP BY d.id, d.title, d.content, d.metadata, d.source
+            ORDER BY keyword_matches DESC, d.id
+            LIMIT $3;
+            """
+            params = (like_patterns, tenant_id, limit)
+        else:
+            query = """
+            SELECT d.id, d.title, d.content, d.metadata, d.source,
+                   COUNT(*) as keyword_matches
+            FROM documents d
+            WHERE LOWER(d.content) LIKE ANY($1::text[])
+               OR LOWER(d.title) LIKE ANY($1::text[])
+            GROUP BY d.id, d.title, d.content, d.metadata, d.source
+            ORDER BY keyword_matches DESC, d.id
+            LIMIT $2;
+            """
+            params = (like_patterns, limit)
+
+        try:
+            results = await self.db.execute_query(
+                query,
+                params=params,
+                fetch_all=True,
+            )
+
+            # Format results similar to vector search
+            formatted_results = []
+            for row in results:
+                # Parse JSON metadata if needed
+                metadata = row.get("metadata", {})
+                if isinstance(metadata, str):
+                    try:
+                        metadata = json.loads(metadata)
+                    except json.JSONDecodeError:
+                        metadata = {}
+
+                formatted_results.append(
+                    {
+                        "id": str(row["id"]),
+                        "title": row.get("title", ""),
+                        "content": row.get("content", ""),
+                        "metadata": metadata,
+                        "source": row.get("source"),
+                        "similarity": row.get("keyword_matches", 0) / len(keywords),  # Normalize score
+                        "score_type": "keyword",
+                    }
+                )
+
+            return formatted_results
+        except Exception as e:
+            logger.warning(f"Keyword search failed: {str(e)}")
+            return []
+

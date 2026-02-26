@@ -142,14 +142,19 @@ class TestRetrieverOTELIntegration:
         vector_ops.similarity_search = AsyncMock(return_value=[
             {"id": "1", "content": "test", "similarity": 0.9}
         ])
-        vector_ops.db = MagicMock()
-        vector_ops.db.execute_query = MagicMock(return_value=[])
+        
+        # Mock DocumentDAL for keyword search
+        from src.faas.shared.dal.document_dal import DocumentDAL
+        mock_db = MagicMock()
+        mock_document_dal = DocumentDAL(mock_db)
+        mock_document_dal.keyword_search = AsyncMock(return_value=[])
         
         retriever = Retriever(
             vector_ops=vector_ops,
             gateway=gateway,
             otel_tracer=tracer,
             otel_metrics=metrics,
+            document_dal=mock_document_dal,
         )
         
         # Execute retrieve_hybrid - should not raise exception

@@ -917,7 +917,8 @@ class TestRetriever:
         assert retriever.vector_ops == mock_vector_ops
         assert retriever.gateway == mock_gateway
         assert retriever.embedding_model == "text-embedding-ada-002"
-        assert retriever.db == mock_vector_ops.db
+        # DocumentDAL should be auto-created when db is available
+        assert retriever.document_dal is not None
 
     def test_retriever_init_without_db(self):
         """Test Retriever initialization without db attribute."""
@@ -928,7 +929,23 @@ class TestRetriever:
         
         retriever = Retriever(vector_ops=mock_vector_ops)
         
-        assert retriever.db is None
+        # DocumentDAL should be None when db is not available
+        assert retriever.document_dal is None
+
+    def test_retriever_init_with_document_dal(self):
+        """Test Retriever initialization with explicit DocumentDAL."""
+        from src.faas.shared.dal.document_dal import DocumentDAL
+        
+        mock_vector_ops = MagicMock()
+        mock_db = MagicMock()
+        mock_document_dal = DocumentDAL(mock_db)
+        
+        retriever = Retriever(
+            vector_ops=mock_vector_ops,
+            document_dal=mock_document_dal
+        )
+        
+        assert retriever.document_dal == mock_document_dal
 
     def test_retrieve_hybrid(self, mock_retriever):
         """Test retrieve_hybrid method."""
@@ -939,12 +956,14 @@ class TestRetriever:
             {"id": "1", "similarity": 0.9, "content": "Vector result"},
         ])
         
-        # Mock keyword search (needs db on vector_ops)
+        # Mock DocumentDAL for keyword search
+        from src.faas.shared.dal.document_dal import DocumentDAL
         mock_db = MagicMock()
-        mock_db.execute_query = MagicMock(return_value=[
-            {"id": 2, "title": "Keyword", "content": "Keyword result", "keyword_matches": 2}
+        mock_document_dal = DocumentDAL(mock_db)
+        mock_document_dal.keyword_search = AsyncMock(return_value=[
+            {"id": "2", "title": "Keyword", "content": "Keyword result", "similarity": 0.5, "score_type": "keyword"}
         ])
-        mock_vector_ops.db = mock_db
+        retriever.document_dal = mock_document_dal
         
         results = retriever.retrieve_hybrid(
             query="Test query",
@@ -958,80 +977,67 @@ class TestRetriever:
 
     def test_keyword_search_with_tenant_id(self, mock_retriever):
         """Test _keyword_search with tenant_id."""
-        retriever, mock_vector_ops, _ = mock_retriever
+        retriever, _mock_vector_ops, _ = mock_retriever
         
+        # Mock DocumentDAL
+        from src.faas.shared.dal.document_dal import DocumentDAL
         mock_db = MagicMock()
-        mock_db.execute_query = MagicMock(return_value=[
-            {"id": 1, "title": "Test", "content": "Content", "keyword_matches": 2}
+        mock_document_dal = DocumentDAL(mock_db)
+        mock_document_dal.keyword_search = AsyncMock(return_value=[
+            {"id": "1", "title": "Test", "content": "Content", "similarity": 0.8, "score_type": "keyword"}
         ])
-        mock_vector_ops.db = mock_db
+        retriever.document_dal = mock_document_dal
         
         results = retriever._keyword_search("test query", tenant_id="tenant-123", top_k=5)
         
         assert len(results) > 0
         assert results[0]["score_type"] == "keyword"
-        mock_db.execute_query.assert_called_once()
+        mock_document_dal.keyword_search.assert_called_once()
 
     def test_keyword_search_without_tenant_id(self, mock_retriever):
         """Test _keyword_search without tenant_id."""
-        retriever, mock_vector_ops, _ = mock_retriever
+        retriever, _mock_vector_ops, _ = mock_retriever
         
+        # Mock DocumentDAL
+        from src.faas.shared.dal.document_dal import DocumentDAL
         mock_db = MagicMock()
-        mock_db.execute_query = MagicMock(return_value=[
-            {"id": 1, "title": "Test", "content": "Content", "keyword_matches": 2}
+        mock_document_dal = DocumentDAL(mock_db)
+        mock_document_dal.keyword_search = AsyncMock(return_value=[
+            {"id": "1", "title": "Test", "content": "Content", "similarity": 0.8, "score_type": "keyword"}
         ])
-        mock_vector_ops.db = mock_db
+        retriever.document_dal = mock_document_dal
         
         results = retriever._keyword_search("test query", top_k=5)
         
         assert len(results) > 0
-        mock_db.execute_query.assert_called_once()
+        mock_document_dal.keyword_search.assert_called_once()
 
-    def test_keyword_search_no_db(self, mock_retriever):
-        """Test _keyword_search returns empty when no db."""
-        retriever, mock_vector_ops, _ = mock_retriever
+    def test_keyword_search_no_document_dal(self, mock_retriever):
+        """Test _keyword_search returns empty when no DocumentDAL."""
+        retriever, _mock_vector_ops, _ = mock_retriever
         
-        # Remove db attribute
-        if hasattr(mock_vector_ops, 'db'):
-            delattr(mock_vector_ops, 'db')
-        if hasattr(mock_vector_ops, 'connection'):
-            delattr(mock_vector_ops, 'connection')
+        # Set document_dal to None
+        retriever.document_dal = None
         
         results = retriever._keyword_search("test query", top_k=5)
         
         assert results == []
 
-    def test_keyword_search_db_error(self, mock_retriever):
-        """Test _keyword_search handles database errors gracefully."""
-        retriever, mock_vector_ops, _ = mock_retriever
+    def test_keyword_search_document_dal_error(self, mock_retriever):
+        """Test _keyword_search handles DocumentDAL errors gracefully."""
+        retriever, _mock_vector_ops, _ = mock_retriever
         
+        # Mock DocumentDAL that raises error
+        from src.faas.shared.dal.document_dal import DocumentDAL
         mock_db = MagicMock()
-        mock_db.execute_query = MagicMock(side_effect=Exception("DB error"))
-        mock_vector_ops.db = mock_db
+        mock_document_dal = DocumentDAL(mock_db)
+        mock_document_dal.keyword_search = AsyncMock(side_effect=Exception("DAL error"))
+        retriever.document_dal = mock_document_dal
         
         results = retriever._keyword_search("test query", top_k=5)
         
         # Should return empty list on error
         assert results == []
-
-    def test_keyword_search_connection_fallback(self, mock_retriever):
-        """Test _keyword_search uses connection attribute as fallback."""
-        retriever, mock_vector_ops, _ = mock_retriever
-        
-        # Remove db attribute, set connection instead
-        if hasattr(mock_vector_ops, 'db'):
-            delattr(mock_vector_ops, 'db')
-        
-        # Set connection instead of db
-        mock_connection = MagicMock()
-        mock_connection.execute_query = MagicMock(return_value=[
-            {"id": 1, "title": "Test", "content": "Content", "keyword_matches": 1}
-        ])
-        mock_vector_ops.connection = mock_connection
-        
-        results = retriever._keyword_search("test query", top_k=5)
-        
-        assert len(results) > 0
 
     def test_combine_results(self, mock_retriever):
         """Test _combine_results method."""
@@ -1170,6 +1176,139 @@ class TestRetriever:
         filtered = retriever._apply_filters(results, {"category": "tech"})
         
         assert len(filtered) == 0
+
+    @pytest.mark.asyncio
+    async def test_retrieve_async_success(self, mock_retriever):
+        """Test retrieve_async method successfully."""
+        retriever, mock_vector_ops, mock_gateway = mock_retriever
+        
+        mock_gateway.embed = MagicMock(return_value=MagicMock(embeddings=[[0.1] * 1536]))
+        mock_vector_ops.similarity_search = AsyncMock(return_value=[
+            {"id": "1", "content": "test", "similarity": 0.9}
+        ])
+        
+        results = await retriever.retrieve_async("test query", top_k=5)
+        
+        assert len(results) == 1
+        assert results[0]["id"] == "1"
+        mock_gateway.embed.assert_called_once()
+        mock_vector_ops.similarity_search.assert_called_once()
+
+    @pytest.mark.asyncio
+    async def test_retrieve_async_with_tenant_id(self, mock_retriever):
+        """Test retrieve_async with tenant_id."""
+        retriever, mock_vector_ops, mock_gateway = mock_retriever
+        
+        mock_gateway.embed = MagicMock(return_value=MagicMock(embeddings=[[0.1] * 1536]))
+        mock_vector_ops.similarity_search = AsyncMock(return_value=[
+            {"id": "1", "content": "test", "similarity": 0.9, "metadata": {"tenant_id": "tenant_123"}}
+        ])
+        
+        results = await retriever.retrieve_async("test query", tenant_id="tenant_123", top_k=5)
+        
+        assert len(results) == 1
+
+    @pytest.mark.asyncio
+    async def test_retrieve_async_with_filters(self, mock_retriever):
+        """Test retrieve_async with filters."""
+        retriever, mock_vector_ops, mock_gateway = mock_retriever
+        
+        mock_gateway.embed = MagicMock(return_value=MagicMock(embeddings=[[0.1] * 1536]))
+        mock_vector_ops.similarity_search = AsyncMock(return_value=[
+            {"id": "1", "content": "test", "similarity": 0.9, "metadata": {"key": "value"}}
+        ])
+        
+        results = await retriever.retrieve_async("test query", filters={"key": "value"}, top_k=5)
+        
+        assert len(results) == 1
+
+    @pytest.mark.asyncio
+    async def test_retrieve_async_with_otel(self, mock_retriever):
+        """Test retrieve_async with OTEL tracing."""
+        from src.core.otel_integration import OTELTracer, OTELMetrics
+        
+        retriever, mock_vector_ops, mock_gateway = mock_retriever
+        tracer = OTELTracer(service_name="test-retriever")
+        metrics = OTELMetrics(service_name="test-retriever")
+        retriever.otel_tracer = tracer
+        retriever.otel_metrics = metrics
+        
+        mock_gateway.embed = MagicMock(return_value=MagicMock(embeddings=[[0.1] * 1536]))
+        mock_vector_ops.similarity_search = AsyncMock(return_value=[
+            {"id": "1", "content": "test", "similarity": 0.9}
+        ])
+        
+        results = await retriever.retrieve_async("test query", top_k=5)
+        
+        assert len(results) == 1
+        assert retriever.otel_tracer is not None
+
+    @pytest.mark.asyncio
+    async def test_retrieve_async_with_otel_error(self, mock_retriever):
+        """Test retrieve_async with OTEL when error occurs."""
+        from src.core.otel_integration import OTELTracer, OTELMetrics
+        
+        retriever, mock_vector_ops, mock_gateway = mock_retriever
+        tracer = OTELTracer(service_name="test-retriever")
+        metrics = OTELMetrics(service_name="test-retriever")
+        retriever.otel_tracer = tracer
+        retriever.otel_metrics = metrics
+        
+        mock_gateway.embed = MagicMock(return_value=MagicMock(embeddings=[[0.1] * 1536]))
+        mock_vector_ops.similarity_search = AsyncMock(side_effect=Exception("Test error"))
+        
+        with pytest.raises(Exception, match="Test error"):
+            await retriever.retrieve_async("test query", top_k=5)
+
+    @pytest.mark.asyncio
+    async def test_retrieve_async_without_otel(self, mock_retriever):
+        """Test retrieve_async without OTEL (no tracing)."""
+        retriever, mock_vector_ops, mock_gateway = mock_retriever
+        retriever.otel_tracer = None
+        retriever.otel_metrics = None
+        
+        mock_gateway.embed = MagicMock(return_value=MagicMock(embeddings=[[0.1] * 1536]))
+        mock_vector_ops.similarity_search = AsyncMock(return_value=[
+            {"id": "1", "content": "test", "similarity": 0.9}
+        ])
+        
+        results = await retriever.retrieve_async("test query", top_k=5)
+        
+        assert len(results) == 1
+        assert results[0]["id"] == "1"
+
+    @pytest.mark.asyncio
+    async def test_retrieve_async_without_otel_with_tenant(self, mock_retriever):
+        """Test retrieve_async without OTEL with tenant_id."""
+        retriever, mock_vector_ops, mock_gateway = mock_retriever
+        retriever.otel_tracer = None
+        retriever.otel_metrics = None
+        
+        mock_gateway.embed = MagicMock(return_value=MagicMock(embeddings=[[0.1] * 1536]))
+        mock_vector_ops.similarity_search = AsyncMock(return_value=[
+            {"id": "1", "content": "test", "similarity": 0.9, "metadata": {"tenant_id": "tenant_123"}}
+        ])
+        
+        results = await retriever.retrieve_async("test query", tenant_id="tenant_123", top_k=5)
+        
+        assert len(results) == 1
+        assert results[0]["id"] == "1"
+
+    def test_retrieve_with_otel_error_handling(self, mock_retriever):
+        """Test retrieve() error handling with OTEL."""
+        from src.core.otel_integration import OTELTracer, OTELMetrics
+        
+        retriever, mock_vector_ops, mock_gateway = mock_retriever
+        tracer = OTELTracer(service_name="test-retriever")
+        metrics = OTELMetrics(service_name="test-retriever")
+        retriever.otel_tracer = tracer
+        retriever.otel_metrics = metrics
+        
+        mock_gateway.embed = MagicMock(return_value=MagicMock(embeddings=[[0.1] * 1536]))
+        mock_vector_ops.similarity_search = AsyncMock(side_effect=Exception("Test error"))
+        
+        with pytest.raises(Exception, match="Test error"):
+            retriever.retrieve("test query", top_k=5)
 
 
 class TestRAGGenerator:
@@ -1529,7 +1668,8 @@ class TestRAGSystem:
 
         rag.vector_ops.batch_insert_embeddings = AsyncMock(return_value=None)
         rag.index_manager.auto_reindex_on_embedding_change = AsyncMock(return_value=None)
-        rag.vector_ops.delete_embeddings_by_document = AsyncMock(return_value=None)
+        # Mock vector_ops.delete_embeddings (DAL-based approach)
+        rag.vector_ops.delete_embeddings = AsyncMock(return_value=3)  # 3 embeddings deleted
         
         # Mock DAL update_document method
         rag.document_dal.update_document = AsyncMock(return_value=True)
@@ -1550,19 +1690,19 @@ class TestRAGSystem:
         """Test document deletion."""
         rag, _mock_db, _ = mock_rag_system
 
-        rag.vector_ops.delete_embeddings_by_document = AsyncMock(return_value=None)
+        # Mock vector_ops.delete_embeddings (DAL-based approach)
+        rag.vector_ops.delete_embeddings = AsyncMock(return_value=5)  # 5 embeddings deleted
         rag.cache.invalidate_pattern = AsyncMock(return_value=None)
         
         # Mock DAL delete_document method
-        rag.document_dal.delete_document = AsyncMock(return_value=None)
-        
-        # Mock _delete_document_chunks (internal method)
-        rag._delete_document_chunks = AsyncMock(return_value=None)
+        rag.document_dal.delete_document = AsyncMock(return_value=True)
 
         result = await rag.delete_document(document_id="1")
 
         assert result is True
         rag.document_dal.delete_document.assert_called_once()
+        # Verify vector_ops.delete_embeddings was called (DAL architecture)
+        rag.vector_ops.delete_embeddings.assert_called_once_with(document_id=1, tenant_id=None)
 
     @pytest.mark.asyncio
     async def test_create_index(self, mock_rag_system):
@@ -2258,10 +2398,10 @@ class TestRAGSystem:
     @pytest.mark.asyncio
     async def test_delete_document_error_handling(self, mock_rag_system):
         """Test delete_document with error handling."""
-        rag, mock_db, _ = mock_rag_system
+        rag, _mock_db, _ = mock_rag_system
 
-        # _delete_document_chunks calls db.execute_query, so mock that to raise error
-        mock_db.execute_query = AsyncMock(side_effect=ConnectionError("DB error"))
+        # _delete_document_chunks now calls vector_ops.delete_embeddings (DAL-based)
+        rag.vector_ops.delete_embeddings = AsyncMock(side_effect=ConnectionError("DB error"))
         rag.cache.invalidate_pattern = AsyncMock(return_value=None)
 
         result = await rag.delete_document(document_id="1")
@@ -2271,10 +2411,10 @@ class TestRAGSystem:
     @pytest.mark.asyncio
     async def test_delete_document_unexpected_error(self, mock_rag_system):
         """Test delete_document with unexpected error."""
-        rag, mock_db, _ = mock_rag_system
+        rag, _mock_db, _ = mock_rag_system
 
-        # _delete_document_chunks calls db.execute_query, so mock that to raise error
-        mock_db.execute_query = AsyncMock(side_effect=KeyError("Unexpected error"))
+        # _delete_document_chunks now calls vector_ops.delete_embeddings (DAL-based)
+        rag.vector_ops.delete_embeddings = AsyncMock(side_effect=KeyError("Unexpected error"))
         rag.cache.invalidate_pattern = AsyncMock(return_value=None)
 
         result = await rag.delete_document(document_id="1")
@@ -2284,14 +2424,103 @@ class TestRAGSystem:
     @pytest.mark.asyncio
     async def test_delete_document_value_error(self, mock_rag_system):
         """Test delete_document with ValueError."""
-        rag, mock_db, _ = mock_rag_system
+        rag, _mock_db, _ = mock_rag_system
 
-        mock_db.execute_query = AsyncMock(side_effect=ValueError("Invalid document ID"))
+        # _delete_document_chunks now calls vector_ops.delete_embeddings (DAL-based)
+        # ValueError can occur when converting document_id to int
+        rag.vector_ops.delete_embeddings = AsyncMock(side_effect=ValueError("Invalid document ID"))
         rag.cache.invalidate_pattern = AsyncMock(return_value=None)
 
         result = await rag.delete_document(document_id="1")
 
         assert result is False
+
+    @pytest.mark.asyncio
+    async def test_delete_document_chunks_with_invalid_id(self, mock_rag_system):
+        """Test _delete_document_chunks with invalid document_id format."""
+        rag, _mock_db, _ = mock_rag_system
+        
+        # Test with non-numeric document_id (should handle gracefully)
+        rag.vector_ops.delete_embeddings = AsyncMock()
+        
+        # Should handle ValueError when converting to int
+        await rag._delete_document_chunks(document_id="invalid_id")
+        
+        # Should not raise exception, just log warning
+
+    @pytest.mark.asyncio
+    async def test_delete_document_chunks_with_tenant_id(self, mock_rag_system):
+        """Test _delete_document_chunks with tenant_id."""
+        rag, _mock_db, _ = mock_rag_system
+        
+        rag.vector_ops.delete_embeddings = AsyncMock(return_value=3)
+        
+        await rag._delete_document_chunks(document_id="123", tenant_id="tenant_456")
+        
+        rag.vector_ops.delete_embeddings.assert_called_once_with(document_id=123, tenant_id="tenant_456")
+
+    def test_build_document_update_query_with_title(self, mock_rag_system):
+        """Test _build_document_update_query with title only."""
+        rag, _mock_db, _ = mock_rag_system
+        
+        updates, params = rag._build_document_update_query(title="New Title", metadata=None)
+        
+        assert len(updates) == 1
+        assert "title" in updates[0]
+        assert params == ["New Title"]
+
+    def test_build_document_update_query_with_metadata(self, mock_rag_system):
+        """Test _build_document_update_query with metadata only."""
+        rag, _mock_db, _ = mock_rag_system
+        
+        metadata = {"key": "value"}
+        updates, params = rag._build_document_update_query(title=None, metadata=metadata)
+        
+        assert len(updates) == 1
+        assert "metadata" in updates[0]
+        assert len(params) == 1
+        import json
+        assert json.loads(params[0]) == metadata
+
+    def test_build_document_update_query_with_both(self, mock_rag_system):
+        """Test _build_document_update_query with both title and metadata."""
+        rag, _mock_db, _ = mock_rag_system
+        
+        metadata = {"key": "value"}
+        updates, params = rag._build_document_update_query(title="New Title", metadata=metadata)
+        
+        assert len(updates) == 2
+        assert len(params) == 2
+        assert params[0] == "New Title"
+
+    def test_build_document_update_query_with_none(self, mock_rag_system):
+        """Test _build_document_update_query with no updates."""
+        rag, _mock_db, _ = mock_rag_system
+        
+        updates, params = rag._build_document_update_query(title=None, metadata=None)
+        
+        assert len(updates) == 0
+        assert len(params) == 0
+
+    @pytest.mark.asyncio
+    async def test_update_document_content_reindex_error(self, mock_rag_system):
+        """Test _update_document_content with reindex error (non-critical)."""
+        rag, _mock_db, mock_gateway = mock_rag_system
+        
+        mock_embedding_response = MagicMock()
+        mock_embedding_response.embeddings = [[0.1] * 1536]
+        mock_gateway.embed_async = AsyncMock(return_value=mock_embedding_response)
+        
+        rag.vector_ops.batch_insert_embeddings = AsyncMock(return_value=None)
+        rag.vector_ops.delete_embeddings = AsyncMock(return_value=2)
+        rag.index_manager.auto_reindex_on_embedding_change = AsyncMock(side_effect=Exception("Reindex error"))
+        rag.document_dal.update_document = AsyncMock(return_value=True)
+        
+        # Should not raise exception, just log warning
+        await rag._update_document_content("1", "New content", {"key": "value"})
+        
+        # Verify DAL was called
+        rag.document_dal.update_document.assert_called_once()
 
     def test_generate_embeddings_individual_error_handling(self, mock_rag_system):
         """Test individual embedding generation with error handling."""

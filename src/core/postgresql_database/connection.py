@@ -31,6 +31,7 @@ class DatabaseConfig(BaseModel):
     min_connections: int = Field(default=1)
     max_connections: int = Field(default=10)
     connection_timeout: int = Field(default=30)
+    auto_create_extension: bool = Field(default=False, description="Automatically create pgvector extension if missing")
 
     @classmethod
     def from_env(cls) -> "DatabaseConfig":
@@ -90,6 +91,19 @@ class DatabaseConnection:
                 max_size=self.config.max_connections,
                 command_timeout=self.config.connection_timeout,
             )
+            
+            # Verify pgvector extension after connection
+            if not await self.verify_pgvector_extension():
+                if self.config.auto_create_extension:
+                    await self.create_pgvector_extension()
+                else:
+                    # Log warning but don't fail connection
+                    import logging
+                    logger = logging.getLogger(__name__)
+                    logger.warning(
+                        "pgvector extension not found. Vector operations may fail. "
+                        "Set auto_create_extension=True to automatically create it."
+                    )
         except asyncpg.PostgresError as e:
             raise ConnectionError(f"Failed to create connection pool: {e}") from e
         except Exception as e:
@@ -237,6 +251,160 @@ class DatabaseConnection:
             return False
         except Exception:
             return False
+
+    async def verify_pgvector_extension(self) -> bool:
+        """
+        Verify if pgvector extension is installed in the database.
+        
+        Returns:
+            bool: True if pgvector extension exists, False otherwise.
+        """
+        try:
+            if not self.pool:
+                await self.connect()
+            
+            if not self.pool:
+                return False
+            
+            # OTEL Integration (optional)
+            tracer = None
+            try:
+                from ..otel_integration import create_otel_tracer
+                tracer = create_otel_tracer(service_name="database-connection")
+            except (ImportError, Exception):
+                tracer = None
+            
+            if tracer:
+                with tracer.start_trace("database.verify_pgvector_extension") as trace:
+                    trace.set_attribute("database.name", self.config.database)
+                    
+                    try:
+                        async with self.pool.acquire() as conn:
+                            result = await conn.fetchval(
+                                """
+                                SELECT EXISTS(
+                                    SELECT 1 FROM pg_extension WHERE extname = 'vector'
+                                );
+                                """
+                            )
+                            exists = bool(result) if result is not None else False
+                            trace.set_attribute("pgvector.exists", exists)
+                            return exists
+                    except Exception as e:
+                        trace.record_exception(e)
+                        return False
+            else:
+                # No OTEL - execute without tracing
+                async with self.pool.acquire() as conn:
+                    result = await conn.fetchval(
+                        """
+                        SELECT EXISTS(
+                            SELECT 1 FROM pg_extension WHERE extname = 'vector'
+                        );
+                        """
+                    )
+                    return bool(result) if result is not None else False
+        except (asyncpg.PostgresError, ConnectionError) as e:
+            import logging
+            logger = logging.getLogger(__name__)
+            logger.warning(f"Failed to verify pgvector extension: {e}")
+            return False
+        except Exception as e:
+            import logging
+            logger = logging.getLogger(__name__)
+            logger.warning(f"Unexpected error verifying pgvector extension: {e}")
+            return False
+
+    async def create_pgvector_extension(self) -> bool:
+        """
+        Create pgvector extension in the database (requires superuser privileges).
+        
+        Returns:
+            bool: True if extension was created or already exists, False otherwise.
+        """
+        try:
+            if not self.pool:
+                await self.connect()
+            
+            if not self.pool:
+                return False
+            
+            # OTEL Integration (optional)
+            tracer = None
+            try:
+                from ..otel_integration import create_otel_tracer
+                tracer = create_otel_tracer(service_name="database-connection")
+            except (ImportError, Exception):
+                tracer = None
+            
+            if tracer:
+                with tracer.start_trace("database.create_pgvector_extension") as trace:
+                    trace.set_attribute("database.name", self.config.database)
+                    
+                    try:
+                        async with self.pool.acquire() as conn:
+                            # Use IF NOT EXISTS to avoid errors if extension already exists
+                            await conn.execute("CREATE EXTENSION IF NOT EXISTS vector;")
+                            trace.set_attribute("pgvector.created", True)
+                            return True
+                    except asyncpg.PostgresError as e:
+                        trace.record_exception(e)
+                        import logging
+                        logger = logging.getLogger(__name__)
+                        logger.error(f"Failed to create pgvector extension: {e}")
+                        return False
+                    except Exception as e:
+                        trace.record_exception(e)
+                        import logging
+                        logger = logging.getLogger(__name__)
+                        logger.error(f"Unexpected error creating pgvector extension: {e}")
+                        return False
+            else:
+                # No OTEL - execute without tracing
+                async with self.pool.acquire() as conn:
+                    # Use IF NOT EXISTS to avoid errors if extension already exists
+                    await conn.execute("CREATE EXTENSION IF NOT EXISTS vector;")
+                    return True
+        except asyncpg.PostgresError as e:
+            import logging
+            logger = logging.getLogger(__name__)
+            logger.error(f"Failed to create pgvector extension: {e}")
+            return False
+        except Exception as e:
+            import logging
+            logger = logging.getLogger(__name__)
+            logger.error(f"Unexpected error creating pgvector extension: {e}")
+            return False
+
+    async def health_check(self) -> dict[str, Any]:
+        """
+        Perform comprehensive health check including pgvector extension.
+        
+        Returns:
+            dict[str, Any]: Health check results with connection status and extension status.
+        """
+        import logging
+        logger = logging.getLogger(__name__)
+        
+        health_status = {
+            "connection": False,
+            "pgvector_extension": False,
+            "database": self.config.database,
+        }
+        
+        try:
+            # Check basic connection
+            health_status["connection"] = await self.check_connection()
+            
+            # Check pgvector extension if connection is working
+            if health_status["connection"]:
+                health_status["pgvector_extension"] = await self.verify_pgvector_extension()
+            
+            return health_status
+        except Exception as e:
+            logger.error(f"Health check failed: {e}")
+            health_status["error"] = str(e)
+            return health_status
 
     # Synchronous wrappers for backward compatibility (will be deprecated)
     def execute_query_sync(

@@ -531,6 +531,683 @@ class TestDatabaseConnection:
         with pytest.raises(RuntimeError, match="Cannot use sync methods from async context"):
             db._get_or_create_event_loop()
 
+    @pytest.mark.asyncio
+    async def test_verify_pgvector_extension_exists(self, mock_db):
+        """Test verify_pgvector_extension when extension exists."""
+        db, mock_conn, _ = mock_db
+        await db.connect()
+        
+        mock_conn.fetchval = AsyncMock(return_value=True)
+        
+        result = await db.verify_pgvector_extension()
+        
+        assert result is True
+        mock_conn.fetchval.assert_called_once()
+
+    @pytest.mark.asyncio
+    async def test_verify_pgvector_extension_not_exists(self, mock_db):
+        """Test verify_pgvector_extension when extension doesn't exist."""
+        db, mock_conn, _ = mock_db
+        await db.connect()
+        
+        mock_conn.fetchval = AsyncMock(return_value=False)
+        
+        result = await db.verify_pgvector_extension()
+        
+        assert result is False
+
+    @pytest.mark.asyncio
+    async def test_verify_pgvector_extension_none_result(self, mock_db):
+        """Test verify_pgvector_extension with None result."""
+        db, mock_conn, _ = mock_db
+        await db.connect()
+        
+        mock_conn.fetchval = AsyncMock(return_value=None)
+        
+        result = await db.verify_pgvector_extension()
+        
+        assert result is False
+
+    @pytest.mark.asyncio
+    async def test_verify_pgvector_extension_auto_connect(self, mock_db):
+        """Test verify_pgvector_extension auto-connects if pool is None."""
+        db, mock_conn, _ = mock_db
+        db.pool = None
+        
+        mock_conn.fetchval = AsyncMock(return_value=True)
+        
+        result = await db.verify_pgvector_extension()
+        
+        assert result is True
+
+    @pytest.mark.asyncio
+    async def test_verify_pgvector_extension_postgres_error(self, mock_db):
+        """Test verify_pgvector_extension with PostgresError."""
+        db, mock_conn, _ = mock_db
+        await db.connect()
+        
+        mock_conn.fetchval = AsyncMock(side_effect=Exception("Postgres error"))
+        
+        result = await db.verify_pgvector_extension()
+        
+        assert result is False
+
+    @pytest.mark.asyncio
+    async def test_verify_pgvector_extension_connection_error(self, mock_db):
+        """Test verify_pgvector_extension with ConnectionError."""
+        db, _, _ = mock_db
+        db.pool = None
+        
+        with patch("src.core.postgresql_database.connection.asyncpg") as mock_asyncpg:
+            mock_asyncpg.create_pool = AsyncMock(side_effect=ConnectionError("Connection failed"))
+            mock_asyncpg.PostgresError = Exception
+            
+            result = await db.verify_pgvector_extension()
+            
+            assert result is False
+
+    @pytest.mark.asyncio
+    async def test_create_pgvector_extension_success(self, mock_db):
+        """Test create_pgvector_extension success."""
+        db, mock_conn, _ = mock_db
+        await db.connect()
+        
+        mock_conn.execute = AsyncMock(return_value="CREATE EXTENSION")
+        
+        result = await db.create_pgvector_extension()
+        
+        assert result is True
+        mock_conn.execute.assert_called_once()
+        # Verify IF NOT EXISTS is in the call
+        call_args = mock_conn.execute.call_args[0]
+        assert "CREATE EXTENSION IF NOT EXISTS vector" in call_args[0]
+
+    @pytest.mark.asyncio
+    async def test_create_pgvector_extension_auto_connect(self, mock_db):
+        """Test create_pgvector_extension auto-connects if pool is None."""
+        db, mock_conn, _ = mock_db
+        db.pool = None
+        
+        mock_conn.execute = AsyncMock(return_value="CREATE EXTENSION")
+        
+        result = await db.create_pgvector_extension()
+        
+        assert result is True
+
+    @pytest.mark.asyncio
+    async def test_create_pgvector_extension_postgres_error(self, mock_db):
+        """Test create_pgvector_extension with PostgresError."""
+        db, mock_conn, _ = mock_db
+        await db.connect()
+        
+        mock_conn.execute = AsyncMock(side_effect=Exception("Permission denied"))
+        
+        result = await db.create_pgvector_extension()
+        
+        assert result is False
+
+    @pytest.mark.asyncio
+    async def test_create_pgvector_extension_connection_error(self, mock_db):
+        """Test create_pgvector_extension with ConnectionError."""
+        db, _, _ = mock_db
+        db.pool = None
+        
+        with patch("src.core.postgresql_database.connection.asyncpg") as mock_asyncpg:
+            mock_asyncpg.create_pool = AsyncMock(side_effect=ConnectionError("Connection failed"))
+            mock_asyncpg.PostgresError = Exception
+            
+            result = await db.create_pgvector_extension()
+            
+            assert result is False
+
+    @pytest.mark.asyncio
+    async def test_health_check_success_with_extension(self, mock_db):
+        """Test health_check with successful connection and extension."""
+        db, mock_conn, _ = mock_db
+        await db.connect()
+        
+        mock_conn.fetchval = AsyncMock(side_effect=[1, True])  # connection check, extension check
+        
+        result = await db.health_check()
+        
+        assert result["connection"] is True
+        assert result["pgvector_extension"] is True
+        assert result["database"] == "test_db"
+
+    @pytest.mark.asyncio
+    async def test_health_check_success_without_extension(self, mock_db):
+        """Test health_check with successful connection but no extension."""
+        db, mock_conn, _ = mock_db
+        await db.connect()
+        
+        mock_conn.fetchval = AsyncMock(side_effect=[1, False])  # connection check, extension check
+        
+        result = await db.health_check()
+        
+        assert result["connection"] is True
+        assert result["pgvector_extension"] is False
+        assert result["database"] == "test_db"
+
+    @pytest.mark.asyncio
+    async def test_health_check_connection_failure(self, mock_db):
+        """Test health_check with connection failure."""
+        db, mock_conn, _ = mock_db
+        await db.connect()
+        
+        mock_conn.fetchval = AsyncMock(side_effect=Exception("Connection failed"))
+        
+        result = await db.health_check()
+        
+        assert result["connection"] is False
+        assert result["pgvector_extension"] is False
+        assert "database" in result
+
+    @pytest.mark.asyncio
+    async def test_connect_with_extension_verification_no_auto_create(self, mock_db):
+        """Test connect() verifies extension but doesn't create when auto_create_extension=False."""
+        db, mock_conn, _ = mock_db
+        db.config.auto_create_extension = False
+        
+        mock_conn.fetchval = AsyncMock(return_value=False)  # Extension doesn't exist
+        
+        with patch("logging.getLogger") as mock_get_logger:
+            mock_logger = MagicMock()
+            mock_get_logger.return_value = mock_logger
+            
+            await db.connect()
+            
+            # Should log warning but not fail
+            mock_logger.warning.assert_called_once()
+            assert "pgvector extension not found" in mock_logger.warning.call_args[0][0]
+
+    @pytest.mark.asyncio
+    async def test_connect_with_extension_verification_auto_create(self, mock_db):
+        """Test connect() creates extension when auto_create_extension=True."""
+        db, mock_conn, _ = mock_db
+        db.config.auto_create_extension = True
+        
+        mock_conn.fetchval = AsyncMock(return_value=False)  # Extension doesn't exist
+        mock_conn.execute = AsyncMock(return_value="CREATE EXTENSION")
+        
+        await db.connect()
+        
+        # Should attempt to create extension
+        mock_conn.execute.assert_called_once()
+        call_args = mock_conn.execute.call_args[0]
+        assert "CREATE EXTENSION IF NOT EXISTS vector" in call_args[0]
+
+    @pytest.mark.asyncio
+    async def test_connect_with_extension_exists(self, mock_db):
+        """Test connect() when extension already exists."""
+        db, mock_conn, _ = mock_db
+        db.config.auto_create_extension = False
+        
+        mock_conn.fetchval = AsyncMock(return_value=True)  # Extension exists
+        
+        await db.connect()
+        
+        # Should not log warning or create extension
+        mock_conn.execute.assert_not_called()
+
+    def test_database_config_auto_create_extension_default(self, db_config):
+        """Test DatabaseConfig auto_create_extension default value."""
+        assert db_config.auto_create_extension is False
+
+    def test_database_config_auto_create_extension_custom(self):
+        """Test DatabaseConfig with custom auto_create_extension."""
+        from src.core.postgresql_database import DatabaseConfig
+        
+        config = DatabaseConfig(auto_create_extension=True)
+        assert config.auto_create_extension is True
+
+    @pytest.mark.asyncio
+    async def test_connect_unexpected_error(self, db_config):
+        """Test connect() with unexpected error (not PostgresError)."""
+        with patch("src.core.postgresql_database.connection.asyncpg") as mock_asyncpg:
+            mock_asyncpg.create_pool = AsyncMock(side_effect=KeyError("Unexpected error"))
+            mock_asyncpg.PostgresError = Exception
+            
+            db = DatabaseConnection(config=db_config)
+            with pytest.raises(ConnectionError, match="Failed to create connection pool"):
+                await db.connect()
+
+    @pytest.mark.asyncio
+    async def test_execute_query_no_fetch_no_fetch_one(self, mock_db):
+        """Test execute_query with fetch_all=False and fetch_one=False."""
+        db, mock_conn, _ = mock_db
+        await db.connect()
+        
+        mock_conn.execute = AsyncMock(return_value="INSERT 0 5")
+        
+        result = await db.execute_query("INSERT INTO test VALUES ($1)", (1,), fetch_all=False, fetch_one=False)
+        
+        assert result == 5
+        mock_conn.execute.assert_called_once()
+
+    @pytest.mark.asyncio
+    async def test_check_connection_unexpected_exception(self, mock_db):
+        """Test check_connection with unexpected exception."""
+        db, mock_conn, _ = mock_db
+        await db.connect()
+        
+        mock_conn.fetchval = AsyncMock(side_effect=KeyError("Unexpected"))
+        
+        result = await db.check_connection()
+        
+        assert result is False
+
+    @pytest.mark.asyncio
+    async def test_create_pgvector_extension_pool_none_after_connect(self, mock_db):
+        """Test create_pgvector_extension when pool is None after connect."""
+        db, _, _ = mock_db
+        db.pool = None
+        
+        with patch("src.core.postgresql_database.connection.asyncpg") as mock_asyncpg:
+            mock_asyncpg.create_pool = AsyncMock(return_value=None)  # connect() returns None pool
+            mock_asyncpg.PostgresError = Exception
+            
+            result = await db.create_pgvector_extension()
+            
+            assert result is False
+
+    @pytest.mark.asyncio
+    async def test_verify_pgvector_extension_with_otel(self, mock_db):
+        """Test verify_pgvector_extension with OTEL integration."""
+        db, mock_conn, _ = mock_db
+        await db.connect()
+        
+        mock_conn.fetchval = AsyncMock(return_value=True)
+        
+        # Mock OTEL tracer
+        mock_tracer = MagicMock()
+        mock_trace = MagicMock()
+        mock_trace.set_attribute = MagicMock()
+        mock_tracer.start_trace = MagicMock(return_value=mock_trace)
+        mock_trace.__enter__ = MagicMock(return_value=mock_trace)
+        mock_trace.__exit__ = MagicMock(return_value=None)
+        
+        with patch("src.core.otel_integration.create_otel_tracer", return_value=mock_tracer):
+            result = await db.verify_pgvector_extension()
+            
+            assert result is True
+            mock_trace.set_attribute.assert_called()
+
+    @pytest.mark.asyncio
+    async def test_verify_pgvector_extension_otel_exception(self, mock_db):
+        """Test verify_pgvector_extension with OTEL and exception."""
+        db, mock_conn, _ = mock_db
+        await db.connect()
+        
+        mock_conn.fetchval = AsyncMock(side_effect=Exception("DB error"))
+        
+        # Mock OTEL tracer
+        mock_tracer = MagicMock()
+        mock_trace = MagicMock()
+        mock_trace.set_attribute = MagicMock()
+        mock_trace.record_exception = MagicMock()
+        mock_tracer.start_trace = MagicMock(return_value=mock_trace)
+        mock_trace.__enter__ = MagicMock(return_value=mock_trace)
+        mock_trace.__exit__ = MagicMock(return_value=None)
+        
+        with patch("src.core.otel_integration.create_otel_tracer", return_value=mock_tracer):
+            result = await db.verify_pgvector_extension()
+            
+            assert result is False
+            mock_trace.record_exception.assert_called_once()
+
+    @pytest.mark.asyncio
+    async def test_create_pgvector_extension_with_otel(self, mock_db):
+        """Test create_pgvector_extension with OTEL integration."""
+        db, mock_conn, _ = mock_db
+        await db.connect()
+        
+        mock_conn.execute = AsyncMock(return_value="CREATE EXTENSION")
+        
+        # Mock OTEL tracer
+        mock_tracer = MagicMock()
+        mock_trace = MagicMock()
+        mock_trace.set_attribute = MagicMock()
+        mock_tracer.start_trace = MagicMock(return_value=mock_trace)
+        mock_trace.__enter__ = MagicMock(return_value=mock_trace)
+        mock_trace.__exit__ = MagicMock(return_value=None)
+        
+        with patch("src.core.otel_integration.create_otel_tracer", return_value=mock_tracer):
+            result = await db.create_pgvector_extension()
+            
+            assert result is True
+            mock_trace.set_attribute.assert_called()
+
+    @pytest.mark.asyncio
+    async def test_create_pgvector_extension_otel_postgres_error(self, mock_db):
+        """Test create_pgvector_extension with OTEL and PostgresError."""
+        db, mock_conn, _ = mock_db
+        await db.connect()
+        
+        mock_conn.execute = AsyncMock(side_effect=Exception("Permission denied"))
+        
+        # Mock OTEL tracer
+        mock_tracer = MagicMock()
+        mock_trace = MagicMock()
+        mock_trace.set_attribute = MagicMock()
+        mock_trace.record_exception = MagicMock()
+        mock_tracer.start_trace = MagicMock(return_value=mock_trace)
+        mock_trace.__enter__ = MagicMock(return_value=mock_trace)
+        mock_trace.__exit__ = MagicMock(return_value=None)
+        
+        with patch("src.core.otel_integration.create_otel_tracer", return_value=mock_tracer):
+            result = await db.create_pgvector_extension()
+            
+            assert result is False
+            mock_trace.record_exception.assert_called_once()
+
+    @pytest.mark.asyncio
+    async def test_health_check_with_error(self, mock_db):
+        """Test health_check with exception."""
+        db, _, _ = mock_db
+        db.pool = None
+        
+        # Mock check_connection to raise exception directly in health_check
+        async def mock_check_connection():
+            raise Exception("Unexpected error")
+        
+        db.check_connection = mock_check_connection
+        
+        result = await db.health_check()
+        
+        assert result["connection"] is False
+        assert result["pgvector_extension"] is False
+        assert "error" in result
+        assert "Unexpected error" in result["error"]
+
+    @pytest.mark.asyncio
+    async def test_verify_pgvector_extension_unexpected_error(self, mock_db):
+        """Test verify_pgvector_extension with unexpected error."""
+        db, mock_conn, _ = mock_db
+        await db.connect()
+        
+        mock_conn.fetchval = AsyncMock(side_effect=KeyError("Unexpected error"))
+        
+        result = await db.verify_pgvector_extension()
+        
+        assert result is False
+
+    @pytest.mark.asyncio
+    async def test_verify_pgvector_extension_pool_none_after_connect(self, mock_db):
+        """Test verify_pgvector_extension when pool is None after connect."""
+        db, _, _ = mock_db
+        db.pool = None
+        
+        with patch("src.core.postgresql_database.connection.asyncpg") as mock_asyncpg:
+            mock_asyncpg.create_pool = AsyncMock(return_value=None)  # connect() returns None pool
+            mock_asyncpg.PostgresError = Exception
+            
+            result = await db.verify_pgvector_extension()
+            
+            assert result is False
+
+    @pytest.mark.asyncio
+    async def test_execute_query_pool_none_after_connect(self, mock_db):
+        """Test execute_query when pool is None after connect."""
+        db, _, _ = mock_db
+        db.pool = None
+        
+        with patch("src.core.postgresql_database.connection.asyncpg") as mock_asyncpg:
+            mock_asyncpg.create_pool = AsyncMock(return_value=None)  # connect() returns None pool
+            mock_asyncpg.PostgresError = Exception
+            
+            with pytest.raises(ConnectionError, match="Failed to establish database connection"):
+                await db.execute_query("SELECT 1")
+
+    @pytest.mark.asyncio
+    async def test_check_connection_pool_none_after_connect(self, mock_db):
+        """Test check_connection when pool is None after connect."""
+        db, _, _ = mock_db
+        db.pool = None
+        
+        with patch("src.core.postgresql_database.connection.asyncpg") as mock_asyncpg:
+            mock_asyncpg.create_pool = AsyncMock(return_value=None)  # connect() returns None pool
+            mock_asyncpg.PostgresError = Exception
+            
+            result = await db.check_connection()
+            
+            assert result is False
+
+    @pytest.mark.asyncio
+    async def test_create_pgvector_extension_postgres_error_outer(self, mock_db):
+        """Test create_pgvector_extension with PostgresError in outer catch."""
+        db, _, _ = mock_db
+        db.pool = None
+        
+        with patch("src.core.postgresql_database.connection.asyncpg") as mock_asyncpg:
+            mock_asyncpg.create_pool = AsyncMock(side_effect=Exception("Postgres error"))
+            mock_asyncpg.PostgresError = Exception
+            
+            result = await db.create_pgvector_extension()
+            
+            assert result is False
+
+    @pytest.mark.asyncio
+    async def test_verify_pgvector_extension_otel_exception_in_trace(self, mock_db):
+        """Test verify_pgvector_extension with OTEL and exception inside trace."""
+        db, mock_conn, _ = mock_db
+        await db.connect()
+        
+        mock_conn.fetchval = AsyncMock(side_effect=Exception("DB error"))
+        
+        # Mock OTEL tracer
+        mock_tracer = MagicMock()
+        mock_trace = MagicMock()
+        mock_trace.set_attribute = MagicMock()
+        mock_trace.record_exception = MagicMock()
+        mock_tracer.start_trace = MagicMock(return_value=mock_trace)
+        mock_trace.__enter__ = MagicMock(return_value=mock_trace)
+        mock_trace.__exit__ = MagicMock(return_value=None)
+        
+        with patch("src.core.otel_integration.create_otel_tracer", return_value=mock_tracer):
+            result = await db.verify_pgvector_extension()
+            
+            assert result is False
+            mock_trace.record_exception.assert_called_once()
+
+    @pytest.mark.asyncio
+    async def test_create_pgvector_extension_otel_exception_in_trace(self, mock_db):
+        """Test create_pgvector_extension with OTEL and exception inside trace."""
+        db, mock_conn, _ = mock_db
+        await db.connect()
+        
+        mock_conn.execute = AsyncMock(side_effect=KeyError("Unexpected error"))
+        
+        # Mock OTEL tracer
+        mock_tracer = MagicMock()
+        mock_trace = MagicMock()
+        mock_trace.set_attribute = MagicMock()
+        mock_trace.record_exception = MagicMock()
+        mock_tracer.start_trace = MagicMock(return_value=mock_trace)
+        mock_trace.__enter__ = MagicMock(return_value=mock_trace)
+        mock_trace.__exit__ = MagicMock(return_value=None)
+        
+        with patch("src.core.otel_integration.create_otel_tracer", return_value=mock_tracer):
+            result = await db.create_pgvector_extension()
+            
+            assert result is False
+            mock_trace.record_exception.assert_called_once()
+
+    @pytest.mark.asyncio
+    async def test_create_pgvector_extension_unexpected_error_outer(self, mock_db):
+        """Test create_pgvector_extension with unexpected error in outer catch."""
+        db, _, _ = mock_db
+        db.pool = None
+        
+        with patch("src.core.postgresql_database.connection.asyncpg") as mock_asyncpg:
+            mock_asyncpg.create_pool = AsyncMock(side_effect=KeyError("Unexpected error"))
+            mock_asyncpg.PostgresError = Exception
+            
+            result = await db.create_pgvector_extension()
+            
+            assert result is False
+
+    @pytest.mark.asyncio
+    async def test_health_check_exception_handling(self, mock_db):
+        """Test health_check with exception in try block."""
+        db, _, _ = mock_db
+        db.pool = None
+        
+        # Mock check_connection to raise exception
+        async def mock_check_connection():
+            raise ValueError("Health check error")
+        
+        db.check_connection = mock_check_connection
+        
+        result = await db.health_check()
+        
+        assert result["connection"] is False
+        assert result["pgvector_extension"] is False
+        assert "error" in result
+        assert "Health check error" in result["error"]
+
+    @pytest.mark.asyncio
+    async def test_check_connection_postgres_error_path(self, mock_db):
+        """Test check_connection with PostgresError path."""
+        db, mock_conn, _ = mock_db
+        await db.connect()
+        
+        # Use PostgresError specifically
+        from unittest.mock import patch
+        with patch.object(mock_conn, 'fetchval', new_callable=AsyncMock) as mock_fetchval:
+            mock_fetchval.side_effect = Exception("Postgres error")
+            # Make it raise PostgresError
+            import asyncpg
+            mock_fetchval.side_effect = asyncpg.PostgresError("Postgres error")
+            
+            result = await db.check_connection()
+            
+            assert result is False
+
+    @pytest.mark.asyncio
+    async def test_check_connection_connection_error_path(self, mock_db):
+        """Test check_connection with ConnectionError path."""
+        db, mock_conn, _ = mock_db
+        await db.connect()
+        
+        mock_conn.fetchval = AsyncMock(side_effect=ConnectionError("Connection error"))
+        
+        result = await db.check_connection()
+        
+        assert result is False
+
+    @pytest.mark.asyncio
+    async def test_verify_pgvector_extension_postgres_error_path(self, mock_db):
+        """Test verify_pgvector_extension with PostgresError path."""
+        db, mock_conn, _ = mock_db
+        await db.connect()
+        
+        import asyncpg
+        mock_conn.fetchval = AsyncMock(side_effect=asyncpg.PostgresError("Postgres error"))
+        
+        result = await db.verify_pgvector_extension()
+        
+        assert result is False
+
+    @pytest.mark.asyncio
+    async def test_verify_pgvector_extension_connection_error_path(self, mock_db):
+        """Test verify_pgvector_extension with ConnectionError path."""
+        db, mock_conn, _ = mock_db
+        await db.connect()
+        
+        mock_conn.fetchval = AsyncMock(side_effect=ConnectionError("Connection error"))
+        
+        result = await db.verify_pgvector_extension()
+        
+        assert result is False
+
+    @pytest.mark.asyncio
+    async def test_create_pgvector_extension_postgres_error_path(self, mock_db):
+        """Test create_pgvector_extension with PostgresError path."""
+        db, mock_conn, _ = mock_db
+        await db.connect()
+        
+        import asyncpg
+        mock_conn.execute = AsyncMock(side_effect=asyncpg.PostgresError("Permission denied"))
+        
+        result = await db.create_pgvector_extension()
+        
+        assert result is False
+
+    @pytest.mark.asyncio
+    async def test_execute_transaction_pool_none_after_connect(self, mock_db):
+        """Test execute_transaction when pool is None after connect."""
+        db, _, _ = mock_db
+        db.pool = None
+        
+        with patch("src.core.postgresql_database.connection.asyncpg") as mock_asyncpg:
+            mock_asyncpg.create_pool = AsyncMock(return_value=None)  # connect() returns None pool
+            mock_asyncpg.PostgresError = Exception
+            
+            with pytest.raises(ConnectionError, match="Failed to establish database connection"):
+                await db.execute_transaction([("SELECT 1", None)])
+
+    @pytest.mark.asyncio
+    async def test_verify_pgvector_extension_no_otel_path(self, mock_db):
+        """Test verify_pgvector_extension without OTEL (else branch)."""
+        db, mock_conn, _ = mock_db
+        await db.connect()
+        
+        mock_conn.fetchval = AsyncMock(return_value=True)
+        
+        # Ensure OTEL import fails
+        with patch("src.core.otel_integration.create_otel_tracer", side_effect=ImportError("OTEL not available")):
+            result = await db.verify_pgvector_extension()
+            
+            assert result is True
+            mock_conn.fetchval.assert_called_once()
+
+    @pytest.mark.asyncio
+    async def test_create_pgvector_extension_no_otel_path(self, mock_db):
+        """Test create_pgvector_extension without OTEL (else branch)."""
+        db, mock_conn, _ = mock_db
+        await db.connect()
+        
+        mock_conn.execute = AsyncMock(return_value="CREATE EXTENSION")
+        
+        # Ensure OTEL import fails
+        with patch("src.core.otel_integration.create_otel_tracer", side_effect=ImportError("OTEL not available")):
+            result = await db.create_pgvector_extension()
+            
+            assert result is True
+            mock_conn.execute.assert_called_once()
+
+    @pytest.mark.asyncio
+    async def test_check_connection_general_exception_path(self, mock_db):
+        """Test check_connection with general Exception path."""
+        db, mock_conn, _ = mock_db
+        await db.connect()
+        
+        # Use a non-PostgresError, non-ConnectionError exception
+        mock_conn.fetchval = AsyncMock(side_effect=KeyError("Unexpected"))
+        
+        result = await db.check_connection()
+        
+        assert result is False
+
+    def test_get_or_create_event_loop_runtime_error(self, db_config):
+        """Test _get_or_create_event_loop with RuntimeError."""
+        db = DatabaseConnection(config=db_config)
+        
+        # Clear any existing event loop
+        try:
+            loop = asyncio.get_event_loop()
+            if not loop.is_closed():
+                loop.close()
+        except RuntimeError:
+            pass
+        
+        # Mock get_event_loop to raise RuntimeError
+        with patch("asyncio.get_event_loop", side_effect=RuntimeError("No event loop")):
+            loop = db._get_or_create_event_loop()
+            
+            assert loop is not None
+            assert isinstance(loop, asyncio.AbstractEventLoop)
+
 
 class TestVectorOperations:
     """Test VectorOperations."""
@@ -541,6 +1218,8 @@ class TestVectorOperations:
         mock_db = MagicMock()
         mock_db.execute_query = AsyncMock()
         mock_db.execute_transaction = AsyncMock()
+        mock_db.verify_pgvector_extension = AsyncMock(return_value=True)
+        mock_db.check_connection = AsyncMock(return_value=True)
         return mock_db
 
     @pytest.fixture
@@ -745,12 +1424,364 @@ class TestVectorOperations:
         """Test update_embedding when embedding not found."""
         mock_db.execute_query.return_value = 0  # 0 rows updated
 
-        vector_ops = VectorOperations(mock_db)
+        vector_ops = VectorOperations(mock_db, verify_extension=False)
         new_embedding = [0.5] * 1536
 
         result = await vector_ops.update_embedding(embedding_id=999, new_embedding=new_embedding)
 
         assert result is False
+
+    @pytest.mark.asyncio
+    async def test_vector_operations_init_with_verify_extension(self, mock_db):
+        """Test VectorOperations initialization with extension verification."""
+        mock_db.verify_pgvector_extension = AsyncMock(return_value=True)
+        
+        vector_ops = VectorOperations(mock_db, verify_extension=True)
+        
+        # Extension should be verified on first operation
+        embedding = [0.1] * 1536
+        mock_db.execute_query.return_value = {"id": 1}
+        
+        await vector_ops.insert_embedding(document_id=1, embedding=embedding)
+        
+        # Extension should have been verified
+        mock_db.verify_pgvector_extension.assert_called_once()
+
+    @pytest.mark.asyncio
+    async def test_vector_operations_init_without_verify_extension(self, mock_db):
+        """Test VectorOperations initialization without extension verification."""
+        vector_ops = VectorOperations(mock_db, verify_extension=False)
+        
+        embedding = [0.1] * 1536
+        mock_db.execute_query.return_value = {"id": 1}
+        
+        await vector_ops.insert_embedding(document_id=1, embedding=embedding)
+        
+        # Extension should not have been verified
+        mock_db.verify_pgvector_extension.assert_not_called()
+
+    @pytest.mark.asyncio
+    async def test_vector_operations_extension_not_available(self, mock_db):
+        """Test VectorOperations when extension is not available."""
+        mock_db.verify_pgvector_extension = AsyncMock(return_value=False)
+        
+        vector_ops = VectorOperations(mock_db, verify_extension=True)
+        embedding = [0.1] * 1536
+        
+        with pytest.raises(RuntimeError, match="pgvector extension is not installed"):
+            await vector_ops.insert_embedding(document_id=1, embedding=embedding)
+
+    @pytest.mark.asyncio
+    async def test_validate_embedding_dimension_success(self, mock_db):
+        """Test embedding dimension validation with correct dimension."""
+        vector_ops = VectorOperations(mock_db, default_dimension=1536, verify_extension=False)
+        embedding = [0.1] * 1536
+        
+        # Should not raise
+        vector_ops._validate_embedding_dimension(embedding)
+
+    @pytest.mark.asyncio
+    async def test_validate_embedding_dimension_mismatch(self, mock_db):
+        """Test embedding dimension validation with wrong dimension."""
+        vector_ops = VectorOperations(mock_db, default_dimension=1536, verify_extension=False)
+        embedding = [0.1] * 768  # Wrong dimension
+        
+        with pytest.raises(ValueError, match="Embedding dimension mismatch"):
+            vector_ops._validate_embedding_dimension(embedding)
+
+    @pytest.mark.asyncio
+    async def test_validate_embedding_dimension_empty(self, mock_db):
+        """Test embedding dimension validation with empty embedding."""
+        vector_ops = VectorOperations(mock_db, verify_extension=False)
+        
+        with pytest.raises(ValueError, match="Embedding cannot be empty"):
+            vector_ops._validate_embedding_dimension([])
+
+    @pytest.mark.asyncio
+    async def test_validate_embedding_dimension_custom(self, mock_db):
+        """Test embedding dimension validation with custom expected dimension."""
+        vector_ops = VectorOperations(mock_db, default_dimension=1536, verify_extension=False)
+        embedding = [0.1] * 768
+        
+        # Should not raise with custom dimension
+        vector_ops._validate_embedding_dimension(embedding, expected_dim=768)
+
+    @pytest.mark.asyncio
+    async def test_insert_embedding_dimension_validation(self, mock_db):
+        """Test insert_embedding with dimension validation."""
+        vector_ops = VectorOperations(mock_db, verify_extension=False)
+        wrong_embedding = [0.1] * 768  # Wrong dimension
+        
+        with pytest.raises(ValueError, match="Embedding dimension mismatch"):
+            await vector_ops.insert_embedding(document_id=1, embedding=wrong_embedding)
+
+    @pytest.mark.asyncio
+    async def test_similarity_search_dimension_validation(self, mock_db):
+        """Test similarity_search with dimension validation."""
+        vector_ops = VectorOperations(mock_db, verify_extension=False)
+        wrong_query = [0.1] * 768  # Wrong dimension
+        
+        with pytest.raises(ValueError, match="Embedding dimension mismatch"):
+            await vector_ops.similarity_search(query_embedding=wrong_query)
+
+    @pytest.mark.asyncio
+    async def test_batch_insert_embeddings_dimension_validation(self, mock_db):
+        """Test batch_insert_embeddings with dimension validation."""
+        vector_ops = VectorOperations(mock_db, verify_extension=False)
+        embeddings_data = [
+            (1, [0.1] * 1536, "model1"),  # Correct
+            (2, [0.2] * 768, "model2"),   # Wrong dimension
+        ]
+        
+        with pytest.raises(ValueError, match="Embedding dimension mismatch"):
+            await vector_ops.batch_insert_embeddings(embeddings_data)
+
+    @pytest.mark.asyncio
+    async def test_update_embedding_dimension_validation(self, mock_db):
+        """Test update_embedding with dimension validation."""
+        vector_ops = VectorOperations(mock_db, verify_extension=False)
+        wrong_embedding = [0.5] * 768  # Wrong dimension
+        
+        with pytest.raises(ValueError, match="Embedding dimension mismatch"):
+            await vector_ops.update_embedding(embedding_id=1, new_embedding=wrong_embedding)
+
+    @pytest.mark.asyncio
+    async def test_health_check_success(self, mock_db):
+        """Test health_check with successful checks."""
+        mock_db.check_connection = AsyncMock(return_value=True)
+        mock_db.verify_pgvector_extension = AsyncMock(return_value=True)
+        
+        vector_ops = VectorOperations(mock_db, verify_extension=False)
+        
+        result = await vector_ops.health_check()
+        
+        assert result["connection"] is True
+        assert result["pgvector_extension"] is True
+        assert result["embedding_dal"] is True
+
+    @pytest.mark.asyncio
+    async def test_health_check_extension_missing(self, mock_db):
+        """Test health_check when extension is missing."""
+        mock_db.check_connection = AsyncMock(return_value=True)
+        mock_db.verify_pgvector_extension = AsyncMock(return_value=False)
+        
+        vector_ops = VectorOperations(mock_db, verify_extension=False)
+        
+        result = await vector_ops.health_check()
+        
+        assert result["connection"] is True
+        assert result["pgvector_extension"] is False
+        assert result["embedding_dal"] is True
+
+    @pytest.mark.asyncio
+    async def test_health_check_connection_failure(self, mock_db):
+        """Test health_check when connection fails."""
+        mock_db.check_connection = AsyncMock(return_value=False)
+        
+        vector_ops = VectorOperations(mock_db, verify_extension=False)
+        
+        result = await vector_ops.health_check()
+        
+        assert result["connection"] is False
+        assert result["pgvector_extension"] is False
+        assert result["embedding_dal"] is True
+
+    @pytest.mark.asyncio
+    async def test_health_check_exception(self, mock_db):
+        """Test health_check with exception."""
+        mock_db.check_connection = AsyncMock(side_effect=Exception("Connection error"))
+        
+        vector_ops = VectorOperations(mock_db, verify_extension=False)
+        
+        result = await vector_ops.health_check()
+        
+        assert result["connection"] is False
+        assert result["pgvector_extension"] is False
+        assert "error" in result
+
+    @pytest.mark.asyncio
+    async def test_insert_embedding_with_otel(self, mock_db):
+        """Test insert_embedding with OTEL integration."""
+        mock_db.execute_query.return_value = {"id": 1}
+        
+        # Mock OTEL tracer
+        mock_tracer = MagicMock()
+        mock_trace = MagicMock()
+        mock_trace.set_attribute = MagicMock()
+        mock_tracer.start_trace = MagicMock(return_value=mock_trace)
+        mock_trace.__enter__ = MagicMock(return_value=mock_trace)
+        mock_trace.__exit__ = MagicMock(return_value=None)
+        
+        vector_ops = VectorOperations(mock_db, verify_extension=False)
+        embedding = [0.1] * 1536
+        
+        with patch("src.core.otel_integration.create_otel_tracer", return_value=mock_tracer):
+            result = await vector_ops.insert_embedding(document_id=1, embedding=embedding)
+            
+            assert result == 1
+            mock_trace.set_attribute.assert_called()
+
+    @pytest.mark.asyncio
+    async def test_similarity_search_with_otel(self, mock_db):
+        """Test similarity_search with OTEL integration."""
+        mock_db.execute_query.return_value = [
+            {"id": 1, "document_id": 1, "similarity": 0.95, "content": "test"}
+        ]
+        
+        # Mock OTEL tracer
+        mock_tracer = MagicMock()
+        mock_trace = MagicMock()
+        mock_trace.set_attribute = MagicMock()
+        mock_tracer.start_trace = MagicMock(return_value=mock_trace)
+        mock_trace.__enter__ = MagicMock(return_value=mock_trace)
+        mock_trace.__exit__ = MagicMock(return_value=None)
+        
+        vector_ops = VectorOperations(mock_db, verify_extension=False)
+        query_embedding = [0.1] * 1536
+        
+        with patch("src.core.otel_integration.create_otel_tracer", return_value=mock_tracer):
+            results = await vector_ops.similarity_search(query_embedding=query_embedding)
+            
+            assert len(results) == 1
+            mock_trace.set_attribute.assert_called()
+
+    @pytest.mark.asyncio
+    async def test_batch_insert_embeddings_with_otel(self, mock_db):
+        """Test batch_insert_embeddings with OTEL integration."""
+        mock_db.execute_transaction.return_value = None
+        
+        # Mock OTEL tracer
+        mock_tracer = MagicMock()
+        mock_trace = MagicMock()
+        mock_trace.set_attribute = MagicMock()
+        mock_tracer.start_trace = MagicMock(return_value=mock_trace)
+        mock_trace.__enter__ = MagicMock(return_value=mock_trace)
+        mock_trace.__exit__ = MagicMock(return_value=None)
+        
+        vector_ops = VectorOperations(mock_db, verify_extension=False)
+        embeddings_data = [(1, [0.1] * 1536, "model1"), (2, [0.2] * 1536, "model2")]
+        
+        with patch("src.core.otel_integration.create_otel_tracer", return_value=mock_tracer):
+            await vector_ops.batch_insert_embeddings(embeddings_data)
+            
+            mock_trace.set_attribute.assert_called()
+
+    @pytest.mark.asyncio
+    async def test_update_embedding_with_otel(self, mock_db):
+        """Test update_embedding with OTEL integration."""
+        mock_db.execute_query.return_value = 1
+        
+        # Mock OTEL tracer
+        mock_tracer = MagicMock()
+        mock_trace = MagicMock()
+        mock_trace.set_attribute = MagicMock()
+        mock_tracer.start_trace = MagicMock(return_value=mock_trace)
+        mock_trace.__enter__ = MagicMock(return_value=mock_trace)
+        mock_trace.__exit__ = MagicMock(return_value=None)
+        
+        vector_ops = VectorOperations(mock_db, verify_extension=False)
+        new_embedding = [0.5] * 1536
+        
+        with patch("src.core.otel_integration.create_otel_tracer", return_value=mock_tracer):
+            result = await vector_ops.update_embedding(embedding_id=1, new_embedding=new_embedding)
+            
+            assert result is True
+            mock_trace.set_attribute.assert_called()
+
+    @pytest.mark.asyncio
+    async def test_ensure_extension_already_verified(self, mock_db):
+        """Test _ensure_extension when already verified (early return)."""
+        vector_ops = VectorOperations(mock_db, verify_extension=False)
+        vector_ops._extension_verified = True
+        
+        # Should return early without calling verify
+        await vector_ops._ensure_extension()
+        
+        mock_db.verify_pgvector_extension.assert_not_called()
+
+    @pytest.mark.asyncio
+    async def test_ensure_extension_no_otel_path(self, mock_db):
+        """Test _ensure_extension without OTEL (else branch)."""
+        mock_db.verify_pgvector_extension = AsyncMock(return_value=True)
+        
+        vector_ops = VectorOperations(mock_db, verify_extension=False)
+        
+        # Mock OTEL import to fail
+        with patch("src.core.otel_integration.create_otel_tracer", side_effect=ImportError("OTEL not available")):
+            await vector_ops._ensure_extension()
+            
+            assert vector_ops._extension_verified is True
+            mock_db.verify_pgvector_extension.assert_called_once()
+
+    @pytest.mark.asyncio
+    async def test_ensure_extension_no_otel_extension_missing(self, mock_db):
+        """Test _ensure_extension without OTEL when extension is missing."""
+        mock_db.verify_pgvector_extension = AsyncMock(return_value=False)
+        
+        vector_ops = VectorOperations(mock_db, verify_extension=False)
+        
+        # Mock OTEL import to fail
+        with patch("src.core.otel_integration.create_otel_tracer", side_effect=ImportError("OTEL not available")):
+            with pytest.raises(RuntimeError, match="pgvector extension is not installed"):
+                await vector_ops._ensure_extension()
+
+    @pytest.mark.asyncio
+    async def test_insert_embedding_no_otel_path(self, mock_db):
+        """Test insert_embedding without OTEL (else branch)."""
+        mock_db.execute_query.return_value = {"id": 1}
+        
+        vector_ops = VectorOperations(mock_db, verify_extension=False)
+        embedding = [0.1] * 1536
+        
+        # Mock OTEL import to fail
+        with patch("src.core.otel_integration.create_otel_tracer", side_effect=ImportError("OTEL not available")):
+            result = await vector_ops.insert_embedding(document_id=1, embedding=embedding)
+            
+            assert result == 1
+
+    @pytest.mark.asyncio
+    async def test_similarity_search_no_otel_path(self, mock_db):
+        """Test similarity_search without OTEL (else branch)."""
+        mock_db.execute_query.return_value = [
+            {"id": 1, "document_id": 1, "similarity": 0.95, "content": "test"}
+        ]
+        
+        vector_ops = VectorOperations(mock_db, verify_extension=False)
+        query_embedding = [0.1] * 1536
+        
+        # Mock OTEL import to fail
+        with patch("src.core.otel_integration.create_otel_tracer", side_effect=ImportError("OTEL not available")):
+            results = await vector_ops.similarity_search(query_embedding=query_embedding)
+            
+            assert len(results) == 1
+
+    @pytest.mark.asyncio
+    async def test_batch_insert_embeddings_no_otel_path(self, mock_db):
+        """Test batch_insert_embeddings without OTEL (else branch)."""
+        mock_db.execute_transaction.return_value = None
+        
+        vector_ops = VectorOperations(mock_db, verify_extension=False)
+        embeddings_data = [(1, [0.1] * 1536, "model1")]
+        
+        # Mock OTEL import to fail
+        with patch("src.core.otel_integration.create_otel_tracer", side_effect=ImportError("OTEL not available")):
+            await vector_ops.batch_insert_embeddings(embeddings_data)
+            
+            mock_db.execute_transaction.assert_called()
+
+    @pytest.mark.asyncio
+    async def test_update_embedding_no_otel_path(self, mock_db):
+        """Test update_embedding without OTEL (else branch)."""
+        mock_db.execute_query.return_value = 1
+        
+        vector_ops = VectorOperations(mock_db, verify_extension=False)
+        new_embedding = [0.5] * 1536
+        
+        # Mock OTEL import to fail
+        with patch("src.core.otel_integration.create_otel_tracer", side_effect=ImportError("OTEL not available")):
+            result = await vector_ops.update_embedding(embedding_id=1, new_embedding=new_embedding)
+            
+            assert result is True
 
 
     @pytest.mark.asyncio

@@ -189,8 +189,10 @@ The **Motadata Python AI SDK** is a production-ready, modular framework for buil
 - **Want to create agents/tools from natural language?** → Use [Prompt-Based Generator](src/core/prompt_based_generator/README.md)
 - **Answering questions from documents?** → Use [RAG System](src/core/rag/README.md)
 - **Want to reduce API costs?** → Use [Cache Mechanism](src/core/cache_mechanism/README.md)
-- **Need monitoring and debugging?** → Use [Observability](src/core/evaluation_observability/README.md)
+- **Need monitoring and debugging?** → Use [Observability](src/core/evaluation_observability/README.md) and [OTEL Integration](src/core/otel_integration/README.md)
 - **Managing prompts and templates?** → Use [Prompt Context Management](src/core/prompt_context_management/README.md)
+- **Need to validate LLM outputs?** → Use [Validation & Guardrails](src/core/validation/README.md)
+- **Want to collect user feedback?** → Use [Feedback Loop](src/core/feedback_loop/README.md)
 - **Deploying as microservices?** → Use [FaaS Services](src/faas/README.md)
 
 **For detailed guidance on each component, see their individual README files which include:**
@@ -208,7 +210,8 @@ For a simple, beginner-friendly explanation of how data flows through the SDK, s
 The SDK follows a layered architecture with clear separation of concerns:
 
 ### Foundation Layer
-- **Evaluation & Observability**: Provides tracing, logging, and metrics for all components
+- **Evaluation & Observability**: High-level observability interface for all components
+- **OpenTelemetry Integration**: Implementation layer for distributed tracing, metrics, and context propagation
 
 ### Infrastructure Layer
 - **LiteLLM Gateway**: Unified interface for multiple LLM providers
@@ -256,6 +259,9 @@ motadata-python-ai-sdk/
 │   │   ├── prompt_context_management/
 │   │   ├── prompt_based_generator/  # Prompt-based agent/tool creation
 │   │   ├── evaluation_observability/
+│   │   ├── otel_integration/        # OpenTelemetry integration
+│   │   ├── feedback_loop/           # Feedback collection system
+│   │   ├── validation/              # Validation & guardrails framework
 │   │   └── cache_mechanism/
 │   ├── faas/                    # FaaS Services (API Layer)
 │   │   ├── services/            # AI Component Services
@@ -385,9 +391,36 @@ motadata-python-ai-sdk/
    - **Fallback Templates** to ensure continuity if a template is not found
 
 7. **Evaluation & Observability** (`src/core/evaluation_observability/`)
+   - High-level observability interface
    - Distributed tracing
    - Structured logging
    - Metrics collection
+   - Uses **OTEL Integration** (`src/core/otel_integration/`) as implementation layer
+
+8. **OpenTelemetry Integration** (`src/core/otel_integration/`)
+   - OpenTelemetry tracer and metrics implementation
+   - Distributed tracing with context propagation
+   - Auto-instrumentation for FastAPI, HTTP clients, databases
+   - Tenant context middleware
+   - Baggage propagation
+   - See [OTEL Integration README](src/core/otel_integration/README.md) for details
+
+9. **Feedback Loop System** (`src/core/feedback_loop/`)
+   - User feedback collection and processing
+   - Multiple feedback types (correction, rating, useful, improvement, error)
+   - Learning insights extraction
+   - Persistent feedback storage
+   - Multi-tenant support
+   - See [Feedback Loop README](src/core/feedback_loop/README.md) for details
+
+10. **Validation & Guardrails** (`src/core/validation/`)
+    - LLM output validation and guardrails
+    - Content filtering (PII, secrets, blocked patterns)
+    - Format validation (JSON, ITSM formats)
+    - Compliance checking (ITIL, security policies)
+    - Custom validators support
+    - Multiple validation levels (STRICT, MODERATE, LENIENT)
+    - See [Validation README](src/core/validation/README.md) for details
 
 8. **Cache Mechanism** (`src/core/cache_mechanism/`)
    - Response, embedding, and query result caching
@@ -534,6 +567,7 @@ The SDK requires the following key libraries (automatically installed with requi
 - **opentelemetry**: Observability and tracing
 - **httpx/aiohttp**: Async HTTP clients
 - **dragonfly**: Caching backend (optional, Redis-compatible)
+- **Note**: `aioredis==2.0.1` has Python 3.12 compatibility issues. The cache mechanism gracefully falls back to in-memory cache if `aioredis` is unavailable. For Python 3.12, use in-memory cache or wait for `aioredis` compatibility updates.
 
 See `requirements.txt` for complete dependency list.
 
