@@ -182,20 +182,23 @@ result = rag.query("What is machine learning?")  # Second call - from cache
 The RAG system supports **hybrid retrieval strategies** that combine multiple search methods:
 
 1. **Vector Search**: Semantic similarity using embeddings
-2. **Keyword Search**: Traditional text matching
+2. **Keyword Search**: Traditional text matching using DocumentDAL (DAL-first architecture)
 3. **Hybrid**: Combines both with weighted scoring
+
+**Architecture Note:** Keyword search uses the `DocumentDAL.keyword_search()` method, following the SDK's DAL-first architecture pattern. This ensures all database operations go through the Data Access Layer rather than direct SQL queries.
 
 **Benefits:**
 - Better recall for diverse query types
 - Improved accuracy for exact matches
 - Balanced results combining semantic and keyword relevance
+- Proper architectural separation through DAL layer
 
 **Example:**
 ```python
 # Vector-only retrieval (default)
 result = rag.query("What is AI?", retrieval_strategy="vector")
 
-# Hybrid retrieval (vector + keyword)
+# Hybrid retrieval (vector + keyword via DocumentDAL)
 result = rag.query("What is AI?", retrieval_strategy="hybrid")
 ```
 
@@ -515,9 +518,10 @@ The `DocumentProcessor` class handles document preprocessing:
 The `Retriever` class performs document retrieval:
 - **Query Embedding**: Converts text queries into vector embeddings using the gateway
 - **Similarity Search**: Uses the database's vector operations to find similar documents
-- **Hybrid Retrieval**: Combines vector similarity and keyword search for better results
+- **Hybrid Retrieval**: Combines vector similarity and keyword search (via DocumentDAL) for better results
 - **Result Filtering**: Applies metadata filters to refine search results
 - **Query Optimization**: Supports query rewriting and caching for improved performance
+- **DAL-First Architecture**: All database operations go through DocumentDAL, ensuring proper architectural separation
 
 ### RAGGenerator
 
@@ -531,10 +535,11 @@ The `RAGGenerator` class generates context-aware responses:
 The `RAGSystem` class integrates all components:
 - **Document Ingestion**: Orchestrates the complete document ingestion pipeline
 - **Query Processing**: Handles end-to-end query processing from retrieval to generation
-- **Document Management**: Supports document updates and deletion with automatic re-processing
+- **Document Management**: Supports document updates and deletion with automatic re-processing (uses VectorOperations.delete_embeddings via DAL)
 - **Query Optimization**: Implements query rewriting and caching for better performance
-- **Hybrid Retrieval**: Supports multiple retrieval strategies (vector, keyword, hybrid)
+- **Hybrid Retrieval**: Supports multiple retrieval strategies (vector, keyword via DocumentDAL, hybrid)
 - **Component Coordination**: Manages interactions between processor, retriever, and generator
+- **DAL-First Architecture**: All database operations use appropriate DALs (DocumentDAL, EmbeddingDAL) rather than direct SQL
 
 ## Document Ingestion Flow
 

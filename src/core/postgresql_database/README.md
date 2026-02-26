@@ -63,6 +63,7 @@ The `DatabaseConnection` class manages database connectivity and provides:
 - **Query Execution**: Provides safe methods for executing queries with proper error handling
 - **Transaction Management**: Supports transactions for atomic operations
 - **Connection Health Checks**: Validates database connectivity
+- **pgvector Extension Management**: Automatically verifies and optionally creates pgvector extension on connection
 
 ### VectorOperations Class
 
@@ -95,6 +96,19 @@ The database is configured through the `DatabaseConfig` class, which supports:
 - Database connection parameters (host, port, database name, credentials)
 - Connection pool sizing (minimum and maximum connections)
 - Connection timeout settings
+- **pgvector Extension Management**: `auto_create_extension` option to automatically create pgvector extension on connection
+
+**Example:**
+```python
+config = DatabaseConfig(
+    host="localhost",
+    port=5432,
+    database="mydb",
+    user="postgres",
+    password="password",
+    auto_create_extension=True  # Automatically create pgvector extension if missing
+)
+```
 
 Configuration can be loaded from environment variables, enabling flexible deployment across different environments.
 
@@ -552,15 +566,18 @@ The `DatabaseConnection` class provides robust PostgreSQL connectivity with conn
 
 #### Key Methods
 
-##### `connect() -> None`
+##### `async def connect() -> None`
 
 Establishes database connection and creates connection pool.
 
 **Process:**
-1. Parses connection string
-2. Creates connection pool
-3. Validates connection
-4. Sets up health monitoring
+1. Creates async connection pool
+2. Validates connection
+3. Verifies pgvector extension
+4. Optionally creates pgvector extension if `auto_create_extension=True`
+5. Sets up health monitoring
+
+**Note:** The `connect()` method automatically verifies the pgvector extension. If the extension is missing and `auto_create_extension=True` in the config, it will attempt to create it automatically.
 
 ##### `execute_query(query, parameters=None, tenant_id=None) -> List[Dict[str, Any]]`
 
@@ -605,11 +622,57 @@ Commits the current transaction.
 
 Rolls back the current transaction.
 
-##### `check_health() -> Dict[str, Any]`
+##### `async def check_health() -> Dict[str, Any]`
 
-Checks database connection health.
+Checks database connection health, including pgvector extension status.
 
-**Returns:** Dictionary with health status
+**Returns:** Dictionary with health status including:
+- `connection`: Boolean indicating connection status
+- `database`: Database name
+- `pgvector_extension`: Boolean indicating if pgvector extension is installed
+- `error`: Optional error message if health check fails
+
+**Example:**
+```python
+health = await db.health_check()
+# Returns:
+# {
+#     "connection": True,
+#     "database": "mydb",
+#     "pgvector_extension": True
+# }
+```
+
+##### `async def verify_pgvector_extension() -> bool`
+
+Verifies if the pgvector extension is installed in the database.
+
+**Returns:** `True` if extension exists, `False` otherwise
+
+**Example:**
+```python
+if await db.verify_pgvector_extension():
+    print("pgvector extension is installed")
+else:
+    print("pgvector extension not found")
+```
+
+##### `async def create_pgvector_extension() -> bool`
+
+Creates the pgvector extension in the database.
+
+**Returns:** `True` if extension was created successfully, `False` otherwise
+
+**Raises:**
+- `PostgresError`: If extension creation fails (e.g., insufficient permissions)
+
+**Example:**
+```python
+if await db.create_pgvector_extension():
+    print("pgvector extension created successfully")
+else:
+    print("Failed to create pgvector extension")
+```
 
 ##### `close() -> None`
 
@@ -672,10 +735,22 @@ results = db.execute_query(
 ##### Health Monitoring
 
 ```python
-# Check health
-health = db.check_health()
-if health["status"] == "healthy":
-    print("Database is operational")
+# Check health (includes pgvector status)
+health = await db.health_check()
+if health.get("connection") and health.get("pgvector_extension"):
+    print("Database is operational with pgvector support")
+elif health.get("connection"):
+    print("Database is operational but pgvector extension is missing")
+else:
+    print("Database connection failed")
+
+# Verify pgvector extension
+if await db.verify_pgvector_extension():
+    print("pgvector extension is available")
+else:
+    # Create extension if needed
+    if await db.create_pgvector_extension():
+        print("pgvector extension created")
 ```
 
 ### VectorOperations Class
@@ -685,8 +760,11 @@ The `VectorOperations` class provides vector database operations for storing, re
 #### Core Attributes
 
 - `db`: Database connection instance
-- `table_name`: Table name for embeddings (default: "embeddings")
-- `dimension`: Vector dimension
+- `embedding_dal`: EmbeddingDAL instance for database operations (DAL-first architecture)
+- `default_dimension`: Default embedding dimension for validation (default: 1536)
+- `_verify_on_first_operation`: Flag to verify pgvector extension on first operation
+
+**Note:** VectorOperations automatically verifies the pgvector extension on first use if `verify_extension=True` (default). It also validates embedding dimensions to ensure consistency.
 
 #### Key Methods
 
@@ -741,6 +819,27 @@ Deletes embedding for a document.
 - `tenant_id`: Optional tenant ID
 
 **Returns:** Boolean indicating success
+
+##### `async def health_check() -> Dict[str, Any]`
+
+Performs health check for vector operations, including connection, pgvector extension, and EmbeddingDAL status.
+
+**Returns:** Dictionary with health status:
+- `connection`: Boolean indicating database connection status
+- `pgvector_extension`: Boolean indicating if pgvector extension is available
+- `embedding_dal`: Boolean indicating if EmbeddingDAL is initialized
+- `error`: Optional error message if health check fails
+
+**Example:**
+```python
+health = await vector_ops.health_check()
+# Returns:
+# {
+#     "connection": True,
+#     "pgvector_extension": True,
+#     "embedding_dal": True
+# }
+```
 
 #### Usage Examples
 

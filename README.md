@@ -639,6 +639,35 @@ OTEL_EXPORTER_OTLP_ENDPOINT=http://localhost:4317
 
 ### Step 4: Set Up PostgreSQL with pgvector
 
+**Option A: Using SDK Setup Module (Recommended)**
+
+```python
+from src.core.postgresql_database import DatabaseConnection, DatabaseConfig, setup_database
+
+# Create database connection
+config = DatabaseConfig(
+    host="localhost",
+    port=5432,
+    database="motadata_sdk",
+    user="postgres",
+    password="password",
+    auto_create_extension=True  # Automatically create pgvector extension
+)
+db = DatabaseConnection(config)
+await db.connect()
+
+# Initialize database with pgvector, tables, and indexes
+results = await setup_database(db, config={
+    "dimension": 1536,
+    "index_type": "ivfflat",
+    "create_extension": True,
+    "create_tables": True,
+    "create_indexes": True
+})
+```
+
+**Option B: Manual Setup**
+
 ```bash
 # Install pgvector extension in PostgreSQL
 # Connect to your database and run:
@@ -647,6 +676,8 @@ CREATE EXTENSION IF NOT EXISTS vector;
 # Or using psql:
 psql -U your-username -d motadata_sdk -c "CREATE EXTENSION IF NOT EXISTS vector;"
 ```
+
+See [PostgreSQL Database README](src/core/postgresql_database/README.md) for complete setup documentation.
 
 ### Step 5: Verify Installation
 
