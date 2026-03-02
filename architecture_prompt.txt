@@ -1,0 +1,58 @@
+You are a Principal Enterprise Architect preparing a production IT architecture deck
+for Department Heads and Senior Architects.
+
+Context
+- This is a Python SDK and core platform modules for a SaaS platform in the ITSM domain.
+- The goal is to produce an enterprise-grade architecture presentation that is technically defensible.
+- Do NOT write a code walkthrough. Do NOT invent features.
+- Hard rule: distinguish clearly between (A) what is evidenced in code and (B) recommended improvements.
+
+Operating method (mandatory)
+1) Start from the repo entry points: README.md, pyproject.toml/requirements, docs/, CI/CD files, then src/ top-level modules.
+2) Build a module map: folder → responsibility → key public APIs → dependencies (imports) → cross-cutting concerns.
+3) For every architectural claim, include evidence with file paths + symbols (class/function names) or config keys.
+4) If a capability is not provable from code/config, mark it as “Not evidenced” and treat it as a gap.
+
+Output format
+Produce TWO deliverables in one Markdown file:
+
+DELIVERABLE 1 — Slide-ready Architecture Deck (10–14 slides)
+For each slide provide:
+- Slide Title
+- 3–6 crisp bullets
+- Speaker Notes (what I say to senior architects)
+- Evidence (file paths / modules that support the slide)
+
+Slides required (in this order):
+1. Executive Overview (problem, why this architecture, current maturity)
+2. C4 Context (system boundary, users, external systems)
+3. C4 Container (SDK, services/FaaS, DB/cache/LLM gateway, observability)
+4. C4 Component (top 6–10 components/modules and their contracts)
+5. Dependency Direction & Boundaries (what can import what; why)
+6. Request Lifecycle (end-to-end flow; sync vs async)
+7. Data Architecture (ownership, schemas, tenancy model, caching)
+8. Security Architecture (authn/authz patterns, secrets, encryption, audit)
+9. Resilience (timeouts, retries, circuit breakers, backpressure, failover)
+10. Scalability & Performance (hot paths, bottlenecks, scaling levers)
+11. DevOps & Release Engineering (CI/CD, versioning, packaging, environments)
+12. Governance & Compliance Readiness (auditability, policy controls, change management)
+13. Risks & Gaps (code-derived gaps + impact + remediation)
+14. Evolution Roadmap (modular monolith → service seams, AI readiness, platformization)
+
+DELIVERABLE 2 — Architecture Appendix (for architects)
+- Module catalog table: module, purpose, key classes/functions, dependencies in/out, tenancy handling, failure handling.
+- Cross-cutting concerns inventory: logging, OTEL, caching, rate limits, retries, config strategy.
+- “As-Is vs To-Be” matrix: capability, current evidence, risk, recommended change.
+
+Diagrams (Mermaid, required)
+Generate Mermaid diagrams for:
+A) C4 Context
+B) C4 Container
+C) Component dependency graph (imports/boundaries)
+D) Request lifecycle sequence
+E) Multi-tenant isolation model (as-is if present; otherwise proposed with a clear “gap” label)
+
+Tone
+- Executive-ready, but engineered. Minimal fluff.
+- Tell it like it is: call out gaps and operational risks directly.
+- No generic SaaS claims unless backed by evidence in the repo.
