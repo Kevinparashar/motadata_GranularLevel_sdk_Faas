@@ -167,14 +167,16 @@ Each layer has a single responsibility. Requests flow **down** from Layer 1 → 
 
 ### Layer 2 — Orchestration
 
-**Purpose:** Decide **what** to do (intent) and **where** to send the request (which service + endpoint). Optionally serve from cache. Call the target service over HTTP with retries and circuit breaker.
+**Purpose:** Decide **what** to do (intent) and **where** to send the request (which service + endpoint). Optionally serve from cache. Call the target service (over HTTP in the diagram, or in-process—see note below).
+
+**Why the doc shows an HTTP client and internal APIs:** The diagram and layer descriptions use the **internal-microservices** style: the orchestrator calls each capability (Agent, RAG, Prompt, etc.) over HTTP via a Service HTTP Client. This matches a deployment where each service is a separate process and you want independent scaling or deployment. **You do not need HTTP between AI components.** The only HTTP that is required is at the **edge** (API Gateway for external access). The alternative is a **single process**: one entrypoint receives requests from the API Gateway, and the “orchestrator” is just a router that calls Layer 4 (Agent Framework, RAG System, etc.) **in-process** (function calls, no internal HTTP). So: internal HTTP is a **design choice**; the doc describes one valid option. If your engine is one app, think of “Service HTTP Client” as “call the selected module in-process” and “Layer 3” as “that module’s entrypoints” rather than separate HTTP servers.
 
 | Component | What it does | Example |
 |-----------|----------------|--------|
 | **Query Router** | Classifies the request into an intent (e.g. by path, body, or a small classifier). No LLM required for this step in the basic design. | `POST /summarize-ticket` + body `{ "ticket_id": "TKT-5432" }` → intent = `AGENT_TASK` or `summarize_ticket`. |
 | **Service Selector** | Maps intent to a target service and endpoint. | Intent `summarize_ticket` → Agent Service, `POST /execute` with payload `{ "task_type": "summarize", "ticket_id": "TKT-5432" }`. |
 | **Unified Cache** | Before calling the service, builds a cache key (e.g. tenant + operation + entity id). Checks Dragonfly (or other cache). On hit, returns cached response and skips Layer 3/4/5 and LLM. | Key `tenant_acme:summarize:TKT-5432` → cache hit → return cached summary and `cached: true`; no Agent/RAG/LLM call. |
-| **Service HTTP Client** | Calls the selected service (e.g. Agent Service) with retry and circuit breaker. Returns response or propagates error. | `POST http://agent-service/execute` with retry 2 times; if service is down, circuit opens and returns 503 after fast-fail. |
+| **Service HTTP Client** | In the **internal-HTTP** variant: calls the selected service over HTTP with retry and circuit breaker. In the **single-process** variant: invokes the selected module in-process (no HTTP). | Internal HTTP: `POST http://agent-service/execute` with retry; in-process: call agent module’s execute with same payload. |
 
 **Example flow:** Query Router says "summarize_ticket" → Service Selector says "Agent Service /execute" → Cache get `tenant_acme:summarize:TKT-5432` → miss → Service Client calls Agent Service → response flows back.
 
@@ -182,7 +184,7 @@ Each layer has a single responsibility. Requests flow **down** from Layer 1 → 
 
 ### Layer 3 — AI services
 
-**Purpose:** Stateless HTTP APIs that implement one capability each (agents, RAG, prompts, cache, ML, ingestion, LLMOps). They use **Layer 4** (core logic) and **Layer 5** (DALs) and the **AI Gateway** (LLM) to do the work.
+**Purpose:** Stateless APIs (exposed as HTTP in the internal-microservices variant, or as in-process modules in the single-app variant) that implement one capability each (agents, RAG, prompts, cache, ML, ingestion, LLMOps). They use **Layer 4** (core logic) and **Layer 5** (DALs) and the **AI Gateway** (LLM) to do the work.
 
 | Service | Responsibility | Example |
 |---------|-----------------|--------|
